@@ -1,5 +1,10 @@
 <template>
   <div :class="['container', theme]">
+    <!--协议同意按钮 -->
+    <button v-if="showAgreeButton" class="agree-button" :class="{ 'show-animation': isAnimationReady }" @click="agreeWithTerms">
+      ✅ 我已阅读并同意协议
+    </button>
+
     <!-- 主题切换按钮 -->
     <button class="theme-toggle" @click="toggleTheme">
       <span v-if="theme === 'dark'">🌕 切换明亮</span>
@@ -9,7 +14,7 @@
     <!-- 页面头部 -->
     <header class="header">
       <h1>暗夜守护者用户协议</h1>
-      <p class="version-info">版本 1.0 - 最后更新：2023年10月</p>
+      <p>版本 1.0 - 最后更新：2023年10月</p>
     </header>
 
     <!-- 协议内容 -->
@@ -42,6 +47,10 @@ export default {
     return {
       theme: 'dark', // 默认主题
       showScrollButton: false,
+      showAgreeButton: false, // 协议按钮显示状态
+      agreeTimer: null, // 定时器引用
+      isAnimationReady: false, // 动画就绪状态
+      agreeInProgress: false, // 防止重复提交
       sections: [
         {
           title: '1. 协议概述',
@@ -77,8 +86,16 @@ export default {
     // 监听滚动事件
     window.addEventListener('scroll', this.handleScroll)
     
-    // 检查当前主题样式是否存在
+    // 检查当前主题样式
     this.checkCurrentTheme()
+
+    // 设置5秒后显示同意按钮
+    this.agreeTimer = setTimeout(() => {
+      this.showAgreeButton = true
+      this.$nextTick(() => {
+        this.isAnimationReady = true
+      })
+    }, 5000)
   },
   methods: {
     // 初始化主题设置
@@ -112,17 +129,84 @@ export default {
     
     // 检查当前主题并应用样式
     checkCurrentTheme() {
-      document.documentElement.className = this.theme
+      document.documentElement.classList.remove('dark-theme', 'light-theme')
+      document.documentElement.classList.add(this.theme + '-theme')
+    },
+
+    // 协议同意处理
+    agreeWithTerms() {
+      // 防止重复提交
+      if (this.agreeInProgress) return
+      this.agreeInProgress = true
+
+      // 保存同意状态
+      localStorage.setItem('agreedToTerms', 'true')
+      
+      // 获取按钮元素
+      const btn = this.$el.querySelector('.agree-button')
+      if (btn) btn.innerText = '✅ 正在处理...'
+
+      // 模拟处理过程
+      setTimeout(() => {
+        // 移除按钮
+        this.showAgreeButton = false
+        
+        // 路由跳转安全检查
+        if (this.$router && this.$router.app.$options.router) {
+          this.$router.push('/dashboard').catch(() => {})
+        } else {
+          console.warn('Vue Router未初始化，跳转被阻止')
+          alert('感谢您的同意！')
+        }
+
+        this.agreeInProgress = false
+      }, 800)
     }
   },
   beforeUnmount() {
     // 移除事件监听
     window.removeEventListener('scroll', this.handleScroll)
+    
+    // 清除定时器
+    if (this.agreeTimer) {
+      clearTimeout(this.agreeTimer)
+    }
+    
+    // 清理数据引用
+    this.sections = null
   }
 }
 </script>
 
 <style>
+/* === 统一CSS变量定义 === */
+:root {
+  /* 暗黑模式默认值 */
+  --bg-color: #121212;
+  --text-color: #ffffff;
+  --text-muted: #bbb;
+  --accent-color: #212121;
+  --border-color: #333;
+}
+
+:root.dark-theme {
+  /* 暗黑模式专属 */
+  --bg-color: #121212;
+  --text-color: #ffffff;
+  --text-muted: #bbb;
+  --accent-color: #212121;
+  --border-color: #333;
+}
+
+:root.light-theme {
+  /* 明亮模式专属 */
+  --bg-color: #ffffff;
+  --text-color: #333333;
+  --text-muted: #666;
+  --accent-color: #2196f3;
+  --border-color: #ddd;
+}
+
 /* 基础样式 */
 .container {
   max-width: 1000px;
@@ -132,10 +216,10 @@ export default {
   transition: all 0.5s ease-in-out;
 }
 
-/* 暗黑主题 */
+/* 暗黑主题样式 */
 .dark {
-  background-color: #121212;
-  color: #e0e0e0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -153,10 +237,10 @@ export default {
   border-radius: 8px;
 }
 
-/* 明亮主题 */
+/* 明亮主题样式 */
 .light {
-  background-color: #ffffff;
-  color: #333333;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -193,14 +277,8 @@ export default {
   transition: color 0.5s ease;
 }
 
-.version-info {
-  color: var(--text-muted);
-  font-size: 1.1em;
-  transition: color 0.5s ease;
-}
-
 .header p {
-  color: rgba(255,255,255,0.8);
+  color: var(--text-muted);
   font-size: 1.1em;
   transition: color 0.5s ease;
 }
@@ -245,12 +323,13 @@ export default {
   border-radius: 5px;
   cursor: pointer;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  transition: opacity 0.3s, transform 0.3s;
-  z-index: 100;
+  transition: all 0.3s ease;
+  z-index: 99;
 }
 
 .scroll-top:hover {
   transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* 主题切换按钮 */
@@ -274,10 +353,51 @@ export default {
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* 协议同意按钮样式 */
+.agree-button {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+  font-size: 16px;
+  z-index: 101;
+  opacity: 0;
+  animation: none;
+}
+
+.agree-button.show-animation {
+  animation: fadeInUp 0.5s ease forwards;
+  animation-delay: 0.3s;
+}
+
+.agree-button:hover {
+  transform: translateX(-50%) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+
 /* 动画 */
 @keyframes fadeIn {
   from {opacity: 0;}
   to {opacity: 1;}
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 :deep(ul), :deep(ol) {
@@ -298,30 +418,5 @@ export default {
   .header {
     padding: 20px 15px;
   }
-}
-
-/* CSS变量 */
-.dark {
-  --bg-color: #121212;
-  --text-color: #ffffff;
-  --text-muted: #666;
-  --accent-color: #212121;
-  --border-color: #333;
-}
-
-.dark .header {
-  background: linear-gradient(145deg, #1a1a1a, #121212);
-}
-
-.light {
-  --bg-color: #ffffff;
-  --text-color: #333;
-  --text-muted: #666;
-  --accent-color: #2196f3;
-  --border-color: #ddd;
-}
-
-.light .header {
-  background: linear-gradient(145deg, #f0f0f0, #ffffff);
 }
 </style>
