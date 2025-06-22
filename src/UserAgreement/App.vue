@@ -9,7 +9,7 @@
     <!-- 页面头部 -->
     <header class="header">
       <h1>暗夜守护者用户协议</h1>
-      <p>版本 1.0 - 最后更新：2023年10月</p>
+      <p class="version-info">版本 1.0 - 最后更新：2023年10月</p>
     </header>
 
     <!-- 协议内容 -->
@@ -189,6 +189,13 @@ export default {
   margin: 0;
   font-size: 2.5em;
   margin-bottom: 10px;
+  color: var(--text-color);
+  transition: color 0.5s ease;
+}
+
+.version-info {
+  color: var(--text-muted);
+  font-size: 1.1em;
   transition: color 0.5s ease;
 }
 
@@ -263,7 +270,8 @@ export default {
 }
 
 .theme-toggle:hover {
-  transform: rotate(360deg);
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* 动画 */
