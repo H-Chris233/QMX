@@ -151,16 +151,32 @@ export default {
         // 移除按钮
         this.showAgreeButton = false
         
-        // 路由跳转安全检查
-        if (this.$router && this.$router.app.$options.router) {
-          this.$router.push('/dashboard').catch(() => {})
-        } else {
-          console.warn('Vue Router未初始化，跳转被阻止')
-          alert('感谢您的同意！')
-        }
+        // 打开主应用窗口
+        this.openMainWindow()
 
         this.agreeInProgress = false
       }, 800)
+    },
+
+    // 打开主应用窗口
+    async openMainWindow() {
+      try {
+        if (window.__TAURI__) {
+          const { invoke } = window.__TAURI__.tauri
+          await invoke('open_main_window')
+          // 关闭当前协议窗口
+          const { getCurrentWindow } = window.__TAURI__.window
+          await getCurrentWindow().close()
+        } else {
+          // 开发环境下的处理 - 切换到主应用
+          alert('感谢您的同意！正在启动主应用...')
+          // 重新加载应用显示主界面
+          location.reload()
+        }
+      } catch (error) {
+        console.error('打开主窗口失败:', error)
+        alert('感谢您的同意！主应用启动失败，请重试。')
+      }
     }
   },
   beforeUnmount() {

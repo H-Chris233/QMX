@@ -1,0 +1,683 @@
+<template>
+  <div class="student-management">
+    <div class="section-header">
+      <h2>学员管理</h2>
+      <button class="add-btn" @click="showAddModal = true">
+        ➕ 添加学员
+      </button>
+    </div>
+
+    <!-- 搜索和筛选 -->
+    <div class="search-filter">
+      <div class="search-box">
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="搜索学员姓名、电话..."
+          @input="filterStudents"
+        >
+      </div>
+      <div class="filter-options">
+        <select v-model="classFilter" @change="filterStudents">
+          <option value="">全部课程</option>
+          <option value="TenTry">体验课</option>
+          <option value="Month">月卡</option>
+          <option value="Year">年卡</option>
+          <option value="Others">其他</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 学员列表 -->
+    <div class="students-table">
+      <table>
+        <thead>
+          <tr>
+            <th>姓名</th>
+            <th>年龄</th>
+            <th>电话</th>
+            <th>课程</th>
+            <th>射击记录</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="student in filteredStudents" :key="student.uid">
+            <td>{{ student.name }}</td>
+            <td>{{ student.age }}</td>
+            <td>{{ student.phone }}</td>
+            <td>
+              <span :class="['class-badge', getClassType(student.class)]">
+                {{ getClassText(student.class) }}
+              </span>
+            </td>
+            <td>{{ student.rings.length }} 次记录</td>
+            <td class="actions">
+              <button class="score-btn" @click="showScoreModal(student)">🎯</button>
+              <button class="edit-btn" @click="editStudent(student)">✏️</button>
+              <button class="delete-btn" @click="deleteStudent(student.uid)">🗑️</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 统计信息 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>总学员数</h3>
+        <div class="stat-value">{{ totalStudents }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>体验课学员</h3>
+        <div class="stat-value">{{ trialStudents }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>月卡学员</h3>
+        <div class="stat-value">{{ monthlyStudents }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>年卡学员</h3>
+        <div class="stat-value">{{ yearlyStudents }}</div>
+      </div>
+    </div>
+
+    <!-- 添加/编辑学员模态框 -->
+    <div v-if="showAddModal || showEditModal" class="modal-overlay" @click="closeModals">
+      <div class="modal" @click.stop>
+        <div class="modal-header">
+          <h3>{{ showAddModal ? '添加学员' : '编辑学员' }}</h3>
+          <button class="close-btn" @click="closeModals">✖️</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>姓名</label>
+            <input v-model="currentStudent.name" type="text" placeholder="请输入学员姓名">
+          </div>
+          <div class="form-group">
+            <label>年龄</label>
+            <input v-model.number="currentStudent.age" type="number" placeholder="请输入年龄" min="1" max="120">
+          </div>
+          <div class="form-group">
+            <label>电话</label>
+            <input v-model="currentStudent.phone" type="tel" placeholder="请输入电话号码">
+          </div>
+          <div class="form-group">
+            <label>课程类型</label>
+            <select v-model="currentStudent.classType">
+              <option value="">请选择课程</option>
+              <option value="TenTry">体验课 (10次)</option>
+              <option value="Month">月卡</option>
+              <option value="Year">年卡</option>
+              <option value="Others">其他</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeModals">取消</button>
+          <button class="save-btn" @click="saveStudent">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加分数模态框 -->
+    <div v-if="showScoreModalFlag" class="modal-overlay" @click="closeScoreModal">
+      <div class="modal" @click.stop>
+        <div class="modal-header">
+          <h3>添加射击成绩 - {{ currentScoreStudent.name }}</h3>
+          <button class="close-btn" @click="closeScoreModal">✖️</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>射击成绩 (环数)</label>
+            <input v-model.number="newScore" type="number" placeholder="请输入环数" min="0" max="10.9" step="0.1">
+          </div>
+          <div class="recent-scores">
+            <h4>最近成绩</h4>
+            <div class="scores-list">
+              <span v-for="(score, index) in recentScores" :key="index" class="score-tag">
+                {{ score }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeScoreModal">取消</button>
+          <button class="save-btn" @click="addScore">添加成绩</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, computed, onMounted } from 'vue'
+import { ApiService } from '../api/ApiService'
+
+export default {
+  name: 'StudentManagement',
+  setup() {
+    const students = ref([])
+    const searchQuery = ref('')
+    const classFilter = ref('')
+    const showAddModal = ref(false)
+    const showEditModal = ref(false)
+    const showScoreModalFlag = ref(false)
+    const currentStudent = ref({
+      uid: null,
+      name: '',
+      age: '',
+      phone: '',
+      classType: ''
+    })
+    const currentScoreStudent = ref({})
+    const newScore = ref('')
+    const recentScores = ref([])
+
+    const filteredStudents = computed(() => {
+      let filtered = students.value
+      
+      if (searchQuery.value) {
+        filtered = filtered.filter(student => 
+          student.name.includes(searchQuery.value) || 
+          student.phone.includes(searchQuery.value)
+        )
+      }
+      
+      if (classFilter.value) {
+        filtered = filtered.filter(student => student.class === classFilter.value)
+      }
+      
+      return filtered
+    })
+
+    const totalStudents = computed(() => students.value.length)
+    const trialStudents = computed(() => students.value.filter(s => s.class === 'TenTry').length)
+    const monthlyStudents = computed(() => students.value.filter(s => s.class === 'Month').length)
+    const yearlyStudents = computed(() => students.value.filter(s => s.class === 'Year').length)
+
+    const getClassText = (classType) => {
+      const classMap = {
+        'TenTry': '体验课',
+        'Month': '月卡',
+        'Year': '年卡',
+        'Others': '其他'
+      }
+      return classMap[classType] || classType
+    }
+
+    const getClassType = (classType) => {
+      return classType.toLowerCase()
+    }
+
+    const filterStudents = () => {
+      // 搜索逻辑已通过computed属性实现
+    }
+
+    const loadStudents = async () => {
+      try {
+        const data = await ApiService.getAllStudents()
+        students.value = data
+      } catch (error) {
+        console.error('加载学员数据失败:', error)
+        alert('加载学员数据失败')
+      }
+    }
+
+    const editStudent = (student) => {
+      currentStudent.value = {
+        uid: student.uid,
+        name: student.name,
+        age: student.age,
+        phone: student.phone,
+        classType: student.class
+      }
+      showEditModal.value = true
+    }
+
+    const deleteStudent = async (uid) => {
+      if (confirm('确定要删除这个学员吗？')) {
+        try {
+          await ApiService.deleteStudent(uid)
+          await loadStudents() // 重新加载数据
+        } catch (error) {
+          console.error('删除学员失败:', error)
+          alert('删除学员失败')
+        }
+      }
+    }
+
+    const saveStudent = async () => {
+      if (!currentStudent.value.name || !currentStudent.value.age || !currentStudent.value.phone) {
+        alert('请填写必要信息')
+        return
+      }
+
+      try {
+        if (showAddModal.value) {
+          // 添加新学员
+          await ApiService.addStudent(
+            currentStudent.value.name,
+            currentStudent.value.age,
+            currentStudent.value.classType || 'Others',
+            currentStudent.value.phone
+          )
+        } else {
+          // 编辑现有学员
+          await ApiService.updateStudentInfo(currentStudent.value.uid, {
+            name: currentStudent.value.name,
+            age: currentStudent.value.age,
+            classType: currentStudent.value.classType,
+            phone: currentStudent.value.phone
+          })
+        }
+
+        await loadStudents() // 重新加载数据
+        closeModals()
+      } catch (error) {
+        console.error('保存学员失败:', error)
+        alert('保存学员失败')
+      }
+    }
+
+    const showScoreModal = async (student) => {
+      currentScoreStudent.value = student
+      try {
+        const scores = await ApiService.getStudentScores(student.uid)
+        recentScores.value = scores.slice(-10) // 显示最近10次成绩
+        showScoreModalFlag.value = true
+      } catch (error) {
+        console.error('获取成绩失败:', error)
+        recentScores.value = []
+      }
+    }
+
+    const addScore = async () => {
+      if (!newScore.value || newScore.value < 0 || newScore.value > 10.9) {
+        alert('请输入有效的成绩 (0-10.9)')
+        return
+      }
+
+      try {
+        await ApiService.addScore(currentScoreStudent.value.uid, newScore.value)
+        await loadStudents() // 重新加载数据
+        closeScoreModal()
+      } catch (error) {
+        console.error('添加成绩失败:', error)
+        alert('添加成绩失败')
+      }
+    }
+
+    const closeModals = () => {
+      showAddModal.value = false
+      showEditModal.value = false
+      currentStudent.value = {
+        uid: null,
+        name: '',
+        age: '',
+        phone: '',
+        classType: ''
+      }
+    }
+
+    const closeScoreModal = () => {
+      showScoreModalFlag.value = false
+      currentScoreStudent.value = {}
+      newScore.value = ''
+      recentScores.value = []
+    }
+
+    onMounted(() => {
+      loadStudents()
+    })
+
+    return {
+      students,
+      filteredStudents,
+      searchQuery,
+      classFilter,
+      showAddModal,
+      showEditModal,
+      showScoreModalFlag,
+      currentStudent,
+      currentScoreStudent,
+      newScore,
+      recentScores,
+      totalStudents,
+      trialStudents,
+      monthlyStudents,
+      yearlyStudents,
+      getClassText,
+      getClassType,
+      filterStudents,
+      editStudent,
+      deleteStudent,
+      saveStudent,
+      showScoreModal,
+      addScore,
+      closeModals,
+      closeScoreModal
+    }
+  }
+}
+</script>
+
+<style scoped>
+.student-management {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.add-btn {
+  background-color: var(--accent-secondary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.add-btn:hover {
+  background-color: #45a049;
+  transform: translateY(-1px);
+}
+
+.search-filter {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.search-box input {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  width: 300px;
+}
+
+.filter-options select {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.students-table {
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.students-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.students-table th,
+.students-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.students-table th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.students-table tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.class-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.class-badge.tentry {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+}
+
+.class-badge.month {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.class-badge.year {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.class-badge.others {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.score-btn, .edit-btn, .delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.score-btn:hover {
+  background-color: #4caf50;
+  color: white;
+}
+
+.edit-btn:hover {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.delete-btn:hover {
+  background-color: var(--accent-danger);
+  color: white;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background-color: var(--bg-secondary);
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.stat-card h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background-color: var(--bg-primary);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.recent-scores {
+  margin-top: 1rem;
+}
+
+.recent-scores h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.scores-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.score-tag {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.cancel-btn, .save-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.cancel-btn {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.save-btn {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.cancel-btn:hover {
+  background-color: var(--border-color);
+}
+
+.save-btn:hover {
+  background-color: #1976d2;
+}
+
+@media (max-width: 768px) {
+  .search-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-box input {
+    width: 100%;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .students-table {
+    overflow-x: auto;
+  }
+  
+  .students-table table {
+    min-width: 600px;
+  }
+}
+</style>

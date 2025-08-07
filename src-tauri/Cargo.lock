@@ -2757,7 +2757,6 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "tauri",
 ]
 
 [[package]]
