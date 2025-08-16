@@ -2,7 +2,7 @@
   <div class="score-management">
     <div class="section-header">
       <h2>分数管理</h2>
-      <button class="refresh-btn" @click="loadData">
+      <button class="refresh-btn" @click="loadData" title="快捷键: F5">
         🔄 刷新
       </button>
     </div>
@@ -10,7 +10,7 @@
     <!-- 学员选择和快速添加 -->
     <div class="quick-add-section">
       <div class="student-selector">
-        <select v-model="selectedStudent" @change="onStudentChange">
+        <select v-model="selectedStudent" @change="onStudentChange" ref="studentSelect">
           <option value="">选择学员</option>
           <option v-for="student in students" :key="student.uid" :value="student.uid">
             {{ student.name }} ({{ student.age }}岁)
@@ -102,11 +102,8 @@
       <div class="batch-operations">
         <h4>批量操作</h4>
         <div class="batch-buttons">
-          <button class="batch-btn" @click="exportScores">
+          <button class="batch-btn" @click="exportScores" title="快捷键: Ctrl+E">
             📊 导出成绩
-          </button>
-          <button class="batch-btn danger" @click="clearAllScores">
-            🗑️ 清空记录
           </button>
         </div>
       </div>
@@ -124,7 +121,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ApiService } from '../api/ApiService'
 
 export default {
@@ -134,6 +131,7 @@ export default {
     const selectedStudent = ref('')
     const selectedStudentData = ref(null)
     const quickScore = ref('')
+    const studentSelect = ref(null)
 
     const recentScores = computed(() => {
       if (!selectedStudentData.value) return []
@@ -243,17 +241,35 @@ export default {
       document.body.removeChild(link)
     }
 
-    const clearAllScores = () => {
-      if (!selectedStudentData.value) return
-      
-      if (confirm(`确定要清空 ${selectedStudentData.value.name} 的所有成绩记录吗？此操作不可恢复！`)) {
-        // 注意：这里需要后端提供清空成绩的API
-        alert('清空功能需要后端API支持')
+  
+    // 键盘事件处理
+    const handleKeyDown = (event) => {
+      // F5 刷新
+      if (event.key === 'F5') {
+        event.preventDefault()
+        loadData()
+      }
+      // Ctrl+E 导出
+      else if (event.ctrlKey && event.key === 'e') {
+        event.preventDefault()
+        exportScores()
+      }
+      // Ctrl+L 聚焦学员选择
+      else if (event.ctrlKey && event.key === 'l') {
+        event.preventDefault()
+        if (studentSelect.value) {
+          studentSelect.value.focus()
+        }
       }
     }
 
     onMounted(() => {
       loadData()
+      window.addEventListener('keydown', handleKeyDown)
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('keydown', handleKeyDown)
     })
 
     return {
@@ -261,6 +277,7 @@ export default {
       selectedStudent,
       selectedStudentData,
       quickScore,
+      studentSelect,
       recentScores,
       averageScore,
       maxScore,
@@ -270,8 +287,7 @@ export default {
       loadData,
       onStudentChange,
       addQuickScore,
-      exportScores,
-      clearAllScores
+      exportScores
     }
   }
 }
@@ -563,13 +579,6 @@ export default {
   transform: translateY(-1px);
 }
 
-.batch-btn.danger {
-  background-color: var(--accent-danger);
-}
-
-.batch-btn.danger:hover {
-  background-color: #d32f2f;
-}
 
 .no-selection {
   flex: 1;
