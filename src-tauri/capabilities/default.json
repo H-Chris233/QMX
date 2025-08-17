@@ -6,5 +6,10 @@
   "permissions": [
     "core:default",
     "opener:default"
+  ],
+  "platforms": [
+    "linux",
+    "macOS",
+    "windows"
   ]
 }

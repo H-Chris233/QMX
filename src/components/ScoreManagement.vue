@@ -121,7 +121,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
 
 export default {
@@ -132,6 +132,7 @@ export default {
     const selectedStudentData = ref(null)
     const quickScore = ref('')
     const studentSelect = ref(null)
+    const { showError } = inject('errorHandler')
 
     const recentScores = computed(() => {
       if (!selectedStudentData.value) return []
@@ -177,7 +178,7 @@ export default {
         students.value = data
       } catch (error) {
         console.error('加载学员数据失败:', error)
-        alert('加载学员数据失败')
+        showError('加载失败', '加载学员数据时发生错误', error.message)
       }
     }
 
@@ -198,18 +199,18 @@ export default {
         }
       } catch (error) {
         console.error('加载学员成绩失败:', error)
-        alert('加载学员成绩失败')
+        showError('获取失败', '加载学员成绩时发生错误', error.message)
       }
     }
 
     const addQuickScore = async () => {
       if (!selectedStudent.value || !quickScore.value) {
-        alert('请选择学员并输入成绩')
+        showError('输入错误', '请选择学员并输入成绩')
         return
       }
 
       if (quickScore.value < 0 || quickScore.value > 10.9) {
-        alert('请输入有效的成绩 (0-10.9)')
+        showError('输入错误', '请输入有效的成绩 (0-10.9)')
         return
       }
 
@@ -219,7 +220,7 @@ export default {
         await onStudentChange() // 重新加载成绩
       } catch (error) {
         console.error('添加成绩失败:', error)
-        alert('添加成绩失败')
+        showError('添加失败', '添加学员成绩时发生错误', error.message)
       }
     }
 

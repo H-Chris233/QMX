@@ -45,13 +45,14 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
 
 export default {
   name: 'Dashboard',
   setup() {
     const loading = ref(false)
+    const { showError } = inject('errorHandler')
     
     // 仪表盘数据
     const dashboardData = ref({
@@ -83,12 +84,12 @@ export default {
           totalRevenue: stats.total_revenue || 0,
           activeStudents: stats.total_students || 0,
           averageGrade: stats.average_score || 0,
-          activeCourses: 0 // 后端暂时不提供这个字段
+          activeCourses: stats.active_courses || 0
         }
 
       } catch (error) {
         console.error('加载仪表盘数据失败:', error)
-        alert('加载仪表盘数据失败')
+        showError('加载失败', '加载仪表盘数据时发生错误', error.message)
       } finally {
         loading.value = false
       }

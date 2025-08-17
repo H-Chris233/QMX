@@ -153,7 +153,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
 
 export default {
@@ -176,6 +176,7 @@ export default {
     const newScore = ref('')
     const recentScores = ref([])
     const searchInput = ref(null)
+    const { showError } = inject('errorHandler')
 
     const filteredStudents = computed(() => {
       let filtered = students.value
@@ -223,7 +224,7 @@ export default {
         students.value = data
       } catch (error) {
         console.error('加载学员数据失败:', error)
-        alert('加载学员数据失败')
+        showError('加载失败', '加载学员数据时发生错误', error.message)
       }
     }
 
@@ -245,14 +246,14 @@ export default {
           await loadStudents() // 重新加载数据
         } catch (error) {
           console.error('删除学员失败:', error)
-          alert('删除学员失败')
+          showError('删除失败', '删除学员时发生错误', error.message)
         }
       }
     }
 
     const saveStudent = async () => {
       if (!currentStudent.value.name || !currentStudent.value.age || !currentStudent.value.phone) {
-        alert('请填写必要信息')
+        showError('输入错误', '请填写学员姓名、年龄和电话等必要信息')
         return
       }
 
@@ -279,7 +280,7 @@ export default {
         closeModals()
       } catch (error) {
         console.error('保存学员失败:', error)
-        alert('保存学员失败')
+        showError('保存失败', '保存学员信息时发生错误', error.message)
       }
     }
 
@@ -291,13 +292,14 @@ export default {
         showScoreModalFlag.value = true
       } catch (error) {
         console.error('获取成绩失败:', error)
+        showError('获取失败', '获取学员成绩时发生错误', error.message)
         recentScores.value = []
       }
     }
 
     const addScore = async () => {
       if (!newScore.value || newScore.value < 0 || newScore.value > 10.9) {
-        alert('请输入有效的成绩 (0-10.9)')
+        showError('输入错误', '请输入有效的成绩 (0-10.9)')
         return
       }
 
@@ -307,7 +309,7 @@ export default {
         closeScoreModal()
       } catch (error) {
         console.error('添加成绩失败:', error)
-        alert('添加成绩失败')
+        showError('添加失败', '添加学员成绩时发生错误', error.message)
       }
     }
 

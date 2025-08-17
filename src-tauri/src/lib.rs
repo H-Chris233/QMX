@@ -1,5 +1,5 @@
 // src-tauri/src/main.rs
-use tauri::WindowBuilder;
+use tauri::{WindowBuilder, Manager};
 use qmx_backend_lib::{database, student, cash};
 use qmx_backend_lib::init::init;
 use qmx_backend_lib::save::save;
@@ -28,10 +28,23 @@ fn get_db() -> Result<database::Database, String> {
 
 // 窗口管理命令
 #[tauri::command]
-fn open_settings_window(app: tauri::AppHandle) {
-    let _ = WindowBuilder::new(&app, "settings")
+async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    let _window = WindowBuilder::new(&app, "settings")
         .title("设置")
-        .build();
+        .inner_size(600.0, 500.0)
+        .min_inner_size(400.0, 300.0)
+        .center()
+        .build()
+        .map_err(|e| format!("创建窗口失败: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn close_settings_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_window("settings") {
+        let _ = window.close();
+    }
 }
 
 #[tauri::command]
@@ -281,36 +294,16 @@ fn get_dashboard_stats() -> Result<HashMap<String, serde_json::Value>, String> {
     init_database()?;
     
     let db = get_db()?;
+    let dashboard_stats = qmx_backend_lib::get_dashboard_stats(&db.student, &db.cash)
+        .map_err(|e| format!("获取仪表盘统计失败: {}", e))?;
+    
     let mut stats = HashMap::new();
-    
-    // 学员总数
-    let total_students = db.student.len();
-    stats.insert("total_students".to_string(), serde_json::Value::Number(serde_json::Number::from(total_students)));
-    
-    // 总收入
-    let total_revenue: i32 = db.cash.iter().filter(|(_, cash)| cash.cash > 0).map(|(_, cash)| cash.cash).sum();
-    stats.insert("total_revenue".to_string(), serde_json::Value::Number(serde_json::Number::from(total_revenue)));
-    
-    // 总支出
-    let total_expense: i32 = db.cash.iter().filter(|(_, cash)| cash.cash < 0).map(|(_, cash)| cash.cash.abs()).sum();
-    stats.insert("total_expense".to_string(), serde_json::Value::Number(serde_json::Number::from(total_expense)));
-    
-    // 平均分数
-    let all_scores: Vec<f64> = db.student.iter()
-        .flat_map(|(_, person)| person.rings().clone())
-        .collect();
-    
-    let avg_score = if all_scores.is_empty() {
-        0.0
-    } else {
-        let sum: f64 = all_scores.iter().sum();
-        sum / all_scores.len() as f64
-    };
-    stats.insert("average_score".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(avg_score).unwrap()));
-    
-    // 最高分数
-    let max_score = all_scores.iter().fold(0.0_f64, |acc, &score| acc.max(score));
-    stats.insert("max_score".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(max_score).unwrap()));
+    stats.insert("total_students".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.total_students)));
+    stats.insert("total_revenue".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.total_revenue)));
+    stats.insert("total_expense".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.total_expense)));
+    stats.insert("average_score".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(dashboard_stats.average_score).unwrap()));
+    stats.insert("max_score".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(dashboard_stats.max_score).unwrap()));
+    stats.insert("active_courses".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.active_courses)));
     
     Ok(stats)
 }
@@ -320,6 +313,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             open_settings_window, 
+            close_settings_window,
             open_main_window,
             add_student,
             get_all_students,

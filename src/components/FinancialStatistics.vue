@@ -117,7 +117,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
 
 export default {
@@ -133,6 +133,7 @@ export default {
       student_id: null
     })
     const loading = ref(false)
+    const { showError } = inject('errorHandler')
 
     const filteredTransactions = computed(() => {
       let filtered = transactions.value
@@ -184,7 +185,7 @@ export default {
         
       } catch (error) {
         console.error('加载交易数据失败:', error)
-        alert('加载交易数据失败')
+        showError('加载失败', '加载交易数据时发生错误', error.message)
       } finally {
         loading.value = false
       }
@@ -192,7 +193,7 @@ export default {
 
     const saveTransaction = async () => {
       if (!currentTransaction.value.amount || currentTransaction.value.amount <= 0) {
-        alert('请输入有效金额')
+        showError('输入错误', '请输入有效金额')
         return
       }
 
@@ -212,7 +213,7 @@ export default {
         
       } catch (error) {
         console.error('保存交易失败:', error)
-        alert('保存交易失败')
+        showError('保存失败', '保存交易时发生错误', error.message)
       }
     }
 
@@ -223,7 +224,7 @@ export default {
           await loadTransactions()
         } catch (error) {
           console.error('删除交易失败:', error)
-          alert('删除交易失败')
+          showError('删除失败', '删除交易记录时发生错误', error.message)
         }
       }
     }
