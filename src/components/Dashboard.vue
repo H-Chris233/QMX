@@ -33,13 +33,6 @@
         </div>
       </div>
 
-      <div class="metric-card">
-        <div class="metric-icon courses">📚</div>
-        <div class="metric-content">
-          <h3>班级数量</h3>
-          <div class="metric-value">{{ activeCourses }}</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -58,15 +51,13 @@ export default {
     const dashboardData = ref({
       totalRevenue: 0,
       activeStudents: 0,
-      averageGrade: 0,
-      activeCourses: 0
+      averageGrade: 0
     })
 
     // 计算属性
     const totalRevenue = computed(() => dashboardData.value.totalRevenue)
     const activeStudents = computed(() => dashboardData.value.activeStudents)
     const averageGrade = computed(() => dashboardData.value.averageGrade)
-    const activeCourses = computed(() => dashboardData.value.activeCourses)
 
     // 方法
     const formatNumber = (num) => {
@@ -83,8 +74,7 @@ export default {
         dashboardData.value = {
           totalRevenue: stats.total_revenue || 0,
           activeStudents: stats.total_students || 0,
-          averageGrade: stats.average_score || 0,
-          activeCourses: stats.active_courses || 0
+          averageGrade: stats.average_score || 0
         }
 
       } catch (error) {
@@ -104,7 +94,6 @@ export default {
       totalRevenue,
       activeStudents,
       averageGrade,
-      activeCourses,
       formatNumber,
       loadDashboardData
     }
@@ -181,7 +170,6 @@ export default {
 .metric-icon.revenue { color: #4caf50; }
 .metric-icon.students { color: #2196f3; }
 .metric-icon.grades { color: #ff9800; }
-.metric-icon.courses { color: #9c27b0; }
 
 .metric-content h3 {
   margin: 0 0 0.5rem 0;
