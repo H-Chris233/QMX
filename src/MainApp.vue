@@ -1,29 +1,55 @@
 <template>
   <div :class="['main-app', theme]">
-    <!-- 顶部导航栏 -->
+    <!-- 顶部导航栏（同时承载移动端侧边栏触发按钮） -->
     <nav class="navbar">
-      <div class="nav-brand">
-        <h1>启明星管理系统</h1>
-      </div>
+  <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
+  <div class="nav-mobile-header">
+    <h1>启明星管理系统</h1>
+    <button class="sidebar-toggle" @click.stop="toggleSidebar">☰</button>
+  </div>
+
+  <!-- 大屏：原有水平导航菜单（≥769px 显示） -->
+  <div class="nav-menu-desktop">
+    <div 
+      v-for="item in menuItems" 
+      :key="item.id"
+      :class="['nav-menu-item', { active: activeTab === item.id }]"
+      @click="activeTab = item.id"
+    >
+      <span class="nav-menu-icon">{{ item.icon }}</span>
+      <span class="nav-menu-text">{{ item.label }}</span>
+    </div>
+  </div>
+
+  <!-- 移动端：侧边栏（≤768px 显示，抽屉式展开） -->
+  <aside 
+    class="sidebar" 
+    :class="{ 'sidebar-open': isSidebarOpen }"
+  >
+    <div class="sidebar-header">
+      <h2>启明星</h2>
+      <button class="sidebar-close" @click="toggleSidebar">×</button>
+    </div>
+    <ul class="sidebar-menu">
+      <li 
+        v-for="item in menuItems" 
+        :key="item.id"
+        :class="{ active: activeTab === item.id }"
+        @click="handleSidebarItemClick(item.id)"
+      >
+        <span class="sidebar-icon">{{ item.icon }}</span>
+        <span class="sidebar-text">{{ item.label }}</span>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- 遮罩层：独立于侧边栏，作为 navbar 子元素 -->
+  <div 
+    class="sidebar-overlay" 
+    :class="{ 'sidebar-overlay-show': isSidebarOpen }"
+    @click="toggleSidebar"
+  ></div>
       
-      <!-- 水平导航菜单 -->
-      <div class="nav-menu">
-        <div 
-          v-for="item in menuItems" 
-          :key="item.id"
-          :class="['nav-menu-item', { active: activeTab === item.id }]"
-          @click="activeTab = item.id"
-        >
-          <span class="nav-menu-icon">{{ item.icon }}</span>
-          <span class="nav-menu-text">{{ item.label }}</span>
-        </div>
-      </div>
-      
-      <div class="nav-actions">
-        <button class="settings-btn" @click="openSettings">
-          ⚙️ 设置
-        </button>
-      </div>
     </nav>
 
     <!-- 主内容区域 -->
@@ -100,15 +126,25 @@ export default {
     })
 
     const menuItems = [
-      { id: 'dashboard', label: '仪表盘', icon: '📊' },
-      { id: 'students', label: '学员管理', icon: '👥' },
-      { id: 'finance', label: '收支统计', icon: '💰' },
-      { id: 'scores', label: '分数管理', icon: '🎯' }
-    ]
-
+  { id: 'dashboard', label: '仪表盘', icon: '📊' },
+  { id: 'students', label: '学员管理', icon: '👥' },
+  { id: 'finance', label: '收支统计', icon: '💰' },
+  { id: 'scores', label: '分数管理', icon: '🎯' },
+  { id: 'settings', label: '设置', icon: '⚙️' } // 新增「设置」菜单项
+]
     
+    // 新增：侧边栏展开状态 + 交互方法
+    const isSidebarOpen = ref(false)
+    const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value
+  console.log('侧边栏状态：' + isSidebarOpen.value) // 调试用
+}
+    const handleSidebarItemClick = (id) => {
+      activeTab.value = id   // 切换激活Tab
+      toggleSidebar()       // 点击菜单项后自动收起侧边栏
+    }
+
     const openSettings = () => {
-      // 在当前界面显示设置面板
       activeTab.value = 'settings'
     }
 
@@ -141,6 +177,15 @@ export default {
         theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
       }
       document.documentElement.className = theme.value + '-theme'
+      // 小屏时：点击页面外部自动关闭侧边栏
+      document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 768 && isSidebarOpen.value) {
+          const sidebar = document.querySelector('.sidebar')
+          if (!sidebar?.contains(e.target)) {
+            toggleSidebar()
+          }
+        }
+      })
     })
 
     // 提供全局错误处理方法给子组件使用
@@ -158,7 +203,10 @@ export default {
       errorModal,
       showError,
       hideError,
-      retryWithError
+      retryWithError,
+      isSidebarOpen,
+      toggleSidebar,
+      handleSidebarItemClick
     }
   }
 }
@@ -202,15 +250,15 @@ export default {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* 导航栏 */
+/* ========== 导航栏整体布局 ========== */
 .navbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   box-shadow: 0 2px 8px var(--shadow-color);
+  position: relative; /* 为绝对定位的侧边栏做容器 */
 }
 
 .nav-brand h1 {
@@ -262,89 +310,155 @@ export default {
   align-items: center;
 }
 
-.settings-btn {
-  background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 1rem;
-}
-
-.settings-btn:hover {
-  background-color: var(--bg-tertiary);
-  transform: translateY(-1px);
-}
-
 /* 主内容区域 */
 .main-content {
   flex: 1;
   padding: 2rem;
   overflow-y: auto;
   background-color: var(--bg-primary);
-  height: calc(100vh - 80px);
 }
 
 .tab-content {
   height: 100%;
 }
 
-/* 响应式设计 */
+/* ========== 移动端：品牌+侧边栏触发按钮（小屏显示） ========== */
+.nav-mobile-header {
+  display: none; /* 大屏默认隐藏 */
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.sidebar-toggle {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* ========== 大屏：水平导航菜单（≥769px 显示） ========== */
+.nav-menu-desktop {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  justify-content: center;
+}
+.nav-menu-item { /* 原有菜单项样式保持不变 */ }
+
+/* ========== 移动端：侧边栏（≤768px 显示，抽屉式） ========== */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -250px; /* 初始隐藏 */
+  width: 250px;
+  height: 100vh;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  box-shadow: 2px 0 8px var(--shadow-color);
+  transition: left 0.3s ease; /* 确保过渡生效 */
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+.sidebar-open {
+  left: 0; /* 展开时回到屏幕内 */
+}
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.sidebar-close {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.sidebar-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sidebar-menu li {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  color: var(--text-primary);
+}
+.sidebar-menu li.active {
+  background-color: var(--accent-primary);
+  color: white;
+}
+.sidebar-menu li:hover {
+  background-color: var(--bg-tertiary);
+}
+.sidebar-icon {
+  margin-right: 0.5rem;
+  font-size: 1.1rem;
+}
+.sidebar-text {
+  font-weight: 500;
+}
+
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.3);
+  z-index: 998; /* 低于sidebar的999 */
+  display: none; /* 初始隐藏 */
+  pointer-events: auto; /* 确保点击事件生效 */
+}
+.sidebar-overlay-show {
+  display: block; /* 展开时显示 */
+}
+
+/* ========== 响应式媒体查询 ========== */
+/* 小屏（≤768px）：显示移动端元素，隐藏大屏导航 */
 @media (max-width: 768px) {
   .navbar {
+    flex-direction: row; /* 保持横向，让触发按钮和设置按钮在同一行 */
+    justify-content: space-between;
     padding: 1rem;
-    flex-direction: column;
-    gap: 1rem;
   }
-  
-  .nav-menu {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+  .nav-mobile-header {
+    display: flex; /* 显示移动端标题+触发按钮 */
   }
-  
-  .nav-brand h1 {
-    font-size: 1.2rem;
-  }
-  
-  .main-content {
-    padding: 1rem;
+  .nav-menu-desktop {
+    display: none; /* 隐藏大屏水平导航 */
   }
 }
 
+/* 大屏（≥769px）：隐藏移动端元素，显示大屏导航 */
+@media (min-width: 769px) {
+  .sidebar {
+    display: none; /* 大屏不需要侧边栏 */
+  }
+  .nav-mobile-header {
+    display: none; /* 隐藏移动端触发按钮 */
+  }
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* 小屏细节优化（≤600px，可选） */
 @media (max-width: 600px) {
-  .navbar {
-    padding: 0.75rem;
-  }
-  
-  .nav-menu {
-    gap: 0.25rem;
-  }
-  
-  .nav-menu-item {
-    padding: 0.5rem 1rem;
-    flex-direction: column;
-    min-width: 60px;
-    text-align: center;
-  }
-  
-  .nav-menu-icon {
-    margin-right: 0;
-    margin-bottom: 0.25rem;
-  }
-  
-  .nav-menu-text {
-    font-size: 0.8rem;
-  }
-  
   .nav-brand h1 {
     font-size: 1rem;
   }
-  
-  .settings-btn {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
+  .sidebar-menu li {
+    padding: 0.5rem;
   }
 }
 </style>

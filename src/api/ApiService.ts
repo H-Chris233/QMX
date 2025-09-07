@@ -13,13 +13,14 @@ import {
 
 export class ApiService {
   // 学员管理
-  static async addStudent(name: string, age: number, classType: string, phone: string) {
+  static async addStudent(name: string, age: number, classType: string, phone: string, note: string) {
     try {
       const rawData = await invoke<any>('add_student', {
         name,
         age,
         classType,
-        phone
+        phone,
+        note
       });
       
       const student = transformStudentData(rawData);
@@ -82,6 +83,7 @@ export class ApiService {
     age?: number
     classType?: string
     phone?: string
+    note?: string
   }) {
     try {
       return await invoke<null>('update_student_info', {
@@ -89,7 +91,8 @@ export class ApiService {
         name: updates.name,
         age: updates.age,
         classType: updates.classType,
-        phone: updates.phone
+        phone: updates.phone,
+        note: updates.note
       });
     } catch (error) {
       console.error('❌ [ApiService.updateStudentInfo] 调用失败:', error);
@@ -109,12 +112,17 @@ export class ApiService {
   }
 
   // 财务管理
-  static async addCashTransaction(studentUid: number | null, amount: number, description: string) {
+  static async addCashTransaction(studentUid: number | null, amount: number, note: string = '无') {
     try {
+      // 确保传递给后端的是有效的整数
+      const validAmount = Math.round(amount) || 0;
+      const validStudentUid = studentUid && !isNaN(studentUid) ? studentUid : null;
+      const validNote = note || '无';
+
       const rawData = await invoke<any>('add_cash_transaction', {
-        studentUid,
-        amount,
-        description
+        studentUid: validStudentUid,
+        amount: validAmount,
+        note: validNote
       });
       
       const transaction = transformTransactionData(rawData);
@@ -206,14 +214,15 @@ export interface Student {
 export interface Transaction {
   uid: number
   student_id: string
-  amount: number
+  amount: number  // 明确使用number类型处理64位整数
   description: string
+  note: string
 }
 
 export interface DashboardStats {
   total_students: number
-  total_revenue: number
-  total_expense: number
+  total_revenue: string
+  total_expense: string
   average_score: number
   max_score: number
   active_courses: number

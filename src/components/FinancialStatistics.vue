@@ -1,9 +1,18 @@
 <template>
   <div class="financial-statistics">
+    <!-- 加载进度条 -->
+    <div v-if="loading" class="loading-progress"></div>
+    
     <div class="section-header">
       <h2>收支统计</h2>
-      <button class="add-btn" @click="showAddTransaction = true" title="快捷键: Ctrl+N">
-        ➕ 添加交易
+      <button 
+        class="add-btn" 
+        @click="showAddTransaction = true" 
+        :disabled="loading"
+        title="快捷键: Ctrl+N"
+        aria-label="添加新交易"
+      >
+        {{ loading ? '加载中...' : '➕ 添加交易' }}
       </button>
     </div>
 
@@ -13,7 +22,7 @@
         <div class="card-icon">💰</div>
         <div class="card-content">
           <h3>总收入</h3>
-          <div class="card-value">¥{{ totalIncome }}</div>
+          <div class="card-value">{{ formatCurrency(totalIncome) }}</div>
         </div>
       </div>
       
@@ -21,7 +30,7 @@
         <div class="card-icon">💸</div>
         <div class="card-content">
           <h3>总支出</h3>
-          <div class="card-value">¥{{ totalExpense }}</div>
+          <div class="card-value">{{ formatCurrency(totalExpense) }}</div>
         </div>
       </div>
       
@@ -29,7 +38,7 @@
         <div class="card-icon">💎</div>
         <div class="card-content">
           <h3>净收益</h3>
-          <div class="card-value">¥{{ netProfit }}</div>
+          <div class="card-value">{{ formatCurrency(netProfit) }}</div>
         </div>
       </div>
     </div>
@@ -39,7 +48,7 @@
       <div class="transactions-header">
         <h3>交易记录</h3>
         <div class="filter-controls">
-          <select v-model="transactionFilter" @change="filterTransactions">
+          <select v-model="transactionFilter" @change="filterTransactions" aria-label="交易类型筛选">
             <option value="all">全部交易</option>
             <option value="income">收入</option>
             <option value="expense">支出</option>
@@ -48,7 +57,7 @@
             v-model="transactionSearch" 
             type="text" 
             placeholder="搜索交易..."
-            @input="filterTransactions"
+            aria-label="交易搜索"
           >
         </div>
       </div>
@@ -60,6 +69,7 @@
               <th>描述</th>
               <th>金额</th>
               <th>类型</th>
+              <th>备注</th> <!-- 新增备注列 -->
               <th>操作</th>
             </tr>
           </thead>
@@ -67,15 +77,21 @@
             <tr v-for="transaction in filteredTransactions" :key="transaction.id">
               <td>{{ transaction.description }}</td>
               <td :class="['amount', transaction.type]">
-                {{ transaction.type === 'income' ? '+' : '-' }}¥{{ transaction.amount }}
+                {{ formatTransactionAmount(transaction) }}
               </td>
               <td>
                 <span :class="['transaction-type', transaction.type]">
                   {{ transaction.type === 'income' ? '收入' : '支出' }}
                 </span>
               </td>
+              <td>{{ transaction.note || '-' }}</td> <!-- 显示备注 -->
               <td class="actions">
-                <button class="delete-btn" @click="deleteTransaction(transaction.id)" title="快捷键: Delete">🗑️</button>
+                <button 
+                  class="delete-btn" 
+                  @click="deleteTransaction(transaction.id)" 
+                  title="快捷键: Delete"
+                  aria-label="删除交易"
+                >🗑️</button>
               </td>
             </tr>
           </tbody>
@@ -85,31 +101,66 @@
 
     <!-- 添加交易模态框 -->
     <div v-if="showAddTransaction" class="modal-overlay" @click="closeModals">
-      <div class="modal" @click.stop>
+      <div class="modal" @click.stop role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="modal-header">
-          <h3>添加交易</h3>
-          <button class="close-btn" @click="closeModals">✖️</button>
+          <h3 id="modal-title">添加交易</h3>
+          <button class="close-btn" @click="closeModals" aria-label="关闭模态框">✖️</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label>类型</label>
-            <select v-model="currentTransaction.type">
+            <label for="transaction-type">类型</label>
+            <select id="transaction-type" v-model="currentTransaction.type">
               <option value="income">收入</option>
               <option value="expense">支出</option>
             </select>
           </div>
           <div class="form-group">
-            <label>金额</label>
-            <input v-model.number="currentTransaction.amount" type="number" placeholder="0" min="0">
+            <label for="transaction-amount">金额</label>
+            <input 
+              id="transaction-amount" 
+              v-model.number="currentTransaction.amount" 
+              type="number" 
+              placeholder="填入金额" 
+              min="0"
+              step="1"
+              oninput="validity.valid||(value='');"
+              class="no-spinners"
+            >
           </div>
           <div class="form-group">
-            <label>学员ID (可选)</label>
-            <input v-model.number="currentTransaction.student_id" type="number" placeholder="留空表示其他交易">
+            <label for="student-id">学员 (可选)</label>
+            <select 
+              id="student-id" 
+              v-model="currentTransaction.student_id"
+            >
+              <option :value="null">其他交易</option>
+              <option 
+                v-for="student in students" 
+                :key="student.uid" 
+                :value="student.uid"
+              >
+                {{ student.name }} (ID: {{ student.uid }})
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="transaction-note">备注</label>
+            <textarea
+              id="transaction-note"
+              v-model="currentTransaction.note"
+              placeholder="请输入交易备注信息"
+              rows="3"
+            ></textarea>
           </div>
         </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals">取消</button>
-          <button class="save-btn" @click="saveTransaction">保存</button>
+          <button 
+            class="save-btn" 
+            @click="saveTransaction" 
+            :disabled="loading"
+            :title="loading ? '请稍候...' : '保存交易'"
+          >保存</button>
         </div>
       </div>
     </div>
@@ -123,18 +174,23 @@ import { ApiService } from '../api/ApiService'
 export default {
   name: 'FinancialStatistics',
   setup() {
+    const loading = ref(false)
     const transactions = ref([])
+    const students = ref([]) // 添加学员列表
     const transactionFilter = ref('all')
     const transactionSearch = ref('')
     const showAddTransaction = ref(false)
-    const currentTransaction = ref({
-      type: 'income',
-      amount: 0,
-      student_id: null
-    })
-    const loading = ref(false)
+    const abortController = ref(null)
     const { showError } = inject('errorHandler')
 
+    const currentTransaction = ref({
+      type: 'income',
+      amount: '',
+      student_id: null,
+      note: ''
+    })
+
+    // 计算属性
     const filteredTransactions = computed(() => {
       let filtered = transactions.value
       
@@ -143,8 +199,10 @@ export default {
       }
       
       if (transactionSearch.value) {
+        const search = transactionSearch.value.toLowerCase()
         filtered = filtered.filter(t => 
-          t.description.includes(transactionSearch.value)
+          t.description.toLowerCase().includes(search) ||
+          (t.note && t.note.toLowerCase().includes(search)) // 搜索备注
         )
       }
       
@@ -165,46 +223,91 @@ export default {
 
     const netProfit = computed(() => totalIncome.value - totalExpense.value)
 
+    // 格式化方法
+    const formatCurrency = (value) => {
+      return new Intl.NumberFormat('zh-CN', { 
+        style: 'currency', 
+        currency: 'CNY' 
+      }).format(value)
+    }
+
+    const formatTransactionAmount = (transaction) => {
+      const amount = transaction.type === 'income' ? transaction.amount : -transaction.amount
+      return new Intl.NumberFormat('zh-CN', { 
+        style: 'currency', 
+        currency: 'CNY' 
+      }).format(amount)
+    }
+
+    // 数据操作
     const filterTransactions = () => {
       // 筛选逻辑已通过computed属性实现
     }
 
-    // 加载交易数据
+    // 加载学员列表
+    const loadStudents = async () => {
+      try {
+        students.value = await ApiService.getAllStudents()
+      } catch (error) {
+        console.error('加载学员数据失败:', error)
+        showError('加载失败', '加载学员数据时发生错误', error.message)
+      }
+    }
+
     const loadTransactions = async () => {
       loading.value = true
+      abortController.value = new AbortController()
+      
       try {
-        const cashTransactions = await ApiService.getAllTransactions()
+        const cashTransactions = await ApiService.getAllTransactions({
+          signal: abortController.value.signal
+        })
         
         // 转换后端数据为前端格式
         transactions.value = cashTransactions.map(transaction => ({
           id: transaction.uid,
           type: transaction.cash > 0 ? 'income' : 'expense',
-          description: transaction.student_id ? `学员${transaction.student_id}缴费` : '其他交易',
-          amount: Math.abs(transaction.cash)
+          description: transaction.student_id 
+            ? `学员${transaction.student_id}缴费` 
+            : '其他交易',
+          amount: Math.abs(transaction.cash),
+          note: transaction.note || '' // 添加备注字段
         }))
         
       } catch (error) {
-        console.error('加载交易数据失败:', error)
-        showError('加载失败', '加载交易数据时发生错误', error.message)
+        if (error.name !== 'AbortError') {
+          console.error('加载交易数据失败:', error)
+          showError(
+            '加载失败', 
+            '加载交易数据时发生错误，请检查网络连接或稍后重试',
+            error.message
+          )
+        }
       } finally {
         loading.value = false
+        abortController.value = null
       }
     }
 
     const saveTransaction = async () => {
+      // 检查金额是否已输入且为有效数值
       if (!currentTransaction.value.amount || currentTransaction.value.amount <= 0) {
         showError('输入错误', '请输入有效金额')
         return
       }
 
+      loading.value = true
       try {
+        // 确保金额是有效的整数
+        const amount = Math.round(Math.abs(currentTransaction.value.amount) * 100) // 转换为分
         const cashAmount = currentTransaction.value.type === 'income' 
-          ? currentTransaction.value.amount 
-          : -currentTransaction.value.amount
+          ? amount 
+          : -amount
 
         await ApiService.addCashTransaction(
+          currentTransaction.value.student_id,
           cashAmount,
-          currentTransaction.value.student_id
+          currentTransaction.value.note || '无' // 传递备注
         )
 
         // 重新加载数据
@@ -214,17 +317,22 @@ export default {
       } catch (error) {
         console.error('保存交易失败:', error)
         showError('保存失败', '保存交易时发生错误', error.message)
+      } finally {
+        loading.value = false
       }
     }
 
     const deleteTransaction = async (id) => {
       if (confirm('确定要删除这条交易记录吗？')) {
+        loading.value = true
         try {
           await ApiService.deleteCashTransaction(id)
           await loadTransactions()
         } catch (error) {
           console.error('删除交易失败:', error)
           showError('删除失败', '删除交易记录时发生错误', error.message)
+        } finally {
+          loading.value = false
         }
       }
     }
@@ -233,8 +341,9 @@ export default {
       showAddTransaction.value = false
       currentTransaction.value = {
         type: 'income',
-        amount: 0,
-        student_id: null
+        amount: '',
+        student_id: null,
+        note: ''
       }
     }
 
@@ -248,38 +357,58 @@ export default {
         return
       }
 
+      // 忽略在输入框中的快捷键
+      if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
+      
       // 全局快捷键
       if (event.ctrlKey && event.key === 'n') {
         event.preventDefault()
         showAddTransaction.value = true
+      }
+      // Ctrl+S 保存交易
+      else if (event.ctrlKey && event.key === 's' && showAddTransaction.value) {
+        event.preventDefault()
+        saveTransaction()
       }
       // F5 刷新
       else if (event.key === 'F5') {
         event.preventDefault()
         loadTransactions()
       }
+      // Delete 删除交易
+      else if (event.key === 'Delete' && selectedTransaction) {
+        event.preventDefault()
+        deleteTransaction(selectedTransaction)
+      }
     }
 
     onMounted(() => {
+      loadStudents() // 加载学员列表
       loadTransactions()
       window.addEventListener('keydown', handleKeyDown)
     })
 
     onUnmounted(() => {
       window.removeEventListener('keydown', handleKeyDown)
+      if (abortController.value) {
+        abortController.value.abort()
+      }
     })
 
     return {
+      loading,
       transactions,
+      students, // 导出学员列表
       filteredTransactions,
       transactionFilter,
       transactionSearch,
       showAddTransaction,
       currentTransaction,
-      loading,
       totalIncome,
       totalExpense,
       netProfit,
+      formatCurrency,
+      formatTransactionAmount,
       filterTransactions,
       deleteTransaction,
       saveTransaction,
@@ -295,6 +424,39 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  position: relative;
+}
+
+/* 隐藏数字输入框的上下调整按钮 */
+.no-spinners::-webkit-outer-spin-button,
+.no-spinners::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinners {
+  -moz-appearance: textfield;
+}
+
+/* 加载进度条 */
+.loading-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--accent-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: loading 1.5s ease-in-out forwards;
+  z-index: 10;
+}
+
+@keyframes loading {
+  to {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
 }
 
 .section-header {
@@ -319,9 +481,14 @@ export default {
   transition: all 0.3s ease;
 }
 
-.add-btn:hover {
+.add-btn:hover:not(:disabled) {
   background-color: #45a049;
   transform: translateY(-1px);
+}
+
+.add-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* 总览卡片 */
@@ -539,13 +706,28 @@ export default {
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background-color: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+.form-group textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.form-group select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.5rem;
 }
 
 .modal-footer {

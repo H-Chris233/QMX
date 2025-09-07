@@ -31,38 +31,40 @@
     </div>
 
     <!-- 学员列表 -->
-    <div class="students-table">
-      <table>
-        <thead>
-          <tr>
-            <th>姓名</th>
-            <th>年龄</th>
-            <th>电话</th>
-            <th>课程</th>
-            <th>射击记录</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="student in filteredStudents" :key="student.uid">
-            <td>{{ student.name }}</td>
-            <td>{{ student.age }}</td>
-            <td>{{ student.phone }}</td>
-            <td>
-              <span :class="['class-badge', getClassType(student.class)]">
-                {{ getClassText(student.class) }}
-              </span>
-            </td>
-            <td>{{ student.rings.length }} 次记录</td>
-            <td class="actions">
-              <button class="score-btn" @click="showScoreModal(student)" title="快捷键: S">🎯</button>
-              <button class="edit-btn" @click="editStudent(student)" title="快捷键: E">✏️</button>
-              <button class="delete-btn" @click="deleteStudent(student.uid)" title="快捷键: Delete">🗑️</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+<div class="students-table">
+  <table>
+    <thead>
+      <tr>
+        <th>姓名</th>
+        <th>年龄</th>
+        <th>电话</th>
+        <th>课程</th>
+        <th>射击记录</th>
+        <th>备注</th> <!-- 新增列 -->
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="student in filteredStudents" :key="student.uid">
+        <td>{{ student.name }}</td>
+        <td>{{ student.age }}</td>
+        <td>{{ student.phone }}</td>
+        <td>
+          <span :class="['class-badge', getClassType(student.class)]">
+            {{ getClassText(student.class) }}
+          </span>
+        </td>
+        <td>{{ student.rings.length }} 次记录</td>
+        <td>{{ student.note || '-' }}</td> <!-- 新增列 -->
+        <td class="actions">
+          <button class="score-btn" @click="showScoreModal(student)" title="快捷键: S">🎯</button>
+          <button class="edit-btn" @click="editStudent(student)" title="快捷键: E">✏️</button>
+          <button class="delete-btn" @click="deleteStudent(student.uid)" title="快捷键: Delete">🗑️</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
     <!-- 统计信息 -->
     <div class="stats-grid">
@@ -92,29 +94,33 @@
           <button class="close-btn" @click="closeModals">✖️</button>
         </div>
         <div class="modal-body">
-          <div class="form-group">
-            <label>姓名</label>
-            <input v-model="currentStudent.name" type="text" placeholder="请输入学员姓名">
-          </div>
-          <div class="form-group">
-            <label>年龄</label>
-            <input v-model.number="currentStudent.age" type="number" placeholder="请输入年龄" min="1" max="120">
-          </div>
-          <div class="form-group">
-            <label>电话</label>
-            <input v-model="currentStudent.phone" type="tel" placeholder="请输入电话号码">
-          </div>
-          <div class="form-group">
-            <label>课程类型</label>
-            <select v-model="currentStudent.classType">
-              <option value="">请选择课程</option>
-              <option value="TenTry">体验课 (10次)</option>
-              <option value="Month">月卡</option>
-              <option value="Year">年卡</option>
-              <option value="Others">其他</option>
-            </select>
-          </div>
-        </div>
+  <div class="form-group">
+    <label>姓名</label>
+    <input v-model="currentStudent.name" type="text" placeholder="请输入学员姓名">
+  </div>
+  <div class="form-group">
+    <label>年龄</label>
+    <input v-model.number="currentStudent.age" type="number" placeholder="请输入年龄" min="1" max="120">
+  </div>
+  <div class="form-group">
+    <label>电话</label>
+    <input v-model="currentStudent.phone" type="tel" placeholder="请输入电话号码">
+  </div>
+  <div class="form-group">
+    <label>课程类型</label>
+    <select v-model="currentStudent.classType">
+      <option value="">请选择课程</option>
+      <option value="TenTry">体验课 (10次)</option>
+      <option value="Month">月卡</option>
+      <option value="Year">年卡</option>
+      <option value="Others">其他</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>备注</label>
+      <textarea v-model="currentStudent.note" rows="3" placeholder="请输入备注信息"></textarea>
+  </div>
+</div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals">取消</button>
           <button class="save-btn" @click="saveStudent">保存</button>
@@ -166,12 +172,13 @@ export default {
     const showEditModal = ref(false)
     const showScoreModalFlag = ref(false)
     const currentStudent = ref({
-      uid: null,
-      name: '',
-      age: '',
-      phone: '',
-      classType: ''
-    })
+  uid: null,
+  name: '',
+  age: '',
+  phone: '',
+  classType: '',
+  note: ''
+})
     const currentScoreStudent = ref({})
     const newScore = ref('')
     const recentScores = ref([])
@@ -230,12 +237,13 @@ export default {
 
     const editStudent = (student) => {
       currentStudent.value = {
-        uid: student.uid,
-        name: student.name,
-        age: student.age,
-        phone: student.phone,
-        classType: student.class
-      }
+  uid: student.uid,
+  name: student.name,
+  age: student.age,
+  phone: student.phone,
+  classType: student.class,
+  note: student.note || ''
+}
       showEditModal.value = true
     }
 
@@ -264,7 +272,8 @@ export default {
             currentStudent.value.name,
             currentStudent.value.age,
             currentStudent.value.classType || 'Others',
-            currentStudent.value.phone
+            currentStudent.value.phone,
+            currentStudent.value.note
           )
         } else {
           // 编辑现有学员
@@ -272,7 +281,8 @@ export default {
             name: currentStudent.value.name,
             age: currentStudent.value.age,
             classType: currentStudent.value.classType,
-            phone: currentStudent.value.phone
+            phone: currentStudent.value.phone,
+            note: currentStudent.value.note
           })
         }
 
@@ -481,6 +491,20 @@ export default {
   border-bottom: 1px solid var(--border-color);
 }
 
+.students-table td {
+  white-space: pre-line; /* 支持换行 */
+  word-break: break-all; /* 长单词自动换行 */
+  max-width: 300px; /* 限制最大宽度 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.students-table th:nth-child(6),
+.students-table td:nth-child(6) {
+  width: 200px; /* 设置备注列宽度 */
+  min-width: 150px;
+}
+
 .students-table th {
   background-color: var(--bg-tertiary);
   font-weight: 600;
@@ -642,6 +666,12 @@ export default {
   color: var(--text-primary);
 }
 
+.form-group input[type="text"][v-model="currentStudent.note"] {
+  height: 60px;
+  resize: vertical;
+  padding: 0.75rem;
+}
+
 .recent-scores {
   margin-top: 1rem;
 }
@@ -698,6 +728,42 @@ export default {
 
 .save-btn:hover {
   background-color: #1976d2;
+}
+
+.form-group textarea {
+  /* 基础布局与尺寸 */
+  width: 100%;
+  min-height: 80px; /* 增大最小高度，提升输入舒适性 */
+  height: auto;
+  resize: vertical; /* 仅允许垂直拉伸（更可控）,换成none消除小白点 */
+  padding: 0.75rem;  /* 内边距与其他输入框统一 */
+
+  /* 视觉风格（与项目主题变量联动） */
+  border: 1px solid var(--border-color);
+  border-radius: 8px; /* 更大圆角，和按钮/输入框风格统一 */
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem; /* 字体大小与其他表单元素统一 */
+  line-height: 1.5;    /* 行高优化，提升可读性 */
+  transition: all 0.3s ease; /* 过渡动画，让交互更丝滑 */
+}
+
+/* 占位符（Placeholder）样式优化 */
+.form-group textarea::placeholder {
+  color: var(--text-secondary); /* 浅色调，降低视觉干扰 */
+  opacity: 0.8; /* 透明度弱化，更柔和 */
+}
+
+/*  hover 交互：轻量反馈 */
+.form-group textarea:hover {
+  border-color: var(--accent-primary-light); /* 主题色浅版，暗示可交互 */
+}
+
+/*  focus 交互：强反馈引导 */
+.form-group textarea:focus {
+  outline: none; /* 清除默认聚焦轮廓 */
+  border-color: var(--accent-primary); /* 主题色高亮边框 */
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2); /* 柔和焦点阴影 */
 }
 
 @media (max-width: 768px) {

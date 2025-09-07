@@ -1,24 +1,43 @@
 <template>
   <div class="score-management">
+    <!-- 加载进度条 -->
+    <div v-if="loading" class="loading-progress"></div>
+    
     <div class="section-header">
       <h2>分数管理</h2>
-      <button class="refresh-btn" @click="loadData" title="快捷键: F5">
-        🔄 刷新
+      <button 
+        class="refresh-btn" 
+        @click="loadData" 
+        :disabled="loading"
+        title="快捷键: F5"
+        aria-label="刷新学员数据"
+      >
+        {{ loading ? '加载中...' : '🔄 刷新' }}
       </button>
     </div>
 
     <!-- 学员选择和快速添加 -->
     <div class="quick-add-section">
       <div class="student-selector">
-        <select v-model="selectedStudent" @change="onStudentChange" ref="studentSelect">
+        <label for="student-select" class="visually-hidden">选择学员</label>
+        <select 
+          id="student-select"
+          v-model="selectedStudent" 
+          @change="onStudentChange" 
+          ref="studentSelect"
+          aria-label="学员选择"
+        >
           <option value="">选择学员</option>
           <option v-for="student in students" :key="student.uid" :value="student.uid">
             {{ student.name }} ({{ student.age }}岁)
           </option>
         </select>
       </div>
+      
       <div class="quick-score-input">
+        <label for="quick-score" class="visually-hidden">输入成绩</label>
         <input 
+          id="quick-score"
           v-model.number="quickScore" 
           type="number" 
           placeholder="输入成绩 (0-10.9)"
@@ -26,8 +45,15 @@
           max="10.9" 
           step="0.1"
           @keyup.enter="addQuickScore"
+          aria-label="快速添加成绩"
         >
-        <button class="add-score-btn" @click="addQuickScore" :disabled="!selectedStudent || !quickScore">
+        <button 
+          class="add-score-btn" 
+          @click="addQuickScore" 
+          :disabled="!selectedStudent || !quickScore || loading"
+          :title="loading ? '请稍候...' : '添加成绩'"
+          aria-label="添加成绩"
+        >
           🎯 添加成绩
         </button>
       </div>
@@ -102,7 +128,13 @@
       <div class="batch-operations">
         <h4>批量操作</h4>
         <div class="batch-buttons">
-          <button class="batch-btn" @click="exportScores" title="快捷键: Ctrl+E">
+          <button 
+            class="batch-btn" 
+            @click="exportScores" 
+            :disabled="loading"
+            title="快捷键: Ctrl+E"
+            aria-label="导出成绩数据"
+          >
             📊 导出成绩
           </button>
         </div>
@@ -127,13 +159,16 @@ import { ApiService } from '../api/ApiService'
 export default {
   name: 'ScoreManagement',
   setup() {
+    const loading = ref(false)
     const students = ref([])
     const selectedStudent = ref('')
     const selectedStudentData = ref(null)
     const quickScore = ref('')
     const studentSelect = ref(null)
+    const abortController = ref(null)
     const { showError } = inject('errorHandler')
 
+    // 计算属性
     const recentScores = computed(() => {
       if (!selectedStudentData.value) return []
       return selectedStudentData.value.rings.slice(-20) // 最近20次成绩
@@ -155,6 +190,7 @@ export default {
       return Math.min(...selectedStudentData.value.rings)
     })
 
+    // 格式化方法
     const getClassText = (classType) => {
       const classMap = {
         'TenTry': '体验课',
@@ -172,13 +208,28 @@ export default {
       return 'poor'
     }
 
+    // 数据加载
     const loadData = async () => {
+      loading.value = true
+      abortController.value = new AbortController()
+      
       try {
-        const data = await ApiService.getAllStudents()
+        const data = await ApiService.getAllStudents({
+          signal: abortController.value.signal
+        })
         students.value = data
       } catch (error) {
-        console.error('加载学员数据失败:', error)
-        showError('加载失败', '加载学员数据时发生错误', error.message)
+        if (error.name !== 'AbortError') {
+          console.error('加载学员数据失败:', error)
+          showError(
+            '数据加载失败', 
+            '无法获取学员列表，请检查网络连接或稍后重试',
+            error.message
+          )
+        }
+      } finally {
+        loading.value = false
+        abortController.value = null
       }
     }
 
@@ -188,8 +239,14 @@ export default {
         return
       }
 
+      loading.value = true
+      abortController.value = new AbortController()
+      
       try {
-        const scores = await ApiService.getStudentScores(selectedStudent.value)
+        const scores = await ApiService.getStudentScores(
+          selectedStudent.value,
+          { signal: abortController.value.signal }
+        )
         const student = students.value.find(s => s.uid == selectedStudent.value)
         if (student) {
           selectedStudentData.value = {
@@ -198,34 +255,56 @@ export default {
           }
         }
       } catch (error) {
-        console.error('加载学员成绩失败:', error)
-        showError('获取失败', '加载学员成绩时发生错误', error.message)
+        if (error.name !== 'AbortError') {
+          console.error('加载学员成绩失败:', error)
+          showError(
+            '获取失败', 
+            '加载学员成绩时发生错误，请稍后重试',
+            error.message
+          )
+        }
+      } finally {
+        loading.value = false
+        abortController.value = null
       }
     }
 
+    // 成绩操作
     const addQuickScore = async () => {
-      if (!selectedStudent.value || !quickScore.value) {
-        showError('输入错误', '请选择学员并输入成绩')
+      if (!selectedStudent.value) {
+        showError('选择错误', '请选择一个学员')
         return
       }
 
-      if (quickScore.value < 0 || quickScore.value > 10.9) {
+      if (!quickScore.value && quickScore.value !== 0) {
+        showError('输入错误', '请输入有效的成绩')
+        return
+      }
+
+      const score = parseFloat(quickScore.value)
+      if (isNaN(score) || score < 0 || score > 10.9) {
         showError('输入错误', '请输入有效的成绩 (0-10.9)')
         return
       }
 
+      loading.value = true
       try {
-        await ApiService.addScore(selectedStudent.value, quickScore.value)
+        await ApiService.addScore(selectedStudent.value, score)
         quickScore.value = ''
         await onStudentChange() // 重新加载成绩
       } catch (error) {
         console.error('添加成绩失败:', error)
         showError('添加失败', '添加学员成绩时发生错误', error.message)
+      } finally {
+        loading.value = false
       }
     }
 
     const exportScores = () => {
-      if (!selectedStudentData.value) return
+      if (!selectedStudentData.value) {
+        showError('导出失败', '请先选择一个学员')
+        return
+      }
 
       const csvContent = "data:text/csv;charset=utf-8," 
         + "序号,成绩,等级\n"
@@ -242,9 +321,11 @@ export default {
       document.body.removeChild(link)
     }
 
-  
     // 键盘事件处理
     const handleKeyDown = (event) => {
+      // 忽略在输入框中的快捷键
+      if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
+      
       // F5 刷新
       if (event.key === 'F5') {
         event.preventDefault()
@@ -264,6 +345,7 @@ export default {
       }
     }
 
+    // 生命周期钩子
     onMounted(() => {
       loadData()
       window.addEventListener('keydown', handleKeyDown)
@@ -271,9 +353,13 @@ export default {
 
     onUnmounted(() => {
       window.removeEventListener('keydown', handleKeyDown)
+      if (abortController.value) {
+        abortController.value.abort()
+      }
     })
 
     return {
+      loading,
       students,
       selectedStudent,
       selectedStudentData,
@@ -300,6 +386,28 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  position: relative;
+}
+
+/* 加载进度条 */
+.loading-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--accent-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: loading 1.5s ease-in-out forwards;
+  z-index: 10;
+}
+
+@keyframes loading {
+  to {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
 }
 
 .section-header {
@@ -324,9 +432,14 @@ export default {
   transition: all 0.3s ease;
 }
 
-.refresh-btn:hover {
+.refresh-btn:hover:not(:disabled) {
   background-color: #1976d2;
   transform: translateY(-1px);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .quick-add-section {
@@ -345,6 +458,7 @@ export default {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-width: 200px;
+  width: 100%;
 }
 
 .quick-score-input {
@@ -462,6 +576,7 @@ export default {
   height: 100%;
   gap: 2px;
   padding: 0 1rem;
+  overflow-x: auto;
 }
 
 .chart-bar {
@@ -471,6 +586,7 @@ export default {
   position: relative;
   min-height: 4px;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .chart-bar:hover {
@@ -575,11 +691,15 @@ export default {
   transition: all 0.3s ease;
 }
 
-.batch-btn:hover {
+.batch-btn:hover:not(:disabled) {
   background-color: #1976d2;
   transform: translateY(-1px);
 }
 
+.batch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 .no-selection {
   flex: 1;
@@ -610,6 +730,20 @@ export default {
   font-size: 1.1rem;
 }
 
+/* 隐藏的可访问性元素 */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
   .quick-add-section {
     flex-direction: column;

@@ -1,5 +1,5 @@
 import { createApp } from "vue";
-import Useragent from "./UserAgreement/App.vue";
+import Useragent from "./components/UserAgreement.vue";
 import MainApp from "./MainApp.vue";
 
 // 检查是否已经同意协议

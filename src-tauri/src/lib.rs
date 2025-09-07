@@ -1,29 +1,51 @@
-// src-tauri/src/main.rs
+// src-tauri/src/lib.rs
 use tauri::{WindowBuilder};
 use qmx_backend_lib::{database, student, cash};
 use qmx_backend_lib::init::init;
 use qmx_backend_lib::save::save;
 use student::{Person, Class, Student};
 use cash::Cash;
-use std::collections::HashMap;
 use std::sync::Mutex;
+use serde::Serialize;
+use std::sync::OnceLock;
 
 // 全局数据库实例 - 使用 Mutex 保证线程安全
-static DB: Mutex<Option<database::Database>> = Mutex::new(None);
+static DB: OnceLock<Mutex<Option<database::Database>>> = OnceLock::new();
 
 // 初始化数据库
 fn init_database() -> Result<(), String> {
-    let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-    if db_guard.is_none() {
-        let db_instance = init().map_err(|e| format!("初始化后端失败: {}", e))?;
-        *db_guard = Some(db_instance);
+    // 仅初始化一次，后续调用直接返回
+    if DB.get().is_none() {
+        match init() {
+            Ok(database) => {
+                DB.get_or_init(|| Mutex::new(Some(database)));
+                Ok(())
+            },
+            Err(e) => Err(format!("初始化后端失败: {}", e))
+        }
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 fn get_db() -> Result<database::Database, String> {
-    let db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-    db_guard.clone().ok_or_else(|| "数据库未初始化".to_string())
+    // 获取 OnceLock 中的 Mutex
+    let db_mutex = DB.get().ok_or("数据库未初始化")?;
+    
+    // 锁定 Mutex 并克隆数据库实例
+    let db_guard = db_mutex.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    db_guard.clone().ok_or("数据库未初始化".to_string())
+}
+
+// 保存数据库到全局状态
+fn save_db(db: database::Database) -> Result<(), String> {
+    // 获取 OnceLock 中的 Mutex
+    let db_mutex = DB.get().ok_or("数据库未初始化")?;
+    
+    // 锁定 Mutex 并更新数据库实例
+    let mut db_guard = db_mutex.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    *db_guard = Some(db);
+    Ok(())
 }
 
 // 窗口管理命令
@@ -39,7 +61,7 @@ fn open_main_window(app: tauri::AppHandle) {
 
 // 学员管理命令
 #[tauri::command]
-fn add_student(name: String, age: u8, class_type: String, phone: String) -> Result<HashMap<String, serde_json::Value>, String> {
+fn add_student(name: String, age: u8, class_type: String, phone: String, note: String) -> Result<StudentResponse, String> {
     init_database()?;
     
     let class = match class_type.as_str() {
@@ -50,63 +72,44 @@ fn add_student(name: String, age: u8, class_type: String, phone: String) -> Resu
     };
     
     let mut person = Person::new();
-    person.set_name(name).set_age(age).set_class(class);
-    
-    // 添加电话信息到备注字段
-    let note = format!("电话: {}", phone);
-    person.set_note(note);
+    person.set_name(name)
+         .set_age(age)
+         .set_class(class)
+         .set_phone(phone.clone())
+         .set_note(note.clone());
     
     let mut db = get_db()?;
     db.student.insert(person.clone());
     
     save(db.clone()).map_err(|e| format!("保存失败: {}", e))?;
+    save_db(db)?;
     
-    // 更新全局数据库状态
-    {
-        let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-        *db_guard = Some(db);
-    }
-    
-    let mut result = HashMap::new();
-    result.insert("uid".to_string(), serde_json::Value::Number(serde_json::Number::from(person.uid())));
-    result.insert("name".to_string(), serde_json::Value::String(person.name().to_string()));
-    result.insert("age".to_string(), serde_json::Value::Number(serde_json::Number::from(person.age())));
-    result.insert("class".to_string(), serde_json::Value::String(format!("{:?}", person.class())));
-    result.insert("phone".to_string(), serde_json::Value::String(phone));
-    result.insert("note".to_string(), serde_json::Value::String(person.note().to_string()));
-    
-    Ok(result)
+    Ok(StudentResponse {
+        uid: person.uid(),
+        name: person.name().to_string(),
+        age: person.age(),
+        class: format!("{:?}", person.class()),
+        phone: person.phone().to_string(),
+        note: person.note().to_string(),
+    })
 }
 
 #[tauri::command]
-fn get_all_students() -> Result<Vec<HashMap<String, serde_json::Value>>, String> {
+fn get_all_students() -> Result<Vec<StudentResponse>, String> {
     init_database()?;
     
     let db = get_db()?;
     let mut students = Vec::new();
     
     for (uid, person) in db.student.iter() {
-        let mut student_map = HashMap::new();
-        student_map.insert("uid".to_string(), serde_json::Value::Number(serde_json::Number::from(*uid)));
-        student_map.insert("name".to_string(), serde_json::Value::String(person.name().to_string()));
-        student_map.insert("age".to_string(), serde_json::Value::Number(serde_json::Number::from(person.age())));
-        student_map.insert("class".to_string(), serde_json::Value::String(format!("{:?}", person.class())));
-        student_map.insert("rings".to_string(), serde_json::Value::Array(
-            person.rings().iter().map(|&r| serde_json::Value::Number(serde_json::Number::from_f64(r).unwrap())).collect()
-        ));
-        student_map.insert("note".to_string(), serde_json::Value::String(person.note().to_string()));
-        student_map.insert("cash".to_string(), serde_json::Value::String(format!("{:?}", person.cash())));
-        
-        // 从备注中提取电话
-        let note = person.note();
-        let phone = if note.starts_with("电话: ") {
-            note["电话: ".len()..].to_string()
-        } else {
-            "".to_string()
-        };
-        student_map.insert("phone".to_string(), serde_json::Value::String(phone));
-        
-        students.push(student_map);
+        students.push(StudentResponse {
+            uid: *uid,
+            name: person.name().to_string(),
+            age: person.age(),
+            class: format!("{:?}", person.class()),
+            phone: person.phone().to_string(),
+            note: person.note().to_string(),
+        });
     }
     
     Ok(students)
@@ -122,11 +125,8 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
         
         save(db.clone()).map_err(|e| format!("保存分数失败: {}", e))?;
         
-        // 更新全局数据库状态
-        {
-            let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-            *db_guard = Some(db);
-        }
+        save_db(db)?;
+        
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -134,19 +134,21 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_student_scores(student_uid: u64) -> Result<Vec<f64>, String> {
+fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String> {
     init_database()?;
     
     let db = get_db()?;
     if let Some(person) = db.student.get(&student_uid) {
-        Ok(person.rings().clone())
+        Ok(StudentScoresResponse {
+            rings: person.rings().clone(),
+        })
     } else {
         Err("学员不存在".to_string())
     }
 }
 
 #[tauri::command]
-fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, class_type: Option<String>, phone: Option<String>) -> Result<(), String> {
+fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, class_type: Option<String>, phone: Option<String>, note: Option<String>) -> Result<(), String> {
     init_database()?;
     
     let mut db = get_db()?;
@@ -167,17 +169,16 @@ fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, 
             person.set_class(class);
         }
         if let Some(phone) = phone {
-            let note = format!("电话: {}", phone);
+            person.set_phone(phone);
+        }
+        
+        if let Some(note) = note {
             person.set_note(note);
         }
         
         save(db.clone()).map_err(|e| format!("更新学员信息失败: {}", e))?;
+        save_db(db)?;
         
-        // 更新全局数据库状态
-        {
-            let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-            *db_guard = Some(db);
-        }
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -192,11 +193,8 @@ fn delete_student(student_uid: u64) -> Result<(), String> {
     if db.student.student_data.remove(&student_uid).is_some() {
         save(db.clone()).map_err(|e| format!("删除学员失败: {}", e))?;
         
-        // 更新全局数据库状态
-        {
-            let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-            *db_guard = Some(db);
-        }
+        save_db(db)?;
+        
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -205,7 +203,7 @@ fn delete_student(student_uid: u64) -> Result<(), String> {
 
 // 财务管理命令
 #[tauri::command]
-fn add_cash_transaction(student_uid: Option<u64>, amount: i32, description: String) -> Result<HashMap<String, serde_json::Value>, String> {
+fn add_cash_transaction(student_uid: Option<u64>, amount: i32, note: String) -> Result<TransactionResponse, String> {
     init_database()?;
     
     let mut cash = Cash::new(student_uid);
@@ -215,35 +213,32 @@ fn add_cash_transaction(student_uid: Option<u64>, amount: i32, description: Stri
     db.cash.insert(cash.clone());
     
     save(db.clone()).map_err(|e| format!("保存交易记录失败: {}", e))?;
+    save_db(db)?;
     
-    // 更新全局数据库状态
-    {
-        let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-        *db_guard = Some(db);
-    }
-    
-    let mut result = HashMap::new();
-    result.insert("uid".to_string(), serde_json::Value::Number(serde_json::Number::from(cash.uid)));
-    result.insert("student_id".to_string(), serde_json::Value::String(format!("{:?}", student_uid)));
-    result.insert("amount".to_string(), serde_json::Value::Number(serde_json::Number::from(amount)));
-    result.insert("description".to_string(), serde_json::Value::String(description));
-    
-    Ok(result)
+    Ok(TransactionResponse {
+        uid: cash.uid,
+        student_id: cash.student_id,
+        amount: cash.cash,
+        note: note,
+        description: String::from("交易记录"), // 添加description字段
+    })
 }
 
 #[tauri::command]
-fn get_all_transactions() -> Result<Vec<HashMap<String, serde_json::Value>>, String> {
+fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
     init_database()?;
     
     let db = get_db()?;
     let mut transactions = Vec::new();
     
     for (uid, cash) in db.cash.iter() {
-        let mut transaction = HashMap::new();
-        transaction.insert("uid".to_string(), serde_json::Value::Number(serde_json::Number::from(*uid)));
-        transaction.insert("student_id".to_string(), serde_json::Value::String(format!("{:?}", cash.student_id)));
-        transaction.insert("amount".to_string(), serde_json::Value::Number(serde_json::Number::from(cash.cash)));
-        transactions.push(transaction);
+        transactions.push(TransactionResponse {
+            uid: *uid,
+            student_id: cash.student_id,
+            amount: cash.cash,
+            note: String::new(),
+            description: String::from("交易记录"), // 添加description字段
+        });
     }
     
     Ok(transactions)
@@ -257,11 +252,8 @@ fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
     if db.cash.cash_data.remove(&transaction_uid).is_some() {
         save(db.clone()).map_err(|e| format!("删除交易记录失败: {}", e))?;
         
-        // 更新全局数据库状态
-        {
-            let mut db_guard = DB.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
-            *db_guard = Some(db);
-        }
+        save_db(db)?;
+        
         Ok(())
     } else {
         Err("交易记录不存在".to_string())
@@ -270,22 +262,21 @@ fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
 
 // 统计命令
 #[tauri::command]
-fn get_dashboard_stats() -> Result<HashMap<String, serde_json::Value>, String> {
+fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
     init_database()?;
     
     let db = get_db()?;
     let dashboard_stats = qmx_backend_lib::get_dashboard_stats(&db.student, &db.cash)
         .map_err(|e| format!("获取仪表盘统计失败: {}", e))?;
     
-    let mut stats = HashMap::new();
-    stats.insert("total_students".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.total_students)));
-    stats.insert("total_revenue".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.total_revenue)));
-    stats.insert("total_expense".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.total_expense)));
-    stats.insert("average_score".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(dashboard_stats.average_score).unwrap()));
-    stats.insert("max_score".to_string(), serde_json::Value::Number(serde_json::Number::from_f64(dashboard_stats.max_score).unwrap()));
-    stats.insert("active_courses".to_string(), serde_json::Value::Number(serde_json::Number::from(dashboard_stats.active_courses)));
-    
-    Ok(stats)
+    Ok(DashboardStatsResponse {
+        total_students: dashboard_stats.total_students,
+        total_revenue: dashboard_stats.total_revenue,
+        total_expense: dashboard_stats.total_expense,
+        average_score: dashboard_stats.average_score,
+        max_score: dashboard_stats.max_score,
+        active_courses: dashboard_stats.active_courses,
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -307,3 +298,39 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Error running app");
 }
+
+
+#[derive(Serialize)]
+pub struct StudentResponse {
+    pub uid: u64,
+    pub name: String,
+    pub age: u8,
+    pub class: String,
+    pub phone: String,
+    pub note: String,
+}
+
+#[derive(Serialize)]
+pub struct StudentScoresResponse {
+    pub rings: Vec<f64>,
+}
+
+#[derive(Serialize)]
+pub struct TransactionResponse {
+    pub uid: u64,
+    pub student_id: Option<u64>,
+    pub amount: i32,
+    pub note: String,
+    pub description: String,
+}
+
+#[derive(Serialize)]
+pub struct DashboardStatsResponse {
+    pub total_students: usize,
+    pub total_revenue: i32,
+    pub total_expense: i32,
+    pub average_score: f64,
+    pub max_score: f64,
+    pub active_courses: usize,
+}
+

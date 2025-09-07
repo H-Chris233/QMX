@@ -30,7 +30,8 @@ export function transformTransactionData(rawData: any): Transaction {
     uid: rawData.uid,
     student_id: rawData.student_id,
     amount: rawData.amount,
-    description: rawData.description
+    description: rawData.description,
+    note: rawData.note || '' // 添加备注字段
   };
 }
 
@@ -91,9 +92,10 @@ export function validateStudentData(student: any): boolean {
 export function validateTransactionData(transaction: any): boolean {
   return (
     typeof transaction.uid === 'number' &&
-    typeof transaction.student_id === 'string' &&
+    (typeof transaction.student_id === 'number' || transaction.student_id === null) &&
     typeof transaction.amount === 'number' &&
-    typeof transaction.description === 'string'
+    typeof transaction.description === 'string' &&
+    typeof transaction.note === 'string'
   );
 }
 
