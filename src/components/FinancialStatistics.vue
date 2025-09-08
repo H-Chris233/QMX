@@ -299,7 +299,7 @@ export default {
       loading.value = true
       try {
         // 确保金额是有效的整数
-        const amount = Math.round(Math.abs(currentTransaction.value.amount) * 100) // 转换为分
+        const amount = Math.round(Math.abs(currentTransaction.value.amount))
         const cashAmount = currentTransaction.value.type === 'income' 
           ? amount 
           : -amount
