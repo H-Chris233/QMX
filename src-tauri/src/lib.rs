@@ -4,10 +4,11 @@ use qmx_backend_lib::{database, student, cash};
 use qmx_backend_lib::init::init;
 use qmx_backend_lib::save::save;
 use student::{Person, Class, Student};
-use cash::Cash;
+use cash::{Cash, PaymentFrequency, InstallmentStatus};
 use std::sync::Mutex;
 use serde::Serialize;
 use std::sync::OnceLock;
+use chrono::{DateTime, Utc};
 
 // 全局数据库实例 - 使用 Mutex 保证线程安全
 static DB: OnceLock<Mutex<Option<database::Database>>> = OnceLock::new();
@@ -202,25 +203,102 @@ fn delete_student(student_uid: u64) -> Result<(), String> {
 }
 
 // 财务管理命令
-#[tauri::command]
-fn add_cash_transaction(student_uid: Option<u64>, amount: i32, note: String) -> Result<TransactionResponse, String> {
+[tauri::command]
+fn add_cash_transaction(
+    student_uid: Option<u64>,
+    amount: i64,
+    note: Option<String>,
+    is_installment: Option<bool>,
+    total_amount: Option<i64>,
+    total_installments: Option<u32>,
+    frequency: Option<String>,
+    due_date: Option<String>,
+    current_installment: Option<u32>,
+    plan_id: Option<u64>,
+) -> Result<TransactionResponse, String> {
     init_database()?;
     
-    let mut cash = Cash::new(student_uid);
-    cash.add(amount);
-    
     let mut db = get_db()?;
+    
+    let cash = if is_installment.unwrap_or(false) {
+        // 创建分期付款
+        let total_amount = total_amount.ok_or("分期付款需要指定总金额")?;
+        let total_installments = total_installments.ok_or("分期付款需要指定总期数")?;
+        let current_installment = current_installment.unwrap_or(1);
+        let due_date_str = due_date.ok_or("分期付款需要指定到期日期")?;
+        
+        // 解析日期字符串
+        let due_date = DateTime::parse_from_rfc3339(&due_date_str)
+            .map_err(|e| format!("日期格式错误: {}", e))?
+            .with_timezone(&Utc);
+        
+        // 解析付款频率
+        let frequency_enum = match frequency.as_deref() {
+            Some("Weekly") => PaymentFrequency::Weekly,
+            Some("Monthly") => PaymentFrequency::Monthly,
+            Some("Quarterly") => PaymentFrequency::Quarterly,
+            Some(custom) if custom.starts_with("Custom") => {
+                let days = custom.trim_start_matches("Custom")
+                    .parse()
+                    .map_err(|_| "自定义频率格式错误，应为Custom<天数>")?;
+                PaymentFrequency::Custom(days)
+            },
+            _ => PaymentFrequency::Monthly, // 默认月度
+        };
+        
+        Cash::new_installment(
+            student_uid,
+            total_amount,
+            total_installments,
+            frequency_enum,
+            due_date,
+            current_installment,
+            plan_id,
+        )
+    } else {
+        // 创建普通付款
+        let mut cash = Cash::new(student_uid);
+        cash.set_cash(amount);
+        cash.set_note(note.clone());
+        cash
+    };
+    
     db.cash.insert(cash.clone());
     
     save(db.clone()).map_err(|e| format!("保存交易记录失败: {}", e))?;
     save_db(db)?;
     
+    // 构建响应
+    let (is_installment, plan_id, current, total, due_date_str, status_str) = 
+        if let Some(installment) = &cash.installment {
+            (
+                true,
+                Some(installment.plan_id),
+                Some(installment.current_installment),
+                Some(installment.total_installments),
+                Some(installment.due_date.to_rfc3339()),
+                Some(format!("{:?}", installment.status)),
+            )
+        } else {
+            (false, None, None, None, None, None)
+        };
+    
     Ok(TransactionResponse {
         uid: cash.uid,
         student_id: cash.student_id,
         amount: cash.cash,
-        note: note,
-        description: String::from("交易记录"), // 添加description字段
+        note: cash.note.clone(),
+        description: if is_installment {
+            format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+        } else {
+            "普通付款".to_string()
+        },
+        is_installment,
+        installment_plan_id: plan_id,
+        installment_current: current,
+        installment_total: total,
+        installment_due_date: due_date_str,
+        installment_status: status_str,
     })
 }
 
@@ -231,13 +309,37 @@ fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
     let db = get_db()?;
     let mut transactions = Vec::new();
     
-    for (uid, cash) in db.cash.iter() {
+    for (_, cash) in db.cash.iter() {
+        let (is_installment, plan_id, current, total, due_date_str, status_str) = 
+            if let Some(installment) = &cash.installment {
+                (
+                    true,
+                    Some(installment.plan_id),
+                    Some(installment.current_installment),
+                    Some(installment.total_installments),
+                    Some(installment.due_date.to_rfc3339()),
+                    Some(format!("{:?}", installment.status)),
+                )
+            } else {
+                (false, None, None, None, None, None)
+            };
+        
         transactions.push(TransactionResponse {
-            uid: *uid,
+            uid: cash.uid,
             student_id: cash.student_id,
             amount: cash.cash,
-            note: String::new(),
-            description: String::from("交易记录"), // 添加description字段
+            note: cash.note.clone(),
+            description: if is_installment {
+                format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+            } else {
+                "普通付款".to_string()
+            },
+            is_installment,
+            installment_plan_id: plan_id,
+            installment_current: current,
+            installment_total: total,
+            installment_due_date: due_date_str,
+            installment_status: status_str,
         });
     }
     
@@ -279,6 +381,109 @@ fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
     })
 }
 
+#[tauri::command]
+fn update_installment_status(transaction_uid: u64, status: String) -> Result<(), String> {
+    init_database()?;
+    
+    let mut db = get_db()?;
+    let status_enum = match status.as_str() {
+        "Pending" => InstallmentStatus::Pending,
+        "Paid" => InstallmentStatus::Paid,
+        "Overdue" => InstallmentStatus::Overdue,
+        "Cancelled" => InstallmentStatus::Cancelled,
+        _ => return Err("无效的状态值".to_string()),
+    };
+    
+    if let Some(cash) = db.cash.cash_data.get_mut(&transaction_uid) {
+        cash.set_installment_status(status_enum);
+        
+        save(db.clone()).map_err(|e| format!("更新分期状态失败: {}", e))?;
+        save_db(db)?;
+        
+        Ok(())
+    } else {
+        Err("交易记录不存在".to_string())
+    }
+}
+
+#[tauri::command]
+fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, String> {
+    init_database()?;
+    
+    let mut db = get_db()?;
+    
+    // 解析日期字符串
+    let due_date = DateTime::parse_from_rfc3339(&due_date)
+        .map_err(|e| format!("日期格式错误: {}", e))?
+        .with_timezone(&Utc);
+    
+    let next_uid = db.cash.generate_next_installment(plan_id, due_date)
+        .map_err(|e| e.to_string())?;
+    
+    save(db.clone()).map_err(|e| format!("生成下一期分期失败: {}", e))?;
+    save_db(db)?;
+    
+    Ok(next_uid)
+}
+
+#[tauri::command]
+fn cancel_installment_plan(plan_id: u64) -> Result<usize, String> {
+    init_database()?;
+    
+    let mut db = get_db()?;
+    let cancelled_count = db.cash.cancel_installment_plan(plan_id);
+    
+    save(db.clone()).map_err(|e| format!("取消分期计划失败: {}", e))?;
+    save_db(db)?;
+    
+    Ok(cancelled_count)
+}
+
+#[tauri::command]
+fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, String> {
+    init_database()?;
+    
+    let db = get_db()?;
+    let installments = db.cash.get_installments_by_plan(plan_id);
+    let mut transactions = Vec::new();
+    
+    for cash in installments {
+        let (is_installment, plan_id, current, total, due_date_str, status_str) = 
+            if let Some(installment) = &cash.installment {
+                (
+                    true,
+                    Some(installment.plan_id),
+                    Some(installment.current_installment),
+                    Some(installment.total_installments),
+                    Some(installment.due_date.to_rfc3339()),
+                    Some(format!("{:?}", installment.status)),
+                )
+            } else {
+                (false, None, None, None, None, None)
+            };
+        
+        transactions.push(TransactionResponse {
+            uid: cash.uid,
+            student_id: cash.student_id,
+            amount: cash.cash,
+            note: cash.note.clone(),
+            description: if is_installment {
+                format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+            } else {
+                "普通付款".to_string()
+            },
+            is_installment,
+            installment_plan_id: plan_id,
+            installment_current: current,
+            installment_total: total,
+            installment_due_date: due_date_str,
+            installment_status: status_str,
+        });
+    }
+    
+    Ok(transactions)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -293,7 +498,12 @@ pub fn run() {
             add_cash_transaction,
             get_all_transactions,
             delete_cash_transaction,
-            get_dashboard_stats
+            get_dashboard_stats,
+            // 新增的分期付款相关命令
+            update_installment_status,
+            generate_next_installment,
+            cancel_installment_plan,
+            get_installments_by_plan
         ])
         .run(tauri::generate_context!())
         .expect("Error running app");
@@ -319,9 +529,15 @@ pub struct StudentScoresResponse {
 pub struct TransactionResponse {
     pub uid: u64,
     pub student_id: Option<u64>,
-    pub amount: i32,
-    pub note: String,
+    pub amount: i64,
+    pub note: Option<String>,
     pub description: String,
+    pub is_installment: bool,
+    pub installment_plan_id: Option<u64>,
+    pub installment_current: Option<u32>,
+    pub installment_total: Option<u32>,
+    pub installment_due_date: Option<String>,
+    pub installment_status: Option<String>,
 }
 
 #[derive(Serialize)]
