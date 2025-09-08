@@ -111,18 +111,18 @@ export class ApiService {
     }
   }
 
-  // 财务管理
-  static async addCashTransaction(studentUid: number | null, amount: number, note: string = '无') {
+  // 财务管理 - 普通交易
+  static async addCashTransaction(
+    studentUid: number | null, 
+    amount: number, 
+    note: string = ''
+  ) {
     try {
-      // 确保传递给后端的是有效的整数
-      const validAmount = Math.round(amount) || 0;
-      const validStudentUid = studentUid && !isNaN(studentUid) ? studentUid : null;
-      const validNote = note || '无';
-
       const rawData = await invoke<any>('add_cash_transaction', {
-        studentUid: validStudentUid,
-        amount: validAmount,
-        note: validNote
+        studentUid: studentUid || null,
+        amount,
+        note: note || null,
+        isInstallment: false
       });
       
       const transaction = transformTransactionData(rawData);
@@ -136,6 +136,44 @@ export class ApiService {
     } catch (error) {
       console.error('❌ [ApiService.addCashTransaction] 调用失败:', error);
       throw new Error(`添加财务记录失败: ${error}`);
+    }
+  }
+
+  // 财务管理 - 分期付款
+  static async addInstallmentTransaction(
+    studentUid: number | null,
+    totalAmount: number,
+    note: string = '',
+    totalInstallments: number,
+    frequency: string,
+    dueDate: string,
+    planId?: number
+  ) {
+    try {
+      const rawData = await invoke<any>('add_cash_transaction', {
+        studentUid: studentUid || null,
+        amount: totalAmount,
+        note: note || null,
+        isInstallment: true,
+        totalAmount,
+        totalInstallments,
+        frequency,
+        dueDate,
+        currentInstallment: 1,
+        planId: planId || null
+      });
+      
+      const transaction = transformTransactionData(rawData);
+      
+      // 验证转换后的数据
+      if (!validateTransactionData(transaction)) {
+        throw new Error('分期付款数据验证失败');
+      }
+      
+      return transaction;
+    } catch (error) {
+      console.error('❌ [ApiService.addInstallmentTransaction] 调用失败:', error);
+      throw new Error(`添加分期付款失败: ${error}`);
     }
   }
 
@@ -168,6 +206,54 @@ export class ApiService {
     }
   }
 
+  // 分期付款管理
+  static async updateInstallmentStatus(transactionUid: number, status: string) {
+    try {
+      return await invoke<null>('update_installment_status', {
+        transactionUid,
+        status
+      });
+    } catch (error) {
+      console.error('❌ [ApiService.updateInstallmentStatus] 调用失败:', error);
+      throw new Error(`更新分期付款状态失败: ${error}`);
+    }
+  }
+
+  static async generateNextInstallment(planId: number, dueDate: string) {
+    try {
+      return await invoke<number>('generate_next_installment', {
+        planId,
+        dueDate
+      });
+    } catch (error) {
+      console.error('❌ [ApiService.generateNextInstallment] 调用失败:', error);
+      throw new Error(`生成下一期分期失败: ${error}`);
+    }
+  }
+
+  static async cancelInstallmentPlan(planId: number) {
+    try {
+      return await invoke<number>('cancel_installment_plan', {
+        planId
+      });
+    } catch (error) {
+      console.error('❌ [ApiService.cancelInstallmentPlan] 调用失败:', error);
+      throw new Error(`取消分期计划失败: ${error}`);
+    }
+  }
+
+  static async getInstallmentsByPlan(planId: number) {
+    try {
+      const rawDataArray = await invoke<any[]>('get_installments_by_plan', {
+        planId
+      });
+      return transformTransactionDataArray(rawDataArray);
+    } catch (error) {
+      console.error('❌ [ApiService.getInstallmentsByPlan] 调用失败:', error);
+      throw new Error(`获取分期计划详情失败: ${error}`);
+    }
+  }
+
   // 统计数据
   static async getDashboardStats() {
     try {
@@ -187,8 +273,6 @@ export class ApiService {
   }
 
   // 窗口管理
-  // 注意：独立设置窗口功能已移除，设置现在通过主应用的标签页实现
-
   static async openMainWindow() {
     try {
       return await invoke<null>('open_main_window');
@@ -199,7 +283,7 @@ export class ApiService {
   }
 }
 
-// 类型定义
+// 类型定义 - 更新Transaction接口以支持分期付款
 export interface Student {
   uid: number
   name: string
@@ -213,16 +297,22 @@ export interface Student {
 
 export interface Transaction {
   uid: number
-  student_id: string
-  amount: number  // 明确使用number类型处理64位整数
+  student_id: number | null
+  amount: number
   description: string
-  note: string
+  note: string | null
+  is_installment: boolean
+  installment_plan_id: number | null
+  installment_current: number | null
+  installment_total: number | null
+  installment_due_date: string | null
+  installment_status: string | null
 }
 
 export interface DashboardStats {
   total_students: number
-  total_revenue: string
-  total_expense: string
+  total_revenue: number
+  total_expense: number
   average_score: number
   max_score: number
   active_courses: number

@@ -41,6 +41,16 @@
           <div class="card-value">{{ formatCurrency(netProfit) }}</div>
         </div>
       </div>
+
+      <!-- 新增：分期付款统计 -->
+      <div class="overview-card installment">
+        <div class="card-icon">📅</div>
+        <div class="card-content">
+          <h3>分期付款</h3>
+          <div class="card-value">{{ installmentCount }}</div>
+          <div class="card-subtext">待处理: {{ pendingInstallments }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 交易记录 -->
@@ -52,6 +62,7 @@
             <option value="all">全部交易</option>
             <option value="income">收入</option>
             <option value="expense">支出</option>
+            <option value="installment">分期付款</option> <!-- 新增筛选选项 -->
           </select>
           <input 
             v-model="transactionSearch" 
@@ -69,25 +80,45 @@
               <th>描述</th>
               <th>金额</th>
               <th>类型</th>
-              <th>备注</th> <!-- 新增备注列 -->
+              <th>状态</th> <!-- 新增状态列 -->
+              <th>备注</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="transaction in filteredTransactions" :key="transaction.id">
-              <td>{{ transaction.description }}</td>
+              <td>
+                {{ transaction.description }}
+                <span v-if="transaction.is_installment" class="installment-badge">
+                  分期 {{ transaction.installment_current }}/{{ transaction.installment_total }}
+                </span>
+              </td>
               <td :class="['amount', transaction.type]">
                 {{ formatTransactionAmount(transaction) }}
               </td>
               <td>
                 <span :class="['transaction-type', transaction.type]">
                   {{ transaction.type === 'income' ? '收入' : '支出' }}
+                  <span v-if="transaction.is_installment">(分期)</span>
                 </span>
               </td>
-              <td>{{ transaction.note || '-' }}</td> <!-- 显示备注 -->
+              <td>
+                <span v-if="transaction.is_installment" 
+                      :class="['status-badge', getStatusClass(transaction.installment_status)]">
+                  {{ getStatusText(transaction.installment_status) }}
+                </span>
+                <span v-else>-</span>
+              </td>
+              <td>{{ transaction.note || '-' }}</td>
               <td class="actions">
                 <button 
-                  class="delete-btn" 
+                  v-if="transaction.is_installment" 
+                  class="action-btn status-btn"
+                  @click="showUpdateStatus(transaction)"
+                  title="更新状态"
+                >🔄</button>
+                <button 
+                  class="action-btn delete-btn" 
                   @click="deleteTransaction(transaction.id)" 
                   title="快捷键: Delete"
                   aria-label="删除交易"
@@ -107,13 +138,30 @@
           <button class="close-btn" @click="closeModals" aria-label="关闭模态框">✖️</button>
         </div>
         <div class="modal-body">
+          <div class="payment-mode-toggle">
+            <button 
+              :class="['mode-btn', { active: !isInstallmentMode }]"
+              @click="isInstallmentMode = false"
+            >
+              普通付款
+            </button>
+            <button 
+              :class="['mode-btn', { active: isInstallmentMode }]"
+              @click="isInstallmentMode = true"
+            >
+              分期付款
+            </button>
+          </div>
+          
           <div class="form-group">
             <label for="transaction-type">类型</label>
-            <select id="transaction-type" v-model="currentTransaction.type">
+            <select id="transaction-type" v-model="currentTransaction.type" :disabled="isInstallmentMode">
               <option value="income">收入</option>
               <option value="expense">支出</option>
             </select>
+            <span v-if="isInstallmentMode" class="form-note">分期付款仅支持收入类型</span>
           </div>
+          
           <div class="form-group">
             <label for="transaction-amount">金额</label>
             <input 
@@ -127,6 +175,7 @@
               class="no-spinners"
             >
           </div>
+          
           <div class="form-group">
             <label for="student-id">学员 (可选)</label>
             <select 
@@ -143,6 +192,53 @@
               </option>
             </select>
           </div>
+          
+          <!-- 分期付款特定字段 -->
+          <div v-if="isInstallmentMode" class="installment-fields">
+            <div class="form-group">
+              <label for="installment-total">总期数</label>
+              <input 
+                id="installment-total" 
+                v-model.number="currentTransaction.installment_total" 
+                type="number" 
+                placeholder="例如: 12" 
+                min="2"
+                step="1"
+              >
+            </div>
+            
+            <div class="form-group">
+              <label for="installment-frequency">付款频率</label>
+              <select id="installment-frequency" v-model="currentTransaction.installment_frequency">
+                <option value="Weekly">每周</option>
+                <option value="Monthly" selected>每月</option>
+                <option value="Quarterly">每季度</option>
+                <option value="Custom">自定义</option>
+              </select>
+            </div>
+            
+            <div v-if="currentTransaction.installment_frequency === 'Custom'" class="form-group">
+              <label for="custom-frequency-days">自定义天数</label>
+              <input 
+                id="custom-frequency-days" 
+                v-model.number="currentTransaction.custom_frequency_days" 
+                type="number" 
+                placeholder="天数" 
+                min="1"
+                step="1"
+              >
+            </div>
+            
+            <div class="form-group">
+              <label for="installment-due-date">首次到期日</label>
+              <input 
+                id="installment-due-date" 
+                v-model="currentTransaction.installment_due_date" 
+                type="date"
+              >
+            </div>
+          </div>
+          
           <div class="form-group">
             <label for="transaction-note">备注</label>
             <textarea
@@ -164,6 +260,35 @@
         </div>
       </div>
     </div>
+
+    <!-- 更新分期状态模态框 -->
+    <div v-if="showUpdateStatusModal" class="modal-overlay" @click="closeModals">
+      <div class="modal" @click.stop role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
+        <div class="modal-header">
+          <h3 id="status-modal-title">更新分期状态</h3>
+          <button class="close-btn" @click="closeModals" aria-label="关闭模态框">✖️</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="status-select">选择状态</label>
+            <select id="status-select" v-model="selectedStatus">
+              <option value="Pending">待处理</option>
+              <option value="Paid">已支付</option>
+              <option value="Overdue">逾期</option>
+              <option value="Cancelled">已取消</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeModals">取消</button>
+          <button 
+            class="save-btn" 
+            @click="updateInstallmentStatus" 
+            :disabled="loading"
+          >更新</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -176,18 +301,27 @@ export default {
   setup() {
     const loading = ref(false)
     const transactions = ref([])
-    const students = ref([]) // 添加学员列表
+    const students = ref([])
     const transactionFilter = ref('all')
     const transactionSearch = ref('')
     const showAddTransaction = ref(false)
+    const showUpdateStatusModal = ref(false)
+    const isInstallmentMode = ref(false)
+    const selectedTransaction = ref(null)
+    const selectedStatus = ref('Pending')
     const abortController = ref(null)
-    const { showError } = inject('errorHandler')
+    const { showError, showSuccess } = inject('errorHandler')
 
     const currentTransaction = ref({
       type: 'income',
       amount: '',
       student_id: null,
-      note: ''
+      note: '',
+      // 分期付款特定字段
+      installment_total: 2,
+      installment_frequency: 'Monthly',
+      custom_frequency_days: 30,
+      installment_due_date: new Date().toISOString().split('T')[0]
     })
 
     // 计算属性
@@ -195,14 +329,18 @@ export default {
       let filtered = transactions.value
       
       if (transactionFilter.value !== 'all') {
-        filtered = filtered.filter(t => t.type === transactionFilter.value)
+        if (transactionFilter.value === 'installment') {
+          filtered = filtered.filter(t => t.is_installment)
+        } else {
+          filtered = filtered.filter(t => t.type === transactionFilter.value && !t.is_installment)
+        }
       }
       
       if (transactionSearch.value) {
         const search = transactionSearch.value.toLowerCase()
         filtered = filtered.filter(t => 
           t.description.toLowerCase().includes(search) ||
-          (t.note && t.note.toLowerCase().includes(search)) // 搜索备注
+          (t.note && t.note.toLowerCase().includes(search))
         )
       }
       
@@ -223,6 +361,17 @@ export default {
 
     const netProfit = computed(() => totalIncome.value - totalExpense.value)
 
+    // 新增：分期付款统计
+    const installmentCount = computed(() => {
+      return transactions.value.filter(t => t.is_installment).length
+    })
+
+    const pendingInstallments = computed(() => {
+      return transactions.value
+        .filter(t => t.is_installment && t.installment_status === 'Pending')
+        .length
+    })
+
     // 格式化方法
     const formatCurrency = (value) => {
       return new Intl.NumberFormat('zh-CN', { 
@@ -237,6 +386,27 @@ export default {
         style: 'currency', 
         currency: 'CNY' 
       }).format(amount)
+    }
+
+    // 状态处理方法
+    const getStatusClass = (status) => {
+      switch (status) {
+        case 'Paid': return 'status-paid'
+        case 'Pending': return 'status-pending'
+        case 'Overdue': return 'status-overdue'
+        case 'Cancelled': return 'status-cancelled'
+        default: return ''
+      }
+    }
+
+    const getStatusText = (status) => {
+      switch (status) {
+        case 'Paid': return '已支付'
+        case 'Pending': return '待处理'
+        case 'Overdue': return '逾期'
+        case 'Cancelled': return '已取消'
+        default: return status || '未知'
+      }
     }
 
     // 数据操作
@@ -266,12 +436,16 @@ export default {
         // 转换后端数据为前端格式
         transactions.value = cashTransactions.map(transaction => ({
           id: transaction.uid,
-          type: transaction.cash > 0 ? 'income' : 'expense',
+          type: transaction.amount > 0 ? 'income' : 'expense',
           description: transaction.student_id 
             ? `学员${transaction.student_id}缴费` 
             : '其他交易',
-          amount: Math.abs(transaction.cash),
-          note: transaction.note || '' // 添加备注字段
+          amount: Math.abs(transaction.amount),
+          note: transaction.note || '',
+          is_installment: transaction.is_installment,
+          installment_current: transaction.installment_current,
+          installment_total: transaction.installment_total,
+          installment_status: transaction.installment_status
         }))
         
       } catch (error) {
@@ -296,23 +470,56 @@ export default {
         return
       }
 
+      // 分期付款验证
+      if (isInstallmentMode.value) {
+        if (!currentTransaction.value.installment_total || currentTransaction.value.installment_total < 2) {
+          showError('输入错误', '分期付款至少需要2期')
+          return
+        }
+        
+        if (!currentTransaction.value.installment_due_date) {
+          showError('输入错误', '请选择首次到期日')
+          return
+        }
+      }
+
       loading.value = true
       try {
-        // 确保金额是有效的整数
-        const amount = Math.round(Math.abs(currentTransaction.value.amount))
-        const cashAmount = currentTransaction.value.type === 'income' 
-          ? amount 
-          : -amount
+        if (isInstallmentMode.value) {
+          // 处理分期付款
+          const frequency = currentTransaction.value.installment_frequency === 'Custom' 
+            ? `Custom${currentTransaction.value.custom_frequency_days || 30}`
+            : currentTransaction.value.installment_frequency
+          
+          // 转换为UTC日期字符串
+          const dueDate = new Date(currentTransaction.value.installment_due_date + 'T00:00:00Z').toISOString()
+          
+          await ApiService.addInstallmentTransaction(
+            currentTransaction.value.student_id,
+            currentTransaction.value.amount,
+            currentTransaction.value.note || '',
+            currentTransaction.value.installment_total,
+            frequency,
+            dueDate
+          )
+        } else {
+          // 处理普通付款
+          const amount = Math.round(Math.abs(currentTransaction.value.amount))
+          const cashAmount = currentTransaction.value.type === 'income' 
+            ? amount 
+            : -amount
 
-        await ApiService.addCashTransaction(
-          currentTransaction.value.student_id,
-          cashAmount,
-          currentTransaction.value.note || '无' // 传递备注
-        )
+          await ApiService.addCashTransaction(
+            currentTransaction.value.student_id,
+            cashAmount,
+            currentTransaction.value.note || ''
+          )
+        }
 
         // 重新加载数据
         await loadTransactions()
         closeModals()
+        showSuccess('成功', '交易已成功添加')
         
       } catch (error) {
         console.error('保存交易失败:', error)
@@ -328,6 +535,7 @@ export default {
         try {
           await ApiService.deleteCashTransaction(id)
           await loadTransactions()
+          showSuccess('成功', '交易已删除')
         } catch (error) {
           console.error('删除交易失败:', error)
           showError('删除失败', '删除交易记录时发生错误', error.message)
@@ -337,20 +545,54 @@ export default {
       }
     }
 
+    const showUpdateStatus = (transaction) => {
+      selectedTransaction.value = transaction
+      selectedStatus.value = transaction.installment_status || 'Pending'
+      showUpdateStatusModal.value = true
+    }
+
+    const updateInstallmentStatus = async () => {
+      if (!selectedTransaction.value) return
+      
+      loading.value = true
+      try {
+        await ApiService.updateInstallmentStatus(
+          selectedTransaction.value.id,
+          selectedStatus.value
+        )
+        
+        await loadTransactions()
+        closeModals()
+        showSuccess('成功', '分期状态已更新')
+      } catch (error) {
+        console.error('更新分期状态失败:', error)
+        showError('更新失败', '更新分期状态时发生错误', error.message)
+      } finally {
+        loading.value = false
+      }
+    }
+
     const closeModals = () => {
       showAddTransaction.value = false
+      showUpdateStatusModal.value = false
+      isInstallmentMode.value = false
+      selectedTransaction.value = null
       currentTransaction.value = {
         type: 'income',
         amount: '',
         student_id: null,
-        note: ''
+        note: '',
+        installment_total: 2,
+        installment_frequency: 'Monthly',
+        custom_frequency_days: 30,
+        installment_due_date: new Date().toISOString().split('T')[0]
       }
     }
 
     // 键盘事件处理
     const handleKeyDown = (event) => {
       // 如果模态框打开，只处理模态框内的快捷键
-      if (showAddTransaction.value) {
+      if (showAddTransaction.value || showUpdateStatusModal.value) {
         if (event.key === 'Escape') {
           closeModals()
         }
@@ -375,15 +617,10 @@ export default {
         event.preventDefault()
         loadTransactions()
       }
-      // Delete 删除交易
-      else if (event.key === 'Delete' && selectedTransaction) {
-        event.preventDefault()
-        deleteTransaction(selectedTransaction)
-      }
     }
 
     onMounted(() => {
-      loadStudents() // 加载学员列表
+      loadStudents()
       loadTransactions()
       window.addEventListener('keydown', handleKeyDown)
     })
@@ -398,27 +635,138 @@ export default {
     return {
       loading,
       transactions,
-      students, // 导出学员列表
+      students,
       filteredTransactions,
       transactionFilter,
       transactionSearch,
       showAddTransaction,
+      showUpdateStatusModal,
+      isInstallmentMode,
       currentTransaction,
       totalIncome,
       totalExpense,
       netProfit,
+      installmentCount,
+      pendingInstallments,
+      selectedStatus,
       formatCurrency,
       formatTransactionAmount,
       filterTransactions,
       deleteTransaction,
       saveTransaction,
-      closeModals
+      showUpdateStatus,
+      updateInstallmentStatus,
+      closeModals,
+      getStatusClass,
+      getStatusText
     }
   }
 }
 </script>
 
 <style scoped>
+.payment-mode-toggle {
+  display: flex;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+}
+
+.mode-btn.active {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.installment-fields {
+  border-left: 3px solid var(--accent-primary);
+  padding-left: 1rem;
+  margin: 1rem 0;
+}
+
+.form-note {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.installment-badge {
+  background: var(--accent-primary);
+  color: white;
+  padding: 0.1rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-paid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-overdue {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-cancelled {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  margin-right: 0.5rem;
+}
+
+.status-btn:hover {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.delete-btn:hover {
+  background-color: var(--accent-danger);
+  color: white;
+}
+
+.overview-card.installment {
+  border-left: 4px solid var(--accent-primary);
+}
+
+.card-subtext {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* 其他现有样式保持不变 */
 .financial-statistics {
   height: 100%;
   display: flex;
@@ -427,7 +775,6 @@ export default {
   position: relative;
 }
 
-/* 隐藏数字输入框的上下调整按钮 */
 .no-spinners::-webkit-outer-spin-button,
 .no-spinners::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -438,7 +785,6 @@ export default {
   -moz-appearance: textfield;
 }
 
-/* 加载进度条 */
 .loading-progress {
   position: absolute;
   top: 0;
@@ -491,7 +837,6 @@ export default {
   cursor: not-allowed;
 }
 
-/* 总览卡片 */
 .overview-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -536,7 +881,6 @@ export default {
   color: var(--accent-primary);
 }
 
-/* 交易记录 */
 .transactions-section {
   background-color: var(--bg-secondary);
   border-radius: 8px;
@@ -632,21 +976,6 @@ export default {
   gap: 0.5rem;
 }
 
-.delete-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.delete-btn:hover {
-  background-color: var(--accent-danger);
-  color: white;
-}
-
-/* 模态框样式 */
 .modal-overlay {
   position: fixed;
   top: 0;

@@ -30,8 +30,14 @@ export function transformTransactionData(rawData: any): Transaction {
     uid: rawData.uid,
     student_id: rawData.student_id,
     amount: rawData.amount,
-    description: rawData.description,
-    note: rawData.note || '' // 添加备注字段
+    description: rawData.description || '',
+    note: rawData.note || '',
+    is_installment: rawData.is_installment || false,
+    installment_plan_id: rawData.installment_plan_id || null,
+    installment_current: rawData.installment_current || null,
+    installment_total: rawData.installment_total || null,
+    installment_due_date: rawData.installment_due_date || null,
+    installment_status: rawData.installment_status || null
   };
 }
 
@@ -90,13 +96,30 @@ export function validateStudentData(student: any): boolean {
  * @returns 验证结果
  */
 export function validateTransactionData(transaction: any): boolean {
-  return (
+  // 基础验证
+  const basicValidation = (
     typeof transaction.uid === 'number' &&
     (typeof transaction.student_id === 'number' || transaction.student_id === null) &&
     typeof transaction.amount === 'number' &&
     typeof transaction.description === 'string' &&
-    typeof transaction.note === 'string'
+    (typeof transaction.note === 'string' || transaction.note === null) &&
+    typeof transaction.is_installment === 'boolean'
   );
+  
+  if (!basicValidation) return false;
+  
+  // 如果是分期付款，验证相关字段
+  if (transaction.is_installment) {
+    return (
+      typeof transaction.installment_plan_id === 'number' &&
+      typeof transaction.installment_current === 'number' &&
+      typeof transaction.installment_total === 'number' &&
+      (typeof transaction.installment_due_date === 'string' || transaction.installment_due_date === null) &&
+      (typeof transaction.installment_status === 'string' || transaction.installment_status === null)
+    );
+  }
+  
+  return true;
 }
 
 /**
@@ -113,4 +136,47 @@ export function validateDashboardStatsData(stats: any): boolean {
     typeof stats.max_score === 'number' &&
     typeof stats.active_courses === 'number'
   );
+}
+
+/**
+ * 检查是否为分期付款交易
+ * @param transaction 交易对象
+ * @returns 是否为分期付款
+ */
+export function isInstallmentTransaction(transaction: Transaction): boolean {
+  return transaction.is_installment && 
+         transaction.installment_plan_id !== null &&
+         transaction.installment_current !== null &&
+         transaction.installment_total !== null;
+}
+
+/**
+ * 获取分期付款状态标签
+ * @param status 状态字符串
+ * @returns 对应的中文标签
+ */
+export function getInstallmentStatusLabel(status: string | null): string {
+  if (!status) return '未知';
+  
+  switch (status) {
+    case 'Pending': return '待处理';
+    case 'Paid': return '已支付';
+    case 'Overdue': return '逾期';
+    case 'Cancelled': return '已取消';
+    default: return status;
+  }
+}
+
+/**
+ * 格式化分期付款描述
+ * @param transaction 交易对象
+ * @returns 格式化后的描述
+ */
+export function formatInstallmentDescription(transaction: Transaction): string {
+  if (!isInstallmentTransaction(transaction)) {
+    return transaction.description;
+  }
+  
+  const statusLabel = getInstallmentStatusLabel(transaction.installment_status);
+  return `分期付款 ${transaction.installment_current}/${transaction.installment_total} (${statusLabel})`;
 }
