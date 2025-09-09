@@ -1,14 +1,14 @@
 // src-tauri/src/lib.rs
-use tauri::{WindowBuilder};
-use qmx_backend_lib::{database, student, cash};
+use cash::{Cash, InstallmentStatus, PaymentFrequency};
+use chrono::{DateTime, Utc};
 use qmx_backend_lib::init::init;
 use qmx_backend_lib::save::save;
-use student::{Class, Student};
-use cash::{Cash, PaymentFrequency, InstallmentStatus};
-use std::sync::Mutex;
+use qmx_backend_lib::{cash, database, student};
 use serde::Serialize;
+use std::sync::Mutex;
 use std::sync::OnceLock;
-use chrono::{DateTime, Utc};
+use student::{Class, Student};
+use tauri::WindowBuilder;
 
 // 全局数据库实例 - 使用 Mutex 保证线程安全
 static DB: OnceLock<Mutex<Option<database::Database>>> = OnceLock::new();
@@ -21,8 +21,8 @@ fn init_database() -> Result<(), String> {
             Ok(database) => {
                 DB.get_or_init(|| Mutex::new(Some(database)));
                 Ok(())
-            },
-            Err(e) => Err(format!("初始化后端失败: {}", e))
+            }
+            Err(e) => Err(format!("初始化后端失败: {}", e)),
         }
     } else {
         Ok(())
@@ -32,9 +32,11 @@ fn init_database() -> Result<(), String> {
 fn get_db() -> Result<database::Database, String> {
     // 获取 OnceLock 中的 Mutex
     let db_mutex = DB.get().ok_or("数据库未初始化")?;
-    
+
     // 锁定 Mutex 并克隆数据库实例
-    let db_guard = db_mutex.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    let db_guard = db_mutex
+        .lock()
+        .map_err(|e| format!("获取数据库锁失败: {}", e))?;
     db_guard.clone().ok_or("数据库未初始化".to_string())
 }
 
@@ -42,9 +44,11 @@ fn get_db() -> Result<database::Database, String> {
 fn save_db(db: database::Database) -> Result<(), String> {
     // 获取 OnceLock 中的 Mutex
     let db_mutex = DB.get().ok_or("数据库未初始化")?;
-    
+
     // 锁定 Mutex 并更新数据库实例
-    let mut db_guard = db_mutex.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    let mut db_guard = db_mutex
+        .lock()
+        .map_err(|e| format!("获取数据库锁失败: {}", e))?;
     *db_guard = Some(db);
     Ok(())
 }
@@ -62,29 +66,36 @@ fn open_main_window(app: tauri::AppHandle) {
 
 // 学员管理命令
 #[tauri::command]
-fn add_student(name: String, age: u8, class_type: String, phone: String, note: String) -> Result<StudentResponse, String> {
+fn add_student(
+    name: String,
+    age: u8,
+    class_type: String,
+    phone: String,
+    note: String,
+) -> Result<StudentResponse, String> {
     init_database()?;
-    
+
     let class = match class_type.as_str() {
         "TenTry" => Class::TenTry,
         "Month" => Class::Month,
         "Year" => Class::Year,
         _ => Class::Others,
     };
-    
+
     let mut student = Student::new();
-    student.set_name(name)
-         .set_age(age)
-         .set_class(class)
-         .set_phone(phone.clone())
-         .set_note(note.clone());
-    
+    student
+        .set_name(name)
+        .set_age(age)
+        .set_class(class)
+        .set_phone(phone.clone())
+        .set_note(note.clone());
+
     let mut db = get_db()?;
     db.student.insert(student.clone());
-    
+
     save(db.clone()).map_err(|e| format!("保存失败: {}", e))?;
     save_db(db)?;
-    
+
     Ok(StudentResponse {
         uid: student.uid(),
         name: student.name().to_string(),
@@ -98,10 +109,10 @@ fn add_student(name: String, age: u8, class_type: String, phone: String, note: S
 #[tauri::command]
 fn get_all_students() -> Result<Vec<StudentResponse>, String> {
     init_database()?;
-    
+
     let db = get_db()?;
     let mut students = Vec::new();
-    
+
     for (uid, student) in db.student.iter() {
         students.push(StudentResponse {
             uid: *uid,
@@ -112,22 +123,22 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
             note: student.note().to_string(),
         });
     }
-    
+
     Ok(students)
 }
 
 #[tauri::command]
 fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
     if let Some(student) = db.student.student_data.get_mut(&student_uid) {
         student.add_ring(score);
-        
+
         save(db.clone()).map_err(|e| format!("保存分数失败: {}", e))?;
-        
+
         save_db(db)?;
-        
+
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -137,7 +148,7 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
 #[tauri::command]
 fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String> {
     init_database()?;
-    
+
     let db = get_db()?;
     if let Some(student) = db.student.get(&student_uid) {
         Ok(StudentScoresResponse {
@@ -149,9 +160,16 @@ fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String>
 }
 
 #[tauri::command]
-fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, class_type: Option<String>, phone: Option<String>, note: Option<String>) -> Result<(), String> {
+fn update_student_info(
+    student_uid: u64,
+    name: Option<String>,
+    age: Option<u8>,
+    class_type: Option<String>,
+    phone: Option<String>,
+    note: Option<String>,
+) -> Result<(), String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
     if let Some(student) = db.student.student_data.get_mut(&student_uid) {
         if let Some(name) = name {
@@ -172,14 +190,14 @@ fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, 
         if let Some(phone) = phone {
             student.set_phone(phone);
         }
-        
+
         if let Some(note) = note {
             student.set_note(note);
         }
-        
+
         save(db.clone()).map_err(|e| format!("更新学员信息失败: {}", e))?;
         save_db(db)?;
-        
+
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -189,13 +207,13 @@ fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, 
 #[tauri::command]
 fn delete_student(student_uid: u64) -> Result<(), String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
     if db.student.student_data.remove(&student_uid).is_some() {
         save(db.clone()).map_err(|e| format!("删除学员失败: {}", e))?;
-        
+
         save_db(db)?;
-        
+
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -203,7 +221,7 @@ fn delete_student(student_uid: u64) -> Result<(), String> {
 }
 
 // 财务管理命令
-[tauri::command]
+#[tauri::command]
 fn add_cash_transaction(
     student_uid: Option<u64>,
     amount: i64,
@@ -217,35 +235,36 @@ fn add_cash_transaction(
     plan_id: Option<u64>,
 ) -> Result<TransactionResponse, String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
-    
+
     let cash = if is_installment.unwrap_or(false) {
         // 创建分期付款
         let total_amount = total_amount.ok_or("分期付款需要指定总金额")?;
         let total_installments = total_installments.ok_or("分期付款需要指定总期数")?;
         let current_installment = current_installment.unwrap_or(1);
         let due_date_str = due_date.ok_or("分期付款需要指定到期日期")?;
-        
+
         // 解析日期字符串
         let due_date = DateTime::parse_from_rfc3339(&due_date_str)
             .map_err(|e| format!("日期格式错误: {}", e))?
             .with_timezone(&Utc);
-        
+
         // 解析付款频率
         let frequency_enum = match frequency.as_deref() {
             Some("Weekly") => PaymentFrequency::Weekly,
             Some("Monthly") => PaymentFrequency::Monthly,
             Some("Quarterly") => PaymentFrequency::Quarterly,
             Some(custom) if custom.starts_with("Custom") => {
-                let days = custom.trim_start_matches("Custom")
+                let days = custom
+                    .trim_start_matches("Custom")
                     .parse()
                     .map_err(|_| "自定义频率格式错误，应为Custom<天数>")?;
                 PaymentFrequency::Custom(days)
-            },
+            }
             _ => PaymentFrequency::Monthly, // 默认月度
         };
-        
+
         Cash::new_installment(
             student_uid,
             total_amount,
@@ -262,14 +281,14 @@ fn add_cash_transaction(
         cash.set_note(note.clone());
         cash
     };
-    
+
     db.cash.insert(cash.clone());
-    
+
     save(db.clone()).map_err(|e| format!("保存交易记录失败: {}", e))?;
     save_db(db)?;
-    
+
     // 构建响应
-    let (is_installment, plan_id, current, total, due_date_str, status_str) = 
+    let (is_installment, plan_id, current, total, due_date_str, status_str) =
         if let Some(installment) = &cash.installment {
             (
                 true,
@@ -282,7 +301,7 @@ fn add_cash_transaction(
         } else {
             (false, None, None, None, None, None)
         };
-    
+
     Ok(TransactionResponse {
         uid: cash.uid,
         student_id: cash.student_id,
@@ -305,12 +324,12 @@ fn add_cash_transaction(
 #[tauri::command]
 fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
     init_database()?;
-    
+
     let db = get_db()?;
     let mut transactions = Vec::new();
-    
+
     for (_, cash) in db.cash.iter() {
-        let (is_installment, plan_id, current, total, due_date_str, status_str) = 
+        let (is_installment, plan_id, current, total, due_date_str, status_str) =
             if let Some(installment) = &cash.installment {
                 (
                     true,
@@ -323,7 +342,7 @@ fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
             } else {
                 (false, None, None, None, None, None)
             };
-        
+
         transactions.push(TransactionResponse {
             uid: cash.uid,
             student_id: cash.student_id,
@@ -342,20 +361,20 @@ fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
             installment_status: status_str,
         });
     }
-    
+
     Ok(transactions)
 }
 
 #[tauri::command]
 fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
     if db.cash.cash_data.remove(&transaction_uid).is_some() {
         save(db.clone()).map_err(|e| format!("删除交易记录失败: {}", e))?;
-        
+
         save_db(db)?;
-        
+
         Ok(())
     } else {
         Err("交易记录不存在".to_string())
@@ -366,11 +385,11 @@ fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
 #[tauri::command]
 fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
     init_database()?;
-    
+
     let db = get_db()?;
     let dashboard_stats = qmx_backend_lib::get_dashboard_stats(&db.student, &db.cash)
         .map_err(|e| format!("获取仪表盘统计失败: {}", e))?;
-    
+
     Ok(DashboardStatsResponse {
         total_students: dashboard_stats.total_students,
         total_revenue: dashboard_stats.total_revenue,
@@ -384,7 +403,7 @@ fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
 #[tauri::command]
 fn update_installment_status(transaction_uid: u64, status: String) -> Result<(), String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
     let status_enum = match status.as_str() {
         "Pending" => InstallmentStatus::Pending,
@@ -393,13 +412,13 @@ fn update_installment_status(transaction_uid: u64, status: String) -> Result<(),
         "Cancelled" => InstallmentStatus::Cancelled,
         _ => return Err("无效的状态值".to_string()),
     };
-    
+
     if let Some(cash) = db.cash.cash_data.get_mut(&transaction_uid) {
         cash.set_installment_status(status_enum);
-        
+
         save(db.clone()).map_err(|e| format!("更新分期状态失败: {}", e))?;
         save_db(db)?;
-        
+
         Ok(())
     } else {
         Err("交易记录不存在".to_string())
@@ -409,46 +428,48 @@ fn update_installment_status(transaction_uid: u64, status: String) -> Result<(),
 #[tauri::command]
 fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
-    
+
     // 解析日期字符串
     let due_date = DateTime::parse_from_rfc3339(&due_date)
         .map_err(|e| format!("日期格式错误: {}", e))?
         .with_timezone(&Utc);
-    
-    let next_uid = db.cash.generate_next_installment(plan_id, due_date)
+
+    let next_uid = db
+        .cash
+        .generate_next_installment(plan_id, due_date)
         .map_err(|e| e.to_string())?;
-    
+
     save(db.clone()).map_err(|e| format!("生成下一期分期失败: {}", e))?;
     save_db(db)?;
-    
+
     Ok(next_uid)
 }
 
 #[tauri::command]
 fn cancel_installment_plan(plan_id: u64) -> Result<usize, String> {
     init_database()?;
-    
+
     let mut db = get_db()?;
     let cancelled_count = db.cash.cancel_installment_plan(plan_id);
-    
+
     save(db.clone()).map_err(|e| format!("取消分期计划失败: {}", e))?;
     save_db(db)?;
-    
+
     Ok(cancelled_count)
 }
 
 #[tauri::command]
 fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, String> {
     init_database()?;
-    
+
     let db = get_db()?;
     let installments = db.cash.get_installments_by_plan(plan_id);
     let mut transactions = Vec::new();
-    
+
     for cash in installments {
-        let (is_installment, plan_id, current, total, due_date_str, status_str) = 
+        let (is_installment, plan_id, current, total, due_date_str, status_str) =
             if let Some(installment) = &cash.installment {
                 (
                     true,
@@ -461,7 +482,7 @@ fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, St
             } else {
                 (false, None, None, None, None, None)
             };
-        
+
         transactions.push(TransactionResponse {
             uid: cash.uid,
             student_id: cash.student_id,
@@ -480,7 +501,7 @@ fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, St
             installment_status: status_str,
         });
     }
-    
+
     Ok(transactions)
 }
 
@@ -508,7 +529,6 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Error running app");
 }
-
 
 #[derive(Serialize)]
 pub struct StudentResponse {
@@ -549,4 +569,3 @@ pub struct DashboardStatsResponse {
     pub max_score: f64,
     pub active_courses: usize,
 }
-
