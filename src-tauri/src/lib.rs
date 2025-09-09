@@ -3,7 +3,7 @@ use tauri::{WindowBuilder};
 use qmx_backend_lib::{database, student, cash};
 use qmx_backend_lib::init::init;
 use qmx_backend_lib::save::save;
-use student::{Person, Class, Student};
+use student::{Class, Student};
 use cash::{Cash, PaymentFrequency, InstallmentStatus};
 use std::sync::Mutex;
 use serde::Serialize;
@@ -72,26 +72,26 @@ fn add_student(name: String, age: u8, class_type: String, phone: String, note: S
         _ => Class::Others,
     };
     
-    let mut person = Person::new();
-    person.set_name(name)
+    let mut student = Student::new();
+    student.set_name(name)
          .set_age(age)
          .set_class(class)
          .set_phone(phone.clone())
          .set_note(note.clone());
     
     let mut db = get_db()?;
-    db.student.insert(person.clone());
+    db.student.insert(student.clone());
     
     save(db.clone()).map_err(|e| format!("保存失败: {}", e))?;
     save_db(db)?;
     
     Ok(StudentResponse {
-        uid: person.uid(),
-        name: person.name().to_string(),
-        age: person.age(),
-        class: format!("{:?}", person.class()),
-        phone: person.phone().to_string(),
-        note: person.note().to_string(),
+        uid: student.uid(),
+        name: student.name().to_string(),
+        age: student.age(),
+        class: format!("{:?}", student.class()),
+        phone: student.phone().to_string(),
+        note: student.note().to_string(),
     })
 }
 
@@ -102,14 +102,14 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
     let db = get_db()?;
     let mut students = Vec::new();
     
-    for (uid, person) in db.student.iter() {
+    for (uid, student) in db.student.iter() {
         students.push(StudentResponse {
             uid: *uid,
-            name: person.name().to_string(),
-            age: person.age(),
-            class: format!("{:?}", person.class()),
-            phone: person.phone().to_string(),
-            note: person.note().to_string(),
+            name: student.name().to_string(),
+            age: student.age(),
+            class: format!("{:?}", student.class()),
+            phone: student.phone().to_string(),
+            note: student.note().to_string(),
         });
     }
     
@@ -121,8 +121,8 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
     init_database()?;
     
     let mut db = get_db()?;
-    if let Some(person) = db.student.student_data.get_mut(&student_uid) {
-        person.add_ring(score);
+    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
+        student.add_ring(score);
         
         save(db.clone()).map_err(|e| format!("保存分数失败: {}", e))?;
         
@@ -139,9 +139,9 @@ fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String>
     init_database()?;
     
     let db = get_db()?;
-    if let Some(person) = db.student.get(&student_uid) {
+    if let Some(student) = db.student.get(&student_uid) {
         Ok(StudentScoresResponse {
-            rings: person.rings().clone(),
+            rings: student.rings().clone(),
         })
     } else {
         Err("学员不存在".to_string())
@@ -153,12 +153,12 @@ fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, 
     init_database()?;
     
     let mut db = get_db()?;
-    if let Some(person) = db.student.student_data.get_mut(&student_uid) {
+    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
         if let Some(name) = name {
-            person.set_name(name);
+            student.set_name(name);
         }
         if let Some(age) = age {
-            person.set_age(age);
+            student.set_age(age);
         }
         if let Some(class_type) = class_type {
             let class = match class_type.as_str() {
@@ -167,14 +167,14 @@ fn update_student_info(student_uid: u64, name: Option<String>, age: Option<u8>, 
                 "Year" => Class::Year,
                 _ => Class::Others,
             };
-            person.set_class(class);
+            student.set_class(class);
         }
         if let Some(phone) = phone {
-            person.set_phone(phone);
+            student.set_phone(phone);
         }
         
         if let Some(note) = note {
-            person.set_note(note);
+            student.set_note(note);
         }
         
         save(db.clone()).map_err(|e| format!("更新学员信息失败: {}", e))?;
@@ -543,8 +543,8 @@ pub struct TransactionResponse {
 #[derive(Serialize)]
 pub struct DashboardStatsResponse {
     pub total_students: usize,
-    pub total_revenue: i32,
-    pub total_expense: i32,
+    pub total_revenue: i64,
+    pub total_expense: i64,
     pub average_score: f64,
     pub max_score: f64,
     pub active_courses: usize,
