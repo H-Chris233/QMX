@@ -7,7 +7,7 @@ use qmx_backend_lib::{cash, database, student};
 use serde::Serialize;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use student::{Class, Student};
+use student::{Class, Student, Subject};
 use tauri::WindowBuilder;
 
 // 全局数据库实例 - 使用 Mutex 保证线程安全
@@ -72,6 +72,7 @@ fn add_student(
     class_type: String,
     phone: String,
     note: String,
+    subject: String,
 ) -> Result<StudentResponse, String> {
     init_database()?;
 
@@ -82,13 +83,20 @@ fn add_student(
         _ => Class::Others,
     };
 
+    let subject_enum = match subject.as_str() {
+        "Shooting" => Subject::Shooting,
+        "Archery" => Subject::Archery,
+        _ => Subject::Others,
+    };
+
     let mut student = Student::new();
     student
         .set_name(name)
         .set_age(age)
         .set_class(class)
         .set_phone(phone.clone())
-        .set_note(note.clone());
+        .set_note(note.clone())
+        .set_subject(subject_enum);
 
     let mut db = get_db()?;
     db.student.insert(student.clone());
@@ -103,6 +111,8 @@ fn add_student(
         class: format!("{:?}", student.class()),
         phone: student.phone().to_string(),
         note: student.note().to_string(),
+        subject: format!("{:?}", student.subject()),
+        lesson_left: student.lesson_left(),
     })
 }
 
@@ -121,6 +131,8 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
             class: format!("{:?}", student.class()),
             phone: student.phone().to_string(),
             note: student.note().to_string(),
+            subject: format!("{:?}", student.subject()),
+            lesson_left: student.lesson_left(),
         });
     }
 
@@ -167,6 +179,8 @@ fn update_student_info(
     class_type: Option<String>,
     phone: Option<String>,
     note: Option<String>,
+    subject: Option<String>,
+    lesson_left: Option<u32>,
 ) -> Result<(), String> {
     init_database()?;
 
@@ -193,6 +207,17 @@ fn update_student_info(
 
         if let Some(note) = note {
             student.set_note(note);
+        }
+        if let Some(subject) = subject {
+            let subject_enum = match subject.as_str() {
+                "Shooting" => Subject::Shooting,
+                "Archery" => Subject::Archery,
+                _ => Subject::Others,
+            };
+            student.set_subject(subject_enum);
+        }
+        if let Some(lesson_left) = lesson_left {
+            student.set_lesson_left(lesson_left);
         }
 
         save(db.clone()).map_err(|e| format!("更新学员信息失败: {}", e))?;
@@ -538,6 +563,8 @@ pub struct StudentResponse {
     pub class: String,
     pub phone: String,
     pub note: String,
+    pub subject: String,
+    pub lesson_left: Option<u32>,
 }
 
 #[derive(Serialize)]

@@ -16,7 +16,9 @@ export function transformStudentData(rawData: any): Student {
     phone: rawData.phone,
     rings: Array.isArray(rawData.rings) ? rawData.rings : [],
     note: rawData.note || '',
-    cash: rawData.cash || ''
+    cash: rawData.cash || '',
+    subject: rawData.subject || 'Others',
+    lesson_left: rawData.lesson_left
   };
 }
 
@@ -86,7 +88,9 @@ export function validateStudentData(student: any): boolean {
     typeof student.name === 'string' &&
     typeof student.age === 'number' &&
     typeof student.class === 'string' &&
-    typeof student.phone === 'string'
+    typeof student.phone === 'string' &&
+    typeof student.subject === 'string' &&
+    (student.lesson_left === undefined || typeof student.lesson_left === 'number')
   );
 }
 

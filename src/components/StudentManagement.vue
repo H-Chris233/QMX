@@ -94,33 +94,55 @@
           <button class="close-btn" @click="closeModals">✖️</button>
         </div>
         <div class="modal-body">
-  <div class="form-group">
-    <label>姓名</label>
-    <input v-model="currentStudent.name" type="text" placeholder="请输入学员姓名">
-  </div>
-  <div class="form-group">
-    <label>年龄</label>
-    <input v-model.number="currentStudent.age" type="number" placeholder="请输入年龄" min="1" max="120">
-  </div>
-  <div class="form-group">
-    <label>电话</label>
-    <input v-model="currentStudent.phone" type="tel" placeholder="请输入电话号码">
-  </div>
-  <div class="form-group">
-    <label>课程类型</label>
-    <select v-model="currentStudent.classType">
-      <option value="">请选择课程</option>
-      <option value="TenTry">体验课 (10次)</option>
-      <option value="Month">月卡</option>
-      <option value="Year">年卡</option>
-      <option value="Others">其他</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>备注</label>
-      <textarea v-model="currentStudent.note" rows="3" placeholder="请输入备注信息"></textarea>
-  </div>
-</div>
+          <!-- 科目选择切换按钮 -->
+          <div class="subject-toggle">
+            <button 
+              :class="['subject-btn', { active: currentStudent.subject === 'Shooting' }]"
+              @click="currentStudent.subject = 'Shooting'"
+            >
+              射击
+            </button>
+            <button 
+              :class="['subject-btn', { active: currentStudent.subject === 'Archery' }]"
+              @click="currentStudent.subject = 'Archery'"
+            >
+              射箭
+            </button>
+            <button 
+              :class="['subject-btn', { active: currentStudent.subject === 'Others' }]"
+              @click="currentStudent.subject = 'Others'"
+            >
+              其他
+            </button>
+          </div>
+          
+          <div class="form-group">
+            <label>姓名</label>
+            <input v-model="currentStudent.name" type="text" placeholder="请输入学员姓名">
+          </div>
+          <div class="form-group">
+            <label>年龄</label>
+            <input v-model.number="currentStudent.age" type="number" placeholder="请输入年龄" min="1" max="120">
+          </div>
+          <div class="form-group">
+            <label>电话</label>
+            <input v-model="currentStudent.phone" type="tel" placeholder="请输入电话号码">
+          </div>
+          <div class="form-group">
+            <label>课程类型</label>
+            <select v-model="currentStudent.classType">
+              <option value="">请选择课程</option>
+              <option value="TenTry">体验课 (10次)</option>
+              <option value="Month">月卡</option>
+              <option value="Year">年卡</option>
+              <option value="Others">其他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>备注</label>
+            <textarea v-model="currentStudent.note" rows="3" placeholder="请输入备注信息"></textarea>
+          </div>
+        </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals">取消</button>
           <button class="save-btn" @click="saveStudent">保存</button>
@@ -178,7 +200,8 @@ export default {
   age: '',
   phone: '',
   classType: '',
-  note: ''
+  note: '',
+  subject: 'Shooting'
 })
     const currentScoreStudent = ref({})
     const newScore = ref('')
@@ -243,7 +266,8 @@ export default {
   age: student.age,
   phone: student.phone,
   classType: student.class,
-  note: student.note || ''
+  note: student.note || '',
+  subject: student.subject || 'Shooting'
 }
       showEditModal.value = true
     }
@@ -288,7 +312,8 @@ export default {
             currentStudent.value.age,
             currentStudent.value.classType || 'Others',
             currentStudent.value.phone,
-            currentStudent.value.note
+            currentStudent.value.note,
+            currentStudent.value.subject
           )
         } else {
           // 编辑现有学员
@@ -297,7 +322,8 @@ export default {
             age: currentStudent.value.age,
             classType: currentStudent.value.classType,
             phone: currentStudent.value.phone,
-            note: currentStudent.value.note
+            note: currentStudent.value.note,
+            subject: currentStudent.value.subject
           })
         }
 
@@ -346,7 +372,9 @@ export default {
         name: '',
         age: '',
         phone: '',
-        classType: ''
+        classType: '',
+        note: '',
+        subject: 'Shooting'
       }
     }
 
@@ -743,6 +771,30 @@ export default {
 
 .save-btn:hover {
   background-color: #1976d2;
+}
+
+/* 科目选择切换按钮样式 - 参考收支统计页面 */
+.subject-toggle {
+  display: flex;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.subject-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+}
+
+.subject-btn.active {
+  background: var(--accent-primary);
+  color: white;
 }
 
 .form-group textarea {

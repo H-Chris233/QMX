@@ -13,14 +13,15 @@ import {
 
 export class ApiService {
   // 学员管理
-  static async addStudent(name: string, age: number, classType: string, phone: string, note: string) {
+  static async addStudent(name: string, age: number, classType: string, phone: string, note: string, subject: string) {
     try {
       const rawData = await invoke<any>('add_student', {
         name,
         age,
         classType,
         phone,
-        note
+        note,
+        subject
       });
       
       const student = transformStudentData(rawData);
@@ -84,6 +85,8 @@ export class ApiService {
     classType?: string
     phone?: string
     note?: string
+    subject?: string
+    lessonLeft?: number
   }) {
     try {
       return await invoke<null>('update_student_info', {
@@ -92,7 +95,9 @@ export class ApiService {
         age: updates.age,
         classType: updates.classType,
         phone: updates.phone,
-        note: updates.note
+        note: updates.note,
+        subject: updates.subject,
+        lessonLeft: updates.lessonLeft
       });
     } catch (error) {
       console.error('❌ [ApiService.updateStudentInfo] 调用失败:', error);
@@ -293,6 +298,8 @@ export interface Student {
   rings: number[]
   note: string
   cash: string
+  subject: string
+  lesson_left?: number
 }
 
 export interface Transaction {
