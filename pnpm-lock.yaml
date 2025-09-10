@@ -14,6 +14,9 @@ importers:
       '@tauri-apps/plugin-opener':
         specifier: ^2
         version: 2.3.0
+      libphonenumber-js:
+        specifier: ^1.12.15
+        version: 1.12.15
       vue:
         specifier: ^3.5.13
         version: 3.5.17(typescript@5.6.3)
@@ -486,6 +489,9 @@ packages:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
 
+  libphonenumber-js@1.12.15:
+    resolution: {integrity: sha512-TMDCtIhWUDHh91wRC+wFuGlIzKdPzaTUHHVrIZ3vPUEoNaXFLrsIQ1ZpAeZeXApIF6rvDksMTvjrIQlLKaYxqQ==}
+
   magic-string@0.30.17:
     resolution: {integrity: sha512-sNPKHvyjVf7gyjwS4xGTaW/mCnF8wnjtifKBEhxfZ7E/S8tQ0rssrwGNn6q8JH/ohItJfSQp9mBtQYuTlH5QnA==}
 
@@ -938,6 +944,8 @@ snapshots:
     optional: true
 
   he@1.2.0: {}
+
+  libphonenumber-js@1.12.15: {}
 
   magic-string@0.30.17:
     dependencies:
