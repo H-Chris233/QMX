@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/data/data/com.termux/files/home/qmx_backend_lib"
+    ]
+  }
+}
