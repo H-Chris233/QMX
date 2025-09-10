@@ -1,10 +1,10 @@
-// 数据转换工具 - 将后端返回的 BTreeMap 转换为前端期望的对象结构
+// 数据转换与校验工具
 
 import { Student, Transaction, DashboardStats } from './ApiService';
 
 /**
- * 将 BTreeMap 数据转换为 Student 对象
- * @param rawData 后端返回的 BTreeMap 数据
+ * 将后端返回的数据转换为 Student 对象
+ * @param rawData 后端返回的数据
  * @returns 转换后的 Student 对象
  */
 export function transformStudentData(rawData: any): Student {
@@ -21,8 +21,8 @@ export function transformStudentData(rawData: any): Student {
 }
 
 /**
- * 将 BTreeMap 数据转换为 Transaction 对象
- * @param rawData 后端返回的 BTreeMap 数据
+ * 将后端返回的数据转换为 Transaction 对象
+ * @param rawData 后端返回的数据
  * @returns 转换后的 Transaction 对象
  */
 export function transformTransactionData(rawData: any): Transaction {
@@ -42,8 +42,8 @@ export function transformTransactionData(rawData: any): Transaction {
 }
 
 /**
- * 将 BTreeMap 数据转换为 DashboardStats 对象
- * @param rawData 后端返回的 BTreeMap 数据
+ * 将后端返回的数据转换为 DashboardStats 对象
+ * @param rawData 后端返回的数据
  * @returns 转换后的 DashboardStats 对象
  */
 export function transformDashboardStatsData(rawData: any): DashboardStats {
@@ -59,7 +59,7 @@ export function transformDashboardStatsData(rawData: any): DashboardStats {
 
 /**
  * 批量转换 Student 数据
- * @param rawDataArray 后端返回的 BTreeMap 数组
+ * @param rawDataArray 后端返回的数据数组
  * @returns 转换后的 Student 对象数组
  */
 export function transformStudentDataArray(rawDataArray: any[]): Student[] {
@@ -68,7 +68,7 @@ export function transformStudentDataArray(rawDataArray: any[]): Student[] {
 
 /**
  * 批量转换 Transaction 数据
- * @param rawDataArray 后端返回的 BTreeMap 数组
+ * @param rawDataArray 后端返回的数据数组
  * @returns 转换后的 Transaction 对象数组
  */
 export function transformTransactionDataArray(rawDataArray: any[]): Transaction[] {
@@ -96,7 +96,6 @@ export function validateStudentData(student: any): boolean {
  * @returns 验证结果
  */
 export function validateTransactionData(transaction: any): boolean {
-  // 基础验证
   const basicValidation = (
     typeof transaction.uid === 'number' &&
     (typeof transaction.student_id === 'number' || transaction.student_id === null) &&
@@ -105,10 +104,8 @@ export function validateTransactionData(transaction: any): boolean {
     (typeof transaction.note === 'string' || transaction.note === null) &&
     typeof transaction.is_installment === 'boolean'
   );
-  
   if (!basicValidation) return false;
-  
-  // 如果是分期付款，验证相关字段
+
   if (transaction.is_installment) {
     return (
       typeof transaction.installment_plan_id === 'number' &&
@@ -118,7 +115,6 @@ export function validateTransactionData(transaction: any): boolean {
       (typeof transaction.installment_status === 'string' || transaction.installment_status === null)
     );
   }
-  
   return true;
 }
 
@@ -157,7 +153,6 @@ export function isInstallmentTransaction(transaction: Transaction): boolean {
  */
 export function getInstallmentStatusLabel(status: string | null): string {
   if (!status) return '未知';
-  
   switch (status) {
     case 'Pending': return '待处理';
     case 'Paid': return '已支付';
@@ -176,7 +171,6 @@ export function formatInstallmentDescription(transaction: Transaction): string {
   if (!isInstallmentTransaction(transaction)) {
     return transaction.description;
   }
-  
   const statusLabel = getInstallmentStatusLabel(transaction.installment_status);
   return `分期付款 ${transaction.installment_current}/${transaction.installment_total} (${statusLabel})`;
 }

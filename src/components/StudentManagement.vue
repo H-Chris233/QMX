@@ -161,6 +161,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export default {
   name: 'StudentManagement',
@@ -258,12 +259,26 @@ export default {
         }
       }
     }
+    
+    const validatePhone = (phone) => {
+  // 短号优先检测
+  if (/^\d{3,6}$/.test(phone.replace(/[-\s]/g, ''))) return true; 
+  
+  // 国际号码校验
+  const phoneObj = parsePhoneNumberFromString(phone);
+  return !!phoneObj?.isValid(); // 
+};
 
     const saveStudent = async () => {
       if (!currentStudent.value.name || !currentStudent.value.age || !currentStudent.value.phone) {
         showError('输入错误', '请填写学员姓名、年龄和电话等必要信息')
         return
       }
+      
+      if (!validatePhone(currentStudent.value.phone)) {
+    showError('输入错误', '请输入有效的手机号码')
+    return
+  }
 
       try {
         if (showAddModal.value) {
