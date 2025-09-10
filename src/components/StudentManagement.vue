@@ -138,7 +138,7 @@
         <div class="modal-body">
           <div class="form-group">
             <label>射击成绩 (环数)</label>
-            <input v-model.number="newScore" type="number" placeholder="请输入环数" min="0" max="654" step="0.1" @keyup.enter="addScore">
+            <input v-model.number="newScore" type="number" placeholder="请输入环数" min="0" max="10.9" step="0.1" @keyup.enter="addScore">
           </div>
           <div class="recent-scores">
             <h4>最近成绩</h4>
@@ -161,7 +161,6 @@
 <script>
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export default {
   name: 'StudentManagement',
@@ -238,12 +237,12 @@ export default {
 
     const editStudent = (student) => {
       currentStudent.value = {
-      uid: student.uid,
-      name: student.name,
-      age: student.age,
-      phone: student.phone,
-      classType: student.class,
-      note: student.note,
+  uid: student.uid,
+  name: student.name,
+  age: student.age,
+  phone: student.phone,
+  classType: student.class,
+  note: student.note || ''
 }
       showEditModal.value = true
     }
@@ -259,26 +258,12 @@ export default {
         }
       }
     }
-    
-    const validatePhone = (phone) => {
-  // 短号优先检测
-  if (/^\d{3,6}$/.test(phone.replace(/[-\s]/g, ''))) return true
-  
-  // 国际号码校验
-  const phoneObj = parsePhoneNumberFromString(phone)
-  return phoneObj?.isValid()
-}
 
     const saveStudent = async () => {
       if (!currentStudent.value.name || !currentStudent.value.age || !currentStudent.value.phone) {
         showError('输入错误', '请填写学员姓名、年龄和电话等必要信息')
         return
       }
-      
-      if (!validatePhone(currentStudent.value.phone)) {
-    showError('输入错误', '请输入有效的手机号码')
-    return
-  }
 
       try {
         if (showAddModal.value) {
@@ -323,8 +308,8 @@ export default {
     }
 
     const addScore = async () => {
-      if (!newScore.value || newScore.value < 0 || newScore.value > 654) {
-        showError('输入错误', '请输入有效的成绩 (0-654)')
+      if (!newScore.value || newScore.value < 0 || newScore.value > 10.9) {
+        showError('输入错误', '请输入有效的成绩 (0-10.9)')
         return
       }
 
@@ -341,14 +326,12 @@ export default {
     const closeModals = () => {
       showAddModal.value = false
       showEditModal.value = false
-      showScoreModalFlag.value = false
       currentStudent.value = {
         uid: null,
         name: '',
         age: '',
         phone: '',
-        classType: '',
-        note: '',
+        classType: ''
       }
     }
 
