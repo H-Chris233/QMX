@@ -1,12 +1,13 @@
 // API服务 - 封装所有后端调用
 import { invoke } from '@tauri-apps/api/core';
+import type { Student, StudentUpdateData, TauriCommand } from '../types/api';
+import { assertIsStudent } from '../utils/typeGuards';
 import {
   transformStudentData,
   transformStudentDataArray,
   transformTransactionData,
   transformTransactionDataArray,
   transformDashboardStatsData,
-  validateStudentData,
   validateTransactionData,
   validateDashboardStatsData,
 } from './dataTransformers';
@@ -20,9 +21,9 @@ export class ApiService {
     phone: string,
     note: string,
     subject: string,
-  ) {
+  ): Promise<Student> {
     try {
-      const rawData = await invoke<any>('add_student', {
+      const rawData = await invoke<unknown>('add_student' as TauriCommand, {
         name,
         age,
         classType,
@@ -32,79 +33,65 @@ export class ApiService {
       });
 
       const student = transformStudentData(rawData);
-
-      // 验证转换后的数据
-      if (!validateStudentData(student)) {
-        throw new Error('学员数据验证失败');
-      }
+      assertIsStudent(student);
 
       return student;
     } catch (error) {
       console.error('❌ [ApiService.addStudent] 调用失败:', error);
-      throw new Error(`添加学员失败: ${error}`);
+      throw new Error(`添加学员失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  static async getAllStudents() {
+  static async getAllStudents(): Promise<Student[]> {
     try {
-      const rawDataArray = await invoke<any[]>('get_all_students');
+      const rawDataArray = await invoke<unknown[]>('get_all_students' as TauriCommand);
       const students = transformStudentDataArray(rawDataArray);
 
       // 验证转换后的数据
-      const invalidStudents = students.filter(
-        (student) => !validateStudentData(student),
-      );
-      if (invalidStudents.length > 0) {
-        console.warn(
-          '⚠️ [ApiService.getAllStudents] 发现无效学员数据:',
-          invalidStudents,
-        );
-      }
+      students.forEach(student => assertIsStudent(student));
 
       return students;
     } catch (error) {
       console.error('❌ [ApiService.getAllStudents] 调用失败:', error);
-      throw new Error(`获取学员列表失败: ${error}`);
+      throw new Error(`获取学员列表失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  static async addScore(studentUid: number, score: number) {
+  static async addScore(studentUid: number, score: number): Promise<void> {
     try {
-      return await invoke<null>('add_score', {
+      await invoke<null>('add_score' as TauriCommand, {
         studentUid,
         score,
       });
     } catch (error) {
       console.error('❌ [ApiService.addScore] 调用失败:', error);
-      throw new Error(`添加成绩失败: ${error}`);
+      throw new Error(`添加成绩失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  static async getStudentScores(studentUid: number) {
+  static async getStudentScores(studentUid: number): Promise<number[]> {
     try {
-      return await invoke<number[]>('get_student_scores', {
+      const scores = await invoke<number[]>('get_student_scores' as TauriCommand, {
         studentUid,
       });
+      
+      if (!Array.isArray(scores) || !scores.every(score => typeof score === 'number')) {
+        throw new Error('返回的成绩数据格式不正确');
+      }
+      
+      return scores;
     } catch (error) {
       console.error('❌ [ApiService.getStudentScores] 调用失败:', error);
-      throw new Error(`获取学员成绩失败: ${error}`);
+      throw new Error(`获取学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   static async updateStudentInfo(
     studentUid: number,
-    updates: {
-      name?: string;
-      age?: number;
-      classType?: string;
-      phone?: string;
-      note?: string;
-      subject?: string;
-      lessonLeft?: number;
-    },
-  ) {
+    updates: StudentUpdateData,
+  ): Promise<void> {
     try {
-      return await invoke<null>('update_student_info', {
+      await invoke<null>('update_student_info' as TauriCommand, {
         studentUid,
         name: updates.name,
         age: updates.age,
@@ -116,18 +103,18 @@ export class ApiService {
       });
     } catch (error) {
       console.error('❌ [ApiService.updateStudentInfo] 调用失败:', error);
-      throw new Error(`更新学员信息失败: ${error}`);
+      throw new Error(`更新学员信息失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  static async deleteStudent(studentUid: number) {
+  static async deleteStudent(studentUid: number): Promise<void> {
     try {
-      return await invoke<null>('delete_student', {
+      await invoke<null>('delete_student' as TauriCommand, {
         studentUid,
       });
     } catch (error) {
       console.error('❌ [ApiService.deleteStudent] 调用失败:', error);
-      throw new Error(`删除学员失败: ${error}`);
+      throw new Error(`删除学员失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -311,39 +298,5 @@ export class ApiService {
   }
 }
 
-// 类型定义 - 更新Transaction接口以支持分期付款
-export interface Student {
-  uid: number;
-  name: string;
-  age: number;
-  class: string;
-  phone: string;
-  rings: number[];
-  note: string;
-  cash: string;
-  subject: string;
-  lesson_left?: number;
-}
-
-export interface Transaction {
-  uid: number;
-  student_id: number | null;
-  amount: number;
-  description: string;
-  note: string | null;
-  is_installment: boolean;
-  installment_plan_id: number | null;
-  installment_current: number | null;
-  installment_total: number | null;
-  installment_due_date: string | null;
-  installment_status: string | null;
-}
-
-export interface DashboardStats {
-  total_students: number;
-  total_revenue: number;
-  total_expense: number;
-  average_score: number;
-  max_score: number;
-  active_courses: number;
-}
+// 导出类型以保持向后兼容
+export type { Student, Transaction, DashboardStats, StudentUpdateData } from '../types/api';

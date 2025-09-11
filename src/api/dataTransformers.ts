@@ -1,24 +1,33 @@
 // 数据转换与校验工具
 
-import { Student, Transaction, DashboardStats } from './ApiService';
+import type { Student, Transaction, DashboardStats } from '../types/api';
+import { isInstallmentStatus } from '../utils/typeGuards';
 
 /**
  * 将后端返回的数据转换为 Student 对象
  * @param rawData 后端返回的数据
  * @returns 转换后的 Student 对象
  */
-export function transformStudentData(rawData: any): Student {
+export function transformStudentData(rawData: unknown): Student {
+  if (!rawData || typeof rawData !== 'object') {
+    throw new Error('无效的学员数据');
+  }
+  
+  const data = rawData as Record<string, unknown>;
+  
   return {
-    uid: rawData.uid,
-    name: rawData.name,
-    age: rawData.age,
-    class: rawData.class,
-    phone: rawData.phone,
-    rings: Array.isArray(rawData.rings) ? rawData.rings : [],
-    note: rawData.note || '',
-    cash: rawData.cash || '',
-    subject: rawData.subject || 'Others',
-    lesson_left: rawData.lesson_left,
+    uid: typeof data.uid === 'number' ? data.uid : 0,
+    name: typeof data.name === 'string' ? data.name : '',
+    age: typeof data.age === 'number' ? data.age : 0,
+    class: typeof data.class === 'string' ? data.class : '',
+    phone: typeof data.phone === 'string' ? data.phone : '',
+    rings: Array.isArray(data.rings) && data.rings.every(r => typeof r === 'number') 
+      ? data.rings as number[] 
+      : [],
+    note: typeof data.note === 'string' ? data.note : '',
+    cash: typeof data.cash === 'string' ? data.cash : '',
+    subject: typeof data.subject === 'string' ? data.subject : 'Others',
+    lesson_left: typeof data.lesson_left === 'number' ? data.lesson_left : undefined,
   };
 }
 
@@ -27,19 +36,25 @@ export function transformStudentData(rawData: any): Student {
  * @param rawData 后端返回的数据
  * @returns 转换后的 Transaction 对象
  */
-export function transformTransactionData(rawData: any): Transaction {
+export function transformTransactionData(rawData: unknown): Transaction {
+  if (!rawData || typeof rawData !== 'object') {
+    throw new Error('无效的交易数据');
+  }
+  
+  const data = rawData as Record<string, unknown>;
+  
   return {
-    uid: rawData.uid,
-    student_id: rawData.student_id,
-    amount: rawData.amount,
-    description: rawData.description || '',
-    note: rawData.note || '',
-    is_installment: rawData.is_installment || false,
-    installment_plan_id: rawData.installment_plan_id || null,
-    installment_current: rawData.installment_current || null,
-    installment_total: rawData.installment_total || null,
-    installment_due_date: rawData.installment_due_date || null,
-    installment_status: rawData.installment_status || null,
+    uid: typeof data.uid === 'number' ? data.uid : 0,
+    student_id: typeof data.student_id === 'number' ? data.student_id : null,
+    amount: typeof data.amount === 'number' ? data.amount : 0,
+    description: typeof data.description === 'string' ? data.description : '',
+    note: typeof data.note === 'string' ? data.note : null,
+    is_installment: typeof data.is_installment === 'boolean' ? data.is_installment : false,
+    installment_plan_id: typeof data.installment_plan_id === 'number' ? data.installment_plan_id : null,
+    installment_current: typeof data.installment_current === 'number' ? data.installment_current : null,
+    installment_total: typeof data.installment_total === 'number' ? data.installment_total : null,
+    installment_due_date: typeof data.installment_due_date === 'string' ? data.installment_due_date : null,
+    installment_status: isInstallmentStatus(data.installment_status) ? data.installment_status : null,
   };
 }
 
@@ -48,14 +63,20 @@ export function transformTransactionData(rawData: any): Transaction {
  * @param rawData 后端返回的数据
  * @returns 转换后的 DashboardStats 对象
  */
-export function transformDashboardStatsData(rawData: any): DashboardStats {
+export function transformDashboardStatsData(rawData: unknown): DashboardStats {
+  if (!rawData || typeof rawData !== 'object') {
+    throw new Error('无效的统计数据');
+  }
+  
+  const data = rawData as Record<string, unknown>;
+  
   return {
-    total_students: rawData.total_students || 0,
-    total_revenue: rawData.total_revenue || 0,
-    total_expense: rawData.total_expense || 0,
-    average_score: rawData.average_score || 0,
-    max_score: rawData.max_score || 0,
-    active_courses: rawData.active_courses || 0,
+    total_students: typeof data.total_students === 'number' ? data.total_students : 0,
+    total_revenue: typeof data.total_revenue === 'number' ? data.total_revenue : 0,
+    total_expense: typeof data.total_expense === 'number' ? data.total_expense : 0,
+    average_score: typeof data.average_score === 'number' ? data.average_score : 0,
+    max_score: typeof data.max_score === 'number' ? data.max_score : 0,
+    active_courses: typeof data.active_courses === 'number' ? data.active_courses : 0,
   };
 }
 
@@ -64,7 +85,10 @@ export function transformDashboardStatsData(rawData: any): DashboardStats {
  * @param rawDataArray 后端返回的数据数组
  * @returns 转换后的 Student 对象数组
  */
-export function transformStudentDataArray(rawDataArray: any[]): Student[] {
+export function transformStudentDataArray(rawDataArray: unknown[]): Student[] {
+  if (!Array.isArray(rawDataArray)) {
+    throw new Error('输入必须是数组');
+  }
   return rawDataArray.map(transformStudentData);
 }
 
@@ -74,8 +98,11 @@ export function transformStudentDataArray(rawDataArray: any[]): Student[] {
  * @returns 转换后的 Transaction 对象数组
  */
 export function transformTransactionDataArray(
-  rawDataArray: any[],
+  rawDataArray: unknown[],
 ): Transaction[] {
+  if (!Array.isArray(rawDataArray)) {
+    throw new Error('输入必须是数组');
+  }
   return rawDataArray.map(transformTransactionData);
 }
 
