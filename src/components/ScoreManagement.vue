@@ -40,9 +40,9 @@
           id="quick-score"
           v-model.number="quickScore" 
           type="number" 
-          placeholder="输入成绩 (0-10.9)"
+          :placeholder="getScorePlaceholder()"
           min="0" 
-          max="10.9" 
+          :max="getMaxScore()" 
           step="0.1"
 
           aria-label="快速添加成绩"
@@ -99,7 +99,7 @@
               v-for="(score, index) in recentScores" 
               :key="index"
               class="chart-bar"
-              :style="{ height: `${(score / 10.9) * 100}%` }"
+              :style="{ height: `${(score / getMaxScore()) * 100}%` }"
               :title="`第${index + 1}次: ${score}环`"
             >
               <span class="bar-label">{{ score }}</span>
@@ -208,6 +208,38 @@ export default {
       return 'poor'
     }
 
+    // 根据学员的运动项目获取最高分数
+    const getMaxScore = () => {
+      if (!selectedStudentData.value) return 10.9 // 默认值
+      
+      const subject = selectedStudentData.value.subject
+      switch (subject) {
+        case 'Shooting':
+          return 654
+        case 'Archery':
+          return 600
+        case 'Others':
+        default:
+          return 999999 // 其他项目无限制，设置一个很大的数
+      }
+    }
+
+    // 获取输入框的占位符文本
+    const getScorePlaceholder = () => {
+      if (!selectedStudentData.value) return '输入成绩'
+      
+      const subject = selectedStudentData.value.subject
+      switch (subject) {
+        case 'Shooting':
+          return '输入成绩 (0-654)'
+        case 'Archery':
+          return '输入成绩 (0-600)'
+        case 'Others':
+        default:
+          return '输入成绩 (无限制)'
+      }
+    }
+
     // 数据加载
     const loadData = async () => {
       loading.value = true
@@ -282,8 +314,9 @@ export default {
       }
 
       const score = parseFloat(quickScore.value)
-      if (isNaN(score) || score < 0 || score > 10.9) {
-        showError('输入错误', '请输入有效的成绩 (0-10.9)')
+      const maxScore = getMaxScore()
+      if (isNaN(score) || score < 0 || score > maxScore) {
+        showError('输入错误', `请输入有效的成绩 (0-${maxScore})`)
         return
       }
 
@@ -347,6 +380,8 @@ export default {
       minScore,
       getClassText,
       getScoreClass,
+      getMaxScore,
+      getScorePlaceholder,
       loadData,
       onStudentChange,
       addQuickScore,
