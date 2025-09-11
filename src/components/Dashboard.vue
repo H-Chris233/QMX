@@ -10,7 +10,7 @@
         class="add-btn" 
         @click="loadDashboardData" 
         :disabled="loading"
-        title="快捷键: Ctrl+R"
+
         aria-label="刷新仪表板数据"
       >
         {{ loading ? '加载中...' : '刷新数据' }}
@@ -104,25 +104,14 @@ export default {
       return parseFloat(value).toFixed(1)
     }
 
-    // 键盘快捷键处理
-    const handleKeyDown = (event) => {
-      // 忽略在输入框中的快捷键
-      if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
-      
-      if (event.ctrlKey && event.key === 'r') {
-        event.preventDefault()
-        loadDashboardData()
-      }
-    }
+
 
     // 生命周期钩子
     onMounted(() => {
       loadDashboardData()
-      window.addEventListener('keydown', handleKeyDown)
     })
 
     onUnmounted(() => {
-      window.removeEventListener('keydown', handleKeyDown)
       if (abortController.value) {
         abortController.value.abort()
       }

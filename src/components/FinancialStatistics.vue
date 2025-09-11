@@ -9,7 +9,7 @@
         class="add-btn" 
         @click="showAddTransaction = true" 
         :disabled="loading"
-        title="快捷键: Ctrl+N"
+
         aria-label="添加新交易"
       >
         {{ loading ? '加载中...' : '➕ 添加交易' }}
@@ -120,7 +120,7 @@
                 <button 
                   class="action-btn delete-btn" 
                   @click="deleteTransaction(transaction.id)" 
-                  title="快捷键: Delete"
+
                   aria-label="删除交易"
                 >🗑️</button>
               </td>
@@ -589,44 +589,14 @@ export default {
       }
     }
 
-    // 键盘事件处理
-    const handleKeyDown = (event) => {
-      // 如果模态框打开，只处理模态框内的快捷键
-      if (showAddTransaction.value || showUpdateStatusModal.value) {
-        if (event.key === 'Escape') {
-          closeModals()
-        }
-        return
-      }
 
-      // 忽略在输入框中的快捷键
-      if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
-      
-      // 全局快捷键
-      if (event.ctrlKey && event.key === 'n') {
-        event.preventDefault()
-        showAddTransaction.value = true
-      }
-      // Ctrl+S 保存交易
-      else if (event.ctrlKey && event.key === 's' && showAddTransaction.value) {
-        event.preventDefault()
-        saveTransaction()
-      }
-      // F5 刷新
-      else if (event.key === 'F5') {
-        event.preventDefault()
-        loadTransactions()
-      }
-    }
 
     onMounted(() => {
       loadStudents()
       loadTransactions()
-      window.addEventListener('keydown', handleKeyDown)
     })
 
     onUnmounted(() => {
-      window.removeEventListener('keydown', handleKeyDown)
       if (abortController.value) {
         abortController.value.abort()
       }

@@ -9,7 +9,7 @@
         class="refresh-btn" 
         @click="loadData" 
         :disabled="loading"
-        title="快捷键: F5"
+
         aria-label="刷新学员数据"
       >
         {{ loading ? '加载中...' : '🔄 刷新' }}
@@ -44,7 +44,7 @@
           min="0" 
           max="10.9" 
           step="0.1"
-          @keyup.enter="addQuickScore"
+
           aria-label="快速添加成绩"
         >
         <button 
@@ -132,7 +132,7 @@
             class="batch-btn" 
             @click="exportScores" 
             :disabled="loading"
-            title="快捷键: Ctrl+E"
+
             aria-label="导出成绩数据"
           >
             📊 导出成绩
@@ -321,38 +321,14 @@ export default {
       document.body.removeChild(link)
     }
 
-    // 键盘事件处理
-    const handleKeyDown = (event) => {
-      // 忽略在输入框中的快捷键
-      if (['INPUT', 'TEXTAREA'].includes(event.target.tagName)) return
-      
-      // F5 刷新
-      if (event.key === 'F5') {
-        event.preventDefault()
-        loadData()
-      }
-      // Ctrl+E 导出
-      else if (event.ctrlKey && event.key === 'e') {
-        event.preventDefault()
-        exportScores()
-      }
-      // Ctrl+L 聚焦学员选择
-      else if (event.ctrlKey && event.key === 'l') {
-        event.preventDefault()
-        if (studentSelect.value) {
-          studentSelect.value.focus()
-        }
-      }
-    }
+
 
     // 生命周期钩子
     onMounted(() => {
       loadData()
-      window.addEventListener('keydown', handleKeyDown)
     })
 
     onUnmounted(() => {
-      window.removeEventListener('keydown', handleKeyDown)
       if (abortController.value) {
         abortController.value.abort()
       }

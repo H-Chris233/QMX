@@ -2,7 +2,7 @@
   <div class="student-management">
     <div class="section-header">
       <h2>学员管理</h2>
-      <button class="add-btn" @click="showAddModal = true" title="快捷键: Ctrl+N">
+      <button class="add-btn" @click="showAddModal = true">
         ➕ 添加学员
       </button>
     </div>
@@ -17,7 +17,7 @@
           type="text" 
           placeholder="搜索学员姓名、电话..."
           @input="filterStudents"
-          @keyup.ctrl.f.prevent="focusSearch"
+
           ref="searchInput"
         >
       </div>
@@ -71,8 +71,8 @@
         <td data-label="最高分数">{{ getHighestScore(student) }}</td>
         <td data-label="备注">{{ student.note || '-' }}</td>
         <td class="actions">
-          <button class="edit-btn" @click="editStudent(student)" title="编辑">✏️</button>
-          <button class="delete-btn" @click="deleteStudent(student.uid)" title="删除">🗑️</button>
+          <button class="edit-btn" @click="editStudent(student)">✏️</button>
+          <button class="delete-btn" @click="deleteStudent(student.uid)">🗑️</button>
         </td>
       </tr>
     </tbody>
@@ -168,7 +168,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { ApiService } from '../api/ApiService'
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
@@ -360,39 +360,12 @@ export default {
 
 
 
-    const focusSearch = () => {
-      if (searchInput.value) {
-        searchInput.value.focus()
-      }
-    }
 
-    // 键盘事件处理
-    const handleKeyDown = (event) => {
-      // 如果模态框打开，只处理模态框内的快捷键
-      if (showAddModal.value || showEditModal.value) {
-        if (event.key === 'Escape') {
-          closeModals()
-        }
-        return
-      }
 
-      // 全局快捷键
-      if (event.ctrlKey && event.key === 'n') {
-        event.preventDefault()
-        showAddModal.value = true
-      } else if (event.ctrlKey && event.key === 'f') {
-        event.preventDefault()
-        focusSearch()
-      }
-    }
+
 
     onMounted(() => {
       loadStudents()
-      window.addEventListener('keydown', handleKeyDown)
-    })
-
-    onUnmounted(() => {
-      window.removeEventListener('keydown', handleKeyDown)
     })
 
     return {
@@ -418,8 +391,7 @@ export default {
       deleteStudent,
       saveStudent,
       getHighestScore,
-      closeModals,
-      focusSearch
+      closeModals
     }
   }
 }
