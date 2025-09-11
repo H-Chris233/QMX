@@ -2,54 +2,50 @@
   <div :class="['main-app', theme]">
     <!-- 顶部导航栏（同时承载移动端侧边栏触发按钮） -->
     <nav class="navbar">
-  <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
-  <div class="nav-mobile-header">
-    <h1>启明星管理系统</h1>
-    <button class="sidebar-toggle" @click.stop="toggleSidebar">☰</button>
-  </div>
+      <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
+      <div class="nav-mobile-header">
+        <h1>启明星管理系统</h1>
+        <button class="sidebar-toggle" @click.stop="toggleSidebar">☰</button>
+      </div>
 
-  <!-- 大屏：原有水平导航菜单（≥769px 显示） -->
-  <div class="nav-menu-desktop">
-    <div 
-      v-for="item in menuItems" 
-      :key="item.id"
-      :class="['nav-menu-item', { active: activeTab === item.id }]"
-      @click="activeTab = item.id"
-    >
-      <span class="nav-menu-icon">{{ item.icon }}</span>
-      <span class="nav-menu-text">{{ item.label }}</span>
-    </div>
-  </div>
+      <!-- 大屏：原有水平导航菜单（≥769px 显示） -->
+      <div class="nav-menu-desktop">
+        <div
+          v-for="item in menuItems"
+          :key="item.id"
+          :class="['nav-menu-item', { active: activeTab === item.id }]"
+          @click="activeTab = item.id"
+        >
+          <span class="nav-menu-icon">{{ item.icon }}</span>
+          <span class="nav-menu-text">{{ item.label }}</span>
+        </div>
+      </div>
 
-  <!-- 移动端：侧边栏（≤768px 显示，抽屉式展开） -->
-  <aside 
-    class="sidebar" 
-    :class="{ 'sidebar-open': isSidebarOpen }"
-  >
-    <div class="sidebar-header">
-      <h2>启明星</h2>
-      <button class="sidebar-close" @click="toggleSidebar">×</button>
-    </div>
-    <ul class="sidebar-menu">
-      <li 
-        v-for="item in menuItems" 
-        :key="item.id"
-        :class="{ active: activeTab === item.id }"
-        @click="handleSidebarItemClick(item.id)"
-      >
-        <span class="sidebar-icon">{{ item.icon }}</span>
-        <span class="sidebar-text">{{ item.label }}</span>
-      </li>
-    </ul>
-  </aside>
+      <!-- 移动端：侧边栏（≤768px 显示，抽屉式展开） -->
+      <aside class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
+        <div class="sidebar-header">
+          <h2>启明星</h2>
+          <button class="sidebar-close" @click="toggleSidebar">×</button>
+        </div>
+        <ul class="sidebar-menu">
+          <li
+            v-for="item in menuItems"
+            :key="item.id"
+            :class="{ active: activeTab === item.id }"
+            @click="handleSidebarItemClick(item.id)"
+          >
+            <span class="sidebar-icon">{{ item.icon }}</span>
+            <span class="sidebar-text">{{ item.label }}</span>
+          </li>
+        </ul>
+      </aside>
 
-  <!-- 遮罩层：独立于侧边栏，作为 navbar 子元素 -->
-  <div 
-    class="sidebar-overlay" 
-    :class="{ 'sidebar-overlay-show': isSidebarOpen }"
-    @click="toggleSidebar"
-  ></div>
-      
+      <!-- 遮罩层：独立于侧边栏，作为 navbar 子元素 -->
+      <div
+        class="sidebar-overlay"
+        :class="{ 'sidebar-overlay-show': isSidebarOpen }"
+        @click="toggleSidebar"
+      ></div>
     </nav>
 
     <!-- 主内容区域 -->
@@ -94,13 +90,13 @@
 </template>
 
 <script>
-import { ref, onMounted, provide } from 'vue'
-import StudentManagement from './components/StudentManagement.vue'
-import FinancialStatistics from './components/FinancialStatistics.vue'
-import ScoreManagement from './components/ScoreManagement.vue'
-import Dashboard from './components/Dashboard.vue'
-import Settings from './components/Settings.vue'
-import ErrorModal from './components/ErrorModal.vue'
+import { ref, onMounted, provide } from 'vue';
+import StudentManagement from './components/StudentManagement.vue';
+import FinancialStatistics from './components/FinancialStatistics.vue';
+import ScoreManagement from './components/ScoreManagement.vue';
+import Dashboard from './components/Dashboard.vue';
+import Settings from './components/Settings.vue';
+import ErrorModal from './components/ErrorModal.vue';
 
 export default {
   name: 'MainApp',
@@ -110,43 +106,43 @@ export default {
     ScoreManagement,
     Dashboard,
     Settings,
-    ErrorModal
+    ErrorModal,
   },
   setup() {
-    const theme = ref('dark')
-    const activeTab = ref('dashboard')
-    
+    const theme = ref('dark');
+    const activeTab = ref('dashboard');
+
     // 错误弹窗状态
     const errorModal = ref({
       show: false,
       title: '错误',
       message: '',
       details: '',
-      showRetry: false
-    })
+      showRetry: false,
+    });
 
     const menuItems = [
-  { id: 'dashboard', label: '仪表盘', icon: '📊' },
-  { id: 'students', label: '学员管理', icon: '👥' },
-  { id: 'finance', label: '收支统计', icon: '💰' },
-  { id: 'scores', label: '分数管理', icon: '🎯' },
-  { id: 'settings', label: '设置', icon: '⚙️' } // 新增「设置」菜单项
-]
-    
+      { id: 'dashboard', label: '仪表盘', icon: '📊' },
+      { id: 'students', label: '学员管理', icon: '👥' },
+      { id: 'finance', label: '收支统计', icon: '💰' },
+      { id: 'scores', label: '分数管理', icon: '🎯' },
+      { id: 'settings', label: '设置', icon: '⚙️' }, // 新增「设置」菜单项
+    ];
+
     // 新增：侧边栏展开状态 + 交互方法
-    const isSidebarOpen = ref(false)
+    const isSidebarOpen = ref(false);
     const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-  console.log('侧边栏状态：' + isSidebarOpen.value) // 调试用
-}
+      isSidebarOpen.value = !isSidebarOpen.value;
+      console.log('侧边栏状态：' + isSidebarOpen.value); // 调试用
+    };
     const handleSidebarItemClick = (id) => {
-      activeTab.value = id   // 切换激活Tab
-      toggleSidebar()       // 点击菜单项后自动收起侧边栏
-    }
+      activeTab.value = id; // 切换激活Tab
+      toggleSidebar(); // 点击菜单项后自动收起侧边栏
+    };
 
     const openSettings = () => {
-      activeTab.value = 'settings'
-    }
+      activeTab.value = 'settings';
+    };
 
     // 错误处理方法
     const showError = (title, message, details = '', showRetry = false) => {
@@ -155,45 +151,47 @@ export default {
         title,
         message,
         details,
-        showRetry
-      }
-    }
+        showRetry,
+      };
+    };
 
     const hideError = () => {
-      errorModal.value.show = false
-    }
+      errorModal.value.show = false;
+    };
 
     const retryWithError = () => {
-      errorModal.value.show = false
+      errorModal.value.show = false;
       // 这里可以添加重试逻辑，目前只是关闭弹窗
-    }
+    };
 
     onMounted(() => {
       // 初始化主题
-      const savedTheme = localStorage.getItem('theme')
+      const savedTheme = localStorage.getItem('theme');
       if (savedTheme) {
-        theme.value = savedTheme
+        theme.value = savedTheme;
       } else {
-        theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
       }
-      document.documentElement.className = theme.value + '-theme'
+      document.documentElement.className = theme.value + '-theme';
       // 小屏时：点击页面外部自动关闭侧边栏
       document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768 && isSidebarOpen.value) {
-          const sidebar = document.querySelector('.sidebar')
+          const sidebar = document.querySelector('.sidebar');
           if (!sidebar?.contains(e.target)) {
-            toggleSidebar()
+            toggleSidebar();
           }
         }
-      })
-    })
+      });
+    });
 
     // 提供全局错误处理方法给子组件使用
     provide('errorHandler', {
       showError,
       hideError,
-      retryWithError
-    })
+      retryWithError,
+    });
 
     return {
       theme,
@@ -206,10 +204,10 @@ export default {
       retryWithError,
       isSidebarOpen,
       toggleSidebar,
-      handleSidebarItemClick
-    }
-  }
-}
+      handleSidebarItemClick,
+    };
+  },
+};
 </script>
 
 <style>
@@ -344,7 +342,9 @@ export default {
   flex: 1;
   justify-content: center;
 }
-.nav-menu-item { /* 原有菜单项样式保持不变 */ }
+.nav-menu-item {
+  /* 原有菜单项样式保持不变 */
+}
 
 /* ========== 移动端：侧边栏（≤768px 显示，抽屉式） ========== */
 .sidebar {
@@ -414,7 +414,7 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   z-index: 998; /* 低于sidebar的999 */
   display: none; /* 初始隐藏 */
   pointer-events: auto; /* 确保点击事件生效 */

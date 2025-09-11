@@ -1,5 +1,5 @@
 // API服务 - 封装所有后端调用
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 import {
   transformStudentData,
   transformStudentDataArray,
@@ -8,12 +8,19 @@ import {
   transformDashboardStatsData,
   validateStudentData,
   validateTransactionData,
-  validateDashboardStatsData
+  validateDashboardStatsData,
 } from './dataTransformers';
 
 export class ApiService {
   // 学员管理
-  static async addStudent(name: string, age: number, classType: string, phone: string, note: string, subject: string) {
+  static async addStudent(
+    name: string,
+    age: number,
+    classType: string,
+    phone: string,
+    note: string,
+    subject: string,
+  ) {
     try {
       const rawData = await invoke<any>('add_student', {
         name,
@@ -21,16 +28,16 @@ export class ApiService {
         classType,
         phone,
         note,
-        subject
+        subject,
       });
-      
+
       const student = transformStudentData(rawData);
-      
+
       // 验证转换后的数据
       if (!validateStudentData(student)) {
         throw new Error('学员数据验证失败');
       }
-      
+
       return student;
     } catch (error) {
       console.error('❌ [ApiService.addStudent] 调用失败:', error);
@@ -42,13 +49,18 @@ export class ApiService {
     try {
       const rawDataArray = await invoke<any[]>('get_all_students');
       const students = transformStudentDataArray(rawDataArray);
-      
+
       // 验证转换后的数据
-      const invalidStudents = students.filter(student => !validateStudentData(student));
+      const invalidStudents = students.filter(
+        (student) => !validateStudentData(student),
+      );
       if (invalidStudents.length > 0) {
-        console.warn('⚠️ [ApiService.getAllStudents] 发现无效学员数据:', invalidStudents);
+        console.warn(
+          '⚠️ [ApiService.getAllStudents] 发现无效学员数据:',
+          invalidStudents,
+        );
       }
-      
+
       return students;
     } catch (error) {
       console.error('❌ [ApiService.getAllStudents] 调用失败:', error);
@@ -60,7 +72,7 @@ export class ApiService {
     try {
       return await invoke<null>('add_score', {
         studentUid,
-        score
+        score,
       });
     } catch (error) {
       console.error('❌ [ApiService.addScore] 调用失败:', error);
@@ -71,7 +83,7 @@ export class ApiService {
   static async getStudentScores(studentUid: number) {
     try {
       return await invoke<number[]>('get_student_scores', {
-        studentUid
+        studentUid,
       });
     } catch (error) {
       console.error('❌ [ApiService.getStudentScores] 调用失败:', error);
@@ -79,15 +91,18 @@ export class ApiService {
     }
   }
 
-  static async updateStudentInfo(studentUid: number, updates: {
-    name?: string
-    age?: number
-    classType?: string
-    phone?: string
-    note?: string
-    subject?: string
-    lessonLeft?: number
-  }) {
+  static async updateStudentInfo(
+    studentUid: number,
+    updates: {
+      name?: string;
+      age?: number;
+      classType?: string;
+      phone?: string;
+      note?: string;
+      subject?: string;
+      lessonLeft?: number;
+    },
+  ) {
     try {
       return await invoke<null>('update_student_info', {
         studentUid,
@@ -97,7 +112,7 @@ export class ApiService {
         phone: updates.phone,
         note: updates.note,
         subject: updates.subject,
-        lessonLeft: updates.lessonLeft
+        lessonLeft: updates.lessonLeft,
       });
     } catch (error) {
       console.error('❌ [ApiService.updateStudentInfo] 调用失败:', error);
@@ -108,7 +123,7 @@ export class ApiService {
   static async deleteStudent(studentUid: number) {
     try {
       return await invoke<null>('delete_student', {
-        studentUid
+        studentUid,
       });
     } catch (error) {
       console.error('❌ [ApiService.deleteStudent] 调用失败:', error);
@@ -118,25 +133,25 @@ export class ApiService {
 
   // 财务管理 - 普通交易
   static async addCashTransaction(
-    studentUid: number | null, 
-    amount: number, 
-    note: string = ''
+    studentUid: number | null,
+    amount: number,
+    note: string = '',
   ) {
     try {
       const rawData = await invoke<any>('add_cash_transaction', {
         studentUid: studentUid || null,
         amount,
         note: note || null,
-        isInstallment: false
+        isInstallment: false,
       });
-      
+
       const transaction = transformTransactionData(rawData);
-      
+
       // 验证转换后的数据
       if (!validateTransactionData(transaction)) {
         throw new Error('交易数据验证失败');
       }
-      
+
       return transaction;
     } catch (error) {
       console.error('❌ [ApiService.addCashTransaction] 调用失败:', error);
@@ -152,7 +167,7 @@ export class ApiService {
     totalInstallments: number,
     frequency: string,
     dueDate: string,
-    planId?: number
+    planId?: number,
   ) {
     try {
       const rawData = await invoke<any>('add_cash_transaction', {
@@ -165,19 +180,22 @@ export class ApiService {
         frequency,
         dueDate,
         currentInstallment: 1,
-        planId: planId || null
+        planId: planId || null,
       });
-      
+
       const transaction = transformTransactionData(rawData);
-      
+
       // 验证转换后的数据
       if (!validateTransactionData(transaction)) {
         throw new Error('分期付款数据验证失败');
       }
-      
+
       return transaction;
     } catch (error) {
-      console.error('❌ [ApiService.addInstallmentTransaction] 调用失败:', error);
+      console.error(
+        '❌ [ApiService.addInstallmentTransaction] 调用失败:',
+        error,
+      );
       throw new Error(`添加分期付款失败: ${error}`);
     }
   }
@@ -186,13 +204,18 @@ export class ApiService {
     try {
       const rawDataArray = await invoke<any[]>('get_all_transactions');
       const transactions = transformTransactionDataArray(rawDataArray);
-      
+
       // 验证转换后的数据
-      const invalidTransactions = transactions.filter(transaction => !validateTransactionData(transaction));
+      const invalidTransactions = transactions.filter(
+        (transaction) => !validateTransactionData(transaction),
+      );
       if (invalidTransactions.length > 0) {
-        console.warn('⚠️ [ApiService.getAllTransactions] 发现无效交易数据:', invalidTransactions);
+        console.warn(
+          '⚠️ [ApiService.getAllTransactions] 发现无效交易数据:',
+          invalidTransactions,
+        );
       }
-      
+
       return transactions;
     } catch (error) {
       console.error('❌ [ApiService.getAllTransactions] 调用失败:', error);
@@ -203,7 +226,7 @@ export class ApiService {
   static async deleteCashTransaction(transactionUid: number) {
     try {
       return await invoke<null>('delete_cash_transaction', {
-        transactionUid
+        transactionUid,
       });
     } catch (error) {
       console.error('❌ [ApiService.deleteCashTransaction] 调用失败:', error);
@@ -216,7 +239,7 @@ export class ApiService {
     try {
       return await invoke<null>('update_installment_status', {
         transactionUid,
-        status
+        status,
       });
     } catch (error) {
       console.error('❌ [ApiService.updateInstallmentStatus] 调用失败:', error);
@@ -228,7 +251,7 @@ export class ApiService {
     try {
       return await invoke<number>('generate_next_installment', {
         planId,
-        dueDate
+        dueDate,
       });
     } catch (error) {
       console.error('❌ [ApiService.generateNextInstallment] 调用失败:', error);
@@ -239,7 +262,7 @@ export class ApiService {
   static async cancelInstallmentPlan(planId: number) {
     try {
       return await invoke<number>('cancel_installment_plan', {
-        planId
+        planId,
       });
     } catch (error) {
       console.error('❌ [ApiService.cancelInstallmentPlan] 调用失败:', error);
@@ -250,7 +273,7 @@ export class ApiService {
   static async getInstallmentsByPlan(planId: number) {
     try {
       const rawDataArray = await invoke<any[]>('get_installments_by_plan', {
-        planId
+        planId,
       });
       return transformTransactionDataArray(rawDataArray);
     } catch (error) {
@@ -264,12 +287,12 @@ export class ApiService {
     try {
       const rawData = await invoke<any>('get_dashboard_stats');
       const stats = transformDashboardStatsData(rawData);
-      
+
       // 验证转换后的数据
       if (!validateDashboardStatsData(stats)) {
         throw new Error('统计数据验证失败');
       }
-      
+
       return stats;
     } catch (error) {
       console.error('❌ [ApiService.getDashboardStats] 调用失败:', error);
@@ -290,37 +313,37 @@ export class ApiService {
 
 // 类型定义 - 更新Transaction接口以支持分期付款
 export interface Student {
-  uid: number
-  name: string
-  age: number
-  class: string
-  phone: string
-  rings: number[]
-  note: string
-  cash: string
-  subject: string
-  lesson_left?: number
+  uid: number;
+  name: string;
+  age: number;
+  class: string;
+  phone: string;
+  rings: number[];
+  note: string;
+  cash: string;
+  subject: string;
+  lesson_left?: number;
 }
 
 export interface Transaction {
-  uid: number
-  student_id: number | null
-  amount: number
-  description: string
-  note: string | null
-  is_installment: boolean
-  installment_plan_id: number | null
-  installment_current: number | null
-  installment_total: number | null
-  installment_due_date: string | null
-  installment_status: string | null
+  uid: number;
+  student_id: number | null;
+  amount: number;
+  description: string;
+  note: string | null;
+  is_installment: boolean;
+  installment_plan_id: number | null;
+  installment_current: number | null;
+  installment_total: number | null;
+  installment_due_date: string | null;
+  installment_status: string | null;
 }
 
 export interface DashboardStats {
-  total_students: number
-  total_revenue: number
-  total_expense: number
-  average_score: number
-  max_score: number
-  active_courses: number
+  total_students: number;
+  total_revenue: number;
+  total_expense: number;
+  average_score: number;
+  max_score: number;
+  active_courses: number;
 }

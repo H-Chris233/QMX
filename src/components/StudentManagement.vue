@@ -2,24 +2,19 @@
   <div class="student-management">
     <div class="section-header">
       <h2>学员管理</h2>
-      <button class="add-btn" @click="showAddModal = true">
-        ➕ 添加学员
-      </button>
+      <button class="add-btn" @click="showAddModal = true">➕ 添加学员</button>
     </div>
-
-
 
     <!-- 搜索和筛选 -->
     <div class="search-filter">
       <div class="search-box">
-        <input 
-          v-model="searchQuery" 
-          type="text" 
+        <input
+          v-model="searchQuery"
+          type="text"
           placeholder="搜索学员姓名、电话..."
           @input="filterStudents"
-
           ref="searchInput"
-        >
+        />
       </div>
       <div class="filter-options">
         <select v-model="subjectFilter" @change="filterStudents">
@@ -39,45 +34,47 @@
     </div>
 
     <!-- 学员列表 -->
-<div class="students-table">
-  <table>
-    <thead>
-      <tr>
-        <th>姓名</th>
-        <th>年龄</th>
-        <th>电话</th>
-        <th>科目</th>
-        <th>课程</th>
-        <th>最高分数</th>
-        <th>备注</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="student in filteredStudents" :key="student.uid">
-        <td data-label="姓名">{{ student.name }}</td>
-        <td data-label="年龄">{{ student.age }}</td>
-        <td data-label="电话">{{ student.phone }}</td>
-        <td data-label="科目">
-          <span :class="['subject-badge', getSubjectType(student.subject)]">
-            {{ getSubjectText(student.subject) }}
-          </span>
-        </td>
-        <td data-label="课程">
-          <span :class="['class-badge', getClassType(student.class)]">
-            {{ getClassText(student.class) }}
-          </span>
-        </td>
-        <td data-label="最高分数">{{ getHighestScore(student) }}</td>
-        <td data-label="备注">{{ student.note || '-' }}</td>
-        <td class="actions">
-          <button class="edit-btn" @click="editStudent(student)">✏️</button>
-          <button class="delete-btn" @click="deleteStudent(student.uid)">🗑️</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+    <div class="students-table">
+      <table>
+        <thead>
+          <tr>
+            <th>姓名</th>
+            <th>年龄</th>
+            <th>电话</th>
+            <th>科目</th>
+            <th>课程</th>
+            <th>最高分数</th>
+            <th>备注</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="student in filteredStudents" :key="student.uid">
+            <td data-label="姓名">{{ student.name }}</td>
+            <td data-label="年龄">{{ student.age }}</td>
+            <td data-label="电话">{{ student.phone }}</td>
+            <td data-label="科目">
+              <span :class="['subject-badge', getSubjectType(student.subject)]">
+                {{ getSubjectText(student.subject) }}
+              </span>
+            </td>
+            <td data-label="课程">
+              <span :class="['class-badge', getClassType(student.class)]">
+                {{ getClassText(student.class) }}
+              </span>
+            </td>
+            <td data-label="最高分数">{{ getHighestScore(student) }}</td>
+            <td data-label="备注">{{ student.note || '-' }}</td>
+            <td class="actions">
+              <button class="edit-btn" @click="editStudent(student)">✏️</button>
+              <button class="delete-btn" @click="deleteStudent(student.uid)">
+                🗑️
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- 统计信息 -->
     <div class="stats-grid">
@@ -100,7 +97,11 @@
     </div>
 
     <!-- 添加/编辑学员模态框 -->
-    <div v-if="showAddModal || showEditModal" class="modal-overlay" @click="closeModals">
+    <div
+      v-if="showAddModal || showEditModal"
+      class="modal-overlay"
+      @click="closeModals"
+    >
       <div class="modal" @click.stop>
         <div class="modal-header">
           <h3>{{ showAddModal ? '添加学员' : '编辑学员' }}</h3>
@@ -109,37 +110,60 @@
         <div class="modal-body">
           <!-- 科目选择切换按钮 -->
           <div class="subject-toggle">
-            <button 
-              :class="['subject-btn', { active: currentStudent.subject === 'Shooting' }]"
+            <button
+              :class="[
+                'subject-btn',
+                { active: currentStudent.subject === 'Shooting' },
+              ]"
               @click="currentStudent.subject = 'Shooting'"
             >
               射击
             </button>
-            <button 
-              :class="['subject-btn', { active: currentStudent.subject === 'Archery' }]"
+            <button
+              :class="[
+                'subject-btn',
+                { active: currentStudent.subject === 'Archery' },
+              ]"
               @click="currentStudent.subject = 'Archery'"
             >
               射箭
             </button>
-            <button 
-              :class="['subject-btn', { active: currentStudent.subject === 'Others' }]"
+            <button
+              :class="[
+                'subject-btn',
+                { active: currentStudent.subject === 'Others' },
+              ]"
               @click="currentStudent.subject = 'Others'"
             >
               其他
             </button>
           </div>
-          
+
           <div class="form-group">
             <label>姓名</label>
-            <input v-model="currentStudent.name" type="text" placeholder="请输入学员姓名">
+            <input
+              v-model="currentStudent.name"
+              type="text"
+              placeholder="请输入学员姓名"
+            />
           </div>
           <div class="form-group">
             <label>年龄</label>
-            <input v-model.number="currentStudent.age" type="number" placeholder="请输入年龄" min="1" max="120">
+            <input
+              v-model.number="currentStudent.age"
+              type="number"
+              placeholder="请输入年龄"
+              min="1"
+              max="120"
+            />
           </div>
           <div class="form-group">
             <label>电话</label>
-            <input v-model="currentStudent.phone" type="tel" placeholder="请输入电话号码">
+            <input
+              v-model="currentStudent.phone"
+              type="tel"
+              placeholder="请输入电话号码"
+            />
           </div>
           <div class="form-group">
             <label>课程类型</label>
@@ -153,7 +177,11 @@
           </div>
           <div class="form-group">
             <label>备注</label>
-            <textarea v-model="currentStudent.note" rows="3" placeholder="请输入备注信息"></textarea>
+            <textarea
+              v-model="currentStudent.note"
+              rows="3"
+              placeholder="请输入备注信息"
+            ></textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -162,148 +190,161 @@
         </div>
       </div>
     </div>
-
-
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, inject } from 'vue'
-import { ApiService } from '../api/ApiService'
+import { ref, computed, onMounted, inject } from 'vue';
+import { ApiService } from '../api/ApiService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export default {
   name: 'StudentManagement',
   setup() {
-    const students = ref([])
-    const searchQuery = ref('')
-    const classFilter = ref('')
-    const subjectFilter = ref('')
-    const showAddModal = ref(false)
-    const showEditModal = ref(false)
+    const students = ref([]);
+    const searchQuery = ref('');
+    const classFilter = ref('');
+    const subjectFilter = ref('');
+    const showAddModal = ref(false);
+    const showEditModal = ref(false);
     const currentStudent = ref({
-  uid: null,
-  name: '',
-  age: '',
-  phone: '',
-  classType: '',
-  note: '',
-  subject: 'Shooting'
-})
-    const searchInput = ref(null)
-    const { showError } = inject('errorHandler')
+      uid: null,
+      name: '',
+      age: '',
+      phone: '',
+      classType: '',
+      note: '',
+      subject: 'Shooting',
+    });
+    const searchInput = ref(null);
+    const { showError } = inject('errorHandler');
 
     const filteredStudents = computed(() => {
-      let filtered = students.value
-      
-      if (searchQuery.value) {
-        filtered = filtered.filter(student => 
-          student.name.includes(searchQuery.value) || 
-          student.phone.includes(searchQuery.value)
-        )
-      }
-      
-      if (subjectFilter.value) {
-        filtered = filtered.filter(student => student.subject === subjectFilter.value)
-      }
-      
-      if (classFilter.value) {
-        filtered = filtered.filter(student => student.class === classFilter.value)
-      }
-      
-      return filtered
-    })
+      let filtered = students.value;
 
-    const totalStudents = computed(() => students.value.length)
-    const trialStudents = computed(() => students.value.filter(s => s.class === 'TenTry').length)
-    const monthlyStudents = computed(() => students.value.filter(s => s.class === 'Month').length)
-    const yearlyStudents = computed(() => students.value.filter(s => s.class === 'Year').length)
+      if (searchQuery.value) {
+        filtered = filtered.filter(
+          (student) =>
+            student.name.includes(searchQuery.value) ||
+            student.phone.includes(searchQuery.value),
+        );
+      }
+
+      if (subjectFilter.value) {
+        filtered = filtered.filter(
+          (student) => student.subject === subjectFilter.value,
+        );
+      }
+
+      if (classFilter.value) {
+        filtered = filtered.filter(
+          (student) => student.class === classFilter.value,
+        );
+      }
+
+      return filtered;
+    });
+
+    const totalStudents = computed(() => students.value.length);
+    const trialStudents = computed(
+      () => students.value.filter((s) => s.class === 'TenTry').length,
+    );
+    const monthlyStudents = computed(
+      () => students.value.filter((s) => s.class === 'Month').length,
+    );
+    const yearlyStudents = computed(
+      () => students.value.filter((s) => s.class === 'Year').length,
+    );
 
     const getClassText = (classType) => {
       const classMap = {
-        'TenTry': '体验课',
-        'Month': '月卡',
-        'Year': '年卡',
-        'Others': '其他'
-      }
-      return classMap[classType] || classType
-    }
+        TenTry: '体验课',
+        Month: '月卡',
+        Year: '年卡',
+        Others: '其他',
+      };
+      return classMap[classType] || classType;
+    };
 
     const getClassType = (classType) => {
-      return classType.toLowerCase()
-    }
+      return classType.toLowerCase();
+    };
 
     const getSubjectText = (subject) => {
       const subjectMap = {
-        'Shooting': '射击',
-        'Archery': '射箭',
-        'Others': '其他'
-      }
-      return subjectMap[subject] || subject
-    }
+        Shooting: '射击',
+        Archery: '射箭',
+        Others: '其他',
+      };
+      return subjectMap[subject] || subject;
+    };
 
     const getSubjectType = (subject) => {
-      return subject.toLowerCase()
-    }
+      return subject.toLowerCase();
+    };
 
     const filterStudents = () => {
       // 搜索逻辑已通过computed属性实现
-    }
+    };
 
     const loadStudents = async () => {
       try {
-        const data = await ApiService.getAllStudents()
-        students.value = data
+        const data = await ApiService.getAllStudents();
+        students.value = data;
       } catch (error) {
-        console.error('加载学员数据失败:', error)
-        showError('加载失败', '加载学员数据时发生错误', error.message)
+        console.error('加载学员数据失败:', error);
+        showError('加载失败', '加载学员数据时发生错误', error.message);
       }
-    }
+    };
 
     const editStudent = (student) => {
       currentStudent.value = {
-  uid: student.uid,
-  name: student.name,
-  age: student.age,
-  phone: student.phone,
-  classType: student.class,
-  note: student.note || '',
-  subject: student.subject || 'Shooting'
-}
-      showEditModal.value = true
-    }
+        uid: student.uid,
+        name: student.name,
+        age: student.age,
+        phone: student.phone,
+        classType: student.class,
+        note: student.note || '',
+        subject: student.subject || 'Shooting',
+      };
+      showEditModal.value = true;
+    };
 
     const deleteStudent = async (uid) => {
       if (confirm('确定要删除这个学员吗？')) {
         try {
-          await ApiService.deleteStudent(uid)
-          await loadStudents() // 重新加载数据
+          await ApiService.deleteStudent(uid);
+          await loadStudents(); // 重新加载数据
         } catch (error) {
-          console.error('删除学员失败:', error)
-          showError('删除失败', '删除学员时发生错误', error.message)
+          console.error('删除学员失败:', error);
+          showError('删除失败', '删除学员时发生错误', error.message);
         }
       }
-    }
-    
+    };
+
     const validatePhone = (phone) => {
-  // 短号优先检测
-  if (/^\d{3,6}$/.test(phone.replace(/[-\s]/g, ''))) return true; 
-  
-  // 国际号码校验
-  const phoneObj = parsePhoneNumberFromString(phone);
-  return !!phoneObj?.isValid(); // 
-};
+      // 短号优先检测
+      if (/^\d{3,6}$/.test(phone.replace(/[-\s]/g, ''))) return true;
+
+      // 国际号码校验
+      const phoneObj = parsePhoneNumberFromString(phone);
+      return !!phoneObj?.isValid(); //
+    };
 
     const saveStudent = async () => {
-      if (!currentStudent.value.name || !currentStudent.value.age || !currentStudent.value.phone) {
-        showError('输入错误', '请填写学员姓名、年龄和电话等必要信息')
-        return
+      if (
+        !currentStudent.value.name ||
+        !currentStudent.value.age ||
+        !currentStudent.value.phone
+      ) {
+        showError('输入错误', '请填写学员姓名、年龄和电话等必要信息');
+        return;
       }
-      
+
       if (!validatePhone(currentStudent.value.phone)) {
-    showError('输入错误', '请输入有效的手机号码')
-    return
-  }
+        showError('输入错误', '请输入有效的手机号码');
+        return;
+      }
 
       try {
         if (showAddModal.value) {
@@ -314,8 +355,8 @@ export default {
             currentStudent.value.classType || 'Others',
             currentStudent.value.phone,
             currentStudent.value.note,
-            currentStudent.value.subject
-          )
+            currentStudent.value.subject,
+          );
         } else {
           // 编辑现有学员
           await ApiService.updateStudentInfo(currentStudent.value.uid, {
@@ -324,29 +365,29 @@ export default {
             classType: currentStudent.value.classType,
             phone: currentStudent.value.phone,
             note: currentStudent.value.note,
-            subject: currentStudent.value.subject
-          })
+            subject: currentStudent.value.subject,
+          });
         }
 
-        await loadStudents() // 重新加载数据
-        closeModals()
+        await loadStudents(); // 重新加载数据
+        closeModals();
       } catch (error) {
-        console.error('保存学员失败:', error)
-        showError('保存失败', '保存学员信息时发生错误', error.message)
+        console.error('保存学员失败:', error);
+        showError('保存失败', '保存学员信息时发生错误', error.message);
       }
-    }
+    };
 
     const getHighestScore = (student) => {
       if (!student.rings || student.rings.length === 0) {
-        return '-'
+        return '-';
       }
-      const maxScore = Math.max(...student.rings)
-      return maxScore.toFixed(1)
-    }
+      const maxScore = Math.max(...student.rings);
+      return maxScore.toFixed(1);
+    };
 
     const closeModals = () => {
-      showAddModal.value = false
-      showEditModal.value = false
+      showAddModal.value = false;
+      showEditModal.value = false;
       currentStudent.value = {
         uid: null,
         name: '',
@@ -354,19 +395,13 @@ export default {
         phone: '',
         classType: '',
         note: '',
-        subject: 'Shooting'
-      }
-    }
-
-
-
-
-
-
+        subject: 'Shooting',
+      };
+    };
 
     onMounted(() => {
-      loadStudents()
-    })
+      loadStudents();
+    });
 
     return {
       students,
@@ -391,10 +426,10 @@ export default {
       deleteStudent,
       saveStudent,
       getHighestScore,
-      closeModals
-    }
-  }
-}
+      closeModals,
+    };
+  },
+};
 </script>
 
 <style scoped>
@@ -440,7 +475,7 @@ export default {
 
 .filter-options {
   display: flex;
-  gap: 1.0rem;
+  gap: 1rem;
   align-items: center;
 }
 
@@ -504,7 +539,8 @@ export default {
   background-color: var(--bg-tertiary);
 }
 
-.class-badge, .subject-badge {
+.class-badge,
+.subject-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
   font-size: 0.875rem;
@@ -551,7 +587,8 @@ export default {
   gap: 0.5rem;
 }
 
-.edit-btn, .delete-btn {
+.edit-btn,
+.delete-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -665,13 +702,11 @@ export default {
   color: var(--text-primary);
 }
 
-.form-group input[type="text"][v-model="currentStudent.note"] {
+.form-group input[type='text'][v-model='currentStudent.note'] {
   height: 60px;
   resize: vertical;
   padding: 0.75rem;
 }
-
-
 
 .modal-footer {
   display: flex;
@@ -681,7 +716,8 @@ export default {
   border-top: 1px solid var(--border-color);
 }
 
-.cancel-btn, .save-btn {
+.cancel-btn,
+.save-btn {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 6px;
@@ -738,7 +774,7 @@ export default {
   min-height: 80px; /* 增大最小高度，提升输入舒适性 */
   height: auto;
   resize: vertical; /* 仅允许垂直拉伸（更可控）,换成none消除小白点 */
-  padding: 0.75rem;  /* 内边距与其他输入框统一 */
+  padding: 0.75rem; /* 内边距与其他输入框统一 */
 
   /* 视觉风格（与项目主题变量联动） */
   border: 1px solid var(--border-color);
@@ -746,7 +782,7 @@ export default {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 0.875rem; /* 字体大小与其他表单元素统一 */
-  line-height: 1.5;    /* 行高优化，提升可读性 */
+  line-height: 1.5; /* 行高优化，提升可读性 */
   transition: all 0.3s ease; /* 过渡动画，让交互更丝滑 */
 }
 
@@ -773,39 +809,39 @@ export default {
     display: flex;
     flex-direction: column;
   }
-  
+
   /* 调整手机端布局顺序 */
   .stats-grid {
     order: 1;
     grid-template-columns: repeat(2, 1fr);
     margin-bottom: 1rem;
   }
-  
+
   .search-filter {
     order: 2;
     flex-direction: column;
     align-items: stretch;
     margin-bottom: 1rem;
   }
-  
+
   .students-table {
     order: 3;
   }
-  
+
   .search-box input {
     width: 100%;
     margin-bottom: 1rem;
   }
-  
+
   .filter-options {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .filter-options select {
     width: 100%;
   }
-  
+
   /* 手机端表格优化 - 改为卡片式布局 */
   .students-table table,
   .students-table thead,
@@ -815,13 +851,13 @@ export default {
   .students-table tr {
     display: block;
   }
-  
+
   .students-table thead tr {
     position: absolute;
     top: -9999px;
     left: -9999px;
   }
-  
+
   .students-table tr {
     background-color: var(--bg-secondary);
     border-radius: 8px;
@@ -830,7 +866,7 @@ export default {
     box-shadow: 0 2px 8px var(--shadow-color);
     border: 1px solid var(--border-color);
   }
-  
+
   .students-table td {
     border: none;
     padding: 0.5rem 0;
@@ -841,7 +877,7 @@ export default {
     word-break: break-word;
     max-width: none;
   }
-  
+
   .students-table td:before {
     content: attr(data-label);
     position: absolute;
@@ -853,7 +889,7 @@ export default {
     color: var(--text-secondary);
     font-size: 0.875rem;
   }
-  
+
   .students-table .actions {
     padding-left: 0;
     justify-content: flex-start;
@@ -862,7 +898,7 @@ export default {
     padding-top: 1rem;
     border-top: 1px solid var(--border-color);
   }
-  
+
   .students-table .actions:before {
     display: none;
   }

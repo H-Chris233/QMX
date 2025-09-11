@@ -2,15 +2,14 @@
   <div class="student-management">
     <!-- 加载进度条 -->
     <div v-if="loading" class="loading-progress"></div>
-    
+
     <!-- 页面标题 -->
     <div class="section-header">
       <h2>总仪表板</h2>
-      <button 
-        class="add-btn" 
-        @click="loadDashboardData" 
+      <button
+        class="add-btn"
+        @click="loadDashboardData"
         :disabled="loading"
-
         aria-label="刷新仪表板数据"
       >
         {{ loading ? '加载中...' : '刷新数据' }}
@@ -22,100 +21,104 @@
       <!-- 总收入 -->
       <div class="stat-card">
         <h3>总收入</h3>
-        <div class="stat-value">{{ formatCurrency(dashboardData.totalRevenue) }}</div>
+        <div class="stat-value">
+          {{ formatCurrency(dashboardData.totalRevenue) }}
+        </div>
       </div>
 
       <!-- 学员总数 -->
       <div class="stat-card">
         <h3>学员总数</h3>
-        <div class="stat-value">{{ formatNumber(dashboardData.activeStudents) }}</div>
+        <div class="stat-value">
+          {{ formatNumber(dashboardData.activeStudents) }}
+        </div>
       </div>
 
       <!-- 平均成绩 -->
       <div class="stat-card">
         <h3>平均成绩</h3>
-        <div class="stat-value">{{ formatDecimal(dashboardData.averageGrade) }}</div>
+        <div class="stat-value">
+          {{ formatDecimal(dashboardData.averageGrade) }}
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, inject } from 'vue'
-import { ApiService } from '../api/ApiService'
+import { ref, reactive, onMounted, onUnmounted, inject } from 'vue';
+import { ApiService } from '../api/ApiService';
 
 export default {
   name: 'Dashboard',
   setup() {
-    const loading = ref(false)
-    const abortController = ref(null)
-    const { showError } = inject('errorHandler')
-     
+    const loading = ref(false);
+    const abortController = ref(null);
+    const { showError } = inject('errorHandler');
+
     // 仪表盘数据（使用reactive保持响应性）
     const dashboardData = reactive({
       totalRevenue: 0,
       activeStudents: 0,
-      averageGrade: 0
-    })
+      averageGrade: 0,
+    });
 
     // 数据获取
     const loadDashboardData = async () => {
-      loading.value = true
-      abortController.value = new AbortController()
-      
+      loading.value = true;
+      abortController.value = new AbortController();
+
       try {
         const stats = await ApiService.getDashboardStats({
-          signal: abortController.value.signal
-        })
-        
-        // 更新仪表板数据
-        dashboardData.totalRevenue = stats.total_revenue || 0
-        dashboardData.activeStudents = stats.total_students || 0
-        dashboardData.averageGrade = parseFloat(stats.average_score?.toFixed(1)) || 0
+          signal: abortController.value.signal,
+        });
 
+        // 更新仪表板数据
+        dashboardData.totalRevenue = stats.total_revenue || 0;
+        dashboardData.activeStudents = stats.total_students || 0;
+        dashboardData.averageGrade =
+          parseFloat(stats.average_score?.toFixed(1)) || 0;
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error('加载仪表盘数据失败:', error)
+          console.error('加载仪表盘数据失败:', error);
           showError(
-            '数据加载失败', 
+            '数据加载失败',
             '无法获取仪表板数据，请检查网络连接或稍后重试',
-            error.message
-          )
+            error.message,
+          );
         }
       } finally {
-        loading.value = false
-        abortController.value = null
+        loading.value = false;
+        abortController.value = null;
       }
-    }
+    };
 
     // 格式化方法（集成到组件内部）
     const formatNumber = (value) => {
-      return new Intl.NumberFormat().format(value)
-    }
+      return new Intl.NumberFormat().format(value);
+    };
 
     const formatCurrency = (value) => {
-      return new Intl.NumberFormat('zh-CN', { 
-        style: 'currency', 
-        currency: 'CNY' 
-      }).format(value)
-    }
+      return new Intl.NumberFormat('zh-CN', {
+        style: 'currency',
+        currency: 'CNY',
+      }).format(value);
+    };
 
     const formatDecimal = (value) => {
-      return parseFloat(value).toFixed(1)
-    }
-
-
+      return parseFloat(value).toFixed(1);
+    };
 
     // 生命周期钩子
     onMounted(() => {
-      loadDashboardData()
-    })
+      loadDashboardData();
+    });
 
     onUnmounted(() => {
       if (abortController.value) {
-        abortController.value.abort()
+        abortController.value.abort();
       }
-    })
+    });
 
     return {
       loading,
@@ -123,10 +126,10 @@ export default {
       loadDashboardData,
       formatNumber,
       formatCurrency,
-      formatDecimal
-    }
-  }
-}
+      formatDecimal,
+    };
+  },
+};
 </script>
 
 <style scoped>
@@ -229,7 +232,7 @@ export default {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .stat-value {
     font-size: 1.75rem;
   }
@@ -239,7 +242,7 @@ export default {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .stat-value {
     font-size: 1.5rem;
   }

@@ -18,7 +18,7 @@ export function transformStudentData(rawData: any): Student {
     note: rawData.note || '',
     cash: rawData.cash || '',
     subject: rawData.subject || 'Others',
-    lesson_left: rawData.lesson_left
+    lesson_left: rawData.lesson_left,
   };
 }
 
@@ -39,7 +39,7 @@ export function transformTransactionData(rawData: any): Transaction {
     installment_current: rawData.installment_current || null,
     installment_total: rawData.installment_total || null,
     installment_due_date: rawData.installment_due_date || null,
-    installment_status: rawData.installment_status || null
+    installment_status: rawData.installment_status || null,
   };
 }
 
@@ -55,7 +55,7 @@ export function transformDashboardStatsData(rawData: any): DashboardStats {
     total_expense: rawData.total_expense || 0,
     average_score: rawData.average_score || 0,
     max_score: rawData.max_score || 0,
-    active_courses: rawData.active_courses || 0
+    active_courses: rawData.active_courses || 0,
   };
 }
 
@@ -73,7 +73,9 @@ export function transformStudentDataArray(rawDataArray: any[]): Student[] {
  * @param rawDataArray 后端返回的数据数组
  * @returns 转换后的 Transaction 对象数组
  */
-export function transformTransactionDataArray(rawDataArray: any[]): Transaction[] {
+export function transformTransactionDataArray(
+  rawDataArray: any[],
+): Transaction[] {
   return rawDataArray.map(transformTransactionData);
 }
 
@@ -90,7 +92,8 @@ export function validateStudentData(student: any): boolean {
     typeof student.class === 'string' &&
     typeof student.phone === 'string' &&
     typeof student.subject === 'string' &&
-    (student.lesson_left === undefined || typeof student.lesson_left === 'number')
+    (student.lesson_left === undefined ||
+      typeof student.lesson_left === 'number')
   );
 }
 
@@ -100,14 +103,14 @@ export function validateStudentData(student: any): boolean {
  * @returns 验证结果
  */
 export function validateTransactionData(transaction: any): boolean {
-  const basicValidation = (
+  const basicValidation =
     typeof transaction.uid === 'number' &&
-    (typeof transaction.student_id === 'number' || transaction.student_id === null) &&
+    (typeof transaction.student_id === 'number' ||
+      transaction.student_id === null) &&
     typeof transaction.amount === 'number' &&
     typeof transaction.description === 'string' &&
     (typeof transaction.note === 'string' || transaction.note === null) &&
-    typeof transaction.is_installment === 'boolean'
-  );
+    typeof transaction.is_installment === 'boolean';
   if (!basicValidation) return false;
 
   if (transaction.is_installment) {
@@ -115,8 +118,10 @@ export function validateTransactionData(transaction: any): boolean {
       typeof transaction.installment_plan_id === 'number' &&
       typeof transaction.installment_current === 'number' &&
       typeof transaction.installment_total === 'number' &&
-      (typeof transaction.installment_due_date === 'string' || transaction.installment_due_date === null) &&
-      (typeof transaction.installment_status === 'string' || transaction.installment_status === null)
+      (typeof transaction.installment_due_date === 'string' ||
+        transaction.installment_due_date === null) &&
+      (typeof transaction.installment_status === 'string' ||
+        transaction.installment_status === null)
     );
   }
   return true;
@@ -144,10 +149,12 @@ export function validateDashboardStatsData(stats: any): boolean {
  * @returns 是否为分期付款
  */
 export function isInstallmentTransaction(transaction: Transaction): boolean {
-  return transaction.is_installment && 
-         transaction.installment_plan_id !== null &&
-         transaction.installment_current !== null &&
-         transaction.installment_total !== null;
+  return (
+    transaction.is_installment &&
+    transaction.installment_plan_id !== null &&
+    transaction.installment_current !== null &&
+    transaction.installment_total !== null
+  );
 }
 
 /**
@@ -158,11 +165,16 @@ export function isInstallmentTransaction(transaction: Transaction): boolean {
 export function getInstallmentStatusLabel(status: string | null): string {
   if (!status) return '未知';
   switch (status) {
-    case 'Pending': return '待处理';
-    case 'Paid': return '已支付';
-    case 'Overdue': return '逾期';
-    case 'Cancelled': return '已取消';
-    default: return status;
+    case 'Pending':
+      return '待处理';
+    case 'Paid':
+      return '已支付';
+    case 'Overdue':
+      return '逾期';
+    case 'Cancelled':
+      return '已取消';
+    default:
+      return status;
   }
 }
 

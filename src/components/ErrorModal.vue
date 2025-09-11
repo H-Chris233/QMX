@@ -1,11 +1,15 @@
 <template>
-  <div v-if="show" class="error-modal-overlay" @click="closeOnOverlayClick ? closeModal() : null">
+  <div
+    v-if="show"
+    class="error-modal-overlay"
+    @click="closeOnOverlayClick ? closeModal() : null"
+  >
     <div class="error-modal" @click.stop>
       <div class="error-header">
         <div class="error-icon">❌</div>
         <h3>{{ title }}</h3>
       </div>
-      
+
       <div class="error-content">
         <p>{{ message }}</p>
         <div v-if="details" class="error-details">
@@ -15,11 +19,9 @@
           </details>
         </div>
       </div>
-      
+
       <div class="error-actions">
-        <button class="error-btn primary" @click="closeModal">
-          确定
-        </button>
+        <button class="error-btn primary" @click="closeModal">确定</button>
         <button v-if="showRetry" class="error-btn secondary" @click="retry">
           重试
         </button>
@@ -29,69 +31,72 @@
 </template>
 
 <script>
-import { ref, watch } from 'vue'
+import { ref, watch } from 'vue';
 
 export default {
   name: 'ErrorModal',
   props: {
     show: {
       type: Boolean,
-      default: false
+      default: false,
     },
     title: {
       type: String,
-      default: '错误'
+      default: '错误',
     },
     message: {
       type: String,
-      required: true
+      required: true,
     },
     details: {
       type: String,
-      default: ''
+      default: '',
     },
     closeOnOverlayClick: {
       type: Boolean,
-      default: true
+      default: true,
     },
     showRetry: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   emits: ['close', 'retry'],
   setup(props, { emit }) {
     const closeModal = () => {
-      emit('close')
-    }
+      emit('close');
+    };
 
     const retry = () => {
-      emit('retry')
-    }
+      emit('retry');
+    };
 
     // 监听ESC键关闭弹窗
-    watch(() => props.show, (newVal) => {
-      if (newVal) {
-        const handleEscape = (e) => {
-          if (e.key === 'Escape') {
-            closeModal()
-          }
+    watch(
+      () => props.show,
+      (newVal) => {
+        if (newVal) {
+          const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+              closeModal();
+            }
+          };
+          document.addEventListener('keydown', handleEscape);
+
+          // 清理函数
+          return () => {
+            document.removeEventListener('keydown', handleEscape);
+          };
         }
-        document.addEventListener('keydown', handleEscape)
-        
-        // 清理函数
-        return () => {
-          document.removeEventListener('keydown', handleEscape)
-        }
-      }
-    })
+      },
+    );
 
     return {
       closeModal,
-      retry
-    }
-  }
-}
+      retry,
+    };
+  },
+};
 </script>
 
 <style scoped>
@@ -242,17 +247,17 @@ export default {
     padding: 1rem;
     margin: 1rem;
   }
-  
+
   .error-header {
     flex-direction: column;
     text-align: center;
     gap: 0.5rem;
   }
-  
+
   .error-actions {
     flex-direction: column;
   }
-  
+
   .error-btn {
     width: 100%;
   }

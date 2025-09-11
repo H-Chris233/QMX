@@ -2,14 +2,13 @@
   <div class="financial-statistics">
     <!-- 加载进度条 -->
     <div v-if="loading" class="loading-progress"></div>
-    
+
     <div class="section-header">
       <h2>收支统计</h2>
-      <button 
-        class="add-btn" 
-        @click="showAddTransaction = true" 
+      <button
+        class="add-btn"
+        @click="showAddTransaction = true"
         :disabled="loading"
-
         aria-label="添加新交易"
       >
         {{ loading ? '加载中...' : '➕ 添加交易' }}
@@ -25,7 +24,7 @@
           <div class="card-value">{{ formatCurrency(totalIncome) }}</div>
         </div>
       </div>
-      
+
       <div class="overview-card expense">
         <div class="card-icon">💸</div>
         <div class="card-content">
@@ -33,7 +32,7 @@
           <div class="card-value">{{ formatCurrency(totalExpense) }}</div>
         </div>
       </div>
-      
+
       <div class="overview-card balance">
         <div class="card-icon">💎</div>
         <div class="card-content">
@@ -58,18 +57,23 @@
       <div class="transactions-header">
         <h3>交易记录</h3>
         <div class="filter-controls">
-          <select v-model="transactionFilter" @change="filterTransactions" aria-label="交易类型筛选">
+          <select
+            v-model="transactionFilter"
+            @change="filterTransactions"
+            aria-label="交易类型筛选"
+          >
             <option value="all">全部交易</option>
             <option value="income">收入</option>
             <option value="expense">支出</option>
-            <option value="installment">分期付款</option> <!-- 新增筛选选项 -->
+            <option value="installment">分期付款</option>
+            <!-- 新增筛选选项 -->
           </select>
-          <input 
-            v-model="transactionSearch" 
-            type="text" 
+          <input
+            v-model="transactionSearch"
+            type="text"
             placeholder="搜索交易..."
             aria-label="交易搜索"
-          >
+          />
         </div>
       </div>
 
@@ -80,17 +84,26 @@
               <th>描述</th>
               <th>金额</th>
               <th>类型</th>
-              <th>状态</th> <!-- 新增状态列 -->
+              <th>状态</th>
+              <!-- 新增状态列 -->
               <th>备注</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="transaction in filteredTransactions" :key="transaction.id">
+            <tr
+              v-for="transaction in filteredTransactions"
+              :key="transaction.id"
+            >
               <td>
                 {{ transaction.description }}
-                <span v-if="transaction.is_installment" class="installment-badge">
-                  分期 {{ transaction.installment_current }}/{{ transaction.installment_total }}
+                <span
+                  v-if="transaction.is_installment"
+                  class="installment-badge"
+                >
+                  分期 {{ transaction.installment_current }}/{{
+                    transaction.installment_total
+                  }}
                 </span>
               </td>
               <td :class="['amount', transaction.type]">
@@ -103,26 +116,34 @@
                 </span>
               </td>
               <td>
-                <span v-if="transaction.is_installment" 
-                      :class="['status-badge', getStatusClass(transaction.installment_status)]">
+                <span
+                  v-if="transaction.is_installment"
+                  :class="[
+                    'status-badge',
+                    getStatusClass(transaction.installment_status),
+                  ]"
+                >
                   {{ getStatusText(transaction.installment_status) }}
                 </span>
                 <span v-else>-</span>
               </td>
               <td>{{ transaction.note || '-' }}</td>
               <td class="actions">
-                <button 
-                  v-if="transaction.is_installment" 
+                <button
+                  v-if="transaction.is_installment"
                   class="action-btn status-btn"
                   @click="showUpdateStatus(transaction)"
                   title="更新状态"
-                >🔄</button>
-                <button 
-                  class="action-btn delete-btn" 
-                  @click="deleteTransaction(transaction.id)" 
-
+                >
+                  🔄
+                </button>
+                <button
+                  class="action-btn delete-btn"
+                  @click="deleteTransaction(transaction.id)"
                   aria-label="删除交易"
-                >🗑️</button>
+                >
+                  🗑️
+                </button>
               </td>
             </tr>
           </tbody>
@@ -132,113 +153,134 @@
 
     <!-- 添加交易模态框 -->
     <div v-if="showAddTransaction" class="modal-overlay" @click="closeModals">
-      <div class="modal" @click.stop role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div
+        class="modal"
+        @click.stop
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
         <div class="modal-header">
           <h3 id="modal-title">添加交易</h3>
-          <button class="close-btn" @click="closeModals" aria-label="关闭模态框">✖️</button>
+          <button
+            class="close-btn"
+            @click="closeModals"
+            aria-label="关闭模态框"
+          >
+            ✖️
+          </button>
         </div>
         <div class="modal-body">
           <div class="payment-mode-toggle">
-            <button 
+            <button
               :class="['mode-btn', { active: !isInstallmentMode }]"
               @click="isInstallmentMode = false"
             >
               普通付款
             </button>
-            <button 
+            <button
               :class="['mode-btn', { active: isInstallmentMode }]"
               @click="isInstallmentMode = true"
             >
               分期付款
             </button>
           </div>
-          
+
           <div class="form-group">
             <label for="transaction-type">类型</label>
-            <select id="transaction-type" v-model="currentTransaction.type" :disabled="isInstallmentMode">
+            <select
+              id="transaction-type"
+              v-model="currentTransaction.type"
+              :disabled="isInstallmentMode"
+            >
               <option value="income">收入</option>
               <option value="expense">支出</option>
             </select>
-            <span v-if="isInstallmentMode" class="form-note">分期付款仅支持收入类型</span>
+            <span v-if="isInstallmentMode" class="form-note"
+              >分期付款仅支持收入类型</span
+            >
           </div>
-          
+
           <div class="form-group">
             <label for="transaction-amount">金额</label>
-            <input 
-              id="transaction-amount" 
-              v-model.number="currentTransaction.amount" 
-              type="number" 
-              placeholder="填入金额" 
+            <input
+              id="transaction-amount"
+              v-model.number="currentTransaction.amount"
+              type="number"
+              placeholder="填入金额"
               min="0"
               step="1"
               oninput="validity.valid||(value='');"
               class="no-spinners"
-            >
+            />
           </div>
-          
+
           <div class="form-group">
             <label for="student-id">学员 (可选)</label>
-            <select 
-              id="student-id" 
-              v-model="currentTransaction.student_id"
-            >
+            <select id="student-id" v-model="currentTransaction.student_id">
               <option :value="null">其他交易</option>
-              <option 
-                v-for="student in students" 
-                :key="student.uid" 
+              <option
+                v-for="student in students"
+                :key="student.uid"
                 :value="student.uid"
               >
                 {{ student.name }} (ID: {{ student.uid }})
               </option>
             </select>
           </div>
-          
+
           <!-- 分期付款特定字段 -->
           <div v-if="isInstallmentMode" class="installment-fields">
             <div class="form-group">
               <label for="installment-total">总期数</label>
-              <input 
-                id="installment-total" 
-                v-model.number="currentTransaction.installment_total" 
-                type="number" 
-                placeholder="例如: 12" 
+              <input
+                id="installment-total"
+                v-model.number="currentTransaction.installment_total"
+                type="number"
+                placeholder="例如: 12"
                 min="2"
                 step="1"
-              >
+              />
             </div>
-            
+
             <div class="form-group">
               <label for="installment-frequency">付款频率</label>
-              <select id="installment-frequency" v-model="currentTransaction.installment_frequency">
+              <select
+                id="installment-frequency"
+                v-model="currentTransaction.installment_frequency"
+              >
                 <option value="Weekly">每周</option>
                 <option value="Monthly" selected>每月</option>
                 <option value="Quarterly">每季度</option>
                 <option value="Custom">自定义</option>
               </select>
             </div>
-            
-            <div v-if="currentTransaction.installment_frequency === 'Custom'" class="form-group">
+
+            <div
+              v-if="currentTransaction.installment_frequency === 'Custom'"
+              class="form-group"
+            >
               <label for="custom-frequency-days">自定义天数</label>
-              <input 
-                id="custom-frequency-days" 
-                v-model.number="currentTransaction.custom_frequency_days" 
-                type="number" 
-                placeholder="天数" 
+              <input
+                id="custom-frequency-days"
+                v-model.number="currentTransaction.custom_frequency_days"
+                type="number"
+                placeholder="天数"
                 min="1"
                 step="1"
-              >
+              />
             </div>
-            
+
             <div class="form-group">
               <label for="installment-due-date">首次到期日</label>
-              <input 
-                id="installment-due-date" 
-                v-model="currentTransaction.installment_due_date" 
+              <input
+                id="installment-due-date"
+                v-model="currentTransaction.installment_due_date"
                 type="date"
-              >
+              />
             </div>
           </div>
-          
+
           <div class="form-group">
             <label for="transaction-note">备注</label>
             <textarea
@@ -251,22 +293,40 @@
         </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals">取消</button>
-          <button 
-            class="save-btn" 
-            @click="saveTransaction" 
+          <button
+            class="save-btn"
+            @click="saveTransaction"
             :disabled="loading"
             :title="loading ? '请稍候...' : '保存交易'"
-          >保存</button>
+          >
+            保存
+          </button>
         </div>
       </div>
     </div>
 
     <!-- 更新分期状态模态框 -->
-    <div v-if="showUpdateStatusModal" class="modal-overlay" @click="closeModals">
-      <div class="modal" @click.stop role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
+    <div
+      v-if="showUpdateStatusModal"
+      class="modal-overlay"
+      @click="closeModals"
+    >
+      <div
+        class="modal"
+        @click.stop
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="status-modal-title"
+      >
         <div class="modal-header">
           <h3 id="status-modal-title">更新分期状态</h3>
-          <button class="close-btn" @click="closeModals" aria-label="关闭模态框">✖️</button>
+          <button
+            class="close-btn"
+            @click="closeModals"
+            aria-label="关闭模态框"
+          >
+            ✖️
+          </button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -281,11 +341,13 @@
         </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals">取消</button>
-          <button 
-            class="save-btn" 
-            @click="updateInstallmentStatus" 
+          <button
+            class="save-btn"
+            @click="updateInstallmentStatus"
             :disabled="loading"
-          >更新</button>
+          >
+            更新
+          </button>
         </div>
       </div>
     </div>
@@ -293,24 +355,24 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
-import { ApiService } from '../api/ApiService'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
+import { ApiService } from '../api/ApiService';
 
 export default {
   name: 'FinancialStatistics',
   setup() {
-    const loading = ref(false)
-    const transactions = ref([])
-    const students = ref([])
-    const transactionFilter = ref('all')
-    const transactionSearch = ref('')
-    const showAddTransaction = ref(false)
-    const showUpdateStatusModal = ref(false)
-    const isInstallmentMode = ref(false)
-    const selectedTransaction = ref(null)
-    const selectedStatus = ref('Pending')
-    const abortController = ref(null)
-    const { showError, showSuccess } = inject('errorHandler')
+    const loading = ref(false);
+    const transactions = ref([]);
+    const students = ref([]);
+    const transactionFilter = ref('all');
+    const transactionSearch = ref('');
+    const showAddTransaction = ref(false);
+    const showUpdateStatusModal = ref(false);
+    const isInstallmentMode = ref(false);
+    const selectedTransaction = ref(null);
+    const selectedStatus = ref('Pending');
+    const abortController = ref(null);
+    const { showError, showSuccess } = inject('errorHandler');
 
     const currentTransaction = ref({
       type: 'income',
@@ -321,262 +383,284 @@ export default {
       installment_total: 2,
       installment_frequency: 'Monthly',
       custom_frequency_days: 30,
-      installment_due_date: new Date().toISOString().split('T')[0]
-    })
+      installment_due_date: new Date().toISOString().split('T')[0],
+    });
 
     // 计算属性
     const filteredTransactions = computed(() => {
-      let filtered = transactions.value
-      
+      let filtered = transactions.value;
+
       if (transactionFilter.value !== 'all') {
         if (transactionFilter.value === 'installment') {
-          filtered = filtered.filter(t => t.is_installment)
+          filtered = filtered.filter((t) => t.is_installment);
         } else {
-          filtered = filtered.filter(t => t.type === transactionFilter.value && !t.is_installment)
+          filtered = filtered.filter(
+            (t) => t.type === transactionFilter.value && !t.is_installment,
+          );
         }
       }
-      
+
       if (transactionSearch.value) {
-        const search = transactionSearch.value.toLowerCase()
-        filtered = filtered.filter(t => 
-          t.description.toLowerCase().includes(search) ||
-          (t.note && t.note.toLowerCase().includes(search))
-        )
+        const search = transactionSearch.value.toLowerCase();
+        filtered = filtered.filter(
+          (t) =>
+            t.description.toLowerCase().includes(search) ||
+            (t.note && t.note.toLowerCase().includes(search)),
+        );
       }
-      
-      return filtered
-    })
+
+      return filtered;
+    });
 
     const totalIncome = computed(() => {
       return transactions.value
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0)
-    })
+        .filter((t) => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+    });
 
     const totalExpense = computed(() => {
       return transactions.value
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0)
-    })
+        .filter((t) => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+    });
 
-    const netProfit = computed(() => totalIncome.value - totalExpense.value)
+    const netProfit = computed(() => totalIncome.value - totalExpense.value);
 
     // 新增：分期付款统计
     const installmentCount = computed(() => {
-      return transactions.value.filter(t => t.is_installment).length
-    })
+      return transactions.value.filter((t) => t.is_installment).length;
+    });
 
     const pendingInstallments = computed(() => {
-      return transactions.value
-        .filter(t => t.is_installment && t.installment_status === 'Pending')
-        .length
-    })
+      return transactions.value.filter(
+        (t) => t.is_installment && t.installment_status === 'Pending',
+      ).length;
+    });
 
     // 格式化方法
     const formatCurrency = (value) => {
-      return new Intl.NumberFormat('zh-CN', { 
-        style: 'currency', 
-        currency: 'CNY' 
-      }).format(value)
-    }
+      return new Intl.NumberFormat('zh-CN', {
+        style: 'currency',
+        currency: 'CNY',
+      }).format(value);
+    };
 
     const formatTransactionAmount = (transaction) => {
-      const amount = transaction.type === 'income' ? transaction.amount : -transaction.amount
-      return new Intl.NumberFormat('zh-CN', { 
-        style: 'currency', 
-        currency: 'CNY' 
-      }).format(amount)
-    }
+      const amount =
+        transaction.type === 'income'
+          ? transaction.amount
+          : -transaction.amount;
+      return new Intl.NumberFormat('zh-CN', {
+        style: 'currency',
+        currency: 'CNY',
+      }).format(amount);
+    };
 
     // 状态处理方法
     const getStatusClass = (status) => {
       switch (status) {
-        case 'Paid': return 'status-paid'
-        case 'Pending': return 'status-pending'
-        case 'Overdue': return 'status-overdue'
-        case 'Cancelled': return 'status-cancelled'
-        default: return ''
+        case 'Paid':
+          return 'status-paid';
+        case 'Pending':
+          return 'status-pending';
+        case 'Overdue':
+          return 'status-overdue';
+        case 'Cancelled':
+          return 'status-cancelled';
+        default:
+          return '';
       }
-    }
+    };
 
     const getStatusText = (status) => {
       switch (status) {
-        case 'Paid': return '已支付'
-        case 'Pending': return '待处理'
-        case 'Overdue': return '逾期'
-        case 'Cancelled': return '已取消'
-        default: return status || '未知'
+        case 'Paid':
+          return '已支付';
+        case 'Pending':
+          return '待处理';
+        case 'Overdue':
+          return '逾期';
+        case 'Cancelled':
+          return '已取消';
+        default:
+          return status || '未知';
       }
-    }
+    };
 
     // 数据操作
     const filterTransactions = () => {
       // 筛选逻辑已通过computed属性实现
-    }
+    };
 
     // 加载学员列表
     const loadStudents = async () => {
       try {
-        students.value = await ApiService.getAllStudents()
+        students.value = await ApiService.getAllStudents();
       } catch (error) {
-        console.error('加载学员数据失败:', error)
-        showError('加载失败', '加载学员数据时发生错误', error.message)
+        console.error('加载学员数据失败:', error);
+        showError('加载失败', '加载学员数据时发生错误', error.message);
       }
-    }
+    };
 
     const loadTransactions = async () => {
-      loading.value = true
-      abortController.value = new AbortController()
-      
+      loading.value = true;
+      abortController.value = new AbortController();
+
       try {
         const cashTransactions = await ApiService.getAllTransactions({
-          signal: abortController.value.signal
-        })
-        
+          signal: abortController.value.signal,
+        });
+
         // 转换后端数据为前端格式
-        transactions.value = cashTransactions.map(transaction => ({
+        transactions.value = cashTransactions.map((transaction) => ({
           id: transaction.uid,
           type: transaction.amount > 0 ? 'income' : 'expense',
-          description: transaction.student_id 
-            ? `学员${transaction.student_id}缴费` 
+          description: transaction.student_id
+            ? `学员${transaction.student_id}缴费`
             : '其他交易',
           amount: Math.abs(transaction.amount),
           note: transaction.note || '',
           is_installment: transaction.is_installment,
           installment_current: transaction.installment_current,
           installment_total: transaction.installment_total,
-          installment_status: transaction.installment_status
-        }))
-        
+          installment_status: transaction.installment_status,
+        }));
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error('加载交易数据失败:', error)
+          console.error('加载交易数据失败:', error);
           showError(
-            '加载失败', 
+            '加载失败',
             '加载交易数据时发生错误，请检查网络连接或稍后重试',
-            error.message
-          )
+            error.message,
+          );
         }
       } finally {
-        loading.value = false
-        abortController.value = null
+        loading.value = false;
+        abortController.value = null;
       }
-    }
+    };
 
     const saveTransaction = async () => {
       // 检查金额是否已输入且为有效数值
-      if (!currentTransaction.value.amount || currentTransaction.value.amount <= 0) {
-        showError('输入错误', '请输入有效金额')
-        return
+      if (
+        !currentTransaction.value.amount ||
+        currentTransaction.value.amount <= 0
+      ) {
+        showError('输入错误', '请输入有效金额');
+        return;
       }
 
       // 分期付款验证
       if (isInstallmentMode.value) {
-        if (!currentTransaction.value.installment_total || currentTransaction.value.installment_total < 2) {
-          showError('输入错误', '分期付款至少需要2期')
-          return
+        if (
+          !currentTransaction.value.installment_total ||
+          currentTransaction.value.installment_total < 2
+        ) {
+          showError('输入错误', '分期付款至少需要2期');
+          return;
         }
-        
+
         if (!currentTransaction.value.installment_due_date) {
-          showError('输入错误', '请选择首次到期日')
-          return
+          showError('输入错误', '请选择首次到期日');
+          return;
         }
       }
 
-      loading.value = true
+      loading.value = true;
       try {
         if (isInstallmentMode.value) {
           // 处理分期付款
-          const frequency = currentTransaction.value.installment_frequency === 'Custom' 
-            ? `Custom${currentTransaction.value.custom_frequency_days || 30}`
-            : currentTransaction.value.installment_frequency
-          
+          const frequency =
+            currentTransaction.value.installment_frequency === 'Custom'
+              ? `Custom${currentTransaction.value.custom_frequency_days || 30}`
+              : currentTransaction.value.installment_frequency;
+
           // 转换为UTC日期字符串
-          const dueDate = new Date(currentTransaction.value.installment_due_date + 'T00:00:00Z').toISOString()
-          
+          const dueDate = new Date(
+            currentTransaction.value.installment_due_date + 'T00:00:00Z',
+          ).toISOString();
+
           await ApiService.addInstallmentTransaction(
             currentTransaction.value.student_id,
             currentTransaction.value.amount,
             currentTransaction.value.note || '',
             currentTransaction.value.installment_total,
             frequency,
-            dueDate
-          )
+            dueDate,
+          );
         } else {
           // 处理普通付款
-          const amount = Math.round(Math.abs(currentTransaction.value.amount))
-          const cashAmount = currentTransaction.value.type === 'income' 
-            ? amount 
-            : -amount
+          const amount = Math.round(Math.abs(currentTransaction.value.amount));
+          const cashAmount =
+            currentTransaction.value.type === 'income' ? amount : -amount;
 
           await ApiService.addCashTransaction(
             currentTransaction.value.student_id,
             cashAmount,
-            currentTransaction.value.note || ''
-          )
+            currentTransaction.value.note || '',
+          );
         }
 
         // 重新加载数据
-        await loadTransactions()
-        closeModals()
-        showSuccess('成功', '交易已成功添加')
-        
+        await loadTransactions();
+        closeModals();
+        showSuccess('成功', '交易已成功添加');
       } catch (error) {
-        console.error('保存交易失败:', error)
-        showError('保存失败', '保存交易时发生错误', error.message)
+        console.error('保存交易失败:', error);
+        showError('保存失败', '保存交易时发生错误', error.message);
       } finally {
-        loading.value = false
+        loading.value = false;
       }
-    }
+    };
 
     const deleteTransaction = async (id) => {
       if (confirm('确定要删除这条交易记录吗？')) {
-        loading.value = true
+        loading.value = true;
         try {
-          await ApiService.deleteCashTransaction(id)
-          await loadTransactions()
-          showSuccess('成功', '交易已删除')
+          await ApiService.deleteCashTransaction(id);
+          await loadTransactions();
+          showSuccess('成功', '交易已删除');
         } catch (error) {
-          console.error('删除交易失败:', error)
-          showError('删除失败', '删除交易记录时发生错误', error.message)
+          console.error('删除交易失败:', error);
+          showError('删除失败', '删除交易记录时发生错误', error.message);
         } finally {
-          loading.value = false
+          loading.value = false;
         }
       }
-    }
+    };
 
     const showUpdateStatus = (transaction) => {
-      selectedTransaction.value = transaction
-      selectedStatus.value = transaction.installment_status || 'Pending'
-      showUpdateStatusModal.value = true
-    }
+      selectedTransaction.value = transaction;
+      selectedStatus.value = transaction.installment_status || 'Pending';
+      showUpdateStatusModal.value = true;
+    };
 
     const updateInstallmentStatus = async () => {
-      if (!selectedTransaction.value) return
-      
-      loading.value = true
+      if (!selectedTransaction.value) return;
+
+      loading.value = true;
       try {
         await ApiService.updateInstallmentStatus(
           selectedTransaction.value.id,
-          selectedStatus.value
-        )
-        
-        await loadTransactions()
-        closeModals()
-        showSuccess('成功', '分期状态已更新')
+          selectedStatus.value,
+        );
+
+        await loadTransactions();
+        closeModals();
+        showSuccess('成功', '分期状态已更新');
       } catch (error) {
-        console.error('更新分期状态失败:', error)
-        showError('更新失败', '更新分期状态时发生错误', error.message)
+        console.error('更新分期状态失败:', error);
+        showError('更新失败', '更新分期状态时发生错误', error.message);
       } finally {
-        loading.value = false
+        loading.value = false;
       }
-    }
+    };
 
     const closeModals = () => {
-      showAddTransaction.value = false
-      showUpdateStatusModal.value = false
-      isInstallmentMode.value = false
-      selectedTransaction.value = null
+      showAddTransaction.value = false;
+      showUpdateStatusModal.value = false;
+      isInstallmentMode.value = false;
+      selectedTransaction.value = null;
       currentTransaction.value = {
         type: 'income',
         amount: '',
@@ -585,22 +669,20 @@ export default {
         installment_total: 2,
         installment_frequency: 'Monthly',
         custom_frequency_days: 30,
-        installment_due_date: new Date().toISOString().split('T')[0]
-      }
-    }
-
-
+        installment_due_date: new Date().toISOString().split('T')[0],
+      };
+    };
 
     onMounted(() => {
-      loadStudents()
-      loadTransactions()
-    })
+      loadStudents();
+      loadTransactions();
+    });
 
     onUnmounted(() => {
       if (abortController.value) {
-        abortController.value.abort()
+        abortController.value.abort();
       }
-    })
+    });
 
     return {
       loading,
@@ -628,10 +710,10 @@ export default {
       updateInstallmentStatus,
       closeModals,
       getStatusClass,
-      getStatusText
-    }
-  }
-}
+      getStatusText,
+    };
+  },
+};
 </script>
 
 <style scoped>
@@ -1037,7 +1119,8 @@ export default {
   border-top: 1px solid var(--border-color);
 }
 
-.cancel-btn, .save-btn {
+.cancel-btn,
+.save-btn {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 6px;
@@ -1068,13 +1151,13 @@ export default {
   .overview-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .transactions-header {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
   }
-  
+
   .filter-controls {
     flex-direction: column;
   }

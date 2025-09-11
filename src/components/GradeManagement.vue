@@ -42,7 +42,9 @@
         <label>课程</label>
         <select v-model="selectedCourse" @change="filterGrades">
           <option value="">全部课程</option>
-          <option v-for="course in courses" :key="course" :value="course">{{ course }}</option>
+          <option v-for="course in courses" :key="course" :value="course">
+            {{ course }}
+          </option>
         </select>
       </div>
       <div class="filter-group">
@@ -57,7 +59,12 @@
       </div>
       <div class="filter-group">
         <label>学员</label>
-        <input v-model="studentSearch" type="text" placeholder="搜索学员姓名" @input="filterGrades">
+        <input
+          v-model="studentSearch"
+          type="text"
+          placeholder="搜索学员姓名"
+          @input="filterGrades"
+        />
       </div>
     </div>
 
@@ -83,9 +90,17 @@
             <td>{{ grade.examType }}</td>
             <td>
               <div class="score-display">
-                <span :class="['score', getScoreClass(grade.score)]">{{ grade.score }}</span>
+                <span :class="['score', getScoreClass(grade.score)]">{{
+                  grade.score
+                }}</span>
                 <div class="score-bar">
-                  <div class="score-fill" :style="{ width: grade.score + '%', backgroundColor: getScoreColor(grade.score) }"></div>
+                  <div
+                    class="score-fill"
+                    :style="{
+                      width: grade.score + '%',
+                      backgroundColor: getScoreColor(grade.score),
+                    }"
+                  ></div>
                 </div>
               </div>
             </td>
@@ -98,7 +113,9 @@
             <td class="notes">{{ grade.notes || '-' }}</td>
             <td class="actions">
               <button class="edit-btn" @click="editGrade(grade)">✏️</button>
-              <button class="delete-btn" @click="deleteGrade(grade.id)">🗑️</button>
+              <button class="delete-btn" @click="deleteGrade(grade.id)">
+                🗑️
+              </button>
             </td>
           </tr>
         </tbody>
@@ -110,13 +127,20 @@
       <h3>成绩分布</h3>
       <div class="distribution-chart">
         <div class="distribution-bars">
-          <div v-for="(range, index) in scoreRanges" :key="index" class="distribution-item">
+          <div
+            v-for="(range, index) in scoreRanges"
+            :key="index"
+            class="distribution-item"
+          >
             <div class="range-label">{{ range.label }}</div>
             <div class="range-bar">
-              <div class="range-fill" :style="{ 
-                width: (range.count / maxCount) * 100 + '%',
-                backgroundColor: range.color 
-              }"></div>
+              <div
+                class="range-fill"
+                :style="{
+                  width: (range.count / maxCount) * 100 + '%',
+                  backgroundColor: range.color,
+                }"
+              ></div>
             </div>
             <div class="range-count">{{ range.count }}人</div>
           </div>
@@ -125,7 +149,11 @@
     </div>
 
     <!-- 添加/编辑成绩模态框 -->
-    <div v-if="showAddGrade || showEditGrade" class="modal-overlay" @click="closeModals">
+    <div
+      v-if="showAddGrade || showEditGrade"
+      class="modal-overlay"
+      @click="closeModals"
+    >
       <div class="modal" @click.stop>
         <div class="modal-header">
           <h3>{{ showAddGrade ? '添加成绩' : '编辑成绩' }}</h3>
@@ -136,7 +164,11 @@
             <label>学员姓名</label>
             <select v-model="currentGrade.studentId">
               <option value="">请选择学员</option>
-              <option v-for="student in students" :key="student.id" :value="student.id">
+              <option
+                v-for="student in students"
+                :key="student.id"
+                :value="student.id"
+              >
                 {{ student.name }}
               </option>
             </select>
@@ -145,7 +177,9 @@
             <label>课程</label>
             <select v-model="currentGrade.course">
               <option value="">请选择课程</option>
-              <option v-for="course in courses" :key="course" :value="course">{{ course }}</option>
+              <option v-for="course in courses" :key="course" :value="course">
+                {{ course }}
+              </option>
             </select>
           </div>
           <div class="form-group">
@@ -160,15 +194,25 @@
           </div>
           <div class="form-group">
             <label>分数 (0-100)</label>
-            <input v-model.number="currentGrade.score" type="number" min="0" max="100" placeholder="0">
+            <input
+              v-model.number="currentGrade.score"
+              type="number"
+              min="0"
+              max="100"
+              placeholder="0"
+            />
           </div>
           <div class="form-group">
             <label>考试日期</label>
-            <input v-model="currentGrade.examDate" type="date">
+            <input v-model="currentGrade.examDate" type="date" />
           </div>
           <div class="form-group">
             <label>备注</label>
-            <textarea v-model="currentGrade.notes" rows="3" placeholder="可选备注信息"></textarea>
+            <textarea
+              v-model="currentGrade.notes"
+              rows="3"
+              placeholder="可选备注信息"
+            ></textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -189,7 +233,11 @@
           <div class="import-section">
             <h4>选择文件</h4>
             <div class="file-upload">
-              <input type="file" accept=".xlsx,.xls,.csv" @change="handleFileUpload">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                @change="handleFileUpload"
+              />
               <div class="upload-placeholder">
                 <span>📁</span>
                 <p>点击或拖拽文件到此处</p>
@@ -197,7 +245,7 @@
               </div>
             </div>
           </div>
-          
+
           <div class="import-section">
             <h4>导入模板</h4>
             <div class="template-info">
@@ -224,19 +272,19 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue';
 
 export default {
   name: 'GradeManagement',
   setup() {
-    const grades = ref([])
-    const students = ref([])
-    const selectedCourse = ref('')
-    const selectedExamType = ref('')
-    const studentSearch = ref('')
-    const showAddGrade = ref(false)
-    const showEditGrade = ref(false)
-    const showImportModal = ref(false)
+    const grades = ref([]);
+    const students = ref([]);
+    const selectedCourse = ref('');
+    const selectedExamType = ref('');
+    const studentSearch = ref('');
+    const showAddGrade = ref(false);
+    const showEditGrade = ref(false);
+    const showImportModal = ref(false);
     const currentGrade = ref({
       id: null,
       studentId: '',
@@ -245,8 +293,8 @@ export default {
       examType: '',
       score: 0,
       examDate: '',
-      notes: ''
-    })
+      notes: '',
+    });
 
     // 模拟数据
     const mockStudents = [
@@ -254,67 +302,122 @@ export default {
       { id: 2, name: '李四' },
       { id: 3, name: '王五' },
       { id: 4, name: '赵六' },
-      { id: 5, name: '孙七' }
-    ]
+      { id: 5, name: '孙七' },
+    ];
 
     const mockGrades = [
-      { id: 1, studentId: 1, studentName: '张三', course: 'Python基础', examType: '期末考试', score: 85, examDate: '2024-01-15', notes: '表现良好' },
-      { id: 2, studentId: 2, studentName: '李四', course: 'Java进阶', examType: '期末考试', score: 92, examDate: '2024-01-16', notes: '优秀' },
-      { id: 3, studentId: 3, studentName: '王五', course: 'Web前端', examType: '期中考试', score: 78, examDate: '2024-01-20', notes: '需要加强' },
-      { id: 4, studentId: 4, studentName: '赵六', course: '数据分析', examType: '期末考试', score: 88, examDate: '2024-01-25', notes: '稳定发挥' },
-      { id: 5, studentId: 5, studentName: '孙七', course: 'Python基础', examType: '平时测验', score: 95, examDate: '2024-01-28', notes: '非常优秀' }
-    ]
+      {
+        id: 1,
+        studentId: 1,
+        studentName: '张三',
+        course: 'Python基础',
+        examType: '期末考试',
+        score: 85,
+        examDate: '2024-01-15',
+        notes: '表现良好',
+      },
+      {
+        id: 2,
+        studentId: 2,
+        studentName: '李四',
+        course: 'Java进阶',
+        examType: '期末考试',
+        score: 92,
+        examDate: '2024-01-16',
+        notes: '优秀',
+      },
+      {
+        id: 3,
+        studentId: 3,
+        studentName: '王五',
+        course: 'Web前端',
+        examType: '期中考试',
+        score: 78,
+        examDate: '2024-01-20',
+        notes: '需要加强',
+      },
+      {
+        id: 4,
+        studentId: 4,
+        studentName: '赵六',
+        course: '数据分析',
+        examType: '期末考试',
+        score: 88,
+        examDate: '2024-01-25',
+        notes: '稳定发挥',
+      },
+      {
+        id: 5,
+        studentId: 5,
+        studentName: '孙七',
+        course: 'Python基础',
+        examType: '平时测验',
+        score: 95,
+        examDate: '2024-01-28',
+        notes: '非常优秀',
+      },
+    ];
 
-    const courses = ['Python基础', 'Java进阶', 'Web前端', '数据分析']
+    const courses = ['Python基础', 'Java进阶', 'Web前端', '数据分析'];
 
     const filteredGrades = computed(() => {
-      let filtered = grades.value
+      let filtered = grades.value;
 
       if (selectedCourse.value) {
-        filtered = filtered.filter(g => g.course === selectedCourse.value)
+        filtered = filtered.filter((g) => g.course === selectedCourse.value);
       }
 
       if (selectedExamType.value) {
-        filtered = filtered.filter(g => g.examType === selectedExamType.value)
+        filtered = filtered.filter(
+          (g) => g.examType === selectedExamType.value,
+        );
       }
 
       if (studentSearch.value) {
-        filtered = filtered.filter(g => g.studentName.includes(studentSearch.value))
+        filtered = filtered.filter((g) =>
+          g.studentName.includes(studentSearch.value),
+        );
       }
 
-      return filtered
-    })
+      return filtered;
+    });
 
-    const totalCount = computed(() => filteredGrades.value.length)
-    const passedCount = computed(() => filteredGrades.value.filter(g => g.score >= 60).length)
-    const excellentCount = computed(() => filteredGrades.value.filter(g => g.score >= 90).length)
+    const totalCount = computed(() => filteredGrades.value.length);
+    const passedCount = computed(
+      () => filteredGrades.value.filter((g) => g.score >= 60).length,
+    );
+    const excellentCount = computed(
+      () => filteredGrades.value.filter((g) => g.score >= 90).length,
+    );
 
     const averageScore = computed(() => {
-      if (totalCount.value === 0) return 0
-      const sum = filteredGrades.value.reduce((acc, g) => acc + g.score, 0)
-      return Math.round(sum / totalCount.value)
-    })
+      if (totalCount.value === 0) return 0;
+      const sum = filteredGrades.value.reduce((acc, g) => acc + g.score, 0);
+      return Math.round(sum / totalCount.value);
+    });
 
     const highestScore = computed(() => {
-      if (totalCount.value === 0) return 0
-      return Math.max(...filteredGrades.value.map(g => g.score))
-    })
+      if (totalCount.value === 0) return 0;
+      return Math.max(...filteredGrades.value.map((g) => g.score));
+    });
 
     const highestScorer = computed(() => {
-      if (totalCount.value === 0) return ''
-      const highestGrade = filteredGrades.value.reduce((max, g) => g.score > max.score ? g : max)
-      return highestGrade.studentName
-    })
+      if (totalCount.value === 0) return '';
+      const highestGrade = filteredGrades.value.reduce((max, g) =>
+        g.score > max.score ? g : max,
+      );
+      return highestGrade.studentName;
+    });
 
     const passRate = computed(() => {
-      if (totalCount.value === 0) return 0
-      return Math.round((passedCount.value / totalCount.value) * 100)
-    })
+      if (totalCount.value === 0) return 0;
+      return Math.round((passedCount.value / totalCount.value) * 100);
+    });
 
     const excellentRate = computed(() => {
-      if (totalCount.value === 0) return 0
-      return Math.round((excellentCount.value / totalCount.value) * 100)
-    })
+      if (totalCount.value === 0) return 0;
+      return Math.round((excellentCount.value / totalCount.value) * 100);
+    });
 
     const scoreRanges = computed(() => {
       const ranges = [
@@ -322,25 +425,27 @@ export default {
         { label: '80-89', min: 80, max: 89, count: 0, color: '#8bc34a' },
         { label: '70-79', min: 70, max: 79, count: 0, color: '#ffc107' },
         { label: '60-69', min: 60, max: 69, count: 0, color: '#ff9800' },
-        { label: '0-59', min: 0, max: 59, count: 0, color: '#f44336' }
-      ]
+        { label: '0-59', min: 0, max: 59, count: 0, color: '#f44336' },
+      ];
 
-      filteredGrades.value.forEach(grade => {
-        const range = ranges.find(r => grade.score >= r.min && grade.score <= r.max)
-        if (range) range.count++
-      })
+      filteredGrades.value.forEach((grade) => {
+        const range = ranges.find(
+          (r) => grade.score >= r.min && grade.score <= r.max,
+        );
+        if (range) range.count++;
+      });
 
-      const maxCount = Math.max(...ranges.map(r => r.count), 1)
-      return ranges.map(r => ({ ...r, maxCount }))
-    })
+      const maxCount = Math.max(...ranges.map((r) => r.count), 1);
+      return ranges.map((r) => ({ ...r, maxCount }));
+    });
 
     const getScoreClass = (score) => {
-      if (score >= 90) return 'excellent'
-      if (score >= 80) return 'good'
-      if (score >= 70) return 'average'
-      if (score >= 60) return 'pass'
-      return 'fail'
-    }
+      if (score >= 90) return 'excellent';
+      if (score >= 80) return 'good';
+      if (score >= 70) return 'average';
+      if (score >= 60) return 'pass';
+      return 'fail';
+    };
 
     const getScoreColor = (score) => {
       const colors = {
@@ -348,44 +453,50 @@ export default {
         good: '#8bc34a',
         average: '#ffc107',
         pass: '#ff9800',
-        fail: '#f44336'
-      }
-      return colors[getScoreClass(score)]
-    }
+        fail: '#f44336',
+      };
+      return colors[getScoreClass(score)];
+    };
 
     const getGradeLevel = (score) => {
-      if (score >= 90) return 'A'
-      if (score >= 80) return 'B'
-      if (score >= 70) return 'C'
-      if (score >= 60) return 'D'
-      return 'F'
-    }
+      if (score >= 90) return 'A';
+      if (score >= 80) return 'B';
+      if (score >= 70) return 'C';
+      if (score >= 60) return 'D';
+      return 'F';
+    };
 
     const filterGrades = () => {
       // 筛选逻辑已通过computed属性实现
-    }
+    };
 
     const editGrade = (grade) => {
-      currentGrade.value = { ...grade }
-      showEditGrade.value = true
-    }
+      currentGrade.value = { ...grade };
+      showEditGrade.value = true;
+    };
 
     const deleteGrade = (id) => {
       if (confirm('确定要删除这条成绩记录吗？')) {
-        grades.value = grades.value.filter(g => g.id !== id)
+        grades.value = grades.value.filter((g) => g.id !== id);
       }
-    }
+    };
 
     const saveGrade = () => {
-      if (!currentGrade.value.studentId || !currentGrade.value.course || !currentGrade.value.score) {
-        alert('请填写必要信息')
-        return
+      if (
+        !currentGrade.value.studentId ||
+        !currentGrade.value.course ||
+        !currentGrade.value.score
+      ) {
+        alert('请填写必要信息');
+        return;
       }
 
       // 获取学员姓名
-      const student = students.value.find(s => s.id === currentGrade.value.studentId)
+      const student = students.value.find(
+        (s) => s.id === currentGrade.value.studentId,
+      );
       if (student) {
-        currentGrade.value.studentName = student.name
+        currentGrade.value.studentName = student.name;
       }
 
       if (showAddGrade.value) {
@@ -393,23 +504,27 @@ export default {
         const newGrade = {
           ...currentGrade.value,
           id: Date.now(),
-          examDate: currentGrade.value.examDate || new Date().toISOString().split('T')[0]
-        }
-        grades.value.push(newGrade)
+          examDate:
+            currentGrade.value.examDate ||
+            new Date().toISOString().split('T')[0],
+        };
+        grades.value.push(newGrade);
       } else {
         // 编辑现有成绩
-        const index = grades.value.findIndex(g => g.id === currentGrade.value.id)
+        const index = grades.value.findIndex(
+          (g) => g.id === currentGrade.value.id,
+        );
         if (index !== -1) {
-          grades.value[index] = { ...currentGrade.value }
+          grades.value[index] = { ...currentGrade.value };
         }
       }
 
-      closeModals()
-    }
+      closeModals();
+    };
 
     const closeModals = () => {
-      showAddGrade.value = false
-      showEditGrade.value = false
+      showAddGrade.value = false;
+      showEditGrade.value = false;
       currentGrade.value = {
         id: null,
         studentId: '',
@@ -418,32 +533,32 @@ export default {
         examType: '',
         score: 0,
         examDate: '',
-        notes: ''
-      }
-    }
+        notes: '',
+      };
+    };
 
     const closeImportModal = () => {
-      showImportModal.value = false
-    }
+      showImportModal.value = false;
+    };
 
     const handleFileUpload = (event) => {
-      const file = event.target.files[0]
+      const file = event.target.files[0];
       if (file) {
-        console.log('文件上传:', file.name)
+        console.log('文件上传:', file.name);
         // 这里可以实现文件上传逻辑
       }
-    }
+    };
 
     const importGrades = () => {
       // 实现导入逻辑
-      alert('导入功能开发中...')
-      closeImportModal()
-    }
+      alert('导入功能开发中...');
+      closeImportModal();
+    };
 
     onMounted(() => {
-      students.value = mockStudents
-      grades.value = mockGrades
-    })
+      students.value = mockStudents;
+      grades.value = mockGrades;
+    });
 
     return {
       grades,
@@ -476,10 +591,10 @@ export default {
       closeModals,
       closeImportModal,
       handleFileUpload,
-      importGrades
-    }
-  }
-}
+      importGrades,
+    };
+  },
+};
 </script>
 
 <style scoped>
@@ -506,7 +621,8 @@ export default {
   gap: 1rem;
 }
 
-.import-btn, .add-btn {
+.import-btn,
+.add-btn {
   background-color: var(--accent-primary);
   color: white;
   border: none;
@@ -517,7 +633,8 @@ export default {
   transition: all 0.3s ease;
 }
 
-.import-btn:hover, .add-btn:hover {
+.import-btn:hover,
+.add-btn:hover {
   background-color: #1976d2;
   transform: translateY(-1px);
 }
@@ -627,11 +744,21 @@ export default {
   font-size: 1.1rem;
 }
 
-.score.excellent { color: #4caf50; }
-.score.good { color: #8bc34a; }
-.score.average { color: #ffc107; }
-.score.pass { color: #ff9800; }
-.score.fail { color: #f44336; }
+.score.excellent {
+  color: #4caf50;
+}
+.score.good {
+  color: #8bc34a;
+}
+.score.average {
+  color: #ffc107;
+}
+.score.pass {
+  color: #ff9800;
+}
+.score.fail {
+  color: #f44336;
+}
 
 .score-bar {
   width: 100px;
@@ -690,7 +817,8 @@ export default {
   gap: 0.5rem;
 }
 
-.edit-btn, .delete-btn {
+.edit-btn,
+.delete-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -849,7 +977,9 @@ export default {
   border-top: 1px solid var(--border-color);
 }
 
-.cancel-btn, .save-btn, .import-btn {
+.cancel-btn,
+.save-btn,
+.import-btn {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 6px;
@@ -863,7 +993,8 @@ export default {
   color: var(--text-primary);
 }
 
-.save-btn, .import-btn {
+.save-btn,
+.import-btn {
   background-color: var(--accent-primary);
   color: white;
 }
@@ -872,7 +1003,8 @@ export default {
   background-color: var(--border-color);
 }
 
-.save-btn:hover, .import-btn:hover {
+.save-btn:hover,
+.import-btn:hover {
   background-color: #1976d2;
 }
 
@@ -899,7 +1031,7 @@ export default {
   border-color: var(--accent-primary);
 }
 
-.file-upload input[type="file"] {
+.file-upload input[type='file'] {
   position: absolute;
   top: 0;
   left: 0;
@@ -956,40 +1088,40 @@ export default {
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .filter-section {
     flex-direction: column;
   }
-  
+
   .filter-group {
     width: 100%;
   }
-  
+
   .filter-group select,
   .filter-group input {
     width: 100%;
   }
-  
+
   .grades-table {
     overflow-x: auto;
   }
-  
+
   .grades-table table {
     min-width: 800px;
   }
-  
+
   .stats-overview {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .distribution-item {
     flex-wrap: wrap;
   }
-  
+
   .range-label {
     width: 60px;
   }
-  
+
   .range-count {
     width: 50px;
   }

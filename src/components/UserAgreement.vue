@@ -2,7 +2,12 @@
   <div id="app">
     <div :class="['container', theme]">
       <!-- 协议同意按钮 -->
-      <button v-if="showAgreeButton" class="agree-button" :class="{ 'show-animation': isAnimationReady }" @click="agreeWithTerms">
+      <button
+        v-if="showAgreeButton"
+        class="agree-button"
+        :class="{ 'show-animation': isAnimationReady }"
+        @click="agreeWithTerms"
+      >
         ✅ 我已阅读并同意协议
       </button>
 
@@ -22,9 +27,11 @@
 
       <!-- 协议内容 -->
       <main class="content">
-        <section v-for="(section, index) in sections" 
-                 :key="index"
-                 class="section">
+        <section
+          v-for="(section, index) in sections"
+          :key="index"
+          class="section"
+        >
           <h2>{{ section.title }}</h2>
           <div v-html="section.content"></div>
         </section>
@@ -58,124 +65,130 @@ export default {
       sections: [
         {
           title: '1. 协议概述',
-          content: '欢迎使用<code>启明星管理软件</code>（以下简称"本软件"）。本协议适用于所有用户及企业客户，在使用本软件及相关服务前，请您仔细阅读以下条款。'
+          content:
+            '欢迎使用<code>启明星管理软件</code>（以下简称"本软件"）。本协议适用于所有用户及企业客户，在使用本软件及相关服务前，请您仔细阅读以下条款。',
         },
         {
           title: '2. 软件许可',
-          content: '本软件采用<code>商业授权协议</code>，您可在遵守协议的前提下：<ul><li>在企业内部使用本软件</li><li>获得官方技术支持服务</li><li>访问完整的软件功能模块</li></ul>'
+          content:
+            '本软件采用<code>商业授权协议</code>，您可在遵守协议的前提下：<ul><li>在企业内部使用本软件</li><li>获得官方技术支持服务</li><li>访问完整的软件功能模块</li></ul>',
         },
         {
           title: '3. 使用条款',
-          content: '当使用本软件时，您需遵守以下规定：<ol><li>不得逆向工程或破解软件</li><li>不得用于非法商业用途</li><li>不得干扰软件正常运行</li><li>需定期更新软件版本</li></ol>'
+          content:
+            '当使用本软件时，您需遵守以下规定：<ol><li>不得逆向工程或破解软件</li><li>不得用于非法商业用途</li><li>不得干扰软件正常运行</li><li>需定期更新软件版本</li></ol>',
         },
         {
           title: '4. 责任声明',
-          content: '本软件按"原样"提供，开发者对以下情况不承担责任：<ul><li>因使用本软件导致的业务中断</li><li>数据丢失或损坏</li><li>软件与第三方系统的兼容性问题</li></ul>'
+          content:
+            '本软件按"原样"提供，开发者对以下情况不承担责任：<ul><li>因使用本软件导致的业务中断</li><li>数据丢失或损坏</li><li>软件与第三方系统的兼容性问题</li></ul>',
         },
         {
           title: '5. 数据隐私',
-          content: '我们承诺保护您的数据安全：<ul><li>严格遵守GDPR数据保护条例</li><li>加密存储所有用户数据</li><li>未经许可不会共享任何商业信息</li></ul>'
+          content:
+            '我们承诺保护您的数据安全：<ul><li>严格遵守GDPR数据保护条例</li><li>加密存储所有用户数据</li><li>未经许可不会共享任何商业信息</li></ul>',
         },
         {
           title: '6. 协议变更',
-          content: '我们保留随时修改本协议的权利，重大变更将通过官方渠道提前30天通知。'
-        }
-      ]
-    }
+          content:
+            '我们保留随时修改本协议的权利，重大变更将通过官方渠道提前30天通知。',
+        },
+      ],
+    };
   },
   mounted() {
-    this.initializeTheme()
-    window.addEventListener('scroll', this.handleScroll)
-    this.checkCurrentTheme()
+    this.initializeTheme();
+    window.addEventListener('scroll', this.handleScroll);
+    this.checkCurrentTheme();
 
     this.agreeTimer = setTimeout(() => {
-      this.showAgreeButton = true
+      this.showAgreeButton = true;
       this.$nextTick(() => {
-        this.isAnimationReady = true
-      })
-    }, 1000)
+        this.isAnimationReady = true;
+      });
+    }, 1000);
   },
   methods: {
     initializeTheme() {
-      const savedTheme = localStorage.getItem('theme')
+      const savedTheme = localStorage.getItem('theme');
       if (savedTheme) {
-        this.theme = savedTheme
+        this.theme = savedTheme;
       } else {
         // 默认使用明亮主题
-        this.theme = 'light'
+        this.theme = 'light';
       }
     },
-    
+
     toggleTheme() {
-      this.theme = this.theme === 'dark' ? 'light' : 'dark'
-      localStorage.setItem('theme', this.theme)
-      this.checkCurrentTheme()
+      this.theme = this.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', this.theme);
+      this.checkCurrentTheme();
     },
-    
+
     handleScroll() {
-      this.showScrollButton = window.pageYOffset > 300
+      this.showScrollButton = window.pageYOffset > 300;
     },
-    
+
     scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-    
+
     checkCurrentTheme() {
-      document.documentElement.classList.remove('dark-theme', 'light-theme')
-      document.documentElement.classList.add(this.theme + '-theme')
-      
+      document.documentElement.classList.remove('dark-theme', 'light-theme');
+      document.documentElement.classList.add(this.theme + '-theme');
+
       // 更新body背景色
-      document.body.style.backgroundColor = this.theme === 'dark' ? '#1e1e2f' : '#f5f5f5'
+      document.body.style.backgroundColor =
+        this.theme === 'dark' ? '#1e1e2f' : '#f5f5f5';
     },
 
     agreeWithTerms() {
-      if (this.agreeInProgress) return
-      this.agreeInProgress = true
-      
+      if (this.agreeInProgress) return;
+      this.agreeInProgress = true;
+
       // 保存同意状态
-      localStorage.setItem('agreedToTerms', 'true')
-      
-      const btn = this.$el.querySelector('.agree-button')
-      if (btn) btn.innerText = '✅ 正在处理...'
+      localStorage.setItem('agreedToTerms', 'true');
+
+      const btn = this.$el.querySelector('.agree-button');
+      if (btn) btn.innerText = '✅ 正在处理...';
 
       setTimeout(() => {
-        this.showAgreeButton = false
-        this.openMainWindow()
-        this.agreeInProgress = true
-      }, 800)
+        this.showAgreeButton = false;
+        this.openMainWindow();
+        this.agreeInProgress = true;
+      }, 800);
     },
 
     async openMainWindow() {
       try {
-        document.body.classList.add('transition-out')
-        
+        document.body.classList.add('transition-out');
+
         // Tauri特定代码保留
         if (window.__TAURI__) {
-          const { invoke } = window.__TAURI__.tauri
-          await invoke('open_main_window')
+          const { invoke } = window.__TAURI__.tauri;
+          await invoke('open_main_window');
           // 关闭当前协议窗口
-          const { getCurrentWindow } = window.__TAURI__.window
-          await getCurrentWindow().close()
+          const { getCurrentWindow } = window.__TAURI__.window;
+          await getCurrentWindow().close();
         } else {
           // 开发环境下的处理
-          alert('感谢您的同意！即将进入启明星管理软件主界面')
+          alert('感谢您的同意！即将进入启明星管理软件主界面');
           // 重新加载应用显示主界面
-          location.reload()
+          location.reload();
         }
-        
       } catch (error) {
-        console.error('打开主窗口失败:', error)
-        alert('感谢您的同意！主应用启动失败，请重试。')
+        console.error('打开主窗口失败:', error);
+        alert('感谢您的同意！主应用启动失败，请重试。');
       }
-    }
+    },
   },
   beforeUmount() {
-    window.removeEventListener('scroll', this.handleScroll)
+    window.removeEventListener('scroll', this.handleScroll);
     if (this.agreeTimer) {
-      clearTimeout(this.agreeTimer)
+      clearTimeout(this.agreeTimer);
     }
-  }
-}
+  },
+};
 </script>
 
 <style>
@@ -245,7 +258,7 @@ body {
   margin-bottom: 40px;
   padding: 30px 20px;
   background: var(--bg-color);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border-radius: 8px;
   transition: all 0.3s ease;
   position: relative;
@@ -318,7 +331,7 @@ body {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
   z-index: 99;
   font-weight: 500;
@@ -340,7 +353,7 @@ body {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
   z-index: 100;
   font-weight: 500;
@@ -364,7 +377,7 @@ body {
   border: none;
   border-radius: 20px;
   cursor: pointer;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
   font-size: 15px;
   z-index: 101;
@@ -380,13 +393,17 @@ body {
 
 .agree-button:hover {
   transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 5px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* 动画 */
 @keyframes fadeIn {
-  from {opacity: 0;}
-  to {opacity: 1;}
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeInUp {
@@ -401,12 +418,19 @@ body {
 }
 
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(33, 150, 243, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(33, 150, 243, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(33, 150, 243, 0);
+  }
 }
 
-ul, ol {
+ul,
+ol {
   padding-left: 20px;
   margin: 1em 0;
 }
@@ -421,7 +445,7 @@ code {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 500;
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 /* 响应式设计 */
@@ -429,29 +453,29 @@ code {
   .container {
     padding: 15px;
   }
-  
+
   .header {
     padding: 20px 15px;
   }
-  
+
   .header h1 {
     font-size: 1.6rem;
   }
-  
+
   .agree-button {
     width: 90%;
     padding: 10px 18px;
     bottom: 30px;
     font-size: 0.9rem;
   }
-  
+
   .theme-toggle {
     top: 15px;
     right: 15px;
     padding: 6px 10px;
     font-size: 0.8rem;
   }
-  
+
   .scroll-top {
     bottom: 90px;
     right: 20px;

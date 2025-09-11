@@ -19,8 +19,8 @@
               <p class="setting-description">选择应用程序的主题外观</p>
             </div>
             <div class="setting-control">
-              <button 
-                class="theme-toggle-btn" 
+              <button
+                class="theme-toggle-btn"
                 @click="toggleTheme"
                 :title="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'"
               >
@@ -39,17 +39,24 @@
         </div>
         <div class="card-content">
           <div class="setting-item">
-  <div class="setting-info">
-    <label>自动保存</label>
-    <p class="setting-description">为了防止忘记保存的悲剧发生，本开关无法关闭。</p>
-  </div>
-  <div class="setting-control">
-    <label class="switch">
-      <input type="checkbox" v-model="autoSave" disabled @change="saveSettings">
-      <span class="slider"></span>
-    </label>
-  </div>
-</div>
+            <div class="setting-info">
+              <label>自动保存</label>
+              <p class="setting-description">
+                为了防止忘记保存的悲剧发生，本开关无法关闭。
+              </p>
+            </div>
+            <div class="setting-control">
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  v-model="autoSave"
+                  disabled
+                  @change="saveSettings"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -71,49 +78,51 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from 'vue';
 
 export default {
   name: 'Settings',
   setup() {
-    const theme = ref('dark')
-    const autoSave = ref(true)
+    const theme = ref('dark');
+    const autoSave = ref(true);
 
     const toggleTheme = () => {
-      theme.value = theme.value === 'dark' ? 'light' : 'dark'
-      localStorage.setItem('theme', theme.value)
-      document.documentElement.className = theme.value + '-theme'
-    }
+      theme.value = theme.value === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', theme.value);
+      document.documentElement.className = theme.value + '-theme';
+    };
 
     const saveSettings = () => {
-      localStorage.setItem('autoSave', autoSave.value.toString())
-    }
+      localStorage.setItem('autoSave', autoSave.value.toString());
+    };
 
     onMounted(() => {
       // 初始化主题
-      const savedTheme = localStorage.getItem('theme')
+      const savedTheme = localStorage.getItem('theme');
       if (savedTheme) {
-        theme.value = savedTheme
+        theme.value = savedTheme;
       } else {
-        theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
       }
-      document.documentElement.className = theme.value + '-theme'
+      document.documentElement.className = theme.value + '-theme';
 
       // 加载设置
-      const savedAutoSave = localStorage.getItem('autoSave')
+      const savedAutoSave = localStorage.getItem('autoSave');
       if (savedAutoSave) {
-        autoSave.value = savedAutoSave === 'true'
+        autoSave.value = savedAutoSave === 'true';
       }
-    })
+    });
 
     return {
       theme,
       autoSave,
       toggleTheme,
-      saveSettings
-    }
-  }
-}
+      saveSettings,
+    };
+  },
+};
 </script>
 
 <style scoped>
@@ -254,19 +263,19 @@ export default {
   right: 0;
   bottom: 0;
   background-color: var(--bg-tertiary);
-  transition: .4s;
+  transition: 0.4s;
   border-radius: 34px;
 }
 
 .slider:before {
   position: absolute;
-  content: "";
+  content: '';
   height: 26px;
   width: 26px;
   left: 4px;
   bottom: 4px;
   background-color: white;
-  transition: .4s;
+  transition: 0.4s;
   border-radius: 50%;
 }
 
@@ -301,13 +310,13 @@ input:checked + .slider:before {
   .settings-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .setting-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .setting-control {
     align-self: flex-end;
   }
