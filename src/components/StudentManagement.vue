@@ -464,27 +464,64 @@ export default {
       }
     };
 
-    // 输入验证函数
+    // 增强的输入验证函数
     const validateStudentInput = (student) => {
       const errors = [];
       
-      if (!student.name || typeof student.name !== 'string' || student.name.trim().length === 0) {
-        errors.push('姓名不能为空');
-      } else if (student.name.trim().length > 50) {
-        errors.push('姓名长度不能超过50个字符');
+      // 基础对象验证
+      if (!student || typeof student !== 'object') {
+        errors.push('学员数据格式无效');
+        return { isValid: false, errors };
       }
       
+      // 姓名验证 - 增强安全检查
+      if (!student.name || typeof student.name !== 'string' || student.name.trim().length === 0) {
+        errors.push('姓名不能为空');
+      } else {
+        const trimmedName = student.name.trim();
+        if (trimmedName.length > 50) {
+          errors.push('姓名长度不能超过50个字符');
+        }
+        // 检查特殊字符和潜在的注入攻击
+        if (/<script|javascript:|data:|vbscript:/i.test(trimmedName)) {
+          errors.push('姓名包含非法字符');
+        }
+      }
+      
+      // 年龄验证 - 增强类型检查
       const age = Number(student.age);
-      if (!age || isNaN(age) || age < 1 || age > 120) {
+      if (!age || isNaN(age) || !isFinite(age) || age < 1 || age > 120) {
         errors.push('年龄必须是1-120之间的有效数字');
       }
       
+      // 电话验证 - 增强类型和长度检查
       if (!student.phone || typeof student.phone !== 'string') {
         errors.push('电话号码不能为空');
+      } else if (student.phone.length > 20) {
+        errors.push('电话号码长度不能超过20个字符');
       }
       
-      if (student.note && student.note.length > 500) {
-        errors.push('备注长度不能超过500个字符');
+      // 备注验证 - 增强安全检查
+      if (student.note) {
+        if (typeof student.note !== 'string') {
+          errors.push('备注格式无效');
+        } else if (student.note.length > 500) {
+          errors.push('备注长度不能超过500个字符');
+        } else if (/<script|javascript:|data:|vbscript:/i.test(student.note)) {
+          errors.push('备注包含非法字符');
+        }
+      }
+      
+      // 科目验证
+      const validSubjects = ['Shooting', 'Archery', 'Others'];
+      if (!validSubjects.includes(student.subject)) {
+        errors.push('科目选择无效');
+      }
+      
+      // 课程类型验证
+      const validClassTypes = ['TenTry', 'Month', 'Year', 'Others'];
+      if (!validClassTypes.includes(student.classType)) {
+        errors.push('课程类型选择无效');
       }
       
       return {
@@ -497,7 +534,11 @@ export default {
       try {
         if (!phone || typeof phone !== 'string') return false;
         
-        const cleanPhone = phone.replace(/[-\s]/g, '');
+        // 安全的字符串清理，防止异常输入
+        const cleanPhone = String(phone).replace(/[-\s]/g, '').trim();
+        
+        // 长度检查，防止过长输入
+        if (cleanPhone.length > 20) return false;
         
         // 短号优先检测 (3-6位数字)
         if (/^\d{3,6}$/.test(cleanPhone)) return true;
@@ -505,9 +546,14 @@ export default {
         // 中国手机号码检测 (11位，1开头)
         if (/^1[3-9]\d{9}$/.test(cleanPhone)) return true;
 
-        // 国际号码校验
-        const phoneObj = parsePhoneNumberFromString(phone);
-        return !!phoneObj?.isValid();
+        // 国际号码校验 - 增强异常处理
+        try {
+          const phoneObj = parsePhoneNumberFromString(phone);
+          return phoneObj?.isValid() === true;
+        } catch (parseError) {
+          console.warn('国际号码解析失败:', parseError);
+          return false;
+        }
       } catch (error) {
         console.warn('电话验证失败:', error);
         return false;
@@ -602,24 +648,46 @@ export default {
 
     const getHighestScore = (student) => {
       try {
-        if (!student || !student.rings || !Array.isArray(student.rings) || student.rings.length === 0) {
+        // 增强的空值和类型检查
+        if (!student || typeof student !== 'object') {
           return '-';
         }
         
-        // 过滤出有效的数字成绩
-        const validScores = student.rings.filter(score => 
-          typeof score === 'number' && !isNaN(score) && isFinite(score)
-        );
+        if (!student.rings || !Array.isArray(student.rings) || student.rings.length === 0) {
+          return '-';
+        }
+        
+        // 防止数组过大导致性能问题
+        if (student.rings.length > 10000) {
+          console.warn('成绩数组过大，截取前10000条记录');
+          student.rings = student.rings.slice(0, 10000);
+        }
+        
+        // 过滤出有效的数字成绩，增强验证
+        const validScores = student.rings.filter(score => {
+          return typeof score === 'number' && 
+                 !isNaN(score) && 
+                 isFinite(score) && 
+                 score >= 0 && 
+                 score <= 1000; // 合理的分数范围
+        });
         
         if (validScores.length === 0) {
           return '-';
         }
         
-        const maxScore = Math.max(...validScores);
+        // 安全的Math.max调用，防止栈溢出
+        let maxScore;
+        if (validScores.length > 1000) {
+          // 对于大数组，使用reduce避免栈溢出
+          maxScore = validScores.reduce((max, current) => Math.max(max, current), -Infinity);
+        } else {
+          maxScore = Math.max(...validScores);
+        }
+        
         return maxScore.toFixed(1);
       } catch (error) {
-        console.warn('获取最高分数失败:', student, error);
-        // 对于显示函数的错误，通常不需要弹窗，只记录日志
+        console.warn('获取最高分数失败:', student?.uid || 'unknown', error);
         return '-';
       }
     };

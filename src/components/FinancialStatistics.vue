@@ -425,19 +425,81 @@ export default {
       return filtered;
     });
 
+    // 增强的计算属性 - 防止数值溢出和无效数据
     const totalIncome = computed(() => {
-      return transactions.value
-        .filter((t) => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0);
+      try {
+        const MAX_SAFE_AMOUNT = 999999999999;
+        let total = 0;
+        
+        const incomeTransactions = transactions.value.filter((t) => 
+          t && t.type === 'income' && typeof t.amount === 'number' && isFinite(t.amount)
+        );
+        
+        for (const transaction of incomeTransactions) {
+          const amount = Math.max(0, Math.min(MAX_SAFE_AMOUNT, transaction.amount));
+          total += amount;
+          
+          // 检查累计是否超出安全范围
+          if (total > MAX_SAFE_AMOUNT) {
+            console.warn('总收入超出安全范围，限制为最大值');
+            return MAX_SAFE_AMOUNT;
+          }
+        }
+        
+        return total;
+      } catch (error) {
+        console.error('计算总收入失败:', error);
+        return 0;
+      }
     });
 
     const totalExpense = computed(() => {
-      return transactions.value
-        .filter((t) => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0);
+      try {
+        const MAX_SAFE_AMOUNT = 999999999999;
+        let total = 0;
+        
+        const expenseTransactions = transactions.value.filter((t) => 
+          t && t.type === 'expense' && typeof t.amount === 'number' && isFinite(t.amount)
+        );
+        
+        for (const transaction of expenseTransactions) {
+          const amount = Math.max(0, Math.min(MAX_SAFE_AMOUNT, transaction.amount));
+          total += amount;
+          
+          // 检查累计是否超出安全范围
+          if (total > MAX_SAFE_AMOUNT) {
+            console.warn('总支出超出安全范围，限制为最大值');
+            return MAX_SAFE_AMOUNT;
+          }
+        }
+        
+        return total;
+      } catch (error) {
+        console.error('计算总支出失败:', error);
+        return 0;
+      }
     });
 
-    const netProfit = computed(() => totalIncome.value - totalExpense.value);
+    const netProfit = computed(() => {
+      try {
+        const income = totalIncome.value;
+        const expense = totalExpense.value;
+        
+        // 防止计算结果溢出
+        const MAX_SAFE_AMOUNT = 999999999999;
+        const result = income - expense;
+        
+        if (!isFinite(result)) {
+          console.warn('净收益计算结果无效');
+          return 0;
+        }
+        
+        return Math.max(-MAX_SAFE_AMOUNT, Math.min(MAX_SAFE_AMOUNT, result));
+      } catch (error) {
+        console.error('计算净收益失败:', error);
+        return 0;
+      }
+    });
 
     // 新增：分期付款统计
     const installmentCount = computed(() => {
@@ -450,12 +512,32 @@ export default {
       ).length;
     });
 
-    // 格式化方法
+    // 增强的格式化方法 - 防止数值溢出
     const formatCurrency = (value) => {
-      return new Intl.NumberFormat('zh-CN', {
-        style: 'currency',
-        currency: 'CNY',
-      }).format(value);
+      try {
+        // 数值验证和范围检查
+        if (typeof value !== 'number' || !isFinite(value)) {
+          return '¥0.00';
+        }
+        
+        // 防止极大数值导致显示问题
+        const MAX_SAFE_AMOUNT = 999999999999; // 约1万亿
+        const clampedValue = Math.max(-MAX_SAFE_AMOUNT, Math.min(MAX_SAFE_AMOUNT, value));
+        
+        if (clampedValue !== value) {
+          console.warn('金额数值过大，已限制显示范围:', value, '->', clampedValue);
+        }
+        
+        return new Intl.NumberFormat('zh-CN', {
+          style: 'currency',
+          currency: 'CNY',
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2
+        }).format(clampedValue);
+      } catch (error) {
+        console.error('格式化货币失败:', error, value);
+        return '¥--';
+      }
     };
 
     const formatTransactionAmount = (transaction) => {
@@ -540,31 +622,69 @@ export default {
       return true;
     };
 
+    // 增强的交易输入验证 - 防止溢出和注入攻击
     const validateTransactionInput = (transaction) => {
       const errors = [];
       
-      if (!transaction.amount || isNaN(Number(transaction.amount)) || Number(transaction.amount) <= 0) {
+      // 基础对象验证
+      if (!transaction || typeof transaction !== 'object') {
+        errors.push('交易数据格式无效');
+        return { isValid: false, errors };
+      }
+      
+      // 金额验证 - 增强范围和类型检查
+      const amount = Number(transaction.amount);
+      if (!transaction.amount || isNaN(amount) || !isFinite(amount) || amount <= 0) {
         errors.push('金额必须是大于0的有效数字');
+      } else {
+        const MAX_AMOUNT = 999999999; // 约10亿
+        const MIN_AMOUNT = 0.01; // 最小1分钱
+        
+        if (amount > MAX_AMOUNT) {
+          errors.push(`金额不能超过 ${MAX_AMOUNT.toLocaleString()}`);
+        }
+        
+        if (amount < MIN_AMOUNT) {
+          errors.push(`金额不能小于 ${MIN_AMOUNT}`);
+        }
+        
+        // 检查小数位数
+        const decimalPlaces = (amount.toString().split('.')[1] || '').length;
+        if (decimalPlaces > 2) {
+          errors.push('金额最多支持2位小数');
+        }
       }
       
-      if (transaction.amount && Number(transaction.amount) > 999999999) {
-        errors.push('金额不能超过999,999,999');
-      }
-      
+      // 分期付款验证
       if (isInstallmentMode.value) {
-        if (!transaction.installment_total || Number(transaction.installment_total) < 2) {
-          errors.push('分期付款至少需要2期');
+        const installmentTotal = Number(transaction.installment_total);
+        if (!installmentTotal || installmentTotal < 2 || installmentTotal > 120) {
+          errors.push('分期付款期数必须在2-120之间');
         }
         
         if (!transaction.installment_due_date) {
           errors.push('请选择首次到期日');
         } else {
-          const dueDate = new Date(transaction.installment_due_date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          if (dueDate < today) {
-            errors.push('到期日不能早于今天');
+          try {
+            const dueDate = new Date(transaction.installment_due_date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // 检查日期有效性
+            if (isNaN(dueDate.getTime())) {
+              errors.push('到期日格式无效');
+            } else if (dueDate < today) {
+              errors.push('到期日不能早于今天');
+            } else {
+              // 检查日期不能过于久远
+              const maxDate = new Date();
+              maxDate.setFullYear(maxDate.getFullYear() + 10);
+              if (dueDate > maxDate) {
+                errors.push('到期日不能超过10年后');
+              }
+            }
+          } catch (error) {
+            errors.push('到期日处理失败');
           }
         }
         
@@ -576,8 +696,28 @@ export default {
         }
       }
       
-      if (transaction.note && transaction.note.length > 500) {
-        errors.push('备注长度不能超过500个字符');
+      // 备注验证 - 增强安全检查
+      if (transaction.note) {
+        if (typeof transaction.note !== 'string') {
+          errors.push('备注格式无效');
+        } else {
+          if (transaction.note.length > 500) {
+            errors.push('备注长度不能超过500个字符');
+          }
+          
+          // 检查潜在的脚本注入
+          if (/<script|javascript:|data:|vbscript:/i.test(transaction.note)) {
+            errors.push('备注包含非法字符');
+          }
+        }
+      }
+      
+      // 学员ID验证
+      if (transaction.student_id !== null && transaction.student_id !== undefined) {
+        const studentId = Number(transaction.student_id);
+        if (isNaN(studentId) || studentId <= 0) {
+          errors.push('学员ID无效');
+        }
       }
       
       return {

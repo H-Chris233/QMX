@@ -90,7 +90,7 @@
 </template>
 
 <script>
-import { ref, onMounted, provide } from 'vue';
+import { ref, onMounted, onUnmounted, provide } from 'vue';
 import StudentManagement from './components/StudentManagement.vue';
 import FinancialStatistics from './components/FinancialStatistics.vue';
 import ScoreManagement from './components/ScoreManagement.vue';
@@ -146,13 +146,27 @@ export default {
 
     // 错误处理方法
     const showError = (title, message, details = '', showRetry = false) => {
-      errorModal.value = {
-        show: true,
-        title,
-        message,
-        details,
-        showRetry,
-      };
+      try {
+        // 验证参数
+        if (!title || typeof title !== 'string') {
+          title = '系统错误';
+        }
+        if (!message || typeof message !== 'string') {
+          message = '发生了未知错误';
+        }
+
+        errorModal.value = {
+          show: true,
+          title: title.substring(0, 100), // 限制长度防止UI问题
+          message: message.substring(0, 500),
+          details: details ? String(details).substring(0, 2000) : '',
+          showRetry: Boolean(showRetry),
+        };
+      } catch (error) {
+        console.error('显示错误弹窗失败:', error);
+        // 降级方案
+        alert(`${title}: ${message}`);
+      }
     };
 
     const hideError = () => {
@@ -170,26 +184,80 @@ export default {
       // 这里可以添加Toast通知或其他成功提示UI
     };
 
+    // 事件监听器清理函数
+    let cleanupFunctions = [];
+
     onMounted(() => {
-      // 初始化主题
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        theme.value = savedTheme;
-      } else {
-        theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
-      }
-      document.documentElement.className = theme.value + '-theme';
-      // 小屏时：点击页面外部自动关闭侧边栏
-      document.addEventListener('click', (e) => {
-        if (window.innerWidth <= 768 && isSidebarOpen.value) {
-          const sidebar = document.querySelector('.sidebar');
-          if (!sidebar?.contains(e.target)) {
-            toggleSidebar();
+      try {
+        // 安全的主题初始化
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme && ['dark', 'light'].includes(savedTheme)) {
+          theme.value = savedTheme;
+        } else {
+          // 安全的媒体查询检查
+          const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+          theme.value = mediaQuery?.matches ? 'dark' : 'light';
+        }
+        document.documentElement.className = `${theme.value}-theme`;
+        
+        // 修复内存泄漏：正确管理事件监听器
+        const handleOutsideClick = (e) => {
+          if (window.innerWidth <= 768 && isSidebarOpen.value) {
+            const sidebar = document.querySelector('.sidebar');
+            const toggleButton = document.querySelector('.sidebar-toggle');
+            
+            // 更安全的DOM查询和事件检查
+            if (sidebar && !sidebar.contains(e.target) && 
+                toggleButton && !toggleButton.contains(e.target)) {
+              isSidebarOpen.value = false;
+            }
           }
+        };
+
+        // 防抖处理，避免频繁触发
+        let debounceTimer = null;
+        const debouncedHandleClick = (e) => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => handleOutsideClick(e), 10);
+        };
+
+        document.addEventListener('click', debouncedHandleClick, { passive: true });
+        
+        // 添加清理函数
+        cleanupFunctions.push(() => {
+          document.removeEventListener('click', debouncedHandleClick);
+          if (debounceTimer) clearTimeout(debounceTimer);
+        });
+
+        // 添加窗口大小变化监听器，自动关闭侧边栏
+        const handleResize = () => {
+          if (window.innerWidth > 768 && isSidebarOpen.value) {
+            isSidebarOpen.value = false;
+          }
+        };
+
+        window.addEventListener('resize', handleResize, { passive: true });
+        cleanupFunctions.push(() => {
+          window.removeEventListener('resize', handleResize);
+        });
+
+      } catch (error) {
+        console.error('主题初始化失败:', error);
+        theme.value = 'dark'; // 安全的降级方案
+        document.documentElement.className = 'dark-theme';
+      }
+    });
+
+    onUnmounted(() => {
+      // 清理所有事件监听器
+      cleanupFunctions.forEach(cleanup => {
+        try {
+          cleanup();
+        } catch (error) {
+          console.warn('清理事件监听器失败:', error);
         }
       });
+      cleanupFunctions = [];
     });
 
     // 提供全局错误处理方法给子组件使用

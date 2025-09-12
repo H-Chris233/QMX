@@ -483,32 +483,69 @@ export default {
           return;
         }
 
-        // 生成CSV内容
+        // 数据量检查，防止导出过大文件
+        if (selectedStudentData.value.rings.length > 50000) {
+          showError('导出失败', '成绩记录过多，请联系管理员处理');
+          return;
+        }
+
+        // 安全的CSV内容生成
         const headers = '序号,成绩,等级,日期\n';
         const rows = selectedStudentData.value.rings
+          .slice(0, 10000) // 限制最大导出数量
           .map((score, index) => {
-            const scoreClass = getScoreClass(score);
+            // 数据清理和验证
+            const safeScore = typeof score === 'number' && isFinite(score) ? score.toFixed(2) : '0.00';
+            const scoreClass = getScoreClass(Number(safeScore));
             const date = new Date().toLocaleDateString('zh-CN');
-            return `${index + 1},${score},${scoreClass},${date}`;
+            
+            // CSV注入防护 - 转义特殊字符
+            const safeIndex = String(index + 1).replace(/[,"\r\n]/g, '');
+            const safeScoreClass = String(scoreClass).replace(/[,"\r\n]/g, '');
+            const safeDate = String(date).replace(/[,"\r\n]/g, '');
+            
+            return `"${safeIndex}","${safeScore}","${safeScoreClass}","${safeDate}"`;
           })
           .join('\n');
 
-        const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + headers + rows;
+        // 添加BOM以支持中文
+        const csvContent = '\uFEFF' + headers + rows;
         
-        // 安全的文件名处理
-        const fileName = `${selectedStudentData.value.name.replace(/[^\w\u4e00-\u9fa5]/g, '_')}_成绩表_${new Date().toISOString().slice(0, 10)}.csv`;
+        // 创建安全的Blob对象
+        const blob = new Blob([csvContent], { 
+          type: 'text/csv;charset=utf-8' 
+        });
         
-        const encodedUri = encodeURI(csvContent);
+        // 安全的文件名处理 - 更严格的过滤
+        const safeName = selectedStudentData.value.name
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, '') // 移除文件系统不安全字符
+          .replace(/\s+/g, '_') // 空格替换为下划线
+          .substring(0, 50); // 限制长度
+        
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const fileName = `${safeName}_成绩表_${timestamp}.csv`;
+        
+        // 使用现代API创建下载链接
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', fileName);
-        link.style.display = 'none';
         
+        // 安全属性设置
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        link.rel = 'noopener noreferrer'; // 安全属性
+        
+        // 执行下载
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
         
-        console.log(`成功导出 ${selectedStudentData.value.name} 的成绩表`);
+        // 清理资源
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
+        
+        console.log(`成功导出 ${selectedStudentData.value.name} 的成绩表 (${selectedStudentData.value.rings.length} 条记录)`);
         
         if (showSuccess) {
           showSuccess('导出成功', `${selectedStudentData.value.name} 的成绩表已导出`);
