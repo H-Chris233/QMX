@@ -12,6 +12,76 @@ import {
   validateDashboardStatsData,
 } from './dataTransformers';
 
+// API 配置常量
+const API_CONFIG = {
+  DEFAULT_TIMEOUT: 30000, // 30秒默认超时
+  RETRY_ATTEMPTS: 3, // 最大重试次数
+  RETRY_DELAY: 1000, // 重试延迟(毫秒)
+  LONG_OPERATION_TIMEOUT: 60000, // 长操作超时(如文件导出)
+} as const;
+
+// 超时处理工具函数
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`操作超时 (${timeoutMs}ms)`));
+      }, timeoutMs);
+    })
+  ]);
+}
+
+// 重试机制工具函数
+async function withRetry<T>(
+  operation: () => Promise<T>, 
+  maxAttempts: number = API_CONFIG.RETRY_ATTEMPTS,
+  delay: number = API_CONFIG.RETRY_DELAY
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // 不重试的错误类型
+      if (lastError.message.includes('权限') || 
+          lastError.message.includes('认证') ||
+          lastError.message.includes('参数无效')) {
+        throw lastError;
+      }
+      
+      if (attempt === maxAttempts) {
+        throw new Error(`操作失败，已重试 ${maxAttempts} 次: ${lastError.message}`);
+      }
+      
+      console.warn(`API调用失败，第 ${attempt} 次重试中...`, lastError.message);
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  
+  throw lastError!;
+}
+
+// 增强的 invoke 包装器
+async function invokeWithEnhancements<T>(
+  command: TauriCommand, 
+  args?: Record<string, any>,
+  options: { timeout?: number; retries?: boolean } = {}
+): Promise<T> {
+  const { timeout = API_CONFIG.DEFAULT_TIMEOUT, retries = true } = options;
+  
+  const operation = () => withTimeout(invoke<T>(command, args), timeout);
+  
+  if (retries) {
+    return withRetry(operation);
+  } else {
+    return operation();
+  }
+}
+
 export class ApiService {
   // 学员管理
   static async addStudent(
@@ -23,12 +93,18 @@ export class ApiService {
     subject: string,
   ): Promise<Student> {
     try {
-      const rawData = await invoke<unknown>('add_student' as TauriCommand, {
-        name,
+      // 输入验证增强
+      if (!name?.trim()) throw new Error('学员姓名不能为空');
+      if (!age || age < 1 || age > 120) throw new Error('年龄必须在1-120之间');
+      if (!phone?.trim()) throw new Error('电话号码不能为空');
+      if (note && note.length > 500) throw new Error('备注长度不能超过500字符');
+      
+      const rawData = await invokeWithEnhancements<unknown>('add_student' as TauriCommand, {
+        name: name.trim(),
         age,
         classType,
-        phone,
-        note,
+        phone: phone.trim(),
+        note: note?.trim() || '',
         subject,
       });
 
@@ -44,12 +120,20 @@ export class ApiService {
 
   static async getAllStudents(): Promise<Student[]> {
     try {
-      const rawDataArray = await invoke<unknown[]>('get_all_students' as TauriCommand);
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('get_all_students' as TauriCommand, {}, {
+        timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 获取所有学员可能需要更长时间
+      });
+      
+      if (!Array.isArray(rawDataArray)) {
+        throw new Error('服务器返回的数据格式不正确');
+      }
+      
       const students = transformStudentDataArray(rawDataArray);
 
       // 验证转换后的数据
       students.forEach(student => assertIsStudent(student));
 
+      console.log(`✅ 成功获取 ${students.length} 个学员记录`);
       return students;
     } catch (error) {
       console.error('❌ [ApiService.getAllStudents] 调用失败:', error);
@@ -59,10 +143,17 @@ export class ApiService {
 
   static async addScore(studentUid: number, score: number): Promise<void> {
     try {
-      await invoke<null>('add_score' as TauriCommand, {
+      // 输入验证增强
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      if (typeof score !== 'number' || !isFinite(score)) throw new Error('成绩必须是有效数字');
+      if (score < 0 || score > 1000) throw new Error('成绩范围无效');
+      
+      await invokeWithEnhancements<null>('add_score' as TauriCommand, {
         studentUid,
         score,
       });
+      
+      console.log(`✅ 成功为学员 ${studentUid} 添加成绩 ${score}`);
     } catch (error) {
       console.error('❌ [ApiService.addScore] 调用失败:', error);
       throw new Error(`添加成绩失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -71,15 +162,28 @@ export class ApiService {
 
   static async getStudentScores(studentUid: number): Promise<number[]> {
     try {
-      const scores = await invoke<number[]>('get_student_scores' as TauriCommand, {
+      // 输入验证
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      
+      const scores = await invokeWithEnhancements<number[]>('get_student_scores' as TauriCommand, {
         studentUid,
       });
       
-      if (!Array.isArray(scores) || !scores.every(score => typeof score === 'number')) {
+      if (!Array.isArray(scores)) {
         throw new Error('返回的成绩数据格式不正确');
       }
       
-      return scores;
+      // 数据清理和验证
+      const validScores = scores.filter(score => 
+        typeof score === 'number' && isFinite(score) && score >= 0
+      );
+      
+      if (validScores.length !== scores.length) {
+        console.warn(`⚠️ 过滤了 ${scores.length - validScores.length} 个无效成绩`);
+      }
+      
+      console.log(`✅ 获取学员 ${studentUid} 的 ${validScores.length} 条成绩记录`);
+      return validScores;
     } catch (error) {
       console.error('❌ [ApiService.getStudentScores] 调用失败:', error);
       throw new Error(`获取学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -91,16 +195,36 @@ export class ApiService {
     updates: StudentUpdateData,
   ): Promise<void> {
     try {
-      await invoke<null>('update_student_info' as TauriCommand, {
+      // 输入验证增强
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      if (!updates || typeof updates !== 'object') throw new Error('更新数据无效');
+      
+      // 验证更新字段
+      if (updates.name !== undefined && (!updates.name?.trim())) {
+        throw new Error('学员姓名不能为空');
+      }
+      if (updates.age !== undefined && (updates.age < 1 || updates.age > 120)) {
+        throw new Error('年龄必须在1-120之间');
+      }
+      if (updates.phone !== undefined && (!updates.phone?.trim())) {
+        throw new Error('电话号码不能为空');
+      }
+      if (updates.note !== undefined && updates.note.length > 500) {
+        throw new Error('备注长度不能超过500字符');
+      }
+      
+      await invokeWithEnhancements<null>('update_student_info' as TauriCommand, {
         studentUid,
-        name: updates.name,
+        name: updates.name?.trim(),
         age: updates.age,
         classType: updates.classType,
-        phone: updates.phone,
-        note: updates.note,
+        phone: updates.phone?.trim(),
+        note: updates.note?.trim(),
         subject: updates.subject,
         lessonLeft: updates.lessonLeft,
       });
+      
+      console.log(`✅ 成功更新学员 ${studentUid} 的信息`);
     } catch (error) {
       console.error('❌ [ApiService.updateStudentInfo] 调用失败:', error);
       throw new Error(`更新学员信息失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -109,9 +233,16 @@ export class ApiService {
 
   static async deleteStudent(studentUid: number): Promise<void> {
     try {
-      await invoke<null>('delete_student' as TauriCommand, {
+      // 输入验证
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      
+      await invokeWithEnhancements<null>('delete_student' as TauriCommand, {
         studentUid,
+      }, {
+        retries: false // 删除操作不重试，避免重复删除
       });
+      
+      console.log(`✅ 成功删除学员 ${studentUid}`);
     } catch (error) {
       console.error('❌ [ApiService.deleteStudent] 调用失败:', error);
       throw new Error(`删除学员失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -189,24 +320,29 @@ export class ApiService {
 
   static async getAllTransactions() {
     try {
-      const rawDataArray = await invoke<any[]>('get_all_transactions');
+      const rawDataArray = await invokeWithEnhancements<any[]>('get_all_transactions', {}, {
+        timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 获取所有交易可能需要更长时间
+      });
+      
+      if (!Array.isArray(rawDataArray)) {
+        throw new Error('服务器返回的交易数据格式不正确');
+      }
+      
       const transactions = transformTransactionDataArray(rawDataArray);
 
       // 验证转换后的数据
-      const invalidTransactions = transactions.filter(
-        (transaction) => !validateTransactionData(transaction),
-      );
-      if (invalidTransactions.length > 0) {
-        console.warn(
-          '⚠️ [ApiService.getAllTransactions] 发现无效交易数据:',
-          invalidTransactions,
-        );
+      const validTransactions = transactions.filter(validateTransactionData);
+      const invalidCount = transactions.length - validTransactions.length;
+      
+      if (invalidCount > 0) {
+        console.warn(`⚠️ 过滤了 ${invalidCount} 个无效交易记录`);
       }
 
-      return transactions;
+      console.log(`✅ 成功获取 ${validTransactions.length} 条交易记录`);
+      return validTransactions;
     } catch (error) {
       console.error('❌ [ApiService.getAllTransactions] 调用失败:', error);
-      throw new Error(`获取财务记录失败: ${error}`);
+      throw new Error(`获取财务记录失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -272,7 +408,14 @@ export class ApiService {
   // 统计数据
   static async getDashboardStats() {
     try {
-      const rawData = await invoke<any>('get_dashboard_stats');
+      const rawData = await invokeWithEnhancements<any>('get_dashboard_stats', {}, {
+        timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 统计计算可能需要更长时间
+      });
+      
+      if (!rawData || typeof rawData !== 'object') {
+        throw new Error('服务器返回的统计数据格式不正确');
+      }
+      
       const stats = transformDashboardStatsData(rawData);
 
       // 验证转换后的数据
@@ -280,10 +423,11 @@ export class ApiService {
         throw new Error('统计数据验证失败');
       }
 
+      console.log('✅ 成功获取仪表板统计数据');
       return stats;
     } catch (error) {
       console.error('❌ [ApiService.getDashboardStats] 调用失败:', error);
-      throw new Error(`获取统计数据失败: ${error}`);
+      throw new Error(`获取统计数据失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
