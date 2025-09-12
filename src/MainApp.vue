@@ -164,6 +164,12 @@ export default {
       // 这里可以添加重试逻辑，目前只是关闭弹窗
     };
 
+    // 成功消息处理（简单的控制台日志，可以后续扩展为Toast通知）
+    const showSuccess = (title, message) => {
+      console.log(`✅ ${title}: ${message}`);
+      // 这里可以添加Toast通知或其他成功提示UI
+    };
+
     onMounted(() => {
       // 初始化主题
       const savedTheme = localStorage.getItem('theme');
@@ -191,6 +197,7 @@ export default {
       showError,
       hideError,
       retryWithError,
+      showSuccess,
     });
 
     return {

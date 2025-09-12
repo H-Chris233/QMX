@@ -169,7 +169,20 @@ export default {
     const quickScore = ref('');
     const studentSelect = ref(null);
     const abortController = ref(null);
-    const { showError } = inject('errorHandler');
+    const errorHandler = inject('errorHandler');
+    
+    const showError = errorHandler?.showError || ((title, message, details) => {
+      console.error(`${title}: ${message}`, details);
+      alert(`${title}\n${message}`);
+    });
+    
+    const showSuccess = errorHandler?.showSuccess || ((title, message) => {
+      console.log(`✅ ${title}: ${message}`);
+    });
+    
+    if (!errorHandler) {
+      console.warn('⚠️ errorHandler 未正确注入到 ScoreManagement 组件');
+    }
 
     // 计算属性
     const recentScores = computed(() => {
@@ -258,23 +271,86 @@ export default {
       }
     };
 
+    // 输入验证函数
+    const validateScoreInput = (score, studentData) => {
+      const errors = [];
+      
+      if (score === null || score === undefined || score === '') {
+        errors.push('成绩不能为空');
+        return { isValid: false, errors };
+      }
+      
+      const numScore = Number(score);
+      if (isNaN(numScore) || !isFinite(numScore)) {
+        errors.push('成绩必须是有效数字');
+        return { isValid: false, errors };
+      }
+      
+      if (numScore < 0) {
+        errors.push('成绩不能为负数');
+      }
+      
+      const maxScore = getMaxScore();
+      if (numScore > maxScore) {
+        errors.push(`成绩不能超过 ${maxScore}`);
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors
+      };
+    };
+
     // 数据加载
     const loadData = async () => {
+      if (loading.value) {
+        console.warn('学员数据正在加载中，跳过重复请求');
+        return;
+      }
+
       loading.value = true;
       abortController.value = new AbortController();
 
       try {
-        const data = await ApiService.getAllStudents({
-          signal: abortController.value.signal,
+        const data = await ApiService.getAllStudents();
+        
+        // 验证返回的数据
+        if (!Array.isArray(data)) {
+          throw new Error('返回的学员数据格式不正确，期望数组格式');
+        }
+        
+        // 验证并清理学员数据
+        const validStudents = data.filter(student => {
+          if (!student || typeof student !== 'object') return false;
+          if (!student.uid || !student.name) return false;
+          
+          // 确保 rings 是数组
+          if (!Array.isArray(student.rings)) {
+            student.rings = [];
+          }
+          
+          // 过滤无效成绩
+          student.rings = student.rings.filter(score => 
+            typeof score === 'number' && !isNaN(score) && isFinite(score)
+          );
+          
+          return true;
         });
-        students.value = data;
+        
+        if (validStudents.length !== data.length) {
+          console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
+        }
+        
+        students.value = validStudents;
+        console.log(`成功加载 ${validStudents.length} 个学员记录`);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('加载学员数据失败:', error);
+          students.value = []; // 确保有默认值
           showError(
             '数据加载失败',
             '无法获取学员列表，请检查网络连接或稍后重试',
-            error.message,
+            error.message || '未知错误',
           );
         }
       } finally {
@@ -286,6 +362,12 @@ export default {
     const onStudentChange = async () => {
       if (!selectedStudent.value) {
         selectedStudentData.value = null;
+        quickScore.value = '';
+        return;
+      }
+
+      if (loading.value) {
+        console.warn('正在加载学员成绩，跳过重复请求');
         return;
       }
 
@@ -293,26 +375,46 @@ export default {
       abortController.value = new AbortController();
 
       try {
-        const scores = await ApiService.getStudentScores(
-          selectedStudent.value,
-          { signal: abortController.value.signal },
-        );
-        const student = students.value.find(
-          (s) => s.uid == selectedStudent.value,
-        );
-        if (student) {
-          selectedStudentData.value = {
-            ...student,
-            rings: scores,
-          };
+        const studentUid = Number(selectedStudent.value);
+        if (isNaN(studentUid) || studentUid <= 0) {
+          throw new Error('无效的学员ID');
         }
+
+        const scores = await ApiService.getStudentScores(studentUid);
+        const student = students.value.find(s => s.uid == studentUid);
+        
+        if (!student) {
+          throw new Error('找不到对应的学员信息');
+        }
+
+        // 验证成绩数据
+        let validScores = [];
+        if (Array.isArray(scores)) {
+          validScores = scores.filter(score => 
+            typeof score === 'number' && !isNaN(score) && isFinite(score)
+          );
+          
+          if (validScores.length !== scores.length) {
+            console.warn(`过滤了 ${scores.length - validScores.length} 个无效成绩`);
+          }
+        } else {
+          console.warn('返回的成绩数据不是数组格式，使用空数组');
+        }
+
+        selectedStudentData.value = {
+          ...student,
+          rings: validScores,
+        };
+        
+        console.log(`加载学员 ${student.name} 的 ${validScores.length} 条成绩记录`);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('加载学员成绩失败:', error);
+          selectedStudentData.value = null;
           showError(
             '获取失败',
             '加载学员成绩时发生错误，请稍后重试',
-            error.message,
+            error.message || '未知错误',
           );
         }
       } finally {
@@ -323,61 +425,98 @@ export default {
 
     // 成绩操作
     const addQuickScore = async () => {
+      if (loading.value) {
+        console.warn('正在处理成绩添加，请勿重复提交');
+        return;
+      }
+
       if (!selectedStudent.value) {
-        showError('选择错误', '请选择一个学员');
+        showError('选择错误', '请先选择一个学员');
         return;
       }
 
-      if (!quickScore.value && quickScore.value !== 0) {
-        showError('输入错误', '请输入有效的成绩');
+      // 验证成绩输入
+      const validation = validateScoreInput(quickScore.value, selectedStudentData.value);
+      if (!validation.isValid) {
+        showError('输入错误', validation.errors.join('；'));
         return;
       }
 
-      const score = parseFloat(quickScore.value);
-      const maxScore = getMaxScore();
-      if (isNaN(score) || score < 0 || score > maxScore) {
-        showError('输入错误', `请输入有效的成绩 (0-${maxScore})`);
-        return;
-      }
+      const score = Number(quickScore.value);
+      const studentUid = Number(selectedStudent.value);
 
       loading.value = true;
       try {
-        await ApiService.addScore(selectedStudent.value, score);
+        await ApiService.addScore(studentUid, score);
+        
+        console.log(`成功为学员 ${studentUid} 添加成绩 ${score}`);
         quickScore.value = '';
-        await onStudentChange(); // 重新加载成绩
+        
+        // 重新加载成绩
+        await onStudentChange();
+        
+        // 显示成功消息
+        if (showSuccess) {
+          showSuccess('添加成功', `成绩 ${score} 已成功添加`);
+        }
       } catch (error) {
         console.error('添加成绩失败:', error);
-        showError('添加失败', '添加学员成绩时发生错误', error.message);
+        showError(
+          '添加失败', 
+          '添加学员成绩时发生错误，请稍后重试', 
+          error.message || '未知错误'
+        );
       } finally {
         loading.value = false;
       }
     };
 
     const exportScores = () => {
-      if (!selectedStudentData.value) {
-        showError('导出失败', '请先选择一个学员');
-        return;
-      }
+      try {
+        if (!selectedStudentData.value) {
+          showError('导出失败', '请先选择一个学员');
+          return;
+        }
 
-      const csvContent =
-        'data:text/csv;charset=utf-8,' +
-        '序号,成绩,等级\n' +
-        selectedStudentData.value.rings
-          .map(
-            (score, index) => `${index + 1},${score},${getScoreClass(score)}`,
-          )
+        if (!selectedStudentData.value.rings || selectedStudentData.value.rings.length === 0) {
+          showError('导出失败', '该学员暂无成绩记录');
+          return;
+        }
+
+        // 生成CSV内容
+        const headers = '序号,成绩,等级,日期\n';
+        const rows = selectedStudentData.value.rings
+          .map((score, index) => {
+            const scoreClass = getScoreClass(score);
+            const date = new Date().toLocaleDateString('zh-CN');
+            return `${index + 1},${score},${scoreClass},${date}`;
+          })
           .join('\n');
 
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute(
-        'download',
-        `${selectedStudentData.value.name}_成绩表.csv`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + headers + rows;
+        
+        // 安全的文件名处理
+        const fileName = `${selectedStudentData.value.name.replace(/[^\w\u4e00-\u9fa5]/g, '_')}_成绩表_${new Date().toISOString().slice(0, 10)}.csv`;
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', fileName);
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log(`成功导出 ${selectedStudentData.value.name} 的成绩表`);
+        
+        if (showSuccess) {
+          showSuccess('导出成功', `${selectedStudentData.value.name} 的成绩表已导出`);
+        }
+      } catch (error) {
+        console.error('导出成绩失败:', error);
+        showError('导出失败', '导出成绩表时发生错误', error.message || '未知错误');
+      }
     };
 
     // 生命周期钩子

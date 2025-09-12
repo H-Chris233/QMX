@@ -14,7 +14,7 @@ This is a Tauri desktop application for student management with Vue 3 frontend a
 - `pnpm tauri build` - Build desktop application
 
 ### TypeScript
-- `vue-tsc --noEmit` - Type checking (runs before build)
+- `pnpm vue-tsc --noEmit` - Type checking (runs before build)
 
 ## Architecture Overview
 

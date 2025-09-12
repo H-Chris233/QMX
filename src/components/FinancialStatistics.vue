@@ -372,7 +372,20 @@ export default {
     const selectedTransaction = ref(null);
     const selectedStatus = ref('Pending');
     const abortController = ref(null);
-    const { showError, showSuccess } = inject('errorHandler');
+    const errorHandler = inject('errorHandler');
+    
+    const showError = errorHandler?.showError || ((title, message, details) => {
+      console.error(`${title}: ${message}`, details);
+      alert(`${title}\n${message}`);
+    });
+    
+    const showSuccess = errorHandler?.showSuccess || ((title, message) => {
+      console.log(`✅ ${title}: ${message}`);
+    });
+    
+    if (!errorHandler) {
+      console.warn('⚠️ errorHandler 未正确注入到 FinancialStatistics 组件');
+    }
 
     const currentTransaction = ref({
       type: 'income',
@@ -495,43 +508,148 @@ export default {
     // 加载学员列表
     const loadStudents = async () => {
       try {
-        students.value = await ApiService.getAllStudents();
+        const data = await ApiService.getAllStudents();
+        
+        // 验证学员数据
+        if (!Array.isArray(data)) {
+          throw new Error('返回的学员数据格式不正确');
+        }
+        
+        const validStudents = data.filter(student => 
+          student && typeof student === 'object' && student.uid && student.name
+        );
+        
+        if (validStudents.length !== data.length) {
+          console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
+        }
+        
+        students.value = validStudents;
+        console.log(`成功加载 ${validStudents.length} 个学员记录`);
       } catch (error) {
         console.error('加载学员数据失败:', error);
-        showError('加载失败', '加载学员数据时发生错误', error.message);
+        students.value = []; // 确保有默认值
+        showError('加载失败', '加载学员数据时发生错误', error.message || '未知错误');
       }
     };
 
+    // 数据验证函数
+    const validateTransactionData = (transaction) => {
+      if (!transaction || typeof transaction !== 'object') return false;
+      if (typeof transaction.uid !== 'number' || transaction.uid <= 0) return false;
+      if (typeof transaction.amount !== 'number' || !isFinite(transaction.amount)) return false;
+      return true;
+    };
+
+    const validateTransactionInput = (transaction) => {
+      const errors = [];
+      
+      if (!transaction.amount || isNaN(Number(transaction.amount)) || Number(transaction.amount) <= 0) {
+        errors.push('金额必须是大于0的有效数字');
+      }
+      
+      if (transaction.amount && Number(transaction.amount) > 999999999) {
+        errors.push('金额不能超过999,999,999');
+      }
+      
+      if (isInstallmentMode.value) {
+        if (!transaction.installment_total || Number(transaction.installment_total) < 2) {
+          errors.push('分期付款至少需要2期');
+        }
+        
+        if (!transaction.installment_due_date) {
+          errors.push('请选择首次到期日');
+        } else {
+          const dueDate = new Date(transaction.installment_due_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (dueDate < today) {
+            errors.push('到期日不能早于今天');
+          }
+        }
+        
+        if (transaction.installment_frequency === 'Custom') {
+          const days = Number(transaction.custom_frequency_days);
+          if (!days || days < 1 || days > 365) {
+            errors.push('自定义频率天数必须在1-365之间');
+          }
+        }
+      }
+      
+      if (transaction.note && transaction.note.length > 500) {
+        errors.push('备注长度不能超过500个字符');
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors
+      };
+    };
+
     const loadTransactions = async () => {
+      if (loading.value) {
+        console.warn('交易数据正在加载中，跳过重复请求');
+        return;
+      }
+
       loading.value = true;
       abortController.value = new AbortController();
 
       try {
-        const cashTransactions = await ApiService.getAllTransactions({
-          signal: abortController.value.signal,
-        });
+        const cashTransactions = await ApiService.getAllTransactions();
 
-        // 转换后端数据为前端格式
-        transactions.value = cashTransactions.map((transaction) => ({
-          id: transaction.uid,
-          type: transaction.amount > 0 ? 'income' : 'expense',
-          description: transaction.student_id
-            ? `学员${transaction.student_id}缴费`
-            : '其他交易',
-          amount: Math.abs(transaction.amount),
-          note: transaction.note || '',
-          is_installment: transaction.is_installment,
-          installment_current: transaction.installment_current,
-          installment_total: transaction.installment_total,
-          installment_status: transaction.installment_status,
-        }));
+        // 验证返回的数据
+        if (!Array.isArray(cashTransactions)) {
+          throw new Error('返回的交易数据格式不正确，期望数组格式');
+        }
+
+        // 验证并转换后端数据为前端格式
+        const validTransactions = cashTransactions
+          .filter(transaction => {
+            const isValid = validateTransactionData(transaction);
+            if (!isValid) {
+              console.warn('过滤无效交易记录:', transaction);
+            }
+            return isValid;
+          })
+          .map((transaction) => {
+            try {
+              return {
+                id: transaction.uid,
+                type: transaction.amount > 0 ? 'income' : 'expense',
+                description: transaction.student_id
+                  ? `学员${transaction.student_id}缴费`
+                  : '其他交易',
+                amount: Math.abs(transaction.amount),
+                note: transaction.note || '',
+                is_installment: !!transaction.is_installment,
+                installment_current: transaction.installment_current || null,
+                installment_total: transaction.installment_total || null,
+                installment_status: transaction.installment_status || null,
+                student_id: transaction.student_id || null,
+              };
+            } catch (error) {
+              console.warn('转换交易数据失败:', transaction, error);
+              return null;
+            }
+          })
+          .filter(transaction => transaction !== null);
+
+        transactions.value = validTransactions;
+        
+        if (validTransactions.length !== cashTransactions.length) {
+          console.warn(`过滤了 ${cashTransactions.length - validTransactions.length} 个无效交易记录`);
+        }
+        
+        console.log(`成功加载 ${validTransactions.length} 条交易记录`);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('加载交易数据失败:', error);
+          transactions.value = []; // 确保有默认值
           showError(
             '加载失败',
             '加载交易数据时发生错误，请检查网络连接或稍后重试',
-            error.message,
+            error.message || '未知错误',
           );
         }
       } finally {
@@ -541,91 +659,142 @@ export default {
     };
 
     const saveTransaction = async () => {
-      // 检查金额是否已输入且为有效数值
-      if (
-        !currentTransaction.value.amount ||
-        currentTransaction.value.amount <= 0
-      ) {
-        showError('输入错误', '请输入有效金额');
+      // 防止重复提交
+      if (loading.value) {
+        console.warn('正在保存交易，请勿重复提交');
         return;
       }
 
-      // 分期付款验证
-      if (isInstallmentMode.value) {
-        if (
-          !currentTransaction.value.installment_total ||
-          currentTransaction.value.installment_total < 2
-        ) {
-          showError('输入错误', '分期付款至少需要2期');
-          return;
-        }
-
-        if (!currentTransaction.value.installment_due_date) {
-          showError('输入错误', '请选择首次到期日');
-          return;
-        }
+      // 输入验证
+      const validation = validateTransactionInput(currentTransaction.value);
+      if (!validation.isValid) {
+        showError('输入错误', validation.errors.join('；'));
+        return;
       }
 
       loading.value = true;
+      
       try {
+        // 数据清理和转换
+        const sanitizedTransaction = {
+          ...currentTransaction.value,
+          amount: Number(currentTransaction.value.amount),
+          note: currentTransaction.value.note?.trim() || '',
+          student_id: currentTransaction.value.student_id || null,
+        };
+
         if (isInstallmentMode.value) {
           // 处理分期付款
           const frequency =
-            currentTransaction.value.installment_frequency === 'Custom'
-              ? `Custom${currentTransaction.value.custom_frequency_days || 30}`
-              : currentTransaction.value.installment_frequency;
+            sanitizedTransaction.installment_frequency === 'Custom'
+              ? `Custom${sanitizedTransaction.custom_frequency_days || 30}`
+              : sanitizedTransaction.installment_frequency;
 
-          // 转换为UTC日期字符串
-          const dueDate = new Date(
-            currentTransaction.value.installment_due_date + 'T00:00:00Z',
-          ).toISOString();
+          // 安全的日期处理
+          let dueDate;
+          try {
+            dueDate = new Date(sanitizedTransaction.installment_due_date + 'T00:00:00Z').toISOString();
+          } catch (dateError) {
+            throw new Error('无效的到期日期格式');
+          }
 
-          await ApiService.addInstallmentTransaction(
-            currentTransaction.value.student_id,
-            currentTransaction.value.amount,
-            currentTransaction.value.note || '',
-            currentTransaction.value.installment_total,
+          const result = await ApiService.addInstallmentTransaction(
+            sanitizedTransaction.student_id,
+            sanitizedTransaction.amount,
+            sanitizedTransaction.note,
+            Number(sanitizedTransaction.installment_total),
             frequency,
             dueDate,
           );
+          
+          if (!result) {
+            throw new Error('分期付款创建失败，返回数据无效');
+          }
+          
+          console.log('分期付款创建成功:', result);
         } else {
           // 处理普通付款
-          const amount = Math.round(Math.abs(currentTransaction.value.amount));
+          const amount = Math.round(Math.abs(sanitizedTransaction.amount));
           const cashAmount =
-            currentTransaction.value.type === 'income' ? amount : -amount;
+            sanitizedTransaction.type === 'income' ? amount : -amount;
 
-          await ApiService.addCashTransaction(
-            currentTransaction.value.student_id,
+          const result = await ApiService.addCashTransaction(
+            sanitizedTransaction.student_id,
             cashAmount,
-            currentTransaction.value.note || '',
+            sanitizedTransaction.note,
           );
+          
+          if (!result) {
+            throw new Error('交易创建失败，返回数据无效');
+          }
+          
+          console.log('普通交易创建成功:', result);
         }
 
         // 重新加载数据
         await loadTransactions();
         closeModals();
-        showSuccess('成功', '交易已成功添加');
+        
+        // 显示成功消息
+        if (showSuccess) {
+          const transactionType = isInstallmentMode.value ? '分期付款' : '交易';
+          showSuccess('保存成功', `${transactionType}已成功添加`);
+        }
       } catch (error) {
         console.error('保存交易失败:', error);
-        showError('保存失败', '保存交易时发生错误', error.message);
+        const errorMessage = error.message || '未知错误';
+        showError(
+          '保存失败', 
+          `保存交易时发生错误: ${errorMessage}`,
+          error.stack
+        );
       } finally {
         loading.value = false;
       }
     };
 
     const deleteTransaction = async (id) => {
-      if (confirm('确定要删除这条交易记录吗？')) {
-        loading.value = true;
-        try {
-          await ApiService.deleteCashTransaction(id);
-          await loadTransactions();
-          showSuccess('成功', '交易已删除');
-        } catch (error) {
-          console.error('删除交易失败:', error);
-          showError('删除失败', '删除交易记录时发生错误', error.message);
-        } finally {
-          loading.value = false;
+      if (loading.value) {
+        console.warn('正在处理其他操作，请稍后再试');
+        return;
+      }
+
+      if (!id || isNaN(Number(id)) || Number(id) <= 0) {
+        showError('删除失败', '无效的交易ID');
+        return;
+      }
+
+      // 查找要删除的交易
+      const transaction = transactions.value.find(t => t.id === id);
+      const confirmMessage = transaction 
+        ? `确定要删除这条交易记录吗？\n金额: ${formatTransactionAmount(transaction)}\n描述: ${transaction.description}`
+        : '确定要删除这条交易记录吗？';
+
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+
+      loading.value = true;
+      try {
+        await ApiService.deleteCashTransaction(Number(id));
+        
+        console.log(`成功删除交易记录 ID: ${id}`);
+        
+        // 重新加载数据
+        await loadTransactions();
+        
+        if (showSuccess) {
+          showSuccess('删除成功', '交易记录已删除');
         }
+      } catch (error) {
+        console.error('删除交易失败:', error);
+        showError(
+          '删除失败', 
+          '删除交易记录时发生错误，请稍后重试', 
+          error.message || '未知错误'
+        );
+      } finally {
+        loading.value = false;
       }
     };
 

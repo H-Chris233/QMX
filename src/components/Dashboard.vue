@@ -54,7 +54,16 @@ export default {
   setup() {
     const loading = ref(false);
     const abortController = ref(null);
-    const { showError } = inject('errorHandler');
+    const errorHandler = inject('errorHandler');
+    
+    const showError = errorHandler?.showError || ((title, message, details) => {
+      console.error(`${title}: ${message}`, details);
+      alert(`${title}\n${message}`);
+    });
+    
+    if (!errorHandler) {
+      console.warn('⚠️ errorHandler 未正确注入到 Dashboard 组件');
+    }
 
     // 仪表盘数据（使用reactive保持响应性）
     const dashboardData = reactive({
@@ -63,28 +72,70 @@ export default {
       averageGrade: 0,
     });
 
+    // 数据验证函数
+    const validateDashboardStats = (stats) => {
+      if (!stats || typeof stats !== 'object') {
+        throw new Error('统计数据格式无效');
+      }
+      
+      const requiredFields = ['total_revenue', 'total_students', 'average_score'];
+      const missingFields = requiredFields.filter(field => 
+        stats[field] === undefined || stats[field] === null
+      );
+      
+      if (missingFields.length > 0) {
+        console.warn('缺少统计字段:', missingFields);
+      }
+      
+      return true;
+    };
+
+    // 安全的数值转换函数
+    const safeParseNumber = (value, defaultValue = 0) => {
+      if (value === null || value === undefined) return defaultValue;
+      const parsed = Number(value);
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+
     // 数据获取
     const loadDashboardData = async () => {
+      if (loading.value) {
+        console.warn('数据正在加载中，跳过重复请求');
+        return;
+      }
+
       loading.value = true;
       abortController.value = new AbortController();
 
       try {
-        const stats = await ApiService.getDashboardStats({
-          signal: abortController.value.signal,
-        });
+        const stats = await ApiService.getDashboardStats();
+        
+        // 验证数据
+        validateDashboardStats(stats);
 
-        // 更新仪表板数据
-        dashboardData.totalRevenue = stats.total_revenue || 0;
-        dashboardData.activeStudents = stats.total_students || 0;
-        dashboardData.averageGrade =
-          parseFloat(stats.average_score?.toFixed(1)) || 0;
+        // 安全更新仪表板数据
+        dashboardData.totalRevenue = safeParseNumber(stats.total_revenue);
+        dashboardData.activeStudents = safeParseNumber(stats.total_students);
+        dashboardData.averageGrade = safeParseNumber(
+          parseFloat(stats.average_score?.toFixed(1))
+        );
+
+        console.log('仪表板数据加载成功:', dashboardData);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('加载仪表盘数据失败:', error);
+          
+          // 重置为默认值
+          Object.assign(dashboardData, {
+            totalRevenue: 0,
+            activeStudents: 0,
+            averageGrade: 0,
+          });
+          
           showError(
             '数据加载失败',
             '无法获取仪表板数据，请检查网络连接或稍后重试',
-            error.message,
+            error.message || '未知错误',
           );
         }
       } finally {
@@ -95,18 +146,38 @@ export default {
 
     // 格式化方法（集成到组件内部）
     const formatNumber = (value) => {
-      return new Intl.NumberFormat().format(value);
+      try {
+        const num = safeParseNumber(value);
+        return new Intl.NumberFormat('zh-CN').format(num);
+      } catch (error) {
+        console.warn('数字格式化失败:', value, error);
+        return '0';
+      }
     };
 
     const formatCurrency = (value) => {
-      return new Intl.NumberFormat('zh-CN', {
-        style: 'currency',
-        currency: 'CNY',
-      }).format(value);
+      try {
+        const num = safeParseNumber(value);
+        return new Intl.NumberFormat('zh-CN', {
+          style: 'currency',
+          currency: 'CNY',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        }).format(num);
+      } catch (error) {
+        console.warn('货币格式化失败:', value, error);
+        return '￥0';
+      }
     };
 
     const formatDecimal = (value) => {
-      return parseFloat(value).toFixed(1);
+      try {
+        const num = safeParseNumber(value);
+        return num.toFixed(1);
+      } catch (error) {
+        console.warn('小数格式化失败:', value, error);
+        return '0.0';
+      }
     };
 
     // 生命周期钩子
@@ -127,6 +198,7 @@ export default {
       formatNumber,
       formatCurrency,
       formatDecimal,
+      safeParseNumber,
     };
   },
 };
