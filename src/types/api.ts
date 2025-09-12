@@ -9,6 +9,10 @@ export interface Student {
   cash: string;
   subject: string;
   lesson_left?: number | undefined;
+  membership_start_date?: string | null;
+  membership_end_date?: string | null;
+  is_membership_active: boolean;
+  membership_days_remaining?: number | null;
 }
 
 export interface Transaction {
@@ -44,6 +48,23 @@ export interface StudentUpdateData {
   note?: string;
   subject?: string;
   lessonLeft?: number;
+  membershipStartDate?: string;
+  membershipEndDate?: string;
+}
+
+export interface MembershipData {
+  startDate?: string;
+  endDate?: string;
+}
+
+export type MembershipType = 'month' | 'year';
+
+export interface MembershipInfo {
+  isActive: boolean;
+  startDate?: string;
+  endDate?: string;
+  daysRemaining?: number;
+  type?: MembershipType;
 }
 
 export interface ApiResponse<T> {
@@ -73,4 +94,7 @@ export type TauriCommand =
   | 'cancel_installment_plan'
   | 'get_installments_by_plan'
   | 'get_dashboard_stats'
-  | 'open_main_window';
+  | 'open_main_window'
+  | 'set_student_membership'
+  | 'clear_student_membership'
+  | 'set_membership_by_type';

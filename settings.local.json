@@ -1,4 +1,7 @@
 {
+  "cleanupPeriodDays": 30,
+  "env": {},
+  "includeCoAuthoredBy": false,
   "permissions": {
     "additionalDirectories": [
       "/data/data/com.termux/files/home/qmx_backend_lib"

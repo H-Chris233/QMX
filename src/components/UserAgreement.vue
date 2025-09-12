@@ -33,7 +33,7 @@
           class="section"
         >
           <h2>{{ section.title }}</h2>
-          <div v-html="section.content"></div>
+          <div class="section-content" v-html="sanitizeContent(section.content)"></div>
         </section>
       </main>
 
@@ -157,6 +157,39 @@ export default {
         this.openMainWindow();
         this.agreeInProgress = true;
       }, 800);
+    },
+
+    sanitizeContent(content) {
+      // 安全的HTML清理函数 - 只允许安全的标签和属性
+      const allowedTags = ['ul', 'ol', 'li', 'code', 'strong', 'em', 'br'];
+      
+      // 创建一个临时DOM元素来清理内容
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+      
+      // 递归清理所有元素
+      const cleanElement = (element) => {
+        const children = Array.from(element.children);
+        children.forEach(child => {
+          if (!allowedTags.includes(child.tagName.toLowerCase())) {
+            // 不允许的标签，保留文本内容但移除标签
+            const textNode = document.createTextNode(child.textContent);
+            element.replaceChild(textNode, child);
+          } else {
+            // 清理属性，只保留安全的属性
+            const attributes = Array.from(child.attributes);
+            attributes.forEach(attr => {
+              if (!['class'].includes(attr.name)) {
+                child.removeAttribute(attr.name);
+              }
+            });
+            cleanElement(child);
+          }
+        });
+      };
+      
+      cleanElement(tempDiv);
+      return tempDiv.innerHTML;
     },
 
     async openMainWindow() {

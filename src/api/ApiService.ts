@@ -222,6 +222,8 @@ export class ApiService {
         note: updates.note?.trim(),
         subject: updates.subject,
         lessonLeft: updates.lessonLeft,
+        membershipStartDate: updates.membershipStartDate,
+        membershipEndDate: updates.membershipEndDate,
       });
       
       console.log(`✅ 成功更新学员 ${studentUid} 的信息`);
@@ -428,6 +430,68 @@ export class ApiService {
     } catch (error) {
       console.error('❌ [ApiService.getDashboardStats] 调用失败:', error);
       throw new Error(`获取统计数据失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // 会员管理
+  static async setStudentMembership(
+    studentUid: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<void> {
+    try {
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      
+      await invokeWithEnhancements<null>('set_student_membership' as TauriCommand, {
+        studentUid,
+        startDate: startDate || null,
+        endDate: endDate || null,
+      });
+      
+      console.log(`✅ 成功设置学员 ${studentUid} 的会员信息`);
+    } catch (error) {
+      console.error('❌ [ApiService.setStudentMembership] 调用失败:', error);
+      throw new Error(`设置会员信息失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async clearStudentMembership(studentUid: number): Promise<void> {
+    try {
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      
+      await invokeWithEnhancements<null>('clear_student_membership' as TauriCommand, {
+        studentUid,
+      });
+      
+      console.log(`✅ 成功清除学员 ${studentUid} 的会员信息`);
+    } catch (error) {
+      console.error('❌ [ApiService.clearStudentMembership] 调用失败:', error);
+      throw new Error(`清除会员信息失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async setMembershipByType(
+    studentUid: number,
+    membershipType: 'month' | 'year',
+    startFromToday: boolean = true
+  ): Promise<void> {
+    try {
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      if (!['month', 'year'].includes(membershipType)) {
+        throw new Error('会员类型无效，只支持 month 或 year');
+      }
+      
+      await invokeWithEnhancements<null>('set_membership_by_type' as TauriCommand, {
+        studentUid,
+        membershipType,
+        startFromToday,
+      });
+      
+      const typeText = membershipType === 'month' ? '月卡' : '年卡';
+      console.log(`✅ 成功为学员 ${studentUid} 设置${typeText}会员`);
+    } catch (error) {
+      console.error('❌ [ApiService.setMembershipByType] 调用失败:', error);
+      throw new Error(`设置会员类型失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

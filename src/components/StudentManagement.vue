@@ -48,6 +48,7 @@
             <th>电话</th>
             <th>科目</th>
             <th>课程</th>
+            <th>会员状态</th>
             <th>最高分数</th>
             <th>备注</th>
             <th>操作</th>
@@ -68,10 +69,21 @@
                 {{ getClassText(student.class) }}
               </span>
             </td>
+            <td data-label="会员状态">
+              <div class="membership-info">
+                <span :class="['membership-badge', getMembershipStatusClass(student)]">
+                  {{ getMembershipStatusText(student) }}
+                </span>
+                <div v-if="student.is_membership_active && student.membership_days_remaining !== null" class="membership-days">
+                  剩余{{ student.membership_days_remaining }}天
+                </div>
+              </div>
+            </td>
             <td data-label="最高分数">{{ getHighestScore(student) }}</td>
             <td data-label="备注">{{ student.note || '-' }}</td>
             <td class="actions">
               <button class="edit-btn" @click="editStudent(student)" :disabled="loading">✏️</button>
+              <button class="membership-btn" @click="manageMembership(student)" :disabled="loading">👑</button>
               <button class="delete-btn" @click="deleteStudent(student.uid)" :disabled="loading">
                 🗑️
               </button>
@@ -158,7 +170,7 @@
               v-model.number="currentStudent.age"
               type="number"
               placeholder="请输入年龄"
-              min="1"
+              min="3"
               max="120"
             />
           </div>
@@ -175,10 +187,48 @@
             <select v-model="currentStudent.classType">
               <option value="">请选择课程</option>
               <option value="TenTry">体验课 (10次)</option>
-              <option value="Month">月卡</option>
-              <option value="Year">年卡</option>
+              <option value="Month">月卡 (自动设置30天会员)</option>
+              <option value="Year">年卡 (自动设置365天会员)</option>
               <option value="Others">其他</option>
             </select>
+            <div v-if="currentStudent.classType === 'Month' || currentStudent.classType === 'Year'" class="membership-hint">
+              <span class="hint-icon">💡</span>
+              <span class="hint-text">
+                选择{{ currentStudent.classType === 'Month' ? '月卡' : '年卡' }}将自动为学员设置对应的会员权限
+              </span>
+            </div>
+          </div>
+          
+          <!-- 自定义会员开始时间 -->
+          <div v-if="currentStudent.classType === 'Month' || currentStudent.classType === 'Year'" class="form-group membership-custom">
+            <div class="custom-membership-toggle">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  v-model="currentStudent.enableCustomMembership"
+                  @change="onCustomMembershipToggle"
+                />
+                <span class="checkmark"></span>
+                自定义会员开始时间
+              </label>
+            </div>
+            
+            <div v-if="currentStudent.enableCustomMembership" class="custom-membership-date">
+              <label>会员开始时间</label>
+              <input
+                v-model="currentStudent.customMembershipStart"
+                type="date"
+                :min="getTodayDate()"
+                placeholder="选择会员开始日期"
+              />
+              <div class="membership-preview" v-if="currentStudent.customMembershipStart">
+                <span class="preview-icon">📅</span>
+                <span class="preview-text">
+                  会员将从 {{ formatDateForDisplay(currentStudent.customMembershipStart) }} 开始，
+                  {{ currentStudent.classType === 'Month' ? '30天后' : '365天后' }}到期
+                </span>
+              </div>
+            </div>
           </div>
           <div class="form-group">
             <label>备注</label>
@@ -193,6 +243,85 @@
           <button class="cancel-btn" @click="closeModals" :disabled="loading">取消</button>
           <button class="save-btn" @click="saveStudent" :disabled="loading">
             {{ loading ? '保存中...' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 会员管理模态框 -->
+    <div
+      v-if="showMembershipModal"
+      class="modal-overlay"
+      @click="closeMembershipModal"
+    >
+      <div class="modal membership-modal" @click.stop>
+        <div class="modal-header">
+          <h3>会员管理 - {{ membershipStudent?.name }}</h3>
+          <button class="close-btn" @click="closeMembershipModal">✖️</button>
+        </div>
+        <div class="modal-body">
+          <!-- 当前会员状态 -->
+          <div class="membership-status">
+            <h4>当前会员状态</h4>
+            <div class="status-info">
+              <span :class="['membership-badge', getMembershipStatusClass(membershipStudent)]">
+                {{ getMembershipStatusText(membershipStudent) }}
+              </span>
+              <div v-if="membershipStudent?.is_membership_active && membershipStudent?.membership_days_remaining !== null" class="days-remaining">
+                剩余 {{ membershipStudent.membership_days_remaining }} 天
+              </div>
+            </div>
+            <div v-if="membershipStudent?.membership_start_date || membershipStudent?.membership_end_date" class="membership-dates">
+              <div v-if="membershipStudent.membership_start_date">
+                开始时间: {{ formatDate(membershipStudent.membership_start_date) }}
+              </div>
+              <div v-if="membershipStudent.membership_end_date">
+                结束时间: {{ formatDate(membershipStudent.membership_end_date) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 快捷设置 -->
+          <div class="quick-actions">
+            <h4>快捷设置</h4>
+            <div class="quick-buttons">
+              <button class="membership-action-btn month-btn" @click="setMembershipByType('month')" :disabled="loading">
+                设置月卡 (30天)
+              </button>
+              <button class="membership-action-btn year-btn" @click="setMembershipByType('year')" :disabled="loading">
+                设置年卡 (365天)
+              </button>
+              <button class="membership-action-btn clear-btn" @click="clearMembership" :disabled="loading">
+                清除会员
+              </button>
+            </div>
+          </div>
+
+          <!-- 自定义设置 -->
+          <div class="custom-membership">
+            <h4>自定义设置</h4>
+            <div class="form-group">
+              <label>开始时间</label>
+              <input
+                v-model="membershipForm.startDate"
+                type="date"
+                :min="getTodayDate()"
+              />
+            </div>
+            <div class="form-group">
+              <label>结束时间</label>
+              <input
+                v-model="membershipForm.endDate"
+                type="date"
+                :min="membershipForm.startDate || getTodayDate()"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeMembershipModal" :disabled="loading">取消</button>
+          <button class="save-btn" @click="saveCustomMembership" :disabled="loading">
+            {{ loading ? '设置中...' : '设置自定义会员' }}
           </button>
         </div>
       </div>
@@ -215,6 +344,7 @@ export default {
     const subjectFilter = ref('');
     const showAddModal = ref(false);
     const showEditModal = ref(false);
+    const showMembershipModal = ref(false);
     const currentStudent = ref({
       uid: null,
       name: '',
@@ -223,6 +353,13 @@ export default {
       classType: '',
       note: '',
       subject: 'Shooting',
+      customMembershipStart: '', // 自定义会员开始时间
+      enableCustomMembership: false, // 是否启用自定义会员时间
+    });
+    const membershipStudent = ref(null);
+    const membershipForm = ref({
+      startDate: '',
+      endDate: '',
     });
     const searchInput = ref(null);
     const errorHandler = inject('errorHandler');
@@ -490,8 +627,8 @@ export default {
       
       // 年龄验证 - 增强类型检查
       const age = Number(student.age);
-      if (!age || isNaN(age) || !isFinite(age) || age < 1 || age > 120) {
-        errors.push('年龄必须是1-120之间的有效数字');
+      if (!age || isNaN(age) || !isFinite(age) || age < 3 || age > 120) {
+        errors.push('年龄必须是3-120之间的有效数字');
       }
       
       // 电话验证 - 增强类型和长度检查
@@ -608,11 +745,49 @@ export default {
           }
           
           console.log('学员添加成功:', result);
+
+          // 根据课程类型设置会员（支持自定义开始时间）
+          if (sanitizedStudent.classType === 'Month' || sanitizedStudent.classType === 'Year') {
+            if (currentStudent.value.enableCustomMembership && currentStudent.value.customMembershipStart) {
+              // 使用自定义开始时间
+              console.log(`为新学员设置${sanitizedStudent.classType === 'Month' ? '月卡' : '年卡'}会员，自定义开始时间: ${currentStudent.value.customMembershipStart}`);
+              
+              const startDate = new Date(currentStudent.value.customMembershipStart);
+              const endDate = new Date(startDate);
+              
+              if (sanitizedStudent.classType === 'Month') {
+                endDate.setDate(endDate.getDate() + 30);
+              } else {
+                endDate.setDate(endDate.getDate() + 365);
+              }
+              
+              await ApiService.setStudentMembership(
+                result.uid, 
+                startDate.toISOString(), 
+                endDate.toISOString()
+              );
+              
+              showSuccess('添加成功', `学员"${sanitizedStudent.name}"已添加，会员从${formatDateForDisplay(currentStudent.value.customMembershipStart)}开始`);
+            } else {
+              // 使用默认的当前时间
+              console.log(`为新学员设置${sanitizedStudent.classType === 'Month' ? '月卡' : '年卡'}会员`);
+              const membershipType = sanitizedStudent.classType === 'Month' ? 'month' : 'year';
+              await ApiService.setMembershipByType(result.uid, membershipType, true);
+              
+              showSuccess('添加成功', `学员"${sanitizedStudent.name}"已添加并自动设置${sanitizedStudent.classType === 'Month' ? '30天' : '365天'}会员`);
+            }
+          } else {
+            showSuccess('添加成功', `学员"${sanitizedStudent.name}"已添加`);
+          }
         } else {
           // 编辑现有学员
           if (!sanitizedStudent.uid) {
             throw new Error('学员ID无效，无法更新');
           }
+          
+          // 获取原始学员信息以比较课程类型是否变更
+          const originalStudent = students.value.find(s => s.uid === sanitizedStudent.uid);
+          const classTypeChanged = originalStudent && originalStudent.class !== sanitizedStudent.classType;
           
           await ApiService.updateStudentInfo(sanitizedStudent.uid, {
             name: sanitizedStudent.name,
@@ -624,15 +799,53 @@ export default {
           });
           
           console.log('学员更新成功');
+
+          // 如果课程类型变更为月卡或年卡，设置会员（支持自定义开始时间）
+          if (classTypeChanged) {
+            if (sanitizedStudent.classType === 'Month' || sanitizedStudent.classType === 'Year') {
+              if (currentStudent.value.enableCustomMembership && currentStudent.value.customMembershipStart) {
+                // 使用自定义开始时间
+                console.log(`课程变更为${sanitizedStudent.classType === 'Month' ? '月卡' : '年卡'}，设置自定义会员时间: ${currentStudent.value.customMembershipStart}`);
+                
+                const startDate = new Date(currentStudent.value.customMembershipStart);
+                const endDate = new Date(startDate);
+                
+                if (sanitizedStudent.classType === 'Month') {
+                  endDate.setDate(endDate.getDate() + 30);
+                } else {
+                  endDate.setDate(endDate.getDate() + 365);
+                }
+                
+                await ApiService.setStudentMembership(
+                  sanitizedStudent.uid, 
+                  startDate.toISOString(), 
+                  endDate.toISOString()
+                );
+                
+                showSuccess('更新成功', `学员"${sanitizedStudent.name}"信息已更新，会员从${formatDateForDisplay(currentStudent.value.customMembershipStart)}开始`);
+              } else {
+                // 使用默认的当前时间
+                console.log(`课程变更为${sanitizedStudent.classType === 'Month' ? '月卡' : '年卡'}，设置会员`);
+                const membershipType = sanitizedStudent.classType === 'Month' ? 'month' : 'year';
+                await ApiService.setMembershipByType(sanitizedStudent.uid, membershipType, true);
+                
+                showSuccess('更新成功', `学员"${sanitizedStudent.name}"信息已更新并自动设置${sanitizedStudent.classType === 'Month' ? '30天' : '365天'}会员`);
+              }
+            } else if (originalStudent?.class === 'Month' || originalStudent?.class === 'Year') {
+              // 如果从月卡/年卡变更为其他类型，清除会员
+              console.log('课程从会员类型变更为非会员类型，清除会员');
+              await ApiService.clearStudentMembership(sanitizedStudent.uid);
+              showSuccess('更新成功', `学员"${sanitizedStudent.name}"信息已更新，会员已清除`);
+            } else {
+              showSuccess('更新成功', `学员"${sanitizedStudent.name}"信息已更新`);
+            }
+          } else {
+            showSuccess('更新成功', `学员"${sanitizedStudent.name}"信息已更新`);
+          }
         }
 
-        const isAdding = showAddModal.value;
-        
         await loadStudents(); // 重新加载数据
         closeModals();
-        
-        // 显示成功消息
-        showSuccess('操作成功', isAdding ? '学员添加成功' : '学员信息更新成功');
       } catch (error) {
         console.error('保存学员失败:', error);
         const errorMessage = error.message || '未知错误';
@@ -704,11 +917,170 @@ export default {
           classType: '',
           note: '',
           subject: 'Shooting',
+          customMembershipStart: '',
+          enableCustomMembership: false,
         };
       } catch (error) {
         console.error('关闭模态框失败:', error);
         // 对于UI操作的错误，通常不需要弹窗，但可以记录
         // showError('操作失败', '关闭窗口时发生错误', error.message);
+      }
+    };
+
+    // 会员管理相关方法
+    const getMembershipStatusClass = (student) => {
+      if (!student) return 'no-membership';
+      if (student.is_membership_active) {
+        return student.membership_days_remaining > 7 ? 'active' : 'expiring';
+      }
+      return 'expired';
+    };
+
+    const getMembershipStatusText = (student) => {
+      if (!student) return '无会员';
+      if (student.is_membership_active) {
+        return '有效会员';
+      }
+      if (student.membership_end_date) {
+        return '已过期';
+      }
+      return '无会员';
+    };
+
+    const formatDate = (dateString) => {
+      if (!dateString) return '';
+      try {
+        return new Date(dateString).toLocaleDateString('zh-CN');
+      } catch (error) {
+        console.warn('日期格式化失败:', error);
+        return dateString;
+      }
+    };
+
+    const getTodayDate = () => {
+      return new Date().toISOString().split('T')[0];
+    };
+
+    const manageMembership = (student) => {
+      try {
+        if (!student || !student.uid) {
+          showError('操作失败', '学员数据无效');
+          return;
+        }
+        membershipStudent.value = student;
+        membershipForm.value = {
+          startDate: getTodayDate(),
+          endDate: '',
+        };
+        showMembershipModal.value = true;
+      } catch (error) {
+        console.error('打开会员管理失败:', error);
+        showError('操作失败', '打开会员管理时发生错误', error.message);
+      }
+    };
+
+    const closeMembershipModal = () => {
+      try {
+        showMembershipModal.value = false;
+        membershipStudent.value = null;
+        membershipForm.value = {
+          startDate: '',
+          endDate: '',
+        };
+      } catch (error) {
+        console.error('关闭会员管理模态框失败:', error);
+      }
+    };
+
+    const setMembershipByType = async (type) => {
+      if (loading.value) {
+        console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!membershipStudent.value?.uid) {
+        showError('操作失败', '学员数据无效');
+        return;
+      }
+
+      loading.value = true;
+      try {
+        await ApiService.setMembershipByType(membershipStudent.value.uid, type, true);
+        showSuccess('设置成功', `已为${membershipStudent.value.name}设置${type === 'month' ? '月卡' : '年卡'}会员`);
+        await loadStudents(); // 重新加载数据
+        closeMembershipModal();
+      } catch (error) {
+        console.error('设置会员失败:', error);
+        showError('设置失败', '设置会员时发生错误', error.message);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const clearMembership = async () => {
+      if (loading.value) {
+        console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!membershipStudent.value?.uid) {
+        showError('操作失败', '学员数据无效');
+        return;
+      }
+
+      if (!confirm(`确定要清除${membershipStudent.value.name}的会员信息吗？`)) {
+        return;
+      }
+
+      loading.value = true;
+      try {
+        await ApiService.clearStudentMembership(membershipStudent.value.uid);
+        showSuccess('清除成功', `已清除${membershipStudent.value.name}的会员信息`);
+        await loadStudents(); // 重新加载数据
+        closeMembershipModal();
+      } catch (error) {
+        console.error('清除会员失败:', error);
+        showError('清除失败', '清除会员时发生错误', error.message);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const saveCustomMembership = async () => {
+      if (loading.value) {
+        console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!membershipStudent.value?.uid) {
+        showError('操作失败', '学员数据无效');
+        return;
+      }
+
+      if (!membershipForm.value.startDate || !membershipForm.value.endDate) {
+        showError('输入错误', '请选择开始时间和结束时间');
+        return;
+      }
+
+      if (new Date(membershipForm.value.endDate) <= new Date(membershipForm.value.startDate)) {
+        showError('输入错误', '结束时间必须晚于开始时间');
+        return;
+      }
+
+      loading.value = true;
+      try {
+        const startDate = new Date(membershipForm.value.startDate).toISOString();
+        const endDate = new Date(membershipForm.value.endDate).toISOString();
+        
+        await ApiService.setStudentMembership(membershipStudent.value.uid, startDate, endDate);
+        showSuccess('设置成功', `已为${membershipStudent.value.name}设置自定义会员时间`);
+        await loadStudents(); // 重新加载数据
+        closeMembershipModal();
+      } catch (error) {
+        console.error('设置自定义会员失败:', error);
+        showError('设置失败', '设置自定义会员时发生错误', error.message);
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -721,6 +1093,28 @@ export default {
       }
     });
 
+    // 格式化日期用于显示
+    const formatDateForDisplay = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    // 自定义会员时间切换处理
+    const onCustomMembershipToggle = () => {
+      if (!currentStudent.value.enableCustomMembership) {
+        // 如果关闭自定义时间，清空自定义开始时间
+        currentStudent.value.customMembershipStart = '';
+      } else {
+        // 如果开启自定义时间，默认设置为今天
+        currentStudent.value.customMembershipStart = getTodayDate();
+      }
+    };
+
     return {
       loading,
       students,
@@ -730,7 +1124,10 @@ export default {
       subjectFilter,
       showAddModal,
       showEditModal,
+      showMembershipModal,
       currentStudent,
+      membershipStudent,
+      membershipForm,
       searchInput,
       totalStudents,
       trialStudents,
@@ -746,6 +1143,18 @@ export default {
       saveStudent,
       getHighestScore,
       closeModals,
+      // 会员管理相关方法
+      getMembershipStatusClass,
+      getMembershipStatusText,
+      formatDate,
+      getTodayDate,
+      formatDateForDisplay,
+      onCustomMembershipToggle,
+      manageMembership,
+      closeMembershipModal,
+      setMembershipByType,
+      clearMembership,
+      saveCustomMembership,
     };
   },
 };
@@ -1033,6 +1442,66 @@ export default {
   color: var(--text-primary);
 }
 
+/* 自定义会员时间样式 */
+.membership-custom {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+}
+
+.custom-membership-toggle {
+  margin-bottom: 1rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin-right: 0.5rem;
+  transform: scale(1.2);
+}
+
+.custom-membership-date {
+  margin-top: 1rem;
+}
+
+.custom-membership-date input[type="date"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.membership-preview {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: #e8f5e8;
+  border: 1px solid #4caf50;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preview-icon {
+  font-size: 1.2rem;
+}
+
+.preview-text {
+  font-size: 0.875rem;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
 .form-group input,
 .form-group select {
   width: 100%;
@@ -1242,6 +1711,241 @@ export default {
 
   .students-table .actions:before {
     display: none;
+  }
+}
+
+/* 会员管理相关样式 */
+.membership-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.membership-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.membership-badge.active {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #4caf50;
+}
+
+.membership-badge.expiring {
+  background-color: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ff9800;
+}
+
+.membership-badge.expired {
+  background-color: #fce4ec;
+  color: #c2185b;
+  border: 1px solid #e91e63;
+}
+
+.membership-badge.no-membership {
+  background-color: #f5f5f5;
+  color: #757575;
+  border: 1px solid #bdbdbd;
+}
+
+.membership-days {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.membership-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-size: 1.2rem;
+}
+
+.membership-btn:hover {
+  background-color: #ffd700;
+  transform: scale(1.1);
+}
+
+/* 会员管理模态框样式 */
+.membership-modal {
+  max-width: 600px;
+}
+
+.membership-status {
+  background-color: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.membership-status h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.status-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.days-remaining {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.membership-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.quick-actions {
+  margin-bottom: 1.5rem;
+}
+
+.quick-actions h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.quick-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.membership-action-btn {
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  flex: 1;
+  min-width: 120px;
+}
+
+.month-btn {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #2196f3;
+}
+
+.month-btn:hover {
+  background-color: #2196f3;
+  color: white;
+}
+
+.year-btn {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #9c27b0;
+}
+
+.year-btn:hover {
+  background-color: #9c27b0;
+  color: white;
+}
+
+.clear-btn {
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #f44336;
+}
+
+.clear-btn:hover {
+  background-color: #f44336;
+  color: white;
+}
+
+.custom-membership {
+  background-color: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.custom-membership h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.custom-membership .form-group {
+  margin-bottom: 1rem;
+}
+
+.custom-membership input[type="date"] {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* 会员提示样式 */
+.membership-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: #e8f5e8;
+  border: 1px solid #4caf50;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.hint-icon {
+  font-size: 1rem;
+}
+
+.hint-text {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+/* 响应式设计 - 会员管理 */
+@media (max-width: 768px) {
+  .membership-modal {
+    width: 95%;
+    max-width: none;
+  }
+  
+  .quick-buttons {
+    flex-direction: column;
+  }
+  
+  .membership-action-btn {
+    min-width: auto;
+  }
+  
+  .status-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .membership-hint {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
   }
 }
 </style>

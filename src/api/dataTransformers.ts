@@ -28,6 +28,10 @@ export function transformStudentData(rawData: unknown): Student {
     cash: typeof data.cash === 'string' ? data.cash : '',
     subject: typeof data.subject === 'string' ? data.subject : 'Others',
     lesson_left: typeof data.lesson_left === 'number' ? data.lesson_left : undefined,
+    membership_start_date: typeof data.membership_start_date === 'string' ? data.membership_start_date : null,
+    membership_end_date: typeof data.membership_end_date === 'string' ? data.membership_end_date : null,
+    is_membership_active: typeof data.is_membership_active === 'boolean' ? data.is_membership_active : false,
+    membership_days_remaining: typeof data.membership_days_remaining === 'number' ? data.membership_days_remaining : null,
   };
 }
 

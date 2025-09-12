@@ -13,6 +13,45 @@ use tauri::WindowBuilder;
 // 全局数据库实例 - 使用 Mutex 保证线程安全
 static DB: OnceLock<Mutex<Option<database::Database>>> = OnceLock::new();
 
+// 输入验证函数
+fn validate_student_name(name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("姓名不能为空".to_string());
+    }
+    if name.len() > 50 {
+        return Err("姓名长度不能超过50个字符".to_string());
+    }
+    if name.chars().any(|c| c.is_control() || c == '<' || c == '>' || c == '&') {
+        return Err("姓名包含非法字符".to_string());
+    }
+    Ok(())
+}
+
+fn validate_note(note: &str) -> Result<(), String> {
+    if note.len() > 1000 {
+        return Err("备注长度不能超过1000个字符".to_string());
+    }
+    if note.chars().any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t') {
+        return Err("备注包含非法字符".to_string());
+    }
+    Ok(())
+}
+
+fn validate_age(age: u8) -> Result<(), String> {
+    if age < 3 || age > 120 {
+        return Err("年龄必须在3-120岁之间".to_string());
+    }
+    Ok(())
+}
+
+fn validate_amount(amount: i64) -> Result<(), String> {
+    if amount.abs() > 1_000_000_00 {
+        return Err("金额不能超过100万".to_string());
+    }
+    Ok(())
+}
+
 // 初始化数据库
 fn init_database() -> Result<(), String> {
     // 仅初始化一次，后续调用直接返回
@@ -76,6 +115,11 @@ fn add_student(
 ) -> Result<StudentResponse, String> {
     init_database()?;
 
+    // 输入验证
+    validate_student_name(&name)?;
+    validate_age(age)?;
+    validate_note(&note)?;
+
     let class = match class_type.as_str() {
         "TenTry" => Class::TenTry,
         "Month" => Class::Month,
@@ -113,6 +157,10 @@ fn add_student(
         note: student.note().to_string(),
         subject: format!("{:?}", student.subject()),
         lesson_left: student.lesson_left(),
+        membership_start_date: student.membership_start_date().map(|d| d.to_rfc3339()),
+        membership_end_date: student.membership_end_date().map(|d| d.to_rfc3339()),
+        is_membership_active: student.is_membership_active(),
+        membership_days_remaining: student.membership_days_remaining(),
     })
 }
 
@@ -133,6 +181,10 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
             note: student.note().to_string(),
             subject: format!("{:?}", student.subject()),
             lesson_left: student.lesson_left(),
+            membership_start_date: student.membership_start_date().map(|d| d.to_rfc3339()),
+            membership_end_date: student.membership_end_date().map(|d| d.to_rfc3339()),
+            is_membership_active: student.is_membership_active(),
+            membership_days_remaining: student.membership_days_remaining(),
         });
     }
 
@@ -181,8 +233,26 @@ fn update_student_info(
     note: Option<String>,
     subject: Option<String>,
     lesson_left: Option<u32>,
+    membership_start_date: Option<String>,
+    membership_end_date: Option<String>,
 ) -> Result<(), String> {
     init_database()?;
+
+    // 输入验证
+    if let Some(name_str) = &name {
+        validate_student_name(name_str)?;
+    }
+    if let Some(age_val) = age {
+        validate_age(age_val)?;
+    }
+    if let Some(note_str) = &note {
+        validate_note(note_str)?;
+    }
+    if let Some(lessons) = lesson_left {
+        if lessons > 9999 {
+            return Err("剩余课时不能超过9999".to_string());
+        }
+    }
 
     let mut db = get_db()?;
     if let Some(student) = db.student.student_data.get_mut(&student_uid) {
@@ -220,7 +290,126 @@ fn update_student_info(
             student.set_lesson_left(lesson_left);
         }
 
+        // 处理会员时间更新
+        match (membership_start_date, membership_end_date) {
+            (Some(start_str), Some(end_str)) => {
+                let start_date = DateTime::parse_from_rfc3339(&start_str)
+                    .map_err(|e| format!("会员开始日期格式错误: {}", e))?
+                    .with_timezone(&Utc);
+                let end_date = DateTime::parse_from_rfc3339(&end_str)
+                    .map_err(|e| format!("会员结束日期格式错误: {}", e))?
+                    .with_timezone(&Utc);
+                student.set_membership_dates(Some(start_date), Some(end_date));
+            }
+            (Some(start_str), None) => {
+                let start_date = DateTime::parse_from_rfc3339(&start_str)
+                    .map_err(|e| format!("会员开始日期格式错误: {}", e))?
+                    .with_timezone(&Utc);
+                student.set_membership_start_date(start_date);
+            }
+            (None, Some(end_str)) => {
+                let end_date = DateTime::parse_from_rfc3339(&end_str)
+                    .map_err(|e| format!("会员结束日期格式错误: {}", e))?
+                    .with_timezone(&Utc);
+                student.set_membership_end_date(end_date);
+            }
+            (None, None) => {
+                // 如果两个都是None，不做任何操作（保持原有会员状态）
+            }
+        }
+
         save(db.clone()).map_err(|e| format!("更新学员信息失败: {}", e))?;
+        save_db(db)?;
+
+        Ok(())
+    } else {
+        Err("学员不存在".to_string())
+    }
+}
+
+// 会员管理命令
+#[tauri::command]
+fn set_student_membership(
+    student_uid: u64,
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<(), String> {
+    init_database()?;
+
+    let mut db = get_db()?;
+    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
+        let parsed_start = if let Some(start_str) = start_date {
+            Some(DateTime::parse_from_rfc3339(&start_str)
+                .map_err(|e| format!("会员开始日期格式错误: {}", e))?
+                .with_timezone(&Utc))
+        } else {
+            None
+        };
+
+        let parsed_end = if let Some(end_str) = end_date {
+            Some(DateTime::parse_from_rfc3339(&end_str)
+                .map_err(|e| format!("会员结束日期格式错误: {}", e))?
+                .with_timezone(&Utc))
+        } else {
+            None
+        };
+
+        student.set_membership_dates(parsed_start, parsed_end);
+
+        save(db.clone()).map_err(|e| format!("设置会员时间失败: {}", e))?;
+        save_db(db)?;
+
+        Ok(())
+    } else {
+        Err("学员不存在".to_string())
+    }
+}
+
+// 清除会员信息
+#[tauri::command]
+fn clear_student_membership(student_uid: u64) -> Result<(), String> {
+    init_database()?;
+
+    let mut db = get_db()?;
+    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
+        student.clear_membership();
+
+        save(db.clone()).map_err(|e| format!("清除会员信息失败: {}", e))?;
+        save_db(db)?;
+
+        Ok(())
+    } else {
+        Err("学员不存在".to_string())
+    }
+}
+
+// 批量设置会员（月卡/年卡）
+#[tauri::command]  
+fn set_membership_by_type(
+    student_uid: u64,
+    membership_type: String, // "month" 或 "year"
+    start_from_today: Option<bool>,
+) -> Result<(), String> {
+    init_database()?;
+
+    let mut db = get_db()?;
+    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
+        let start_date = if start_from_today.unwrap_or(true) {
+            Utc::now()
+        } else {
+            // 如果已有会员，从现有结束时间开始
+            student.membership_end_date().unwrap_or(Utc::now())
+        };
+
+        let end_date = match membership_type.as_str() {
+            "month" => start_date + chrono::Duration::days(30),
+            "year" => start_date + chrono::Duration::days(365),
+            _ => return Err("无效的会员类型，只支持 'month' 或 'year'".to_string()),
+        };
+
+        student.set_membership_dates(Some(start_date), Some(end_date));
+
+        save(db.clone()).map_err(|e| format!("设置{}会员失败: {}", membership_type, e))?;
         save_db(db)?;
 
         Ok(())
@@ -260,6 +449,20 @@ fn add_cash_transaction(
     plan_id: Option<u64>,
 ) -> Result<TransactionResponse, String> {
     init_database()?;
+
+    // 输入验证
+    validate_amount(amount)?;
+    if let Some(total) = total_amount {
+        validate_amount(total)?;
+    }
+    if let Some(note_str) = &note {
+        validate_note(note_str)?;
+    }
+    if let Some(installments) = total_installments {
+        if installments == 0 || installments > 360 {
+            return Err("分期数必须在1-360之间".to_string());
+        }
+    }
 
     let mut db = get_db()?;
 
@@ -549,7 +752,11 @@ pub fn run() {
             update_installment_status,
             generate_next_installment,
             cancel_installment_plan,
-            get_installments_by_plan
+            get_installments_by_plan,
+            // 会员管理相关命令
+            set_student_membership,
+            clear_student_membership,
+            set_membership_by_type
         ])
         .run(tauri::generate_context!())
         .expect("Error running app");
@@ -565,6 +772,10 @@ pub struct StudentResponse {
     pub note: String,
     pub subject: String,
     pub lesson_left: Option<u32>,
+    pub membership_start_date: Option<String>,
+    pub membership_end_date: Option<String>,
+    pub is_membership_active: bool,
+    pub membership_days_remaining: Option<i64>,
 }
 
 #[derive(Serialize)]
