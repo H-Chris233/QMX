@@ -5,7 +5,7 @@
 
     <!-- 页面标题 -->
     <div class="section-header">
-      <h2>总仪表板</h2>
+      <h2>仪表板</h2>
       <div class="header-actions">
         <span v-if="lastUpdateTime" class="last-update">
           最后更新: {{ formatTime(lastUpdateTime) }}
