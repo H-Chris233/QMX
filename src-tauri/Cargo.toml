@@ -11,7 +11,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "qmx_chris233_lib"
+name = "qmx_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -22,6 +22,6 @@ tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-qmx_backend_lib = { version = "1.1.0", path = "../../qmx_backend_lib" }
+qmx_backend_lib = { version = "2.1.0", path = "../../qmx_backend_lib" }
 chrono = "0.4.41"
 
