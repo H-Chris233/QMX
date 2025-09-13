@@ -504,6 +504,102 @@ export class ApiService {
       throw new Error(`打开主窗口失败: ${error}`);
     }
   }
+
+  // v2 API - 高级功能
+  static async getStudentStats(studentUid: number) {
+    try {
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      
+      return await invokeWithEnhancements<any>('get_student_stats' as TauriCommand, {
+        studentUid,
+      });
+    } catch (error) {
+      console.error('❌ [ApiService.getStudentStats] 调用失败:', error);
+      throw new Error(`获取学员统计失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async getFinancialStats(period: 'ThisWeek' | 'ThisMonth' | 'ThisYear') {
+    try {
+      return await invokeWithEnhancements<any>('get_financial_stats' as TauriCommand, {
+        period,
+      });
+    } catch (error) {
+      console.error('❌ [ApiService.getFinancialStats] 调用失败:', error);
+      throw new Error(`获取财务统计失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async searchStudents(options: any) {
+    try {
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('search_students' as TauriCommand, {
+        nameContains: options.name_contains,
+        minAge: options.min_age,
+        maxAge: options.max_age,
+        classType: options.class_type,
+        subject: options.subject,
+        hasMembership: options.has_membership,
+      });
+      
+      if (!Array.isArray(rawDataArray)) {
+        throw new Error('服务器返回的搜索数据格式不正确');
+      }
+      
+      return transformStudentDataArray(rawDataArray);
+    } catch (error) {
+      console.error('❌ [ApiService.searchStudents] 调用失败:', error);
+      throw new Error(`搜索学员失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async searchCash(options: any) {
+    try {
+      // 验证日期格式
+      if (options.date_from && !options.date_to) {
+        throw new Error('如果指定开始日期，必须同时指定结束日期');
+      }
+      if (options.date_to && !options.date_from) {
+        throw new Error('如果指定结束日期，必须同时指定开始日期');
+      }
+      
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('search_cash' as TauriCommand, {
+        studentId: options.student_id,
+        minAmount: options.min_amount,
+        maxAmount: options.max_amount,
+        hasInstallment: options.has_installment,
+        dateFrom: options.date_from,
+        dateTo: options.date_to,
+      });
+      
+      if (!Array.isArray(rawDataArray)) {
+        throw new Error('服务器返回的现金搜索数据格式不正确');
+      }
+      
+      return transformTransactionDataArray(rawDataArray);
+    } catch (error) {
+      console.error('❌ [ApiService.searchCash] 调用失败:', error);
+      throw new Error(`搜索现金记录失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async getMembershipExpiringSoon(days: number) {
+    try {
+      if (days <= 0) throw new Error('天数必须大于0');
+      
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('get_membership_expiring_soon' as TauriCommand, {
+        days,
+      });
+      
+      if (!Array.isArray(rawDataArray)) {
+        throw new Error('服务器返回的到期会员数据格式不正确');
+      }
+      
+      return transformStudentDataArray(rawDataArray);
+    } catch (error) {
+      console.error('❌ [ApiService.getMembershipExpiringSoon] 调用失败:', error);
+      throw new Error(`获取即将到期会员失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 // 导出类型以保持向后兼容

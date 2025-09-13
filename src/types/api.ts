@@ -79,6 +79,50 @@ export interface ValidationResult<T> {
   errors: string[];
 }
 
+// v2 API types
+export interface StudentStats {
+  total_payments: number;
+  payment_count: number;
+  average_score?: number;
+  score_count: number;
+  membership_status: string;
+}
+
+export interface FinancialStats {
+  total_income: number;
+  total_expense: number;
+  net_income: number;
+  installment_total: number;
+  installment_paid: number;
+  installment_pending: number;
+}
+
+export interface StudentSearchOptions {
+  name_contains?: string;
+  min_age?: number;
+  max_age?: number;
+  class_type?: string;
+  subject?: string;
+  has_membership?: boolean;
+}
+
+export interface CashSearchOptions {
+  student_id?: number;
+  min_amount?: number;
+  max_amount?: number;
+  has_installment?: boolean;
+  date_from?: string;
+  date_to?: string;
+}
+
+export interface StudentUpdateBatch {
+  name?: string;
+  age?: number;
+  class_type?: string;
+  subject?: string;
+  note?: string;
+}
+
 export type TauriCommand = 
   | 'add_student'
   | 'get_all_students'
@@ -97,4 +141,12 @@ export type TauriCommand =
   | 'open_main_window'
   | 'set_student_membership'
   | 'clear_student_membership'
-  | 'set_membership_by_type';
+  | 'set_membership_by_type'
+  // v2 API commands
+  | 'get_student_stats'
+  | 'get_financial_stats'
+  | 'search_students'
+  | 'get_student_cash'
+  | 'search_cash'
+  | 'update_multiple_students'
+  | 'get_membership_expiring_soon';

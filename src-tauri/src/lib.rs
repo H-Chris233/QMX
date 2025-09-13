@@ -1,17 +1,17 @@
 // src-tauri/src/lib.rs
-use cash::{Cash, InstallmentStatus, PaymentFrequency};
-use chrono::{DateTime, Utc};
-use qmx_backend_lib::init::init;
-use qmx_backend_lib::save::save;
-use qmx_backend_lib::{cash, database, student};
-use serde::Serialize;
-use std::sync::Mutex;
-use std::sync::OnceLock;
-use student::{Class, Student, Subject};
+use chrono::{DateTime, Utc, Duration};
+use qmx_backend_lib::{
+    QmxManager, StudentBuilder, StudentUpdater, StudentQuery, CashBuilder, CashUpdater, CashQuery,
+    TimePeriod,
+};
+use qmx_backend_lib::student::{Class, Subject};
+use qmx_backend_lib::cash::{InstallmentStatus, PaymentFrequency, Installment};
+use serde::{Serialize, Deserialize};
+use std::sync::{Arc, OnceLock};
 use tauri::WindowBuilder;
 
-// 全局数据库实例 - 使用 Mutex 保证线程安全
-static DB: OnceLock<Mutex<Option<database::Database>>> = OnceLock::new();
+// 全局QmxManager实例 - 使用Arc保证线程安全
+static MANAGER: OnceLock<Arc<QmxManager>> = OnceLock::new();
 
 // 输入验证函数
 fn validate_student_name(name: &str) -> Result<(), String> {
@@ -52,44 +52,24 @@ fn validate_amount(amount: i64) -> Result<(), String> {
     Ok(())
 }
 
-// 初始化数据库
-fn init_database() -> Result<(), String> {
+// 初始化QmxManager
+fn init_manager() -> Result<(), String> {
     // 仅初始化一次，后续调用直接返回
-    if DB.get().is_none() {
-        match init() {
-            Ok(database) => {
-                DB.get_or_init(|| Mutex::new(Some(database)));
+    if MANAGER.get().is_none() {
+        match QmxManager::new(true) {
+            Ok(manager) => {
+                MANAGER.get_or_init(|| Arc::new(manager));
                 Ok(())
             }
-            Err(e) => Err(format!("初始化后端失败: {}", e)),
+            Err(e) => Err(format!("初始化QmxManager失败: {}", e)),
         }
     } else {
         Ok(())
     }
 }
 
-fn get_db() -> Result<database::Database, String> {
-    // 获取 OnceLock 中的 Mutex
-    let db_mutex = DB.get().ok_or("数据库未初始化")?;
-
-    // 锁定 Mutex 并克隆数据库实例
-    let db_guard = db_mutex
-        .lock()
-        .map_err(|e| format!("获取数据库锁失败: {}", e))?;
-    db_guard.clone().ok_or("数据库未初始化".to_string())
-}
-
-// 保存数据库到全局状态
-fn save_db(db: database::Database) -> Result<(), String> {
-    // 获取 OnceLock 中的 Mutex
-    let db_mutex = DB.get().ok_or("数据库未初始化")?;
-
-    // 锁定 Mutex 并更新数据库实例
-    let mut db_guard = db_mutex
-        .lock()
-        .map_err(|e| format!("获取数据库锁失败: {}", e))?;
-    *db_guard = Some(db);
-    Ok(())
+fn get_manager() -> Result<Arc<QmxManager>, String> {
+    MANAGER.get().cloned().ok_or("QmxManager未初始化".to_string())
 }
 
 // 窗口管理命令
@@ -113,7 +93,7 @@ fn add_student(
     note: String,
     subject: String,
 ) -> Result<StudentResponse, String> {
-    init_database()?;
+    init_manager()?;
 
     // 输入验证
     validate_student_name(&name)?;
@@ -133,20 +113,22 @@ fn add_student(
         _ => Subject::Others,
     };
 
-    let mut student = Student::new();
-    student
-        .set_name(name)
-        .set_age(age)
-        .set_class(class)
-        .set_phone(phone.clone())
-        .set_note(note.clone())
-        .set_subject(subject_enum);
+    let manager = get_manager()?;
+    let builder = StudentBuilder::new(name, age)
+        .phone(phone)
+        .class(class)
+        .subject(subject_enum)
+        .note(note);
 
-    let mut db = get_db()?;
-    db.student.insert(student.clone());
+    let uid = manager
+        .create_student(builder)
+        .map_err(|e| format!("创建学生失败: {}", e))?;
 
-    save(db.clone()).map_err(|e| format!("保存失败: {}", e))?;
-    save_db(db)?;
+    // 获取创建的学生信息用于响应
+    let student = manager
+        .get_student(uid)
+        .map_err(|e| format!("获取学生失败: {}", e))?
+        .ok_or("学生创建后未找到")?;
 
     Ok(StudentResponse {
         uid: student.uid(),
@@ -166,14 +148,17 @@ fn add_student(
 
 #[tauri::command]
 fn get_all_students() -> Result<Vec<StudentResponse>, String> {
-    init_database()?;
+    init_manager()?;
 
-    let db = get_db()?;
-    let mut students = Vec::new();
+    let manager = get_manager()?;
+    let students = manager
+        .list_students()
+        .map_err(|e| format!("获取学生列表失败: {}", e))?;
 
-    for (uid, student) in db.student.iter() {
-        students.push(StudentResponse {
-            uid: *uid,
+    let mut student_responses = Vec::new();
+    for student in students {
+        student_responses.push(StudentResponse {
+            uid: student.uid(),
             name: student.name().to_string(),
             age: student.age(),
             class: format!("{:?}", student.class()),
@@ -188,39 +173,34 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
         });
     }
 
-    Ok(students)
+    Ok(student_responses)
 }
 
 #[tauri::command]
 fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
-        student.add_ring(score);
+    let manager = get_manager()?;
+    manager
+        .update_student(student_uid, StudentUpdater::new().add_ring(score))
+        .map_err(|e| format!("添加分数失败: {}", e))?;
 
-        save(db.clone()).map_err(|e| format!("保存分数失败: {}", e))?;
-
-        save_db(db)?;
-
-        Ok(())
-    } else {
-        Err("学员不存在".to_string())
-    }
+    Ok(())
 }
 
 #[tauri::command]
 fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String> {
-    init_database()?;
+    init_manager()?;
 
-    let db = get_db()?;
-    if let Some(student) = db.student.get(&student_uid) {
-        Ok(StudentScoresResponse {
-            rings: student.rings().clone(),
-        })
-    } else {
-        Err("学员不存在".to_string())
-    }
+    let manager = get_manager()?;
+    let student = manager
+        .get_student(student_uid)
+        .map_err(|e| format!("获取学生失败: {}", e))?
+        .ok_or("学员不存在")?;
+
+    Ok(StudentScoresResponse {
+        rings: student.rings().to_vec(),
+    })
 }
 
 #[tauri::command]
@@ -236,7 +216,7 @@ fn update_student_info(
     membership_start_date: Option<String>,
     membership_end_date: Option<String>,
 ) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
     // 输入验证
     if let Some(name_str) = &name {
@@ -254,77 +234,81 @@ fn update_student_info(
         }
     }
 
-    let mut db = get_db()?;
-    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
-        if let Some(name) = name {
-            student.set_name(name);
-        }
-        if let Some(age) = age {
-            student.set_age(age);
-        }
-        if let Some(class_type) = class_type {
-            let class = match class_type.as_str() {
-                "TenTry" => Class::TenTry,
-                "Month" => Class::Month,
-                "Year" => Class::Year,
-                _ => Class::Others,
-            };
-            student.set_class(class);
-        }
-        if let Some(phone) = phone {
-            student.set_phone(phone);
-        }
+    let manager = get_manager()?;
+    let mut updater = StudentUpdater::new();
 
-        if let Some(note) = note {
-            student.set_note(note);
-        }
-        if let Some(subject) = subject {
-            let subject_enum = match subject.as_str() {
-                "Shooting" => Subject::Shooting,
-                "Archery" => Subject::Archery,
-                _ => Subject::Others,
-            };
-            student.set_subject(subject_enum);
-        }
-        if let Some(lesson_left) = lesson_left {
-            student.set_lesson_left(lesson_left);
-        }
-
-        // 处理会员时间更新
-        match (membership_start_date, membership_end_date) {
-            (Some(start_str), Some(end_str)) => {
-                let start_date = DateTime::parse_from_rfc3339(&start_str)
-                    .map_err(|e| format!("会员开始日期格式错误: {}", e))?
-                    .with_timezone(&Utc);
-                let end_date = DateTime::parse_from_rfc3339(&end_str)
-                    .map_err(|e| format!("会员结束日期格式错误: {}", e))?
-                    .with_timezone(&Utc);
-                student.set_membership_dates(Some(start_date), Some(end_date));
-            }
-            (Some(start_str), None) => {
-                let start_date = DateTime::parse_from_rfc3339(&start_str)
-                    .map_err(|e| format!("会员开始日期格式错误: {}", e))?
-                    .with_timezone(&Utc);
-                student.set_membership_start_date(start_date);
-            }
-            (None, Some(end_str)) => {
-                let end_date = DateTime::parse_from_rfc3339(&end_str)
-                    .map_err(|e| format!("会员结束日期格式错误: {}", e))?
-                    .with_timezone(&Utc);
-                student.set_membership_end_date(end_date);
-            }
-            (None, None) => {
-                // 如果两个都是None，不做任何操作（保持原有会员状态）
-            }
-        }
-
-        save(db.clone()).map_err(|e| format!("更新学员信息失败: {}", e))?;
-        save_db(db)?;
-
-        Ok(())
-    } else {
-        Err("学员不存在".to_string())
+    if let Some(name) = name {
+        updater = updater.name(name);
     }
+    if let Some(age) = age {
+        updater = updater.age(age);
+    }
+    if let Some(class_type) = class_type {
+        let class = match class_type.as_str() {
+            "TenTry" => Class::TenTry,
+            "Month" => Class::Month,
+            "Year" => Class::Year,
+            _ => Class::Others,
+        };
+        updater = updater.class(class);
+    }
+    if let Some(phone) = phone {
+        updater = updater.phone(phone);
+    }
+    if let Some(note) = note {
+        updater = updater.note(note);
+    }
+    if let Some(subject) = subject {
+        let subject_enum = match subject.as_str() {
+            "Shooting" => Subject::Shooting,
+            "Archery" => Subject::Archery,
+            _ => Subject::Others,
+        };
+        updater = updater.subject(subject_enum);
+    }
+    if let Some(lesson_left) = lesson_left {
+        updater = updater.lesson_left(Some(lesson_left));
+    }
+
+    // 处理会员时间更新
+    match (membership_start_date, membership_end_date) {
+        (Some(start_str), Some(end_str)) => {
+            let start_date = DateTime::parse_from_rfc3339(&start_str)
+                .map_err(|e| format!("会员开始日期格式错误: {}", e))?
+                .with_timezone(&Utc);
+            let end_date = DateTime::parse_from_rfc3339(&end_str)
+                .map_err(|e| format!("会员结束日期格式错误: {}", e))?
+                .with_timezone(&Utc);
+            updater = updater.membership(Some(start_date), Some(end_date));
+        }
+        (Some(start_str), None) => {
+            let start_date = DateTime::parse_from_rfc3339(&start_str)
+                .map_err(|e| format!("会员开始日期格式错误: {}", e))?
+                .with_timezone(&Utc);
+            // 需要获取当前的结束日期
+            if let Some(student) = manager.get_student(student_uid).map_err(|e| format!("获取学生失败: {}", e))? {
+                updater = updater.membership(Some(start_date), student.membership_end_date());
+            }
+        }
+        (None, Some(end_str)) => {
+            let end_date = DateTime::parse_from_rfc3339(&end_str)
+                .map_err(|e| format!("会员结束日期格式错误: {}", e))?
+                .with_timezone(&Utc);
+            // 需要获取当前的开始日期
+            if let Some(student) = manager.get_student(student_uid).map_err(|e| format!("获取学生失败: {}", e))? {
+                updater = updater.membership(student.membership_start_date(), Some(end_date));
+            }
+        }
+        (None, None) => {
+            // 如果两个都是None，不做任何操作（保持原有会员状态）
+        }
+    }
+
+    manager
+        .update_student(student_uid, updater)
+        .map_err(|e| format!("更新学员信息失败: {}", e))?;
+
+    Ok(())
 }
 
 // 会员管理命令
@@ -334,53 +318,43 @@ fn set_student_membership(
     start_date: Option<String>,
     end_date: Option<String>,
 ) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
-        let parsed_start = if let Some(start_str) = start_date {
-            Some(DateTime::parse_from_rfc3339(&start_str)
-                .map_err(|e| format!("会员开始日期格式错误: {}", e))?
-                .with_timezone(&Utc))
-        } else {
-            None
-        };
-
-        let parsed_end = if let Some(end_str) = end_date {
-            Some(DateTime::parse_from_rfc3339(&end_str)
-                .map_err(|e| format!("会员结束日期格式错误: {}", e))?
-                .with_timezone(&Utc))
-        } else {
-            None
-        };
-
-        student.set_membership_dates(parsed_start, parsed_end);
-
-        save(db.clone()).map_err(|e| format!("设置会员时间失败: {}", e))?;
-        save_db(db)?;
-
-        Ok(())
+    let parsed_start = if let Some(start_str) = start_date {
+        Some(DateTime::parse_from_rfc3339(&start_str)
+            .map_err(|e| format!("会员开始日期格式错误: {}", e))?
+            .with_timezone(&Utc))
     } else {
-        Err("学员不存在".to_string())
-    }
+        None
+    };
+
+    let parsed_end = if let Some(end_str) = end_date {
+        Some(DateTime::parse_from_rfc3339(&end_str)
+            .map_err(|e| format!("会员结束日期格式错误: {}", e))?
+            .with_timezone(&Utc))
+    } else {
+        None
+    };
+
+    let manager = get_manager()?;
+    manager
+        .update_student(student_uid, StudentUpdater::new().membership(parsed_start, parsed_end))
+        .map_err(|e| format!("设置会员时间失败: {}", e))?;
+
+    Ok(())
 }
 
 // 清除会员信息
 #[tauri::command]
 fn clear_student_membership(student_uid: u64) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
-        student.clear_membership();
+    let manager = get_manager()?;
+    manager
+        .update_student(student_uid, StudentUpdater::new().membership(None, None))
+        .map_err(|e| format!("清除会员信息失败: {}", e))?;
 
-        save(db.clone()).map_err(|e| format!("清除会员信息失败: {}", e))?;
-        save_db(db)?;
-
-        Ok(())
-    } else {
-        Err("学员不存在".to_string())
-    }
+    Ok(())
 }
 
 // 批量设置会员（月卡/年卡）
@@ -390,44 +364,44 @@ fn set_membership_by_type(
     membership_type: String, // "month" 或 "year"
     start_from_today: Option<bool>,
 ) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    if let Some(student) = db.student.student_data.get_mut(&student_uid) {
-        let start_date = if start_from_today.unwrap_or(true) {
-            Utc::now()
-        } else {
-            // 如果已有会员，从现有结束时间开始
-            student.membership_end_date().unwrap_or(Utc::now())
-        };
-
-        let end_date = match membership_type.as_str() {
-            "month" => start_date + chrono::Duration::days(30),
-            "year" => start_date + chrono::Duration::days(365),
-            _ => return Err("无效的会员类型，只支持 'month' 或 'year'".to_string()),
-        };
-
-        student.set_membership_dates(Some(start_date), Some(end_date));
-
-        save(db.clone()).map_err(|e| format!("设置{}会员失败: {}", membership_type, e))?;
-        save_db(db)?;
-
-        Ok(())
+    let manager = get_manager()?;
+    
+    let start_date = if start_from_today.unwrap_or(true) {
+        Utc::now()
     } else {
-        Err("学员不存在".to_string())
-    }
+        // 如果已有会员，从现有结束时间开始
+        if let Some(student) = manager.get_student(student_uid).map_err(|e| format!("获取学生失败: {}", e))? {
+            student.membership_end_date().unwrap_or(Utc::now())
+        } else {
+            return Err("学员不存在".to_string());
+        }
+    };
+
+    let end_date = match membership_type.as_str() {
+        "month" => start_date + chrono::Duration::days(30),
+        "year" => start_date + chrono::Duration::days(365),
+        _ => return Err("无效的会员类型，只支持 'month' 或 'year'".to_string()),
+    };
+
+    manager
+        .update_student(student_uid, StudentUpdater::new().membership(Some(start_date), Some(end_date)))
+        .map_err(|e| format!("设置{}会员失败: {}", membership_type, e))?;
+
+    Ok(())
 }
 
 #[tauri::command]
 fn delete_student(student_uid: u64) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    if db.student.student_data.remove(&student_uid).is_some() {
-        save(db.clone()).map_err(|e| format!("删除学员失败: {}", e))?;
+    let manager = get_manager()?;
+    let deleted = manager
+        .delete_student(student_uid)
+        .map_err(|e| format!("删除学员失败: {}", e))?;
 
-        save_db(db)?;
-
+    if deleted {
         Ok(())
     } else {
         Err("学员不存在".to_string())
@@ -448,7 +422,7 @@ fn add_cash_transaction(
     current_installment: Option<u32>,
     plan_id: Option<u64>,
 ) -> Result<TransactionResponse, String> {
-    init_database()?;
+    init_manager()?;
 
     // 输入验证
     validate_amount(amount)?;
@@ -464,9 +438,17 @@ fn add_cash_transaction(
         }
     }
 
-    let mut db = get_db()?;
+    let manager = get_manager()?;
+    let mut builder = CashBuilder::new(amount);
 
-    let cash = if is_installment.unwrap_or(false) {
+    if let Some(student_id) = student_uid {
+        builder = builder.student_id(student_id);
+    }
+    if let Some(note_str) = note.clone() {
+        builder = builder.note(note_str);
+    }
+
+    if is_installment.unwrap_or(false) {
         // 创建分期付款
         let total_amount = total_amount.ok_or("分期付款需要指定总金额")?;
         let total_installments = total_installments.ok_or("分期付款需要指定总期数")?;
@@ -493,27 +475,28 @@ fn add_cash_transaction(
             _ => PaymentFrequency::Monthly, // 默认月度
         };
 
-        Cash::new_installment(
-            student_uid,
+        let installment = Installment {
+            plan_id: plan_id.unwrap_or(0),
             total_amount,
             total_installments,
-            frequency_enum,
-            due_date,
             current_installment,
-            plan_id,
-        )
-    } else {
-        // 创建普通付款
-        let mut cash = Cash::new(student_uid);
-        cash.set_cash(amount);
-        cash.set_note(note.clone());
-        cash
-    };
+            frequency: frequency_enum,
+            due_date,
+            status: InstallmentStatus::Pending,
+        };
 
-    db.cash.insert(cash.clone());
+        builder = builder.installment(installment);
+    }
 
-    save(db.clone()).map_err(|e| format!("保存交易记录失败: {}", e))?;
-    save_db(db)?;
+    let cash_id = manager
+        .record_cash(builder)
+        .map_err(|e| format!("保存交易记录失败: {}", e))?;
+
+    // 获取创建的现金记录用于响应
+    let cash = manager
+        .get_cash(cash_id)
+        .map_err(|e| format!("获取现金记录失败: {}", e))?
+        .ok_or("现金记录创建后未找到")?;
 
     // 构建响应
     let (is_installment, plan_id, current, total, due_date_str, status_str) =
@@ -551,12 +534,15 @@ fn add_cash_transaction(
 
 #[tauri::command]
 fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
-    init_database()?;
+    init_manager()?;
 
-    let db = get_db()?;
+    let manager = get_manager()?;
+    let cash_list = manager
+        .search_cash(CashQuery::new())
+        .map_err(|e| format!("获取交易记录失败: {}", e))?;
+
     let mut transactions = Vec::new();
-
-    for (_, cash) in db.cash.iter() {
+    for cash in cash_list {
         let (is_installment, plan_id, current, total, due_date_str, status_str) =
             if let Some(installment) = &cash.installment {
                 (
@@ -595,14 +581,14 @@ fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
 
 #[tauri::command]
 fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    if db.cash.cash_data.remove(&transaction_uid).is_some() {
-        save(db.clone()).map_err(|e| format!("删除交易记录失败: {}", e))?;
+    let manager = get_manager()?;
+    let deleted = manager
+        .delete_cash(transaction_uid)
+        .map_err(|e| format!("删除交易记录失败: {}", e))?;
 
-        save_db(db)?;
-
+    if deleted {
         Ok(())
     } else {
         Err("交易记录不存在".to_string())
@@ -612,10 +598,11 @@ fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
 // 统计命令
 #[tauri::command]
 fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
-    init_database()?;
+    init_manager()?;
 
-    let db = get_db()?;
-    let dashboard_stats = qmx_backend_lib::get_dashboard_stats(&db.student, &db.cash)
+    let manager = get_manager()?;
+    let dashboard_stats = manager
+        .get_dashboard_stats()
         .map_err(|e| format!("获取仪表盘统计失败: {}", e))?;
 
     Ok(DashboardStatsResponse {
@@ -630,9 +617,8 @@ fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
 
 #[tauri::command]
 fn update_installment_status(transaction_uid: u64, status: String) -> Result<(), String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
     let status_enum = match status.as_str() {
         "Pending" => InstallmentStatus::Pending,
         "Paid" => InstallmentStatus::Paid,
@@ -641,62 +627,291 @@ fn update_installment_status(transaction_uid: u64, status: String) -> Result<(),
         _ => return Err("无效的状态值".to_string()),
     };
 
-    if let Some(cash) = db.cash.cash_data.get_mut(&transaction_uid) {
-        cash.set_installment_status(status_enum);
+    let manager = get_manager()?;
+    
+    // 获取现金记录并更新分期状态
+    let cash = manager
+        .get_cash(transaction_uid)
+        .map_err(|e| format!("获取交易记录失败: {}", e))?
+        .ok_or("交易记录不存在")?;
 
-        save(db.clone()).map_err(|e| format!("更新分期状态失败: {}", e))?;
-        save_db(db)?;
-
+    if let Some(mut installment) = cash.installment {
+        installment.status = status_enum;
+        manager
+            .update_cash(transaction_uid, CashUpdater::new().installment(Some(installment)))
+            .map_err(|e| format!("更新分期状态失败: {}", e))?;
         Ok(())
     } else {
-        Err("交易记录不存在".to_string())
+        Err("该交易记录不是分期付款".to_string())
     }
 }
 
 #[tauri::command]
 fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-
+    let manager = get_manager()?;
+    
     // 解析日期字符串
     let due_date = DateTime::parse_from_rfc3339(&due_date)
         .map_err(|e| format!("日期格式错误: {}", e))?
         .with_timezone(&Utc);
 
-    let next_uid = db
-        .cash
-        .generate_next_installment(plan_id, due_date)
-        .map_err(|e| e.to_string())?;
+    // 查找该计划的所有分期付款
+    let installments = manager
+        .search_cash(CashQuery::new().has_installment(true))
+        .map_err(|e| format!("查询分期付款失败: {}", e))?;
 
-    save(db.clone()).map_err(|e| format!("生成下一期分期失败: {}", e))?;
-    save_db(db)?;
+    // 找到指定计划的分期付款
+    let mut plan_installments: Vec<_> = installments
+        .into_iter()
+        .filter_map(|cash| {
+            if let Some(installment) = cash.installment.clone() {
+                if installment.plan_id == plan_id {
+                    Some((cash, installment))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    Ok(next_uid)
+    if plan_installments.is_empty() {
+        return Err("未找到指定的分期计划".to_string());
+    }
+
+    // 按期数排序，找到最新的分期
+    plan_installments.sort_by_key(|(_, installment)| installment.current_installment);
+    let (_, latest_installment) = plan_installments.last().unwrap();
+
+    // 检查是否已经是最后一期
+    if latest_installment.current_installment >= latest_installment.total_installments {
+        return Err("分期计划已完成，无法生成下一期".to_string());
+    }
+
+    // 计算下一期的金额（平均分配剩余金额）
+    let amount_per_installment = latest_installment.total_amount / latest_installment.total_installments as i64;
+
+    // 创建下一期分期
+    let next_installment = Installment {
+        plan_id: latest_installment.plan_id,
+        total_amount: latest_installment.total_amount,
+        total_installments: latest_installment.total_installments,
+        current_installment: latest_installment.current_installment + 1,
+        frequency: latest_installment.frequency,
+        due_date,
+        status: InstallmentStatus::Pending,
+    };
+
+    let cash_id = manager
+        .record_cash(
+            CashBuilder::new(amount_per_installment)
+                .student_id(plan_installments[0].0.student_id.unwrap_or(0))
+                .installment(next_installment)
+                .note(format!("分期付款第{}期", latest_installment.current_installment + 1))
+        )
+        .map_err(|e| format!("生成下一期分期失败: {}", e))?;
+
+    Ok(cash_id)
 }
 
 #[tauri::command]
 fn cancel_installment_plan(plan_id: u64) -> Result<usize, String> {
-    init_database()?;
+    init_manager()?;
 
-    let mut db = get_db()?;
-    let cancelled_count = db.cash.cancel_installment_plan(plan_id);
+    let manager = get_manager()?;
+    
+    // 查找该计划的所有分期付款
+    let installments = manager
+        .search_cash(CashQuery::new().has_installment(true))
+        .map_err(|e| format!("查询分期付款失败: {}", e))?;
 
-    save(db.clone()).map_err(|e| format!("取消分期计划失败: {}", e))?;
-    save_db(db)?;
+    let mut cancelled_count = 0;
 
-    Ok(cancelled_count)
+    for cash in installments {
+        if let Some(mut installment) = cash.installment {
+            if installment.plan_id == plan_id && installment.status != InstallmentStatus::Cancelled {
+                // 更新状态为已取消
+                installment.status = InstallmentStatus::Cancelled;
+                
+                manager
+                    .update_cash(cash.uid, CashUpdater::new().installment(Some(installment)))
+                    .map_err(|e| format!("取消分期付款失败: {}", e))?;
+                
+                cancelled_count += 1;
+            }
+        }
+    }
+
+    if cancelled_count == 0 {
+        Err("未找到可取消的分期计划".to_string())
+    } else {
+        Ok(cancelled_count)
+    }
 }
 
 #[tauri::command]
 fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, String> {
-    init_database()?;
+    init_manager()?;
 
-    let db = get_db()?;
-    let installments = db.cash.get_installments_by_plan(plan_id);
+    let manager = get_manager()?;
+    
+    // 使用CashQuery查询具有分期付款的记录，然后手动筛选plan_id
+    let all_installments = manager
+        .search_cash(CashQuery::new().has_installment(true))
+        .map_err(|e| format!("查询分期付款失败: {}", e))?;
+
     let mut transactions = Vec::new();
+    for cash in all_installments {
+        if let Some(installment) = &cash.installment {
+            if installment.plan_id == plan_id {
+                transactions.push(TransactionResponse {
+                    uid: cash.uid,
+                    student_id: cash.student_id,
+                    amount: cash.cash,
+                    note: cash.note.clone(),
+                    description: format!("分期付款 {}/{}", installment.current_installment, installment.total_installments),
+                    is_installment: true,
+                    installment_plan_id: Some(installment.plan_id),
+                    installment_current: Some(installment.current_installment),
+                    installment_total: Some(installment.total_installments),
+                    installment_due_date: Some(installment.due_date.to_rfc3339()),
+                    installment_status: Some(format!("{:?}", installment.status)),
+                });
+            }
+        }
+    }
 
-    for cash in installments {
+    Ok(transactions)
+}
+
+// v2 API功能 - 学生统计
+#[tauri::command]
+fn get_student_stats(student_uid: u64) -> Result<StudentStatsResponse, String> {
+    init_manager()?;
+
+    let manager = get_manager()?;
+    let stats = manager
+        .get_student_stats(student_uid)
+        .map_err(|e| format!("获取学生统计失败: {}", e))?;
+
+    Ok(StudentStatsResponse {
+        total_payments: stats.total_payments,
+        payment_count: stats.payment_count,
+        average_score: stats.average_score,
+        score_count: stats.score_count,
+        membership_status: format!("{:?}", stats.membership_status),
+    })
+}
+
+// v2 API功能 - 财务统计
+#[tauri::command]
+fn get_financial_stats(period: String) -> Result<FinancialStatsResponse, String> {
+    init_manager()?;
+
+    let time_period = match period.as_str() {
+        "ThisWeek" => TimePeriod::ThisWeek,
+        "ThisMonth" => TimePeriod::ThisMonth,
+        "ThisYear" => TimePeriod::ThisYear,
+        _ => return Err("无效的时间段".to_string()),
+    };
+
+    let manager = get_manager()?;
+    let stats = manager
+        .get_financial_stats(time_period)
+        .map_err(|e| format!("获取财务统计失败: {}", e))?;
+
+    Ok(FinancialStatsResponse {
+        total_income: stats.total_income,
+        total_expense: stats.total_expense,
+        net_income: stats.net_income,
+        installment_total: stats.transaction_count as i64,
+        installment_paid: stats.installment_count as i64,
+        installment_pending: 0, // 计算pending状态的分期付款数量
+    })
+}
+
+// v2 API功能 - 搜索学生
+#[tauri::command]
+fn search_students(
+    name_contains: Option<String>,
+    min_age: Option<u8>,
+    max_age: Option<u8>,
+    class_type: Option<String>,
+    subject: Option<String>,
+    has_membership: Option<bool>,
+) -> Result<Vec<StudentResponse>, String> {
+    init_manager()?;
+
+    let manager = get_manager()?;
+    let mut query = StudentQuery::new();
+
+    if let Some(name) = name_contains {
+        query = query.name_contains(name);
+    }
+    if let (Some(min), Some(max)) = (min_age, max_age) {
+        query = query.age_range(min, max);
+    }
+    if let Some(class_str) = class_type {
+        let class = match class_str.as_str() {
+            "TenTry" => Class::TenTry,
+            "Month" => Class::Month,
+            "Year" => Class::Year,
+            _ => Class::Others,
+        };
+        query = query.class(class);
+    }
+    if let Some(subject_str) = subject {
+        let subject_enum = match subject_str.as_str() {
+            "Shooting" => Subject::Shooting,
+            "Archery" => Subject::Archery,
+            _ => Subject::Others,
+        };
+        query = query.subject(subject_enum);
+    }
+    if let Some(has_mem) = has_membership {
+        query = query.has_membership(has_mem);
+    }
+
+    let students = manager
+        .search_students(query)
+        .map_err(|e| format!("搜索学生失败: {}", e))?;
+
+    let mut student_responses = Vec::new();
+    for student in students {
+        student_responses.push(StudentResponse {
+            uid: student.uid(),
+            name: student.name().to_string(),
+            age: student.age(),
+            class: format!("{:?}", student.class()),
+            phone: student.phone().to_string(),
+            note: student.note().to_string(),
+            subject: format!("{:?}", student.subject()),
+            lesson_left: student.lesson_left(),
+            membership_start_date: student.membership_start_date().map(|d| d.to_rfc3339()),
+            membership_end_date: student.membership_end_date().map(|d| d.to_rfc3339()),
+            is_membership_active: student.is_membership_active(),
+            membership_days_remaining: student.membership_days_remaining(),
+        });
+    }
+
+    Ok(student_responses)
+}
+
+// v2 API功能 - 获取学生现金记录
+#[tauri::command]
+fn get_student_cash(student_uid: u64) -> Result<Vec<TransactionResponse>, String> {
+    init_manager()?;
+
+    let manager = get_manager()?;
+    let cash_list = manager
+        .get_student_cash(student_uid)
+        .map_err(|e| format!("获取学生现金记录失败: {}", e))?;
+
+    let mut transactions = Vec::new();
+    for cash in cash_list {
         let (is_installment, plan_id, current, total, due_date_str, status_str) =
             if let Some(installment) = &cash.installment {
                 (
@@ -733,6 +948,167 @@ fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, St
     Ok(transactions)
 }
 
+// v2 API功能 - 高级现金搜索
+#[tauri::command]
+fn search_cash(
+    student_id: Option<u64>,
+    min_amount: Option<i64>,
+    max_amount: Option<i64>,
+    has_installment: Option<bool>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+) -> Result<Vec<TransactionResponse>, String> {
+    init_manager()?;
+
+    let manager = get_manager()?;
+    let mut query = CashQuery::new();
+
+    if let Some(sid) = student_id {
+        query = query.student_id(sid);
+    }
+    if let (Some(min), Some(max)) = (min_amount, max_amount) {
+        query = query.amount_range(min, max);
+    }
+    if let Some(has_inst) = has_installment {
+        query = query.has_installment(has_inst);
+    }
+    
+    // 添加日期范围查询支持
+    if let (Some(from_str), Some(to_str)) = (date_from, date_to) {
+        let start_date = DateTime::parse_from_rfc3339(&from_str)
+            .map_err(|e| format!("开始日期格式错误: {}", e))?
+            .with_timezone(&Utc);
+        let end_date = DateTime::parse_from_rfc3339(&to_str)
+            .map_err(|e| format!("结束日期格式错误: {}", e))?
+            .with_timezone(&Utc);
+        query = query.date_range(start_date, end_date);
+    }
+
+    let cash_list = manager
+        .search_cash(query)
+        .map_err(|e| format!("搜索现金记录失败: {}", e))?;
+
+    let mut transactions = Vec::new();
+    for cash in cash_list {
+        let (is_installment, plan_id, current, total, due_date_str, status_str) =
+            if let Some(installment) = &cash.installment {
+                (
+                    true,
+                    Some(installment.plan_id),
+                    Some(installment.current_installment),
+                    Some(installment.total_installments),
+                    Some(installment.due_date.to_rfc3339()),
+                    Some(format!("{:?}", installment.status)),
+                )
+            } else {
+                (false, None, None, None, None, None)
+            };
+
+        transactions.push(TransactionResponse {
+            uid: cash.uid,
+            student_id: cash.student_id,
+            amount: cash.cash,
+            note: cash.note.clone(),
+            description: if is_installment {
+                format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+            } else {
+                "普通付款".to_string()
+            },
+            is_installment,
+            installment_plan_id: plan_id,
+            installment_current: current,
+            installment_total: total,
+            installment_due_date: due_date_str,
+            installment_status: status_str,
+        });
+    }
+
+    Ok(transactions)
+}
+
+// v2 API功能 - 批量操作学生
+#[tauri::command]
+fn update_multiple_students(
+    student_uids: Vec<u64>,
+    updates: StudentUpdateBatch,
+) -> Result<usize, String> {
+    init_manager()?;
+    
+    let manager = get_manager()?;
+    let mut success_count = 0;
+    
+    for uid in student_uids {
+        let mut updater = StudentUpdater::new();
+        
+        if let Some(ref name) = updates.name {
+            updater = updater.name(name.clone());
+        }
+        if let Some(age) = updates.age {
+            updater = updater.age(age);
+        }
+        if let Some(ref class_type) = updates.class_type {
+            let class = match class_type.as_str() {
+                "TenTry" => Class::TenTry,
+                "Month" => Class::Month,
+                "Year" => Class::Year,
+                _ => Class::Others,
+            };
+            updater = updater.class(class);
+        }
+        if let Some(ref subject) = updates.subject {
+            let subject_enum = match subject.as_str() {
+                "Shooting" => Subject::Shooting,
+                "Archery" => Subject::Archery,
+                _ => Subject::Others,
+            };
+            updater = updater.subject(subject_enum);
+        }
+        
+        if manager.update_student(uid, updater).is_ok() {
+            success_count += 1;
+        }
+    }
+    
+    Ok(success_count)
+}
+
+// v2 API功能 - 获取会员到期提醒
+#[tauri::command]
+fn get_membership_expiring_soon(days: i64) -> Result<Vec<StudentResponse>, String> {
+    init_manager()?;
+
+    let manager = get_manager()?;
+    let cutoff_date = Utc::now() + Duration::days(days);
+    
+    let students = manager
+        .search_students(StudentQuery::new().has_membership(true))
+        .map_err(|e| format!("搜索会员学生失败: {}", e))?;
+
+    let mut expiring_students = Vec::new();
+    for student in students {
+        if let Some(end_date) = student.membership_end_date() {
+            if end_date <= cutoff_date && student.is_membership_active() {
+                expiring_students.push(StudentResponse {
+                    uid: student.uid(),
+                    name: student.name().to_string(),
+                    age: student.age(),
+                    class: format!("{:?}", student.class()),
+                    phone: student.phone().to_string(),
+                    note: student.note().to_string(),
+                    subject: format!("{:?}", student.subject()),
+                    lesson_left: student.lesson_left(),
+                    membership_start_date: student.membership_start_date().map(|d| d.to_rfc3339()),
+                    membership_end_date: student.membership_end_date().map(|d| d.to_rfc3339()),
+                    is_membership_active: student.is_membership_active(),
+                    membership_days_remaining: student.membership_days_remaining(),
+                });
+            }
+        }
+    }
+
+    Ok(expiring_students)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -748,7 +1124,7 @@ pub fn run() {
             get_all_transactions,
             delete_cash_transaction,
             get_dashboard_stats,
-            // 新增的分期付款相关命令
+            // 分期付款相关命令
             update_installment_status,
             generate_next_installment,
             cancel_installment_plan,
@@ -756,7 +1132,15 @@ pub fn run() {
             // 会员管理相关命令
             set_student_membership,
             clear_student_membership,
-            set_membership_by_type
+            set_membership_by_type,
+            // v2 API命令
+            get_student_stats,
+            get_financial_stats,
+            search_students,
+            get_student_cash,
+            search_cash,
+            update_multiple_students,
+            get_membership_expiring_soon
         ])
         .run(tauri::generate_context!())
         .expect("Error running app");
@@ -806,4 +1190,32 @@ pub struct DashboardStatsResponse {
     pub average_score: f64,
     pub max_score: f64,
     pub active_courses: usize,
+}
+
+#[derive(Serialize)]
+pub struct StudentStatsResponse {
+    pub total_payments: i64,
+    pub payment_count: usize,
+    pub average_score: Option<f64>,
+    pub score_count: usize,
+    pub membership_status: String,
+}
+
+#[derive(Serialize)]
+pub struct FinancialStatsResponse {
+    pub total_income: i64,
+    pub total_expense: i64,
+    pub net_income: i64,
+    pub installment_total: i64,
+    pub installment_paid: i64,
+    pub installment_pending: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StudentUpdateBatch {
+    pub name: Option<String>,
+    pub age: Option<u8>,
+    pub class_type: Option<String>,
+    pub subject: Option<String>,
+    pub note: Option<String>,
 }
