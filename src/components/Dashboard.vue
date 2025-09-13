@@ -168,7 +168,7 @@ export default {
       return parsed;
     };
 
-    // 数据获取
+    // 数据获取 - 使用新的v2 API方法
     const loadDashboardData = async () => {
       if (loading.value) {
         console.warn('数据正在加载中，跳过重复请求');
@@ -179,12 +179,17 @@ export default {
       abortController.value = new AbortController();
 
       try {
+        // 方法1: 使用单一的 getDashboardStats API 方法（推荐，性能更好）
         const stats = await ApiService.getDashboardStats();
         
-        // 验证数据
-        validateDashboardStats(stats);
+        console.log('获取到的仪表板统计数据:', stats);
 
-        // 安全更新仪表板数据 - 增强验证
+        // 验证返回的数据
+        if (!stats || typeof stats !== 'object') {
+          throw new Error('返回的统计数据格式无效');
+        }
+
+        // 安全更新仪表板数据
         dashboardData.totalRevenue = safeParseNumber(stats.total_revenue, 0, {
           min: 0,
           max: 999999999999,

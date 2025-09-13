@@ -10,31 +10,106 @@
       </button>
     </div>
 
-    <!-- 搜索和筛选 -->
+    <!-- 搜索和筛选 - 增强版 -->
     <div class="search-filter">
       <div class="search-box">
         <input
           v-model="searchQuery"
           type="text"
           placeholder="搜索学员姓名、电话..."
-          @input="filterStudents"
+          @input="performSearch"
           ref="searchInput"
         />
+        <button 
+          class="search-btn" 
+          @click="performAdvancedSearch"
+          :disabled="loading"
+          title="高级搜索"
+        >
+          🔍
+        </button>
       </div>
       <div class="filter-options">
-        <select v-model="subjectFilter" @change="filterStudents">
+        <select v-model="subjectFilter" @change="performSearch">
           <option value="">全部科目</option>
           <option value="Shooting">射击</option>
           <option value="Archery">射箭</option>
           <option value="Others">其他</option>
         </select>
-        <select v-model="classFilter" @change="filterStudents">
+        <select v-model="classFilter" @change="performSearch">
           <option value="">全部课程</option>
           <option value="TenTry">体验课</option>
           <option value="Month">月卡</option>
           <option value="Year">年卡</option>
           <option value="Others">其他</option>
         </select>
+        <select v-model="membershipFilter" @change="performSearch">
+          <option value="">全部会员状态</option>
+          <option value="active">活跃会员</option>
+          <option value="expired">已过期</option>
+          <option value="expiring_soon">即将过期</option>
+        </select>
+      </div>
+      <div class="advanced-search-toggle">
+        <button 
+          class="toggle-btn" 
+          @click="showAdvancedSearch = !showAdvancedSearch"
+          :class="{ 'active': showAdvancedSearch }"
+        >
+          {{ showAdvancedSearch ? '隐藏高级搜索' : '显示高级搜索' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- 高级搜索面板 -->
+    <div v-if="showAdvancedSearch" class="advanced-search-panel">
+      <div class="advanced-search-row">
+        <div class="search-field">
+          <label>年龄范围</label>
+          <div class="age-range">
+            <input 
+              v-model.number="advancedSearch.minAge" 
+              type="number" 
+              placeholder="最小" 
+              min="0" 
+              max="120"
+            />
+            <span>-</span>
+            <input 
+              v-model.number="advancedSearch.maxAge" 
+              type="number" 
+              placeholder="最大" 
+              min="0" 
+              max="120"
+            />
+          </div>
+        </div>
+        <div class="search-field">
+          <label>分数范围</label>
+          <div class="score-range">
+            <input 
+              v-model.number="advancedSearch.minScore" 
+              type="number" 
+              placeholder="最低分" 
+              min="0"
+            />
+            <span>-</span>
+            <input 
+              v-model.number="advancedSearch.maxScore" 
+              type="number" 
+              placeholder="最高分" 
+              min="0"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="advanced-search-actions">
+        <button class="apply-btn" @click="performAdvancedSearch" :disabled="loading">
+          应用筛选
+        </button>
+        <button class="clear-btn" @click="clearAdvancedSearch">
+          清除筛选
+        </button>
       </div>
     </div>
 
@@ -342,6 +417,14 @@ export default {
     const searchQuery = ref('');
     const classFilter = ref('');
     const subjectFilter = ref('');
+    const membershipFilter = ref('');
+    const showAdvancedSearch = ref(false);
+    const advancedSearch = ref({
+      minAge: null,
+      maxAge: null,
+      minScore: null,
+      maxScore: null,
+    });
     const showAddModal = ref(false);
     const showEditModal = ref(false);
     const showMembershipModal = ref(false);
@@ -407,6 +490,26 @@ export default {
           filtered = filtered.filter(
             (student) => student && student.class === classFilter.value,
           );
+        }
+
+        // 新增：会员状态筛选
+        if (membershipFilter.value) {
+          filtered = filtered.filter((student) => {
+            if (!student) return false;
+            
+            switch (membershipFilter.value) {
+              case 'active':
+                return student.is_membership_active === true;
+              case 'expired':
+                return student.is_membership_active === false && student.membership_end_date;
+              case 'expiring_soon':
+                return student.is_membership_active === true && 
+                       student.membership_days_remaining !== null && 
+                       student.membership_days_remaining <= 7;
+              default:
+                return true;
+            }
+          });
         }
 
         return filtered;
@@ -480,15 +583,75 @@ export default {
       return subject.toLowerCase();
     };
 
-    const filterStudents = () => {
+    // 执行搜索（基础搜索）
+    const performSearch = () => {
       try {
-        // 搜索逻辑已通过computed属性实现
-        // 这个函数主要用于手动触发过滤
+        // 基础搜索逻辑已通过computed属性实现
+        console.log('执行基础搜索:', { searchQuery: searchQuery.value, classFilter: classFilter.value, subjectFilter: subjectFilter.value });
       } catch (error) {
-        console.error('过滤学员失败:', error);
-        showError('过滤失败', '学员搜索过滤时发生错误', error.message || '未知错误');
+        console.error('搜索失败:', error);
+        showError('搜索失败', '执行搜索时发生错误', error.message || '未知错误');
       }
     };
+
+    // 执行高级搜索
+    const performAdvancedSearch = async () => {
+      if (loading.value) {
+        console.warn('正在加载中，跳过搜索请求');
+        return;
+      }
+
+      loading.value = true;
+      try {
+        // 构建搜索选项
+        const searchOptions = {
+          query: searchQuery.value?.trim() || '',
+          subject: subjectFilter.value || null,
+          class_type: classFilter.value || null,
+          min_age: advancedSearch.value.minAge || null,
+          max_age: advancedSearch.value.maxAge || null,
+          min_score: advancedSearch.value.minScore || null,
+          max_score: advancedSearch.value.maxScore || null,
+        };
+
+        console.log('执行高级搜索:', searchOptions);
+        
+        // 使用新的v2 API搜索方法
+        const searchResults = await ApiService.searchStudents(searchOptions);
+        
+        if (!Array.isArray(searchResults)) {
+          throw new Error('搜索结果格式不正确，期望数组格式');
+        }
+
+        students.value = searchResults;
+        console.log(`高级搜索完成，找到 ${searchResults.length} 个学员`);
+        
+      } catch (error) {
+        console.error('高级搜索失败:', error);
+        showError('搜索失败', '高级搜索时发生错误', error.message || '未知错误');
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // 清除高级搜索条件
+    const clearAdvancedSearch = () => {
+      advancedSearch.value = {
+        minAge: null,
+        maxAge: null,
+        minScore: null,
+        maxScore: null,
+      };
+      searchQuery.value = '';
+      classFilter.value = '';
+      subjectFilter.value = '';
+      membershipFilter.value = '';
+      
+      // 重新加载所有学员数据
+      loadStudents();
+    };
+
+    const filterStudents = performSearch; // 保持向后兼容
 
     const loadStudents = async () => {
       if (loading.value) {
@@ -1122,6 +1285,9 @@ export default {
       searchQuery,
       classFilter,
       subjectFilter,
+      membershipFilter,
+      showAdvancedSearch,
+      advancedSearch,
       showAddModal,
       showEditModal,
       showMembershipModal,
@@ -1138,6 +1304,9 @@ export default {
       getSubjectText,
       getSubjectType,
       filterStudents,
+      performSearch,
+      performAdvancedSearch,
+      clearAdvancedSearch,
       editStudent,
       deleteStudent,
       saveStudent,
@@ -1243,6 +1412,128 @@ export default {
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.search-btn {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.search-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.search-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.advanced-search-toggle {
+  margin-left: auto;
+}
+
+.toggle-btn {
+  background-color: transparent;
+  color: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.toggle-btn:hover,
+.toggle-btn.active {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.advanced-search-panel {
+  background-color: var(--bg-secondary);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-top: 1rem;
+}
+
+.advanced-search-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.age-range,
+.score-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.age-range input,
+.score-range input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.age-range span,
+.score-range span {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.advanced-search-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.apply-btn {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.apply-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.clear-btn {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.clear-btn:hover {
+  background-color: var(--bg-primary);
   color: var(--text-primary);
 }
 
@@ -1652,6 +1943,74 @@ export default {
     width: 100%;
   }
 
+  /* 高级搜索面板移动端优化 */
+  .advanced-search-toggle {
+    margin-left: 0;
+    margin-top: 1rem;
+  }
+
+  .toggle-btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+
+  .advanced-search-panel {
+    padding: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .advanced-search-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .search-field {
+    width: 100%;
+  }
+
+  .search-field label {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .age-range,
+  .score-range {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .age-range input,
+  .score-range input {
+    flex: 1;
+    min-width: 80px;
+    max-width: 120px;
+    padding: 0.6rem 0.4rem;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  .age-range span,
+  .score-range span {
+    font-size: 0.9rem;
+    padding: 0 0.2rem;
+    flex-shrink: 0;
+  }
+
+  .advanced-search-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .apply-btn,
+  .clear-btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
+
   /* 手机端表格优化 - 改为卡片式布局 */
   .students-table table,
   .students-table thead,
@@ -1946,6 +2305,83 @@ export default {
     flex-direction: column;
     align-items: flex-start;
     text-align: left;
+  }
+}
+
+/* 小屏幕设备优化 - 针对分数输入框 */
+@media (max-width: 480px) {
+  /* 进一步优化高级搜索的输入框 */
+  .age-range,
+  .score-range {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .age-range input,
+  .score-range input {
+    width: 100%;
+    max-width: none;
+    min-width: auto;
+    padding: 0.75rem;
+    font-size: 16px; /* 防止iOS放大输入框 */
+    border-radius: 6px;
+  }
+
+  .age-range span,
+  .score-range span {
+    align-self: center;
+    font-size: 1rem;
+    padding: 0.25rem 0;
+  }
+
+  /* 优化高级搜索面板间距 */
+  .advanced-search-panel {
+    padding: 0.75rem;
+  }
+
+  .search-field {
+    margin-bottom: 1rem;
+  }
+
+  .search-field label {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* 优化按钮布局 */
+  .advanced-search-actions {
+    margin-top: 1.5rem;
+    gap: 0.75rem;
+  }
+
+  .apply-btn,
+  .clear-btn {
+    padding: 1rem;
+    font-size: 1.1rem;
+    border-radius: 8px;
+  }
+}
+
+/* 超小屏幕设备优化 */
+@media (max-width: 360px) {
+  .advanced-search-row {
+    gap: 0.75rem;
+  }
+
+  .age-range input,
+  .score-range input {
+    padding: 0.6rem;
+    font-size: 14px;
+  }
+
+  .advanced-search-panel {
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .search-field label {
+    font-size: 0.9rem;
   }
 }
 </style>

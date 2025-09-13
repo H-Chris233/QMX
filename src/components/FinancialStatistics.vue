@@ -66,14 +66,55 @@
             <option value="income">收入</option>
             <option value="expense">支出</option>
             <option value="installment">分期付款</option>
-            <!-- 新增筛选选项 -->
           </select>
           <input
             v-model="transactionSearch"
             type="text"
-            placeholder="搜索交易..."
+            placeholder="搜索交易描述、备注..."
+            @input="performSearch"
             aria-label="交易搜索"
           />
+          <button 
+            class="search-btn" 
+            @click="performAdvancedSearch"
+            :disabled="loading"
+            title="高级搜索"
+          >
+            🔍
+          </button>
+        </div>
+        
+        <!-- 日期范围搜索 -->
+        <div class="date-filter">
+          <div class="date-range">
+            <label>日期范围:</label>
+            <input 
+              v-model="dateFrom" 
+              type="date" 
+              placeholder="开始日期"
+              aria-label="开始日期"
+            />
+            <span>-</span>
+            <input 
+              v-model="dateTo" 
+              type="date" 
+              placeholder="结束日期"
+              aria-label="结束日期"
+            />
+            <button 
+              class="apply-date-btn" 
+              @click="performAdvancedSearch"
+              :disabled="loading"
+            >
+              应用日期筛选
+            </button>
+            <button 
+              class="clear-date-btn" 
+              @click="clearDateFilter"
+            >
+              清除
+            </button>
+          </div>
         </div>
       </div>
 
@@ -366,6 +407,8 @@ export default {
     const students = ref([]);
     const transactionFilter = ref('all');
     const transactionSearch = ref('');
+    const dateFrom = ref('');
+    const dateTo = ref('');
     const showAddTransaction = ref(false);
     const showUpdateStatusModal = ref(false);
     const isInstallmentMode = ref(false);
@@ -582,10 +625,87 @@ export default {
       }
     };
 
-    // 数据操作
-    const filterTransactions = () => {
-      // 筛选逻辑已通过computed属性实现
+    // 搜索功能
+    const performSearch = () => {
+      try {
+        // 基础搜索逻辑已通过computed属性实现
+        console.log('执行交易搜索:', { search: transactionSearch.value, filter: transactionFilter.value });
+      } catch (error) {
+        console.error('搜索失败:', error);
+        showError('搜索失败', '执行搜索时发生错误', error.message || '未知错误');
+      }
     };
+
+    // 执行高级搜索（使用v2 API）
+    const performAdvancedSearch = async () => {
+      if (loading.value) {
+        console.warn('正在加载中，跳过搜索请求');
+        return;
+      }
+
+      loading.value = true;
+      abortController.value = new AbortController();
+
+      try {
+        // 构建搜索选项
+        const searchOptions = {
+          query: transactionSearch.value?.trim() || '',
+          transaction_type: transactionFilter.value !== 'all' ? transactionFilter.value : null,
+          date_from: dateFrom.value || null,
+          date_to: dateTo.value || null,
+        };
+
+        console.log('执行高级交易搜索:', searchOptions);
+        
+        // 使用新的v2 API搜索方法
+        const searchResults = await ApiService.searchCash(searchOptions);
+        
+        if (!Array.isArray(searchResults)) {
+          throw new Error('搜索结果格式不正确，期望数组格式');
+        }
+
+        // 转换搜索结果为前端格式
+        const validTransactions = searchResults
+          .filter(transaction => validateTransactionData(transaction))
+          .map((transaction) => ({
+            id: transaction.uid,
+            type: transaction.amount > 0 ? 'income' : 'expense',
+            description: transaction.student_id
+              ? `学员${transaction.student_id}缴费`
+              : '其他交易',
+            amount: Math.abs(transaction.amount),
+            note: transaction.note || '',
+            is_installment: !!transaction.is_installment,
+            installment_current: transaction.installment_current || null,
+            installment_total: transaction.installment_total || null,
+            installment_status: transaction.installment_status || null,
+            student_id: transaction.student_id || null,
+          }));
+
+        transactions.value = validTransactions;
+        console.log(`高级搜索完成，找到 ${validTransactions.length} 条交易记录`);
+        
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('高级搜索失败:', error);
+          showError('搜索失败', '高级搜索时发生错误', error.message || '未知错误');
+        }
+      } finally {
+        loading.value = false;
+        abortController.value = null;
+      }
+    };
+
+    // 清除日期筛选
+    const clearDateFilter = () => {
+      dateFrom.value = '';
+      dateTo.value = '';
+      // 重新加载所有交易数据
+      loadTransactions();
+    };
+
+    // 数据操作
+    const filterTransactions = performSearch; // 保持向后兼容
 
     // 加载学员列表
     const loadStudents = async () => {
@@ -736,7 +856,13 @@ export default {
       abortController.value = new AbortController();
 
       try {
-        const cashTransactions = await ApiService.getAllTransactions();
+        // 使用新的v2 API获取财务统计和交易数据
+        const [cashTransactions, financialStats] = await Promise.all([
+          ApiService.getAllTransactions(),
+          ApiService.getFinancialStats()
+        ]);
+        
+        console.log('获取到的财务统计:', financialStats);
 
         // 验证返回的数据
         if (!Array.isArray(cashTransactions)) {
@@ -1000,6 +1126,8 @@ export default {
       filteredTransactions,
       transactionFilter,
       transactionSearch,
+      dateFrom,
+      dateTo,
       showAddTransaction,
       showUpdateStatusModal,
       isInstallmentMode,
@@ -1013,6 +1141,9 @@ export default {
       formatCurrency,
       formatTransactionAmount,
       filterTransactions,
+      performSearch,
+      performAdvancedSearch,
+      clearDateFilter,
       deleteTransaction,
       saveTransaction,
       showUpdateStatus,
@@ -1120,6 +1251,91 @@ export default {
 
 .overview-card.installment {
   border-left: 4px solid var(--accent-primary);
+}
+
+.search-btn {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.search-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.search-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.date-filter {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.date-range label {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-right: 0.5rem;
+}
+
+.date-range input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.date-range span {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.apply-date-btn {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.apply-date-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.clear-date-btn {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.clear-date-btn:hover {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .card-subtext {

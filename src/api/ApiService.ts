@@ -506,6 +506,7 @@ export class ApiService {
   }
 
   // v2 API - 高级功能
+  // 获取特定学员的统计信息
   static async getStudentStats(studentUid: number) {
     try {
       if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
@@ -519,7 +520,25 @@ export class ApiService {
     }
   }
 
-  static async getFinancialStats(period: 'ThisWeek' | 'ThisMonth' | 'ThisYear') {
+  // 获取全局学员统计信息（用于仪表板）
+  static async getGlobalStudentStats() {
+    try {
+      const dashboardStats = await this.getDashboardStats();
+      
+      return {
+        total_students: dashboardStats.total_students || 0,
+        average_score: dashboardStats.average_score || 0,
+        max_score: dashboardStats.max_score || 0,
+        active_courses: dashboardStats.active_courses || 0,
+      };
+    } catch (error) {
+      console.error('❌ [ApiService.getGlobalStudentStats] 调用失败:', error);
+      throw new Error(`获取全局学员统计失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // 获取特定周期的财务统计
+  static async getFinancialStats(period: 'ThisWeek' | 'ThisMonth' | 'ThisYear' = 'ThisMonth') {
     try {
       return await invokeWithEnhancements<any>('get_financial_stats' as TauriCommand, {
         period,
@@ -527,6 +546,22 @@ export class ApiService {
     } catch (error) {
       console.error('❌ [ApiService.getFinancialStats] 调用失败:', error);
       throw new Error(`获取财务统计失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // 获取全局财务统计信息（用于仪表板）
+  static async getGlobalFinancialStats() {
+    try {
+      const dashboardStats = await this.getDashboardStats();
+      
+      return {
+        total_income: dashboardStats.total_revenue || 0,
+        total_expense: dashboardStats.total_expense || 0,
+        net_profit: (dashboardStats.total_revenue || 0) - (dashboardStats.total_expense || 0),
+      };
+    } catch (error) {
+      console.error('❌ [ApiService.getGlobalFinancialStats] 调用失败:', error);
+      throw new Error(`获取全局财务统计失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

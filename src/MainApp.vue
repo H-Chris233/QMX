@@ -86,6 +86,9 @@
       @close="hideError"
       @retry="retryWithError"
     />
+
+    <!-- 会员到期提醒 -->
+    <MembershipAlerts />
   </div>
 </template>
 
@@ -97,6 +100,7 @@ import ScoreManagement from './components/ScoreManagement.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import ErrorModal from './components/ErrorModal.vue';
+import MembershipAlerts from './components/MembershipAlerts.vue';
 
 export default {
   name: 'MainApp',
@@ -107,6 +111,7 @@ export default {
     Dashboard,
     Settings,
     ErrorModal,
+    MembershipAlerts,
   },
   setup() {
     const theme = ref('dark');

@@ -16,6 +16,23 @@ This is a Tauri desktop application for student management with Vue 3 frontend a
 ### TypeScript
 - `pnpm vue-tsc --noEmit` - Type checking (runs before build)
 
+## Important Development Notes
+
+### Rust Backend Compilation
+**DO NOT compile the Rust backend during development** - Use frontend-only development mode instead.
+
+**Reasons:**
+- Rust compilation takes extremely long time (several minutes)
+- Tauri build process is resource-intensive
+- Frontend development can be done independently using `pnpm dev`
+- Backend changes are infrequent compared to frontend iterations
+
+**Recommended workflow:**
+- Use `pnpm dev` for frontend development and testing (port 1420)
+- **DO NOT use `pnpm tauri dev`/'cargo build'/'cargo check'** - This triggers Rust backend compilation
+- Only use `pnpm tauri dev` when backend changes are absolutely necessary
+- Reserve `pnpm tauri build` for final production builds only
+
 ## Architecture Overview
 
 ### Frontend Structure
