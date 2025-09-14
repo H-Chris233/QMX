@@ -71,6 +71,40 @@
           </span>
         </div>
       </div>
+
+      <!-- 会员提醒 -->
+      <div class="stat-card membership-alerts-card" :class="{ 'skeleton': loading }">
+        <div class="card-header">
+          <h3>会员提醒</h3>
+          <span class="card-icon">⚠️</span>
+        </div>
+        <div v-if="!loading" class="membership-content">
+          <div v-if="expiringMemberships.length > 0" class="expiring-list">
+            <div class="stat-value expiring-count">
+              {{ expiringMemberships.length }}
+            </div>
+            <div class="expiring-text">个会员即将过期</div>
+            <div class="expiring-members">
+              <div 
+                v-for="student in expiringMemberships.slice(0, 3)" 
+                :key="student.uid"
+                class="member-item"
+              >
+                <span class="member-name">{{ student.name }}</span>
+                <span class="member-days">{{ student.membership_days_remaining }}天</span>
+              </div>
+              <div v-if="expiringMemberships.length > 3" class="more-members">
+                还有 {{ expiringMemberships.length - 3 }} 个...
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-expiring">
+            <div class="stat-value no-alerts">✅</div>
+            <div class="no-alerts-text">暂无即将过期的会员</div>
+          </div>
+        </div>
+        <div class="skeleton-text" v-else></div>
+      </div>
     </div>
   </div>
 </template>
@@ -103,6 +137,9 @@ export default {
       activeStudents: 0,
       averageGrade: 0,
     });
+
+    // 会员提醒数据
+    const expiringMemberships = ref([]);
 
     // 增强的数据验证函数
     const validateDashboardStats = (stats) => {
@@ -169,6 +206,34 @@ export default {
       return parsed;
     };
 
+    // 加载即将过期的会员
+    const loadExpiringMemberships = async () => {
+      try {
+        // 使用新的v2 API方法
+        const expiring = await ApiService.getMembershipExpiringSoon(7); // 7天内过期
+        
+        if (!Array.isArray(expiring)) {
+          throw new Error('返回的数据格式不正确，期望数组格式');
+        }
+
+        expiringMemberships.value = expiring.filter(student => 
+          student && student.uid && student.name
+        );
+
+        console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
+      } catch (error) {
+        console.error('加载即将过期会员失败:', error);
+        expiringMemberships.value = [];
+        
+        // 显示用户友好的错误提示，但不阻塞其他功能
+        showError(
+          '会员数据加载失败',
+          '无法获取即将过期的会员信息，请稍后刷新页面重试',
+          error.message || '未知错误'
+        );
+      }
+    };
+
     // 数据获取 - 使用新的v2 API方法
     const loadDashboardData = async () => {
       if (loading.value) {
@@ -180,8 +245,11 @@ export default {
       abortController.value = new AbortController();
 
       try {
-        // 方法1: 使用单一的 getDashboardStats API 方法（推荐，性能更好）
-        const stats = await ApiService.getDashboardStats();
+        // 并行加载仪表板数据和会员提醒数据
+        const [stats] = await Promise.all([
+          ApiService.getDashboardStats(),
+          loadExpiringMemberships()
+        ]);
         
         console.log('获取到的仪表板统计数据:', stats);
 
@@ -343,7 +411,9 @@ export default {
       loading,
       lastUpdateTime,
       dashboardData,
+      expiringMemberships,
       loadDashboardData,
+      loadExpiringMemberships,
       formatNumber,
       formatCurrency,
       formatDecimal,
@@ -533,10 +603,95 @@ export default {
   opacity: 0.7;
 }
 
+/* 会员提醒卡片样式 */
+.membership-alerts-card {
+  grid-column: span 2; /* 占据两列宽度 */
+}
+
+.membership-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.expiring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.expiring-count {
+  color: #ff9800;
+  font-size: 2rem;
+  margin-bottom: 0;
+}
+
+.expiring-text {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.expiring-members {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.member-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.member-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.member-days {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.more-members {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.25rem;
+  font-style: italic;
+}
+
+.no-expiring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.no-alerts {
+  color: #4caf50;
+  font-size: 2rem;
+  margin-bottom: 0;
+}
+
+.no-alerts-text {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
 /* 响应式设计优化 */
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .membership-alerts-card {
+    grid-column: span 2; /* 在小屏幕上仍然占据两列 */
   }
 
   .stat-value {
@@ -547,6 +702,10 @@ export default {
 @media (max-width: 480px) {
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .membership-alerts-card {
+    grid-column: span 1; /* 在极小屏幕上占据一列 */
   }
 
   .stat-value {

@@ -164,7 +164,10 @@ fn convert_cash_to_response(cash: &qmx_backend_lib::cash::Cash) -> TransactionRe
         amount: cash.cash,
         note: cash.note.clone(),
         description: if is_installment {
-            format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+            format!("分期付款 {}/{}", 
+                current.unwrap_or(0), 
+                total.unwrap_or(0)
+            )
         } else {
             "普通付款".to_string()
         },
@@ -730,7 +733,10 @@ fn add_cash_transaction(
         amount: cash.cash,
         note: cash.note.clone(),
         description: if is_installment {
-            format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+            format!("分期付款 {}/{}", 
+                current.unwrap_or(0), 
+                total.unwrap_or(0)
+            )
         } else {
             "普通付款".to_string()
         },
@@ -893,7 +899,8 @@ fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, Stri
 
     // 按期数排序，找到最新的分期
     plan_installments.sort_by_key(|(_, installment)| installment.current_installment);
-    let (_, latest_installment) = plan_installments.last().unwrap();
+    let (_, latest_installment) = plan_installments.last()
+        .ok_or("分期计划数据异常，无法找到最新分期")?;
 
     // 检查是否已经是最后一期
     if latest_installment.current_installment >= latest_installment.total_installments {
@@ -1141,7 +1148,10 @@ fn get_student_cash(student_uid: u64) -> Result<Vec<TransactionResponse>, String
             amount: cash.cash,
             note: cash.note.clone(),
             description: if is_installment {
-                format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+                format!("分期付款 {}/{}", 
+                    current.unwrap_or(0), 
+                    total.unwrap_or(0)
+                )
             } else {
                 "普通付款".to_string()
             },
@@ -1219,7 +1229,10 @@ fn search_cash(
             amount: cash.cash,
             note: cash.note.clone(),
             description: if is_installment {
-                format!("分期付款 {}/{}", current.unwrap(), total.unwrap())
+                format!("分期付款 {}/{}", 
+                    current.unwrap_or(0), 
+                    total.unwrap_or(0)
+                )
             } else {
                 "普通付款".to_string()
             },
@@ -1320,7 +1333,9 @@ fn get_membership_expiring_soon(days: i64) -> Result<Vec<StudentResponse>, Strin
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    simple_logger::init().unwrap();
+    if let Err(e) = simple_logger::init() {
+        eprintln!("Warning: Failed to initialize logger: {}", e);
+    }
     log::info!("启明星管理系统启动，日志系统已初始化");
     
     tauri::Builder::default()
