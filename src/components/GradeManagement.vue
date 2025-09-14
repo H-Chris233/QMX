@@ -204,7 +204,12 @@
           </div>
           <div class="form-group">
             <label>考试日期</label>
-            <input v-model="currentGrade.examDate" type="date" />
+            <DatePicker
+              v-model="currentGrade.examDate"
+              label="考试日期"
+              placeholder="选择考试日期"
+              required
+            />
           </div>
           <div class="form-group">
             <label>备注</label>
@@ -272,10 +277,14 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
+import DatePicker from './DatePicker.vue';
 
 export default {
   name: 'GradeManagement',
+  components: {
+    DatePicker,
+  },
   setup() {
     const grades = ref([]);
     const students = ref([]);
@@ -294,6 +303,17 @@ export default {
       score: 0,
       examDate: '',
       notes: '',
+    });
+
+    // 注入错误处理函数
+    const errorHandler = inject('errorHandler');
+    const showConfirm = errorHandler?.showConfirm || ((options) => {
+      const confirmed = confirm(options.message);
+      if (confirmed && options.onConfirm) {
+        options.onConfirm();
+      } else if (!confirmed && options.onCancel) {
+        options.onCancel();
+      }
     });
 
     // 模拟数据
@@ -476,9 +496,16 @@ export default {
     };
 
     const deleteGrade = (id) => {
-      if (confirm('确定要删除这条成绩记录吗？')) {
-        grades.value = grades.value.filter((g) => g.id !== id);
-      }
+      showConfirm({
+        title: '删除成绩记录',
+        message: '确定要删除这条成绩记录吗？',
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmType: 'danger',
+        onConfirm: () => {
+          grades.value = grades.value.filter((g) => g.id !== id);
+        }
+      });
     };
 
     const saveGrade = () => {

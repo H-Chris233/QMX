@@ -50,19 +50,19 @@
           <option value="expiring_soon">即将过期</option>
         </select>
       </div>
-      <div class="advanced-search-toggle">
-        <button 
-          class="toggle-btn" 
-          @click="showAdvancedSearch = !showAdvancedSearch"
-          :class="{ 'active': showAdvancedSearch }"
-        >
-          {{ showAdvancedSearch ? '隐藏高级搜索' : '显示高级搜索' }}
-        </button>
-      </div>
-    </div>
-
-    <!-- 高级搜索面板 -->
-    <div v-if="showAdvancedSearch" class="advanced-search-panel">
+      <div class="advanced-search-container">
+        <div class="advanced-search-toggle">
+          <button 
+            class="toggle-btn" 
+            @click="showAdvancedSearch = !showAdvancedSearch"
+            :class="{ 'active': showAdvancedSearch }"
+          >
+            {{ showAdvancedSearch ? '隐藏高级搜索' : '显示高级搜索' }}
+          </button>
+        </div>
+        
+        <!-- 高级搜索面板 -->
+        <div v-if="showAdvancedSearch" class="advanced-search-panel">
       <div class="advanced-search-row">
         <div class="search-field">
           <label>年龄范围</label>
@@ -110,6 +110,8 @@
         <button class="clear-btn" @click="clearAdvancedSearch">
           清除筛选
         </button>
+      </div>
+        </div>
       </div>
     </div>
 
@@ -289,12 +291,12 @@
             </div>
             
             <div v-if="currentStudent.enableCustomMembership" class="custom-membership-date">
-              <label>会员开始时间</label>
-              <input
+              <DatePicker
                 v-model="currentStudent.customMembershipStart"
-                type="date"
-                :min="getTodayDate()"
+                label="会员开始时间"
+                :min-date="getTodayDate()"
                 placeholder="选择会员开始日期"
+                required
               />
               <div class="membership-preview" v-if="currentStudent.customMembershipStart">
                 <span class="preview-icon">📅</span>
@@ -376,19 +378,19 @@
           <div class="custom-membership">
             <h4>自定义设置</h4>
             <div class="form-group">
-              <label>开始时间</label>
-              <input
+              <DatePicker
                 v-model="membershipForm.startDate"
-                type="date"
-                :min="getTodayDate()"
+                label="开始时间"
+                :min-date="getTodayDate()"
+                required
               />
             </div>
             <div class="form-group">
-              <label>结束时间</label>
-              <input
+              <DatePicker
                 v-model="membershipForm.endDate"
-                type="date"
-                :min="membershipForm.startDate || getTodayDate()"
+                label="结束时间"
+                :min-date="membershipForm.startDate || getTodayDate()"
+                required
               />
             </div>
           </div>
@@ -408,9 +410,13 @@
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import DatePicker from './DatePicker.vue';
 
 export default {
   name: 'StudentManagement',
+  components: {
+    DatePicker,
+  },
   setup() {
     const loading = ref(false);
     const students = ref([]);
@@ -452,6 +458,15 @@ export default {
     const showError = errorHandler?.showError || ((title, message, details) => {
       console.error(`${title}: ${message}`, details);
       alert(`${title}\n${message}`);
+    });
+    
+    const showConfirm = errorHandler?.showConfirm || ((options) => {
+      const confirmed = confirm(options.message);
+      if (confirmed && options.onConfirm) {
+        options.onConfirm();
+      } else if (!confirmed && options.onCancel) {
+        options.onCancel();
+      }
     });
     
     const showSuccess = errorHandler?.showSuccess || ((title, message) => {
@@ -734,14 +749,17 @@ export default {
       // 查找要删除的学员信息
       const student = students.value.find(s => s.uid === uid);
       const confirmMessage = student 
-        ? `确定要删除学员"${student.name}"吗？\n此操作不可撤销！`
+        ? `确定要删除学员"${student.name}"吗？此操作不可撤销！`
         : '确定要删除这个学员吗？此操作不可撤销！';
 
-      if (!confirm(confirmMessage)) {
-        return;
-      }
-
-      loading.value = true;
+      showConfirm({
+        title: '删除学员',
+        message: confirmMessage,
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmType: 'danger',
+        onConfirm: async () => {
+          loading.value = true;
       
       try {
         await ApiService.deleteStudent(Number(uid));
@@ -769,9 +787,11 @@ export default {
           '删除学员时发生错误，请稍后重试', 
           error.message || '未知错误'
         );
-      } finally {
-        loading.value = false;
-      }
+          } finally {
+            loading.value = false;
+          }
+        }
+      });
     };
 
     // 增强的输入验证函数
@@ -1231,11 +1251,14 @@ export default {
       }
 
       const studentName = membershipStudent.value.name; // 保存学员姓名
-      if (!confirm(`确定要清除${studentName}的会员信息吗？`)) {
-        return;
-      }
-
-      loading.value = true;
+      showConfirm({
+        title: '清除会员信息',
+        message: `确定要清除${studentName}的会员信息吗？`,
+        confirmText: '清除',
+        cancelText: '取消',
+        confirmType: 'warning',
+        onConfirm: async () => {
+          loading.value = true;
       try {
         await ApiService.clearStudentMembership(membershipStudent.value.uid);
         
@@ -1257,9 +1280,11 @@ export default {
       } catch (error) {
         console.error('清除会员失败:', error);
         showError('清除失败', '清除会员时发生错误', error.message);
-      } finally {
-        loading.value = false;
-      }
+          } finally {
+            loading.value = false;
+          }
+        }
+      });
     };
 
     const saveCustomMembership = async () => {
@@ -1515,6 +1540,13 @@ export default {
   cursor: not-allowed;
 }
 
+.advanced-search-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  position: relative;
+}
+
 .advanced-search-toggle {
   margin-left: auto;
 }
@@ -1528,20 +1560,59 @@ export default {
   cursor: pointer;
   font-size: 0.875rem;
   transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.toggle-btn:hover,
+.toggle-btn::after {
+  content: '▼';
+  font-size: 0.8rem;
+  transition: transform 0.3s ease;
+}
+
+.toggle-btn.active::after {
+  transform: rotate(180deg);
+}
+
+.toggle-btn:hover {
+  background-color: var(--accent-primary);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
 .toggle-btn.active {
   background-color: var(--accent-primary);
   color: white;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .advanced-search-panel {
   background-color: var(--bg-secondary);
   padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  margin-top: 1rem;
+  border-radius: 0 0 8px 8px;
+  border: 1px solid var(--accent-primary);
+  border-top: none;
+  margin-top: 0;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+  animation: slideDown 0.3s ease-out;
+  position: relative;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 500px;
+  }
 }
 
 .advanced-search-row {
@@ -1842,12 +1913,8 @@ export default {
   margin-top: 1rem;
 }
 
-.custom-membership-date input[type="date"] {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-primary);
+.custom-membership-date {
+  /* DatePicker component handles its own styling */
   color: var(--text-primary);
   font-size: 1rem;
 }
@@ -1990,7 +2057,96 @@ export default {
     display: flex;
     flex-direction: column;
   }
+  
+  .form-group input,
+  .form-group select {
+    padding: 1rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 8px;
+  }
+  
+  .form-group textarea {
+    padding: 1rem;
+    font-size: 1rem;
+    min-height: 120px;
+    border-radius: 8px;
+  }
+  
+  .form-group label {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .modal-footer {
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+  
+  .modal-footer button {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 8px;
+  }
+}
 
+@media (max-width: 480px) {
+  .form-group input,
+  .form-group select {
+    padding: 1.25rem;
+    font-size: 1.125rem;
+    min-height: 52px;
+    border-radius: 12px;
+  }
+  
+  .form-group textarea {
+    padding: 1.25rem;
+    font-size: 1.125rem;
+    min-height: 140px;
+    border-radius: 12px;
+  }
+  
+  .form-group label {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  
+  .modal-footer button {
+    padding: 1.25rem 1.5rem;
+    font-size: 1.125rem;
+    min-height: 52px;
+    border-radius: 12px;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    transform: scale(1.02);
+    transition: transform 0.2s ease;
+  }
+  
+  .modal-footer button:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  .student-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  /* 移除点击高亮 */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* 移动端布局优化 */
+@media (max-width: 768px) {
   /* 调整手机端布局顺序 */
   .stats-grid {
     order: 1;
@@ -2024,6 +2180,10 @@ export default {
   }
 
   /* 高级搜索面板移动端优化 */
+  .advanced-search-container {
+    position: relative;
+  }
+  
   .advanced-search-toggle {
     margin-left: 0;
     margin-top: 1rem;
@@ -2033,11 +2193,18 @@ export default {
     width: 100%;
     padding: 0.75rem 1rem;
     font-size: 1rem;
+    justify-content: center;
+  }
+  
+  .toggle-btn.active {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
   }
 
   .advanced-search-panel {
     padding: 1rem;
-    margin-top: 0.5rem;
+    margin-top: 0;
+    border-radius: 0 0 12px 12px;
   }
 
   .advanced-search-row {
@@ -2330,12 +2497,8 @@ export default {
   margin-bottom: 1rem;
 }
 
-.custom-membership input[type="date"] {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--bg-primary);
+.custom-membership .form-group {
+  /* DatePicker component handles its own styling */
   color: var(--text-primary);
 }
 
@@ -2418,6 +2581,8 @@ export default {
   /* 优化高级搜索面板间距 */
   .advanced-search-panel {
     padding: 0.75rem;
+    margin-top: 0;
+    border-radius: 0 0 12px 12px;
   }
 
   .search-field {
@@ -2457,7 +2622,8 @@ export default {
 
   .advanced-search-panel {
     padding: 0.5rem;
-    margin-top: 0.5rem;
+    margin-top: 0;
+    border-radius: 0 0 12px 12px;
   }
 
   .search-field label {

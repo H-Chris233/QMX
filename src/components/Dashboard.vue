@@ -7,9 +7,6 @@
     <div class="section-header">
       <h2>仪表板</h2>
       <div class="header-actions">
-        <span v-if="lastUpdateTime" class="last-update">
-          最后更新: {{ formatTime(lastUpdateTime) }}
-        </span>
         <button
           class="refresh-btn"
           @click="loadDashboardData"
@@ -106,30 +103,67 @@
         <div class="skeleton-text" v-else></div>
       </div>
     </div>
+    <ErrorModal
+      :show="showStatsErrorModal"
+      :title="statsErrorTitle"
+      :message="statsErrorMessage"
+      :details="statsErrorDetails"
+      :showRetry="true"
+      @close="closeStatsError"
+      @retry="retryLoadStats"
+    />
+    <ErrorModal
+      :show="showMembershipErrorModal"
+      :title="membershipErrorTitle"
+      :message="membershipErrorMessage"
+      :details="membershipErrorDetails"
+      :showRetry="true"
+      @close="closeMembershipError"
+      @retry="retryLoadMembership"
+    />
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
+import ErrorModal from './ErrorModal.vue';
 
 export default {
   name: 'Dashboard',
+  components: { ErrorModal },
   setup() {
     const loading = ref(false);
     const abortController = ref(null);
     const lastUpdateTime = ref(null);
     const errorHandler = inject('errorHandler');
     const refreshSystem = inject('refreshSystem');
-    
-    const showError = errorHandler?.showError || ((title, message, details) => {
+
+    const showStatsErrorModal = ref(false);
+    const statsErrorTitle = ref('错误');
+    const statsErrorMessage = ref('');
+    const statsErrorDetails = ref('');
+
+    const showMembershipErrorModal = ref(false);
+    const membershipErrorTitle = ref('错误');
+    const membershipErrorMessage = ref('');
+    const membershipErrorDetails = ref('');
+
+    const showStatsError = (title, message, details) => {
+      statsErrorTitle.value = title;
+      statsErrorMessage.value = message;
+      statsErrorDetails.value = details || '';
+      showStatsErrorModal.value = true;
       console.error(`${title}: ${message}`, details);
-      alert(`${title}\n${message}`);
-    });
-    
-    if (!errorHandler) {
-      console.warn('⚠️ errorHandler 未正确注入到 Dashboard 组件');
-    }
+    };
+
+    const showMembershipError = (title, message, details) => {
+      membershipErrorTitle.value = title;
+      membershipErrorMessage.value = message;
+      membershipErrorDetails.value = details || '';
+      showMembershipErrorModal.value = true;
+      console.error(`${title}: ${message}`, details);
+    };
 
     // 仪表盘数据（使用reactive保持响应性）
     const dashboardData = reactive({
@@ -206,32 +240,21 @@ export default {
       return parsed;
     };
 
-    // 加载即将过期的会员
+    // 加载即将过期的会员 - 简化版，错误处理在调用方
     const loadExpiringMemberships = async () => {
-      try {
-        // 使用新的v2 API方法
-        const expiring = await ApiService.getMembershipExpiringSoon(7); // 7天内过期
-        
-        if (!Array.isArray(expiring)) {
-          throw new Error('返回的数据格式不正确，期望数组格式');
-        }
-
-        expiringMemberships.value = expiring.filter(student => 
-          student && student.uid && student.name
-        );
-
-        console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
-      } catch (error) {
-        console.error('加载即将过期会员失败:', error);
-        expiringMemberships.value = [];
-        
-        // 显示用户友好的错误提示，但不阻塞其他功能
-        showError(
-          '会员数据加载失败',
-          '无法获取即将过期的会员信息，请稍后刷新页面重试',
-          error.message || '未知错误'
-        );
+      // 使用新的v2 API方法，直接返回结果，不做错误处理
+      const expiring = await ApiService.getMembershipExpiringSoon(7); // 7天内过期
+      
+      if (!Array.isArray(expiring)) {
+        throw new Error('返回的数据格式不正确，期望数组格式');
       }
+
+      const validExpiring = expiring.filter(student => 
+        student && student.uid && student.name
+      );
+
+      console.log(`找到 ${validExpiring.length} 个即将过期的会员`);
+      return validExpiring;
     };
 
     // 数据获取 - 使用新的v2 API方法
@@ -245,11 +268,74 @@ export default {
       abortController.value = new AbortController();
 
       try {
-        // 并行加载仪表板数据和会员提醒数据
-        const [stats] = await Promise.all([
-          ApiService.getDashboardStats(),
-          loadExpiringMemberships()
-        ]);
+        // 分别处理两个API调用，让每个API调用都能独立失败并显示错误
+        console.log('🔄 开始并行调用两个API...');
+        
+        // 统计数据API调用 - 不做内部错误处理，让错误抛出到组件层
+        const statsPromise = ApiService.getDashboardStats()
+          .then(result => {
+            console.log('✅ getDashboardStats 调用成功:', result);
+            return { success: true, data: result };
+          })
+          .catch(error => {
+            console.error('❌ getDashboardStats 调用失败:', error);
+            console.error('getDashboardStats 错误详情:', error.message, error.stack);
+            // 确保错误被正确传递，包括错误消息
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            return { success: false, error: errorObj };
+          });
+
+        // 会员数据API调用 - 不做内部错误处理，让错误抛出到组件层  
+        const membershipPromise = loadExpiringMemberships()
+          .then(result => {
+            console.log('✅ loadExpiringMemberships 调用成功:', result);
+            expiringMemberships.value = result;
+            return { success: true, data: result };
+          })
+          .catch(error => {
+            console.error('❌ loadExpiringMemberships 调用失败:', error);
+            console.error('loadExpiringMemberships 错误详情:', error.message, error.stack);
+            expiringMemberships.value = [];
+            // 确保错误被正确传递，包括错误消息
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            return { success: false, error: errorObj };
+          });
+
+        // 等待两个API调用完成
+        const [statsResult, membershipResult] = await Promise.all([statsPromise, membershipPromise]);
+        
+        console.log('statsResult:', statsResult);
+        console.log('membershipResult:', membershipResult);
+        
+        // 处理统计数据结果
+        let stats;
+        if (statsResult.success) {
+          stats = statsResult.data;
+        } else {
+          // 统计数据API失败，显示错误并使用默认值
+          showStatsError(
+            '统计数据加载失败',
+            '无法获取仪表板统计数据，请检查网络连接或稍后重试',
+            statsResult.error.message || '未知错误'
+          );
+          stats = {
+            total_revenue: 0,
+            total_students: 0,
+            average_score: 0,
+            total_expense: 0,
+            max_score: 0,
+            active_courses: 0
+          };
+        }
+        
+        // 处理会员数据结果
+        if (!membershipResult.success) {
+          showMembershipError(
+            '会员数据加载失败',
+            '无法获取即将过期的会员信息，请稍后刷新页面重试',
+            membershipResult.error.message || '未知错误'
+          );
+        }
         
         console.log('获取到的仪表板统计数据:', stats);
 
@@ -282,7 +368,7 @@ export default {
         console.log('仪表板数据加载成功:', dashboardData);
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error('加载仪表盘数据失败:', error);
+          console.error('加载仪表盘数据时发生未预期错误:', error);
           
           // 重置为默认值
           Object.assign(dashboardData, {
@@ -291,10 +377,11 @@ export default {
             averageGrade: 0,
           });
           
-          showError(
-            '数据加载失败',
-            '无法获取仪表板数据，请检查网络连接或稍后重试',
-            error.message || '未知错误',
+          // 这里只处理Promise.all本身的错误，具体API错误已在上面处理
+          showStatsError(
+            '系统错误',
+            '数据加载过程中发生未预期错误，请刷新页面重试',
+            error.message || '未知错误'
           );
         }
       } finally {
@@ -401,6 +488,40 @@ export default {
       loadDashboardData();
     });
 
+    const closeStatsError = () => {
+      showStatsErrorModal.value = false;
+    };
+
+    const closeMembershipError = () => {
+      showMembershipErrorModal.value = false;
+    };
+
+    const retryLoadStats = async () => {
+      showStatsErrorModal.value = false;
+      loading.value = true;
+      try {
+        const statsResult = await ApiService.getDashboardStats();
+        dashboardData.totalRevenue = safeParseNumber(statsResult.total_revenue, 0, { min: 0, max: 999999999999, decimals: 2 });
+        dashboardData.activeStudents = safeParseNumber(statsResult.total_students, 0, { min: 0, max: 100000, decimals: 0 });
+        dashboardData.averageGrade = safeParseNumber(statsResult.average_score, 0, { min: 0, max: 1000, decimals: 1 });
+        lastUpdateTime.value = new Date();
+      } catch (e) {
+        showStatsError('统计数据加载失败', '无法获取仪表板统计数据，请检查网络连接或稍后重试', e.message || '未知错误');
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const retryLoadMembership = async () => {
+      showMembershipErrorModal.value = false;
+      try {
+        const result = await loadExpiringMemberships();
+        expiringMemberships.value = result;
+      } catch (e) {
+        showMembershipError('会员数据加载失败', '无法获取即将过期的会员信息，请稍后刷新页面重试', e.message || '未知错误');
+      }
+    };
+
     onUnmounted(() => {
       if (abortController.value) {
         abortController.value.abort();
@@ -421,6 +542,18 @@ export default {
       getGradeTrendClass,
       getGradeTrendText,
       safeParseNumber,
+      showStatsErrorModal,
+      statsErrorTitle,
+      statsErrorMessage,
+      statsErrorDetails,
+      showMembershipErrorModal,
+      membershipErrorTitle,
+      membershipErrorMessage,
+      membershipErrorDetails,
+      closeStatsError,
+      closeMembershipError,
+      retryLoadStats,
+      retryLoadMembership,
     };
   },
 };
@@ -475,11 +608,6 @@ export default {
   gap: 1rem;
 }
 
-.last-update {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  opacity: 0.8;
-}
 
 .refresh-btn {
   background-color: var(--accent-primary);

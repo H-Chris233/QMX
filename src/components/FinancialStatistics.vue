@@ -97,19 +97,19 @@
         <!-- 日期范围搜索 -->
         <div class="date-filter">
           <div class="date-range">
-            <label>日期范围:</label>
-            <input 
-              v-model="dateFrom" 
-              type="date" 
-              placeholder="开始日期"
-              aria-label="开始日期"
+            <DatePicker
+              v-model="dateFrom"
+              label="开始日期"
+              placeholder="选择开始日期"
+              :show-calendar-icon="false"
             />
-            <span>-</span>
-            <input 
-              v-model="dateTo" 
-              type="date" 
-              placeholder="结束日期"
-              aria-label="结束日期"
+            <span class="date-separator">-</span>
+            <DatePicker
+              v-model="dateTo"
+              label="结束日期"
+              placeholder="选择结束日期"
+              :min-date="dateFrom"
+              :show-calendar-icon="false"
             />
             <button 
               class="apply-date-btn" 
@@ -323,11 +323,12 @@
             </div>
 
             <div class="form-group">
-              <label for="installment-due-date">首次到期日</label>
-              <input
-                id="installment-due-date"
+              <DatePicker
                 v-model="currentTransaction.installment_due_date"
-                type="date"
+                label="首次到期日"
+                placeholder="选择到期日期"
+                :min-date="getTodayDate()"
+                required
               />
             </div>
           </div>
@@ -408,9 +409,13 @@
 <script>
 import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } from 'vue';
 import { ApiService } from '../api/ApiService';
+import DatePicker from './DatePicker.vue';
 
 export default {
   name: 'FinancialStatistics',
+  components: {
+    DatePicker,
+  },
   setup() {
     const loading = ref(false);
     const transactions = ref([]);
@@ -436,6 +441,15 @@ export default {
       alert(`${title}\n${message}`);
     });
     
+    const showConfirm = errorHandler?.showConfirm || ((options) => {
+      const confirmed = confirm(options.message);
+      if (confirmed && options.onConfirm) {
+        options.onConfirm();
+      } else if (!confirmed && options.onCancel) {
+        options.onCancel();
+      }
+    });
+    
     const showSuccess = errorHandler?.showSuccess || ((title, message) => {
       console.log(`✅ ${title}: ${message}`);
     });
@@ -443,6 +457,11 @@ export default {
     if (!errorHandler) {
       console.warn('⚠️ errorHandler 未正确注入到 FinancialStatistics 组件');
     }
+
+    // 获取今天的日期字符串
+    const getTodayDate = () => {
+      return new Date().toISOString().split('T')[0];
+    };
 
     const currentTransaction = ref({
       type: 'income',
@@ -1067,11 +1086,14 @@ export default {
         ? `确定要删除这条交易记录吗？\n金额: ${formatTransactionAmount(transaction)}\n描述: ${transaction.description}`
         : '确定要删除这条交易记录吗？';
 
-      if (!confirm(confirmMessage)) {
-        return;
-      }
-
-      loading.value = true;
+      showConfirm({
+        title: '删除交易记录',
+        message: confirmMessage,
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmType: 'danger',
+        onConfirm: async () => {
+          loading.value = true;
       try {
         await ApiService.deleteCashTransaction(Number(id));
         
@@ -1097,9 +1119,11 @@ export default {
           '删除交易记录时发生错误，请稍后重试', 
           error.message || '未知错误'
         );
-      } finally {
-        loading.value = false;
-      }
+          } finally {
+            loading.value = false;
+          }
+        }
+      });
     };
 
     const showUpdateStatus = (transaction) => {
@@ -1253,6 +1277,7 @@ export default {
       getStatusClass,
       getStatusText,
       forceRefresh,
+      getTodayDate,
     };
   },
 };
@@ -1385,28 +1410,43 @@ export default {
 
 .date-range {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-end;
+  gap: 1rem;
   flex-wrap: wrap;
 }
 
-.date-range label {
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-right: 0.5rem;
-}
-
-.date-range input {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.date-range span {
+.date-separator {
   color: var(--text-secondary);
   font-weight: 500;
+  font-size: 1.2rem;
+  margin: 0 0.5rem;
+  align-self: center;
+}
+
+/* 移动端日期范围优化 */
+@media (max-width: 768px) {
+  .date-range {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .date-separator {
+    display: none;
+  }
+  
+  .date-filter {
+    margin-top: 1rem;
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .date-filter {
+    padding: 1rem;
+    margin: 1rem 0;
+  }
 }
 
 .apply-date-btn {
@@ -1805,6 +1845,7 @@ export default {
 @media (max-width: 768px) {
   .overview-cards {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .transactions-header {
@@ -1815,6 +1856,93 @@ export default {
 
   .filter-controls {
     flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .header-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .add-btn,
+  .refresh-btn,
+  .search-btn,
+  .apply-date-btn,
+  .clear-date-btn {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 8px;
+    width: 100%;
+  }
+  
+  .modal-footer button {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .add-btn,
+  .refresh-btn,
+  .search-btn,
+  .apply-date-btn,
+  .clear-date-btn {
+    padding: 1.25rem 1.5rem;
+    font-size: 1.125rem;
+    min-height: 52px;
+    border-radius: 12px;
+  }
+  
+  .modal-footer button {
+    padding: 1.25rem 1.5rem;
+    font-size: 1.125rem;
+    min-height: 52px;
+    border-radius: 12px;
+  }
+  
+  .overview-card {
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+  
+  .card-title {
+    font-size: 1rem;
+  }
+  
+  .card-value {
+    font-size: 1.75rem;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .add-btn:active,
+  .refresh-btn:active,
+  .search-btn:active,
+  .apply-date-btn:active,
+  .clear-date-btn:active,
+  .modal-footer button:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  .overview-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  .transaction-item:active {
+    transform: scale(0.98);
+    background-color: var(--bg-tertiary);
+    transition: all 0.1s ease;
+  }
+  
+  /* 移除点击高亮 */
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 </style>

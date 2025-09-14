@@ -197,6 +197,15 @@ export default {
       alert(`${title}\n${message}`);
     });
     
+    const showConfirm = errorHandler?.showConfirm || ((options) => {
+      const confirmed = confirm(options.message);
+      if (confirmed && options.onConfirm) {
+        options.onConfirm();
+      } else if (!confirmed && options.onCancel) {
+        options.onCancel();
+      }
+    });
+    
     const showSuccess = errorHandler?.showSuccess || ((title, message) => {
       console.log(`✅ ${title}: ${message}`);
     });
@@ -511,11 +520,14 @@ export default {
       }
 
       const studentName = students.value.find(s => s.uid == selectedStudent.value)?.name || '未知学员';
-      if (!confirm(`确定要删除${studentName}的第${scoreIndex + 1}次成绩 ${score} 吗？`)) {
-        return;
-      }
-
-      loading.value = true;
+      showConfirm({
+        title: '删除成绩',
+        message: `确定要删除${studentName}的第${scoreIndex + 1}次成绩 ${score} 吗？`,
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmType: 'danger',
+        onConfirm: async () => {
+          loading.value = true;
       try {
         const studentUid = Number(selectedStudent.value);
         await ApiService.deleteStudentScore(studentUid, scoreIndex);
@@ -542,9 +554,11 @@ export default {
           '删除学员成绩时发生错误，请稍后重试', 
           error.message || '未知错误'
         );
-      } finally {
-        loading.value = false;
-      }
+          } finally {
+            loading.value = false;
+          }
+        }
+      });
     };
 
     // 编辑成绩

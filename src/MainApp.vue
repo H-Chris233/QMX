@@ -87,8 +87,19 @@
       @retry="retryWithError"
     />
 
-    <!-- 会员到期提醒 -->
-    <MembershipAlerts ref="membershipAlertsRef" />
+    <!-- 确认弹窗 -->
+    <ConfirmModal
+      :show="confirmModal.show"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      :details="confirmModal.details"
+      :confirm-text="confirmModal.confirmText"
+      :cancel-text="confirmModal.cancelText"
+      :confirm-type="confirmModal.confirmType"
+      @confirm="handleConfirm"
+      @cancel="handleCancel"
+    />
+
   </div>
 </template>
 
@@ -100,7 +111,8 @@ import ScoreManagement from './components/ScoreManagement.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import ErrorModal from './components/ErrorModal.vue';
-import MembershipAlerts from './components/MembershipAlerts.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
+import DatePicker from './components/DatePicker.vue';
 
 export default {
   name: 'MainApp',
@@ -111,7 +123,8 @@ export default {
     Dashboard,
     Settings,
     ErrorModal,
-    MembershipAlerts,
+    ConfirmModal,
+    DatePicker,
   },
   setup() {
     const theme = ref('dark');
@@ -124,6 +137,19 @@ export default {
       message: '',
       details: '',
       showRetry: false,
+    });
+
+    // 确认弹窗状态
+    const confirmModal = ref({
+      show: false,
+      title: '确认操作',
+      message: '',
+      details: '',
+      confirmText: '确定',
+      cancelText: '取消',
+      confirmType: 'primary',
+      onConfirm: null,
+      onCancel: null,
     });
 
     const menuItems = [
@@ -181,6 +207,46 @@ export default {
     const retryWithError = () => {
       errorModal.value.show = false;
       // 这里可以添加重试逻辑，目前只是关闭弹窗
+    };
+
+    // 确认弹窗方法
+    const showConfirm = (options) => {
+      const {
+        title = '确认操作',
+        message,
+        details = '',
+        confirmText = '确定',
+        cancelText = '取消',
+        confirmType = 'primary',
+        onConfirm = null,
+        onCancel = null,
+      } = options;
+
+      confirmModal.value = {
+        show: true,
+        title,
+        message,
+        details,
+        confirmText,
+        cancelText,
+        confirmType,
+        onConfirm,
+        onCancel,
+      };
+    };
+
+    const handleConfirm = () => {
+      confirmModal.value.show = false;
+      if (confirmModal.value.onConfirm) {
+        confirmModal.value.onConfirm();
+      }
+    };
+
+    const handleCancel = () => {
+      confirmModal.value.show = false;
+      if (confirmModal.value.onCancel) {
+        confirmModal.value.onCancel();
+      }
     };
 
     // 成功消息处理（简单的控制台日志，可以后续扩展为Toast通知）
@@ -320,6 +386,7 @@ export default {
       hideError,
       retryWithError,
       showSuccess,
+      showConfirm,
     });
 
     provide('refreshSystem', {
@@ -367,6 +434,10 @@ export default {
       showError,
       hideError,
       retryWithError,
+      confirmModal,
+      showConfirm,
+      handleConfirm,
+      handleCancel,
       isSidebarOpen,
       toggleSidebar,
       handleSidebarItemClick,
@@ -498,6 +569,23 @@ export default {
   color: var(--text-primary);
   font-size: 1.5rem;
   cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.sidebar-toggle:active {
+  transform: scale(0.95);
+  background-color: var(--bg-secondary);
 }
 
 /* ========== 大屏：水平导航菜单（≥769px 显示） ========== */
@@ -515,20 +603,22 @@ export default {
 .sidebar {
   position: fixed;
   top: 0;
-  left: -250px; /* 初始隐藏 */
+  left: 0;
   width: 250px;
   height: 100vh;
   background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   box-shadow: 2px 0 8px var(--shadow-color);
-  transition: left 0.3s ease; /* 确保过渡生效 */
+  transform: translateX(-100%); /* 完全隐藏在屏幕外 */
+  transition: transform 0.3s ease; /* 使用transform性能更好 */
   z-index: 999;
   display: flex;
   flex-direction: column;
   padding: 1rem;
+  overflow: hidden; /* 防止内容溢出 */
 }
 .sidebar-open {
-  left: 0; /* 展开时回到屏幕内 */
+  transform: translateX(0); /* 展开时回到屏幕内 */
 }
 .sidebar-header {
   display: flex;
@@ -542,6 +632,24 @@ export default {
   color: var(--text-primary);
   font-size: 1.5rem;
   cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-close:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.sidebar-close:active {
+  transform: scale(0.95);
+  background-color: var(--bg-primary);
 }
 .sidebar-menu {
   list-style: none;
@@ -551,19 +659,28 @@ export default {
 .sidebar-menu li {
   display: flex;
   align-items: center;
-  padding: 0.75rem;
+  padding: 1rem 0.75rem;
   margin-bottom: 0.5rem;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
   color: var(--text-primary);
+  min-height: 48px;
+  font-size: 1rem;
+  -webkit-tap-highlight-color: transparent;
 }
 .sidebar-menu li.active {
   background-color: var(--accent-primary);
   color: white;
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
 }
 .sidebar-menu li:hover {
   background-color: var(--bg-tertiary);
+  transform: translateX(2px);
+}
+.sidebar-menu li:active {
+  transform: scale(0.98) translateX(2px);
 }
 .sidebar-icon {
   margin-right: 0.5rem;
@@ -623,7 +740,71 @@ export default {
     font-size: 1rem;
   }
   .sidebar-menu li {
-    padding: 0.5rem;
+    padding: 1rem;
+    font-size: 1.125rem;
+  }
+  .sidebar {
+    width: 280px;
+    padding: 1.5rem;
+  }
+  .main-content {
+    padding: 1rem;
+  }
+}
+
+/* 超小屏优化（≤480px） */
+@media (max-width: 480px) {
+  .navbar {
+    padding: 0.75rem;
+  }
+  
+  .nav-mobile-header h1 {
+    font-size: 1.125rem;
+  }
+  
+  .sidebar {
+    width: calc(100vw - 40px);
+    max-width: 320px;
+    border-radius: 0 16px 16px 0;
+  }
+  
+  .sidebar-header h2 {
+    font-size: 1.25rem;
+  }
+  
+  .main-content {
+    padding: 0.75rem;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .sidebar-overlay {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .sidebar-menu li:active {
+    background-color: var(--accent-primary);
+    color: white;
+  }
+  
+  .sidebar-menu li.active:active {
+    background-color: #1976d2;
+  }
+}
+
+/* 横屏模式优化 */
+@media (max-width: 768px) and (orientation: landscape) {
+  .sidebar {
+    width: 240px;
+  }
+  
+  .navbar {
+    padding: 0.5rem 1rem;
+  }
+  
+  .main-content {
+    padding: 1rem;
   }
 }
 </style>
