@@ -298,7 +298,7 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
     Ok(())
 }
 
-// v2 API - 删除学生成绩
+// v2 API - 删除学生成绩（使用 remove_ring_at 方法）
 #[tauri::command]
 fn delete_student_score(student_uid: u64, score_index: usize) -> Result<(), String> {
     init_manager()?;
@@ -309,38 +309,20 @@ fn delete_student_score(student_uid: u64, score_index: usize) -> Result<(), Stri
     }
 
     let manager = get_manager()?;
-    let student = manager
-        .get_student(student_uid)
-        .map_err(|e| {
-            log::error!("v2 API获取学生失败 - UID: {}, 错误: {}", student_uid, e);
-            format!("获取学生失败: {}", e)
-        })?
-        .ok_or_else(|| {
-            log::warn!("v2 API学员不存在 - UID: {}", student_uid);
-            "学员不存在".to_string()
-        })?;
-
-    let mut rings = student.rings().to_vec();
     
-    if score_index >= rings.len() {
-        return Err("成绩索引超出范围".to_string());
-    }
-
-    let removed_score = rings.remove(score_index);
-    
-    // 更新学生的成绩列表
+    // 使用新的 remove_ring_at 方法直接删除指定索引的成绩
     manager
-        .update_student(student_uid, StudentUpdater::new().set_rings(rings))
+        .update_student(student_uid, StudentUpdater::new().remove_ring_at(score_index))
         .map_err(|e| {
             log::error!("v2 API删除成绩失败 - 学生UID: {}, 索引: {}, 错误: {}", student_uid, score_index, e);
             format!("删除成绩失败: {}", e)
         })?;
 
-    log::info!("v2 API成功删除成绩 - 学生UID: {}, 索引: {}, 成绩: {}", student_uid, score_index, removed_score);
+    log::info!("v2 API成功删除成绩 - 学生UID: {}, 索引: {}", student_uid, score_index);
     Ok(())
 }
 
-// v2 API - 更新学生成绩
+// v2 API - 更新学生成绩（使用 update_ring_at 方法）
 #[tauri::command]
 fn update_student_score(student_uid: u64, score_index: usize, new_score: f64) -> Result<(), String> {
     init_manager()?;
@@ -357,35 +339,16 @@ fn update_student_score(student_uid: u64, score_index: usize, new_score: f64) ->
     }
 
     let manager = get_manager()?;
-    let student = manager
-        .get_student(student_uid)
-        .map_err(|e| {
-            log::error!("v2 API获取学生失败 - UID: {}, 错误: {}", student_uid, e);
-            format!("获取学生失败: {}", e)
-        })?
-        .ok_or_else(|| {
-            log::warn!("v2 API学员不存在 - UID: {}", student_uid);
-            "学员不存在".to_string()
-        })?;
-
-    let mut rings = student.rings().to_vec();
     
-    if score_index >= rings.len() {
-        return Err("成绩索引超出范围".to_string());
-    }
-
-    let old_score = rings[score_index];
-    rings[score_index] = new_score;
-    
-    // 更新学生的成绩列表
+    // 使用新的 update_ring_at 方法直接更新指定索引的成绩
     manager
-        .update_student(student_uid, StudentUpdater::new().set_rings(rings))
+        .update_student(student_uid, StudentUpdater::new().update_ring_at(score_index, new_score))
         .map_err(|e| {
             log::error!("v2 API更新成绩失败 - 学生UID: {}, 索引: {}, 错误: {}", student_uid, score_index, e);
             format!("更新成绩失败: {}", e)
         })?;
 
-    log::info!("v2 API成功更新成绩 - 学生UID: {}, 索引: {}, 旧成绩: {}, 新成绩: {}", student_uid, score_index, old_score, new_score);
+    log::info!("v2 API成功更新成绩 - 学生UID: {}, 索引: {}, 新成绩: {}", student_uid, score_index, new_score);
     Ok(())
 }
 
