@@ -4,7 +4,8 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "additionalDirectories": [
-      "/data/data/com.termux/files/home/qmx_backend_lib"
+      "/data/data/com.termux/files/home/qmx_backend_lib",
+      "/home/Chris233/Desktop/QMX_PROJECT/qmx_backend_lib"
     ]
   }
 }

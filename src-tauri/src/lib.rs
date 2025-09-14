@@ -298,6 +298,97 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
     Ok(())
 }
 
+// v2 API - 删除学生成绩
+#[tauri::command]
+fn delete_student_score(student_uid: u64, score_index: usize) -> Result<(), String> {
+    init_manager()?;
+
+    // 输入验证
+    if student_uid == 0 {
+        return Err("学生UID无效".to_string());
+    }
+
+    let manager = get_manager()?;
+    let student = manager
+        .get_student(student_uid)
+        .map_err(|e| {
+            log::error!("v2 API获取学生失败 - UID: {}, 错误: {}", student_uid, e);
+            format!("获取学生失败: {}", e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("v2 API学员不存在 - UID: {}", student_uid);
+            "学员不存在".to_string()
+        })?;
+
+    let mut rings = student.rings().to_vec();
+    
+    if score_index >= rings.len() {
+        return Err("成绩索引超出范围".to_string());
+    }
+
+    let removed_score = rings.remove(score_index);
+    
+    // 更新学生的成绩列表
+    manager
+        .update_student(student_uid, StudentUpdater::new().set_rings(rings))
+        .map_err(|e| {
+            log::error!("v2 API删除成绩失败 - 学生UID: {}, 索引: {}, 错误: {}", student_uid, score_index, e);
+            format!("删除成绩失败: {}", e)
+        })?;
+
+    log::info!("v2 API成功删除成绩 - 学生UID: {}, 索引: {}, 成绩: {}", student_uid, score_index, removed_score);
+    Ok(())
+}
+
+// v2 API - 更新学生成绩
+#[tauri::command]
+fn update_student_score(student_uid: u64, score_index: usize, new_score: f64) -> Result<(), String> {
+    init_manager()?;
+
+    // 输入验证
+    if student_uid == 0 {
+        return Err("学生UID无效".to_string());
+    }
+    if new_score < 0.0 || new_score > 1000.0 {
+        return Err("成绩必须在0-1000范围内".to_string());
+    }
+    if !new_score.is_finite() {
+        return Err("成绩必须是有效数字".to_string());
+    }
+
+    let manager = get_manager()?;
+    let student = manager
+        .get_student(student_uid)
+        .map_err(|e| {
+            log::error!("v2 API获取学生失败 - UID: {}, 错误: {}", student_uid, e);
+            format!("获取学生失败: {}", e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("v2 API学员不存在 - UID: {}", student_uid);
+            "学员不存在".to_string()
+        })?;
+
+    let mut rings = student.rings().to_vec();
+    
+    if score_index >= rings.len() {
+        return Err("成绩索引超出范围".to_string());
+    }
+
+    let old_score = rings[score_index];
+    rings[score_index] = new_score;
+    
+    // 更新学生的成绩列表
+    manager
+        .update_student(student_uid, StudentUpdater::new().set_rings(rings))
+        .map_err(|e| {
+            log::error!("v2 API更新成绩失败 - 学生UID: {}, 索引: {}, 错误: {}", student_uid, score_index, e);
+            format!("更新成绩失败: {}", e)
+        })?;
+
+    log::info!("v2 API成功更新成绩 - 学生UID: {}, 索引: {}, 旧成绩: {}, 新成绩: {}", student_uid, score_index, old_score, new_score);
+    Ok(())
+}
+
 // v2 API - 获取学生成绩（优化版）
 #[tauri::command]
 fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String> {
@@ -1266,6 +1357,9 @@ fn get_membership_expiring_soon(days: i64) -> Result<Vec<StudentResponse>, Strin
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    simple_logger::init().unwrap();
+    log::info!("启明星管理系统启动，日志系统已初始化");
+    
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             open_main_window,
@@ -1273,6 +1367,8 @@ pub fn run() {
             get_all_students,
             add_score,
             get_student_scores,
+            delete_student_score,
+            update_student_score,
             update_student_info,
             delete_student,
             add_cash_transaction,

@@ -123,11 +123,17 @@ export interface StudentUpdateBatch {
   note?: string;
 }
 
+export interface StudentScoresResponse {
+  rings: number[];
+}
+
 export type TauriCommand = 
   | 'add_student'
   | 'get_all_students'
   | 'add_score'
   | 'get_student_scores'
+  | 'delete_student_score'
+  | 'update_student_score'
   | 'update_student_info'
   | 'delete_student'
   | 'add_cash_transaction'

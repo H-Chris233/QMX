@@ -405,7 +405,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
@@ -446,6 +446,7 @@ export default {
     });
     const searchInput = ref(null);
     const errorHandler = inject('errorHandler');
+    const refreshSystem = inject('refreshSystem');
     
     // 确保错误处理函数可用
     const showError = errorHandler?.showError || ((title, message, details) => {
@@ -747,11 +748,20 @@ export default {
         
         console.log(`成功删除学员 ID: ${uid}`);
         
-        // 重新加载数据
-        await loadStudents();
+        // 保存当前页面状态
+        const studentName = student ? student.name : '学员';
+        try {
+          localStorage.setItem('qmx_active_tab', 'students');
+          localStorage.setItem('qmx_last_operation', `学员"${studentName}"删除成功`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
         
-        // 显示成功消息
-        showSuccess('删除成功', student ? `学员"${student.name}"已删除` : '学员已删除');
+        console.log(`✅ 学员"${studentName}"删除成功，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('删除学员失败:', error);
         showError(
@@ -1007,8 +1017,22 @@ export default {
           }
         }
 
-        await loadStudents(); // 重新加载数据
         closeModals();
+        
+        // 保存当前页面状态
+        const operationType = showAddModal.value ? '学员添加成功' : '学员更新成功';
+        try {
+          localStorage.setItem('qmx_active_tab', 'students');
+          localStorage.setItem('qmx_last_operation', operationType);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        console.log(`✅ ${operationType}，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('保存学员失败:', error);
         const errorMessage = error.message || '未知错误';
@@ -1168,10 +1192,25 @@ export default {
 
       loading.value = true;
       try {
+        const studentName = membershipStudent.value.name; // 保存学员姓名
         await ApiService.setMembershipByType(membershipStudent.value.uid, type, true);
-        showSuccess('设置成功', `已为${membershipStudent.value.name}设置${type === 'month' ? '月卡' : '年卡'}会员`);
-        await loadStudents(); // 重新加载数据
+        
         closeMembershipModal();
+        
+        // 保存当前页面状态
+        const membershipType = type === 'month' ? '月卡' : '年卡';
+        try {
+          localStorage.setItem('qmx_active_tab', 'students');
+          localStorage.setItem('qmx_last_operation', `已为${studentName}设置${membershipType}会员`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        console.log(`✅ 已为${studentName}设置${membershipType}会员，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('设置会员失败:', error);
         showError('设置失败', '设置会员时发生错误', error.message);
@@ -1191,16 +1230,30 @@ export default {
         return;
       }
 
-      if (!confirm(`确定要清除${membershipStudent.value.name}的会员信息吗？`)) {
+      const studentName = membershipStudent.value.name; // 保存学员姓名
+      if (!confirm(`确定要清除${studentName}的会员信息吗？`)) {
         return;
       }
 
       loading.value = true;
       try {
         await ApiService.clearStudentMembership(membershipStudent.value.uid);
-        showSuccess('清除成功', `已清除${membershipStudent.value.name}的会员信息`);
-        await loadStudents(); // 重新加载数据
+        
         closeMembershipModal();
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'students');
+          localStorage.setItem('qmx_last_operation', `已清除${studentName}的会员信息`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        console.log(`✅ 已清除${studentName}的会员信息，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('清除会员失败:', error);
         showError('清除失败', '清除会员时发生错误', error.message);
@@ -1232,13 +1285,27 @@ export default {
 
       loading.value = true;
       try {
+        const studentName = membershipStudent.value.name; // 保存学员姓名
         const startDate = new Date(membershipForm.value.startDate).toISOString();
         const endDate = new Date(membershipForm.value.endDate).toISOString();
         
         await ApiService.setStudentMembership(membershipStudent.value.uid, startDate, endDate);
-        showSuccess('设置成功', `已为${membershipStudent.value.name}设置自定义会员时间`);
-        await loadStudents(); // 重新加载数据
+        
         closeMembershipModal();
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'students');
+          localStorage.setItem('qmx_last_operation', `已为${studentName}设置自定义会员时间`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        console.log(`✅ 已为${studentName}设置自定义会员时间，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('设置自定义会员失败:', error);
         showError('设置失败', '设置自定义会员时发生错误', error.message);
@@ -1246,6 +1313,19 @@ export default {
         loading.value = false;
       }
     };
+
+    // 监听刷新触发器
+    if (refreshSystem?.refreshTriggers) {
+      watch(
+        () => refreshSystem.refreshTriggers.students,
+        (newValue, oldValue) => {
+          if (newValue > oldValue) {
+            console.log('StudentManagement 收到刷新信号，重新加载数据');
+            loadStudents();
+          }
+        }
+      );
+    }
 
     onMounted(() => {
       try {

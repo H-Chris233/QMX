@@ -122,8 +122,28 @@
             class="score-item"
             :class="getScoreClass(score)"
           >
-            <div class="score-number">{{ score }}</div>
-            <div class="score-index">第{{ index + 1 }}次</div>
+            <div class="score-content">
+              <div class="score-number">{{ score }}</div>
+              <div class="score-index">第{{ index + 1 }}次</div>
+            </div>
+            <div class="score-actions">
+              <button 
+                class="edit-score-btn"
+                @click="editScore(index, score)"
+                :disabled="loading"
+                title="编辑成绩"
+              >
+                ✏️
+              </button>
+              <button 
+                class="delete-score-btn"
+                @click="deleteScore(index, score)"
+                :disabled="loading"
+                title="删除成绩"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -156,7 +176,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 
 export default {
@@ -170,6 +190,7 @@ export default {
     const studentSelect = ref(null);
     const abortController = ref(null);
     const errorHandler = inject('errorHandler');
+    const refreshSystem = inject('refreshSystem');
     
     const showError = errorHandler?.showError || ((title, message, details) => {
       console.error(`${title}: ${message}`, details);
@@ -447,23 +468,139 @@ export default {
 
       loading.value = true;
       try {
+        const studentName = students.value.find(s => s.uid == studentUid)?.name || '未知学员';
         await ApiService.addScore(studentUid, score);
         
         console.log(`成功为学员 ${studentUid} 添加成绩 ${score}`);
-        quickScore.value = '';
         
-        // 重新加载成绩
-        await onStudentChange();
-        
-        // 显示成功消息
-        if (showSuccess) {
-          showSuccess('添加成功', `成绩 ${score} 已成功添加`);
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'scores');
+          localStorage.setItem('qmx_last_operation', `已为${studentName}添加成绩${score}`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
         }
+        
+        console.log(`✅ 已为${studentName}添加成绩${score}，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('添加成绩失败:', error);
         showError(
           '添加失败', 
           '添加学员成绩时发生错误，请稍后重试', 
+          error.message || '未知错误'
+        );
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // 删除成绩
+    const deleteScore = async (scoreIndex, score) => {
+      if (loading.value) {
+        console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!selectedStudent.value) {
+        showError('操作失败', '请先选择学员');
+        return;
+      }
+
+      const studentName = students.value.find(s => s.uid == selectedStudent.value)?.name || '未知学员';
+      if (!confirm(`确定要删除${studentName}的第${scoreIndex + 1}次成绩 ${score} 吗？`)) {
+        return;
+      }
+
+      loading.value = true;
+      try {
+        const studentUid = Number(selectedStudent.value);
+        await ApiService.deleteStudentScore(studentUid, scoreIndex);
+        
+        console.log(`成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'scores');
+          localStorage.setItem('qmx_last_operation', `已删除${studentName}的第${scoreIndex + 1}次成绩${score}`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        console.log(`✅ 已删除${studentName}的第${scoreIndex + 1}次成绩${score}，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
+      } catch (error) {
+        console.error('删除成绩失败:', error);
+        showError(
+          '删除失败', 
+          '删除学员成绩时发生错误，请稍后重试', 
+          error.message || '未知错误'
+        );
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // 编辑成绩
+    const editScore = async (scoreIndex, currentScore) => {
+      if (loading.value) {
+        console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!selectedStudent.value) {
+        showError('操作失败', '请先选择学员');
+        return;
+      }
+
+      const studentName = students.value.find(s => s.uid == selectedStudent.value)?.name || '未知学员';
+      const newScoreStr = prompt(`修改${studentName}的第${scoreIndex + 1}次成绩：`, currentScore.toString());
+      
+      if (newScoreStr === null) {
+        return; // 用户取消
+      }
+
+      const newScore = Number(newScoreStr);
+      if (isNaN(newScore) || newScore < 0 || newScore > getMaxScore()) {
+        showError('输入错误', `成绩必须是0-${getMaxScore()}之间的数字`);
+        return;
+      }
+
+      if (newScore === currentScore) {
+        return; // 没有变化
+      }
+
+      loading.value = true;
+      try {
+        const studentUid = Number(selectedStudent.value);
+        await ApiService.updateStudentScore(studentUid, scoreIndex, newScore);
+        
+        console.log(`成功更新学员 ${studentUid} 的第 ${scoreIndex} 个成绩为 ${newScore}`);
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'scores');
+          localStorage.setItem('qmx_last_operation', `已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        console.log(`✅ 已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}，即将刷新页面`);
+        
+        // 直接刷新整个页面
+        window.location.reload();
+      } catch (error) {
+        console.error('更新成绩失败:', error);
+        showError(
+          '更新失败', 
+          '更新学员成绩时发生错误，请稍后重试', 
           error.message || '未知错误'
         );
       } finally {
@@ -557,6 +694,19 @@ export default {
     };
 
     // 生命周期钩子
+    // 监听刷新触发器
+    if (refreshSystem?.refreshTriggers) {
+      watch(
+        () => refreshSystem.refreshTriggers.scores,
+        (newValue, oldValue) => {
+          if (newValue > oldValue) {
+            console.log('ScoreManagement 收到刷新信号，重新加载数据');
+            loadData();
+          }
+        }
+      );
+    }
+
     onMounted(() => {
       loadData();
     });
@@ -585,6 +735,8 @@ export default {
       loadData,
       onStudentChange,
       addQuickScore,
+      deleteScore,
+      editScore,
       exportScores,
     };
   },
@@ -837,11 +989,70 @@ export default {
 }
 
 .score-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   text-align: center;
   padding: 0.75rem;
   border-radius: 6px;
   border: 2px solid transparent;
   transition: all 0.3s ease;
+  position: relative;
+}
+
+.score-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.score-content {
+  flex: 1;
+}
+
+.score-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.score-item:hover .score-actions {
+  opacity: 1;
+}
+
+.edit-score-btn,
+.delete-score-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.edit-score-btn:hover {
+  background-color: rgba(33, 150, 243, 0.1);
+  transform: scale(1.1);
+}
+
+.delete-score-btn:hover {
+  background-color: rgba(244, 67, 54, 0.1);
+  transform: scale(1.1);
+}
+
+.edit-score-btn:disabled,
+.delete-score-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .score-item.excellent {

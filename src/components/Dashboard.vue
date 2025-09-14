@@ -76,7 +76,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, inject } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 
 export default {
@@ -86,6 +86,7 @@ export default {
     const abortController = ref(null);
     const lastUpdateTime = ref(null);
     const errorHandler = inject('errorHandler');
+    const refreshSystem = inject('refreshSystem');
     
     const showError = errorHandler?.showError || ((title, message, details) => {
       console.error(`${title}: ${message}`, details);
@@ -315,6 +316,19 @@ export default {
     };
 
     // 生命周期钩子
+    // 监听刷新触发器
+    if (refreshSystem?.refreshTriggers) {
+      watch(
+        () => refreshSystem.refreshTriggers.dashboard,
+        (newValue, oldValue) => {
+          if (newValue > oldValue) {
+            console.log('Dashboard 收到刷新信号，重新加载数据');
+            loadDashboardData();
+          }
+        }
+      );
+    }
+
     onMounted(() => {
       loadDashboardData();
     });

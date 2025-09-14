@@ -5,14 +5,24 @@
 
     <div class="section-header">
       <h2>收支统计</h2>
-      <button
-        class="add-btn"
-        @click="showAddTransaction = true"
-        :disabled="loading"
-        aria-label="添加新交易"
-      >
-        {{ loading ? '加载中...' : '➕ 添加交易' }}
-      </button>
+      <div class="header-actions">
+        <button
+          class="refresh-btn"
+          @click="forceRefresh"
+          :disabled="loading"
+          title="刷新数据"
+        >
+          🔄 刷新
+        </button>
+        <button
+          class="add-btn"
+          @click="showAddTransaction = true"
+          :disabled="loading"
+          aria-label="添加新交易"
+        >
+          {{ loading ? '加载中...' : '➕ 添加交易' }}
+        </button>
+      </div>
     </div>
 
     <!-- 总览卡片 -->
@@ -396,7 +406,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } from 'vue';
 import { ApiService } from '../api/ApiService';
 
 export default {
@@ -416,6 +426,10 @@ export default {
     const selectedStatus = ref('Pending');
     const abortController = ref(null);
     const errorHandler = inject('errorHandler');
+    const refreshSystem = inject('refreshSystem');
+    
+    // 添加一个强制刷新触发器
+    const forceUpdateTrigger = ref(0);
     
     const showError = errorHandler?.showError || ((title, message, details) => {
       console.error(`${title}: ${message}`, details);
@@ -468,9 +482,12 @@ export default {
       return filtered;
     });
 
-    // 增强的计算属性 - 防止数值溢出和无效数据
+    // 计算属性 - 总收入
     const totalIncome = computed(() => {
       try {
+        // 依赖强制更新触发器确保重新计算
+        forceUpdateTrigger.value;
+        
         const MAX_SAFE_AMOUNT = 999999999999;
         let total = 0;
         
@@ -482,13 +499,13 @@ export default {
           const amount = Math.max(0, Math.min(MAX_SAFE_AMOUNT, transaction.amount));
           total += amount;
           
-          // 检查累计是否超出安全范围
           if (total > MAX_SAFE_AMOUNT) {
             console.warn('总收入超出安全范围，限制为最大值');
             return MAX_SAFE_AMOUNT;
           }
         }
         
+        console.log('💰 总收入计算完成:', total, '(来自', incomeTransactions.length, '笔收入交易)', '时间戳:', Date.now());
         return total;
       } catch (error) {
         console.error('计算总收入失败:', error);
@@ -496,8 +513,12 @@ export default {
       }
     });
 
+    // 计算属性 - 总支出
     const totalExpense = computed(() => {
       try {
+        // 依赖强制更新触发器确保重新计算
+        forceUpdateTrigger.value;
+        
         const MAX_SAFE_AMOUNT = 999999999999;
         let total = 0;
         
@@ -509,13 +530,13 @@ export default {
           const amount = Math.max(0, Math.min(MAX_SAFE_AMOUNT, transaction.amount));
           total += amount;
           
-          // 检查累计是否超出安全范围
           if (total > MAX_SAFE_AMOUNT) {
             console.warn('总支出超出安全范围，限制为最大值');
             return MAX_SAFE_AMOUNT;
           }
         }
         
+        console.log('💸 总支出计算完成:', total, '(来自', expenseTransactions.length, '笔支出交易)', '时间戳:', Date.now());
         return total;
       } catch (error) {
         console.error('计算总支出失败:', error);
@@ -901,13 +922,14 @@ export default {
           })
           .filter(transaction => transaction !== null);
 
+        // 更新交易数据
         transactions.value = validTransactions;
         
         if (validTransactions.length !== cashTransactions.length) {
           console.warn(`过滤了 ${cashTransactions.length - validTransactions.length} 个无效交易记录`);
         }
         
-        console.log(`成功加载 ${validTransactions.length} 条交易记录`);
+        console.log(`✅ 成功加载 ${validTransactions.length} 条交易记录`);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('加载交易数据失败:', error);
@@ -997,15 +1019,24 @@ export default {
           console.log('普通交易创建成功:', result);
         }
 
-        // 重新加载数据
-        await loadTransactions();
+        // 关闭模态框
         closeModals();
         
         // 显示成功消息
-        if (showSuccess) {
-          const transactionType = isInstallmentMode.value ? '分期付款' : '交易';
-          showSuccess('保存成功', `${transactionType}已成功添加`);
+        const transactionType = isInstallmentMode.value ? '分期付款' : '交易';
+        console.log(`✅ ${transactionType}保存成功，即将刷新页面`);
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'finance');
+          localStorage.setItem('qmx_last_operation', `${transactionType}保存成功`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
         }
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('保存交易失败:', error);
         const errorMessage = error.message || '未知错误';
@@ -1046,12 +1077,19 @@ export default {
         
         console.log(`成功删除交易记录 ID: ${id}`);
         
-        // 重新加载数据
-        await loadTransactions();
+        console.log('✅ 交易删除成功，即将刷新页面');
         
-        if (showSuccess) {
-          showSuccess('删除成功', '交易记录已删除');
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'finance');
+          localStorage.setItem('qmx_last_operation', '交易删除成功');
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
         }
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('删除交易失败:', error);
         showError(
@@ -1080,9 +1118,20 @@ export default {
           selectedStatus.value,
         );
 
-        await loadTransactions();
         closeModals();
-        showSuccess('成功', '分期状态已更新');
+        console.log('✅ 分期状态更新成功，即将刷新页面');
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'finance');
+          localStorage.setItem('qmx_last_operation', '分期状态更新成功');
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        // 直接刷新整个页面
+        window.location.reload();
       } catch (error) {
         console.error('更新分期状态失败:', error);
         showError('更新失败', '更新分期状态时发生错误', error.message);
@@ -1106,6 +1155,58 @@ export default {
         custom_frequency_days: 30,
         installment_due_date: new Date().toISOString().split('T')[0],
       };
+    };
+
+    // 监听刷新触发器
+    if (refreshSystem?.refreshTriggers) {
+      watch(
+        () => refreshSystem.refreshTriggers.transactions,
+        (newValue, oldValue) => {
+          if (newValue > oldValue) {
+            console.log('FinancialStatistics 收到刷新信号，重新加载数据');
+            loadTransactions();
+          }
+        }
+      );
+    }
+    
+    // 添加直接监听 transactions 数据变化
+    watch(
+      () => transactions.value,
+      (newTransactions, oldTransactions) => {
+        console.log('🔄 transactions 数据发生变化:', {
+          oldLength: oldTransactions?.length || 0,
+          newLength: newTransactions?.length || 0,
+          timestamp: Date.now()
+        });
+        
+        // 强制触发计算属性更新
+        forceUpdateTrigger.value++;
+        console.log('🔄 因数据变化强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
+      },
+      { deep: true }
+    );
+    
+    // 添加强制刷新函数
+    const forceRefresh = async () => {
+      console.log('🔄 强制刷新FinancialStatistics数据');
+      
+      // 重新加载数据
+      await loadTransactions();
+      
+      // 强制触发计算属性更新
+      forceUpdateTrigger.value++;
+      console.log('🔄 强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
+      
+      // 触发其他组件刷新
+      if (refreshSystem?.triggerRefresh) {
+        refreshSystem.triggerRefresh('dashboard');
+        refreshSystem.triggerRefresh('transactions');
+        refreshSystem.triggerRefresh('students');
+        console.log('✅ 已触发所有相关组件刷新');
+      }
+      
+      console.log('✅ 强制刷新完成');
     };
 
     onMounted(() => {
@@ -1151,6 +1252,7 @@ export default {
       closeModals,
       getStatusClass,
       getStatusText,
+      forceRefresh,
     };
   },
 };
@@ -1391,6 +1493,34 @@ export default {
 .section-header h2 {
   margin: 0;
   color: var(--text-primary);
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.refresh-btn {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+  transform: translateY(-1px);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .add-btn {

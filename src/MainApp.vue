@@ -88,12 +88,12 @@
     />
 
     <!-- 会员到期提醒 -->
-    <MembershipAlerts />
+    <MembershipAlerts ref="membershipAlertsRef" />
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, provide } from 'vue';
+import { ref, onMounted, onUnmounted, provide, watch } from 'vue';
 import StudentManagement from './components/StudentManagement.vue';
 import FinancialStatistics from './components/FinancialStatistics.vue';
 import ScoreManagement from './components/ScoreManagement.vue';
@@ -194,6 +194,30 @@ export default {
 
     onMounted(() => {
       try {
+        // 恢复页面状态
+        const savedActiveTab = localStorage.getItem('qmx_active_tab');
+        if (savedActiveTab && ['dashboard', 'students', 'finance', 'scores', 'settings'].includes(savedActiveTab)) {
+          activeTab.value = savedActiveTab;
+          console.log('🔄 恢复到之前的页面:', savedActiveTab);
+        }
+        
+        // 检查并显示上次操作结果
+        const lastOperation = localStorage.getItem('qmx_last_operation');
+        const lastOperationTime = localStorage.getItem('qmx_last_operation_time');
+        
+        if (lastOperation && lastOperationTime) {
+          const timeDiff = Date.now() - parseInt(lastOperationTime);
+          // 如果操作是在5秒内完成的，显示成功消息
+          if (timeDiff < 5000) {
+            console.log('✅ 页面刷新完成，上次操作:', lastOperation);
+            showSuccess('操作成功', lastOperation);
+          }
+          
+          // 清除操作记录
+          localStorage.removeItem('qmx_last_operation');
+          localStorage.removeItem('qmx_last_operation_time');
+        }
+        
         // 安全的主题初始化
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme && ['dark', 'light'].includes(savedTheme)) {
@@ -265,12 +289,73 @@ export default {
       cleanupFunctions = [];
     });
 
-    // 提供全局错误处理方法给子组件使用
+    // 全局数据刷新事件系统
+    const refreshTriggers = ref({
+      students: 0,
+      transactions: 0,
+      dashboard: 0,
+      scores: 0,
+    });
+
+    const triggerRefresh = (componentType) => {
+      try {
+        if (componentType === 'all') {
+          // 刷新所有组件
+          refreshTriggers.value.students++;
+          refreshTriggers.value.transactions++;
+          refreshTriggers.value.dashboard++;
+          refreshTriggers.value.scores++;
+        } else if (refreshTriggers.value.hasOwnProperty(componentType)) {
+          refreshTriggers.value[componentType]++;
+        }
+        console.log(`触发 ${componentType} 组件刷新`);
+      } catch (error) {
+        console.error('触发刷新失败:', error);
+      }
+    };
+
+    // 提供全局错误处理方法和刷新机制给子组件使用
     provide('errorHandler', {
       showError,
       hideError,
       retryWithError,
       showSuccess,
+    });
+
+    provide('refreshSystem', {
+      refreshTriggers,
+      triggerRefresh,
+    });
+
+    // 监听标签页切换，自动刷新对应组件并保存状态
+    watch(activeTab, (newTab, oldTab) => {
+      if (newTab !== oldTab) {
+        console.log(`切换到 ${newTab} 标签页，触发刷新`);
+        
+        // 保存当前页面状态到 localStorage
+        try {
+          localStorage.setItem('qmx_active_tab', newTab);
+          console.log('💾 已保存当前页面状态:', newTab);
+        } catch (error) {
+          console.warn('保存页面状态失败:', error);
+        }
+        
+        // 根据切换的标签页触发对应的刷新
+        switch (newTab) {
+          case 'dashboard':
+            triggerRefresh('dashboard');
+            break;
+          case 'students':
+            triggerRefresh('students');
+            break;
+          case 'finance':
+            triggerRefresh('transactions');
+            break;
+          case 'scores':
+            triggerRefresh('scores');
+            break;
+        }
+      }
     });
 
     return {

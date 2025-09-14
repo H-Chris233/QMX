@@ -1,6 +1,6 @@
 // API服务 - 封装所有后端调用
 import { invoke } from '@tauri-apps/api/core';
-import type { Student, StudentUpdateData, TauriCommand } from '../types/api';
+import type { Student, StudentUpdateData, TauriCommand, StudentScoresResponse } from '../types/api';
 import { assertIsStudent } from '../utils/typeGuards';
 import {
   transformStudentData,
@@ -165,11 +165,22 @@ export class ApiService {
       // 输入验证
       if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
       
-      const scores = await invokeWithEnhancements<number[]>('get_student_scores' as TauriCommand, {
+      const response = await invokeWithEnhancements<StudentScoresResponse>('get_student_scores' as TauriCommand, {
         studentUid,
       });
       
+      console.log('🔍 [getStudentScores] 原始返回数据:', response, '类型:', typeof response);
+      
+      // 检查响应格式
+      if (!response || typeof response !== 'object') {
+        console.error('❌ [getStudentScores] 响应不是对象格式:', response);
+        throw new Error('返回的成绩数据格式不正确');
+      }
+      
+      // 提取 rings 数组
+      const scores = response.rings;
       if (!Array.isArray(scores)) {
+        console.error('❌ [getStudentScores] rings 不是数组格式:', scores);
         throw new Error('返回的成绩数据格式不正确');
       }
       
@@ -187,6 +198,45 @@ export class ApiService {
     } catch (error) {
       console.error('❌ [ApiService.getStudentScores] 调用失败:', error);
       throw new Error(`获取学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async deleteStudentScore(studentUid: number, scoreIndex: number): Promise<void> {
+    try {
+      // 输入验证
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      if (scoreIndex < 0) throw new Error('成绩索引无效');
+      
+      await invokeWithEnhancements<null>('delete_student_score' as TauriCommand, {
+        studentUid,
+        scoreIndex,
+      });
+      
+      console.log(`✅ 成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
+    } catch (error) {
+      console.error('❌ [ApiService.deleteStudentScore] 调用失败:', error);
+      throw new Error(`删除学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  static async updateStudentScore(studentUid: number, scoreIndex: number, newScore: number): Promise<void> {
+    try {
+      // 输入验证
+      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
+      if (scoreIndex < 0) throw new Error('成绩索引无效');
+      if (typeof newScore !== 'number' || !isFinite(newScore)) throw new Error('成绩必须是有效数字');
+      if (newScore < 0 || newScore > 1000) throw new Error('成绩范围无效');
+      
+      await invokeWithEnhancements<null>('update_student_score' as TauriCommand, {
+        studentUid,
+        scoreIndex,
+        newScore,
+      });
+      
+      console.log(`✅ 成功更新学员 ${studentUid} 的第 ${scoreIndex} 个成绩为 ${newScore}`);
+    } catch (error) {
+      console.error('❌ [ApiService.updateStudentScore] 调用失败:', error);
+      throw new Error(`更新学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

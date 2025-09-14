@@ -1,5 +1,9 @@
 <template>
-  <div class="membership-alerts" v-if="showAlerts">
+  <div 
+    class="membership-alerts" 
+    v-if="showAlerts"
+    :class="{ 'fade-out': isFadingOut }"
+  >
     <!-- 加载进度条 -->
     <div v-if="loading" class="loading-progress"></div>
     
@@ -15,7 +19,7 @@
         </button>
         <button 
           class="close-btn" 
-          @click="showAlerts = false"
+          @click="startFadeOut"
         >
           ✖️
         </button>
@@ -69,12 +73,13 @@
     <div v-else-if="!loading" class="no-alerts">
       <div class="no-alerts-icon">✅</div>
       <div class="no-alerts-text">暂无即将过期的会员</div>
+      <div class="no-alerts-subtitle">窗口将在2.5秒后自动关闭</div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, inject } from 'vue';
+import { ref, onMounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 
 export default {
@@ -82,6 +87,7 @@ export default {
   setup() {
     const loading = ref(false);
     const showAlerts = ref(true);
+    const isFadingOut = ref(false);
     const expiringMemberships = ref([]);
     const errorHandler = inject('errorHandler');
 
@@ -101,6 +107,10 @@ export default {
         return;
       }
 
+      // 重置状态，重新显示组件
+      isFadingOut.value = false;
+      showAlerts.value = true;
+
       loading.value = true;
       try {
         // 使用新的v2 API方法
@@ -115,6 +125,15 @@ export default {
         );
 
         console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
+        
+        // 如果没有即将过期的会员，2.5秒后自动隐藏
+        if (expiringMemberships.value.length === 0) {
+          setTimeout(() => {
+            if (expiringMemberships.value.length === 0) {
+              startFadeOut();
+            }
+          }, 2500);
+        }
       } catch (error) {
         console.error('加载即将过期会员失败:', error);
         expiringMemberships.value = [];
@@ -189,19 +208,36 @@ export default {
       }
     };
 
+    // 开始渐隐动画
+    const startFadeOut = () => {
+      isFadingOut.value = true;
+      setTimeout(() => {
+        showAlerts.value = false;
+      }, 500); // 渐隐动画持续500ms
+    };
+
     // 组件挂载时自动加载数据
     onMounted(() => {
       loadExpiringMemberships();
     });
 
+    // 暴露方法给父组件
+    const showAlertsAgain = () => {
+      isFadingOut.value = false;
+      showAlerts.value = true;
+      loadExpiringMemberships();
+    };
+
     return {
       loading,
       showAlerts,
+      isFadingOut,
       expiringMemberships,
       loadExpiringMemberships,
       extendMembership,
       contactStudent,
       formatDate,
+      showAlertsAgain,
     };
   },
 };
@@ -210,7 +246,7 @@ export default {
 <style scoped>
 .membership-alerts {
   position: fixed;
-  top: 20px;
+  bottom: 20px;
   right: 20px;
   width: 350px;
   max-height: 500px;
@@ -220,6 +256,26 @@ export default {
   border: 1px solid var(--border-color);
   z-index: 1000;
   overflow: hidden;
+  opacity: 1;
+  transform: translateY(0) translateX(0);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  animation: slideInFromRight 0.6s ease-out;
+}
+
+.membership-alerts.fade-out {
+  opacity: 0;
+  transform: translateY(20px) translateX(20px);
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
 }
 
 /* 加载进度条 */
@@ -409,13 +465,21 @@ export default {
 .no-alerts-text {
   color: var(--text-secondary);
   font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.no-alerts-subtitle {
+  color: var(--text-secondary);
+  opacity: 0.7;
+  font-size: 0.75rem;
+  font-style: italic;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .membership-alerts {
     position: fixed;
-    top: 10px;
+    bottom: 10px;
     right: 10px;
     left: 10px;
     width: auto;
