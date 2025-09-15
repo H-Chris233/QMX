@@ -183,24 +183,16 @@ fn convert_cash_to_response(cash: &qmx_backend_lib::cash::Cash) -> TransactionRe
 // 已在上面合并处理
 
 // 窗口管理命令
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[tauri::command]
 fn open_main_window(app: tauri::AppHandle) {
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
-        // 移动端：简化窗口创建
-        let _ = WindowBuilder::new(&app, "main").build();
-    }
-    
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        // 桌面端：完整功能
-        let _ = WindowBuilder::new(&app, "main")
-            .title("启明星管理系统")
-            .inner_size(1200.0, 800.0)
-            .min_inner_size(800.0, 600.0)
-            .center()
-            .build();
-    }
+    // 桌面端：完整功能
+    let _ = WindowBuilder::new(&app, "main")
+        .title("启明星管理系统")
+        .inner_size(1200.0, 800.0)
+        .min_inner_size(800.0, 600.0)
+        .center()
+        .build();
 }
 
 // v2 API - 学员管理命令（完全优化版）
@@ -1351,6 +1343,7 @@ pub fn run() {
     
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             open_main_window,
             add_student,
             get_all_students,
