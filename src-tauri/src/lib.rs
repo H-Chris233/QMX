@@ -186,7 +186,6 @@ fn convert_cash_to_response(cash: &qmx_backend_lib::cash::Cash) -> TransactionRe
 #[tauri::command]
 fn open_main_window(app: tauri::AppHandle) {
     let _ = WindowBuilder::new(&app, "main")
-        .title("启明星管理系统")
         .inner_size(1200.0, 800.0)
         .min_inner_size(800.0, 600.0)
         .center()
