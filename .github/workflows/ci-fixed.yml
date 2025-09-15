@@ -26,10 +26,11 @@ jobs:
           - platform: 'ubuntu-22.04'
             args: '--target aarch64-linux-android'
             android: true
-          # iOS 平台
+          # iOS 平台 (需要代码签名)
           - platform: 'macos-latest'
             args: '--target aarch64-apple-ios'
             ios: true
+            # 需要设置 APPLE_DEVELOPMENT_TEAM 和证书
 
     runs-on: ${{ matrix.platform }}
     steps:
