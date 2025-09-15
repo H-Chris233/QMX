@@ -25,12 +25,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "ios": {
-      "developmentTeam": null,
-      "signingCertificate": null,
-      "entitlements": null
-    },
+    "targets": ["macos", "windows", "deb", "rpm", "appimage"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

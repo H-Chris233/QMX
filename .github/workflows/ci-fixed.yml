@@ -22,14 +22,6 @@ jobs:
             args: ''
           - platform: 'windows-latest'
             args: ''
-          # Android 平台 (仅保留 arm64)
-          - platform: 'ubuntu-22.04'
-            args: '--target aarch64-linux-android'
-            android: true
-          # iOS 平台 (需要代码签名)
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-ios'
-            ios: true
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -52,19 +44,6 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      # Android 特定设置
-      - name: Setup Android (if Android build)
-        if: matrix.android == true
-        uses: android-actions/setup-android@v2
-
-      - name: Add Android targets
-        if: matrix.android == true
-        run: rustup target add aarch64-linux-android
-
-      # iOS 特定设置
-      - name: Add iOS target
-        if: matrix.ios == true
-        run: rustup target add aarch64-apple-ios
 
       # macOS 额外目标设置
       - name: Add macOS targets
