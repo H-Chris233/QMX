@@ -30,7 +30,6 @@ jobs:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-ios'
             ios: true
-            # 需要设置 APPLE_DEVELOPMENT_TEAM 和证书
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -66,6 +65,13 @@ jobs:
       - name: Add iOS target
         if: matrix.ios == true
         run: rustup target add aarch64-apple-ios
+
+      # macOS 额外目标设置
+      - name: Add macOS targets
+        if: matrix.platform == 'macos-latest'
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
 
       # Ubuntu 依赖
       - name: Install Ubuntu dependencies
