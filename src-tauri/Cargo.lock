@@ -2813,13 +2813,14 @@ dependencies = [
 [[package]]
 name = "qmx_backend_lib"
 version = "2.2.0"
-source = "git+https://github.com/H-Chris233/qmx_backend_lib#dadbadc5741090020903357b5ebe840d0742aca7"
+source = "git+https://github.com/H-Chris233/qmx_backend_lib#86eb9d349d11be23bfba2fc4813e7ebb6c9d1778"
 dependencies = [
  "anyhow",
  "chrono",
  "log",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

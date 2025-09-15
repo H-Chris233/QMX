@@ -25,12 +25,55 @@
       </div>
     </div>
 
+    <!-- 时间周期选择器 -->
+    <div class="time-period-selector">
+      <h3>统计周期</h3>
+      <div class="period-buttons">
+        <button
+          v-for="period in timePeriods"
+          :key="period.value"
+          :class="['period-btn', { active: selectedPeriod === period.value }]"
+          @click="selectTimePeriod(period.value)"
+          :disabled="loading"
+        >
+          {{ period.label }}
+        </button>
+      </div>
+      
+      <!-- 自定义时间范围 -->
+      <div v-if="selectedPeriod === 'custom'" class="custom-period">
+        <div class="custom-date-inputs">
+          <DatePicker
+            v-model="customStartDate"
+            label="开始日期"
+            placeholder="选择开始日期"
+            :show-calendar-icon="false"
+          />
+          <span class="date-separator">-</span>
+          <DatePicker
+            v-model="customEndDate"
+            label="结束日期"
+            placeholder="选择结束日期"
+            :min-date="customStartDate"
+            :show-calendar-icon="false"
+          />
+          <button 
+            class="apply-custom-btn" 
+            @click="applyCustomPeriod"
+            :disabled="loading || !customStartDate || !customEndDate"
+          >
+            应用
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 总览卡片 -->
     <div class="overview-cards">
       <div class="overview-card income">
         <div class="card-icon">💰</div>
         <div class="card-content">
-          <h3>总收入</h3>
+          <h3>总收入 ({{ getCurrentPeriodLabel() }})</h3>
           <div class="card-value">{{ formatCurrency(totalIncome) }}</div>
         </div>
       </div>
@@ -38,7 +81,7 @@
       <div class="overview-card expense">
         <div class="card-icon">💸</div>
         <div class="card-content">
-          <h3>总支出</h3>
+          <h3>总支出 ({{ getCurrentPeriodLabel() }})</h3>
           <div class="card-value">{{ formatCurrency(totalExpense) }}</div>
         </div>
       </div>
@@ -46,7 +89,7 @@
       <div class="overview-card balance">
         <div class="card-icon">💎</div>
         <div class="card-content">
-          <h3>净收益</h3>
+          <h3>净收益 ({{ getCurrentPeriodLabel() }})</h3>
           <div class="card-value">{{ formatCurrency(netProfit) }}</div>
         </div>
       </div>
@@ -433,6 +476,20 @@ export default {
     const errorHandler = inject('errorHandler');
     const refreshSystem = inject('refreshSystem');
     
+    // 时间周期相关状态
+    const selectedPeriod = ref('ThisMonth');
+    const customStartDate = ref('');
+    const customEndDate = ref('');
+    
+    // 时间周期选项
+    const timePeriods = [
+      { value: 'Today', label: '今日' },
+      { value: 'ThisWeek', label: '本周' },
+      { value: 'ThisMonth', label: '本月' },
+      { value: 'ThisYear', label: '本年' },
+      { value: 'custom', label: '自定义' }
+    ];
+    
     // 添加一个强制刷新触发器
     const forceUpdateTrigger = ref(0);
     
@@ -461,6 +518,66 @@ export default {
     // 获取今天的日期字符串
     const getTodayDate = () => {
       return new Date().toISOString().split('T')[0];
+    };
+    
+    // 时间周期相关方法
+    const selectTimePeriod = async (period) => {
+      if (loading.value) return;
+      
+      selectedPeriod.value = period;
+      
+      if (period !== 'custom') {
+        await loadFinancialStatsByPeriod(period);
+      }
+    };
+    
+    const applyCustomPeriod = async () => {
+      if (!customStartDate.value || !customEndDate.value) {
+        showError('输入错误', '请选择开始和结束日期');
+        return;
+      }
+      
+      const customPeriod = {
+        start: new Date(customStartDate.value + 'T00:00:00Z').toISOString(),
+        end: new Date(customEndDate.value + 'T23:59:59Z').toISOString()
+      };
+      
+      await loadFinancialStatsByPeriod(customPeriod);
+    };
+    
+    const getCurrentPeriodLabel = () => {
+      if (selectedPeriod.value === 'custom') {
+        if (customStartDate.value && customEndDate.value) {
+          return `${customStartDate.value} 至 ${customEndDate.value}`;
+        }
+        return '自定义';
+      }
+      
+      const period = timePeriods.find(p => p.value === selectedPeriod.value);
+      return period ? period.label : '本月';
+    };
+    
+    // 根据时间周期加载财务统计
+    const loadFinancialStatsByPeriod = async (period) => {
+      if (loading.value) return;
+      
+      loading.value = true;
+      
+      try {
+        console.log('加载财务统计，周期:', period);
+        
+        const financialStats = await ApiService.getFinancialStats(period);
+        console.log('获取到的财务统计:', financialStats);
+        
+        // 这里可以根据需要更新统计显示
+        // 目前主要是为了验证API调用正常工作
+        
+      } catch (error) {
+        console.error('加载财务统计失败:', error);
+        showError('加载失败', '获取财务统计时发生错误', error.message || '未知错误');
+      } finally {
+        loading.value = false;
+      }
     };
 
     const currentTransaction = ref({
@@ -899,7 +1016,10 @@ export default {
         // 使用新的v2 API获取财务统计和交易数据
         const [cashTransactions, financialStats] = await Promise.all([
           ApiService.getAllTransactions(),
-          ApiService.getFinancialStats()
+          ApiService.getFinancialStats(selectedPeriod.value === 'custom' ? {
+            start: new Date(customStartDate.value + 'T00:00:00Z').toISOString(),
+            end: new Date(customEndDate.value + 'T23:59:59Z').toISOString()
+          } : selectedPeriod.value)
         ]);
         
         console.log('获取到的财务统计:', financialStats);
@@ -1278,6 +1398,15 @@ export default {
       getStatusText,
       forceRefresh,
       getTodayDate,
+      // 时间周期相关
+      selectedPeriod,
+      customStartDate,
+      customEndDate,
+      timePeriods,
+      selectTimePeriod,
+      applyCustomPeriod,
+      getCurrentPeriodLabel,
+      loadFinancialStatsByPeriod,
     };
   },
 };
@@ -1483,6 +1612,90 @@ export default {
 .card-subtext {
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+/* 时间周期选择器样式 */
+.time-period-selector {
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.time-period-selector h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.period-btn {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+}
+
+.period-btn:hover:not(:disabled) {
+  background-color: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.period-btn.active {
+  background-color: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.period-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.custom-period {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+.custom-date-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.apply-custom-btn {
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.apply-custom-btn:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.apply-custom-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* 其他现有样式保持不变 */
@@ -1862,6 +2075,31 @@ export default {
   .header-actions {
     flex-direction: column;
     gap: 0.75rem;
+  }
+  
+  .period-buttons {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .period-btn {
+    padding: 1rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 8px;
+  }
+  
+  .custom-date-inputs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .apply-custom-btn {
+    padding: 1rem;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 8px;
   }
   
   .add-btn,

@@ -588,7 +588,7 @@ export class ApiService {
   }
 
   // 获取特定周期的财务统计
-  static async getFinancialStats(period: 'ThisWeek' | 'ThisMonth' | 'ThisYear' = 'ThisMonth') {
+  static async getFinancialStats(period: 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear' | { start: string; end: string } = 'ThisMonth') {
     try {
       return await invokeWithEnhancements<any>('get_financial_stats' as TauriCommand, {
         period,
