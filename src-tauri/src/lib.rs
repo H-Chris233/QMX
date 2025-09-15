@@ -1028,6 +1028,7 @@ fn get_financial_stats(period: String) -> Result<FinancialStatsResponse, String>
     init_manager()?;
 
     let time_period = match period.as_str() {
+        "Today" => TimePeriod::Today,
         "ThisWeek" => TimePeriod::ThisWeek,
         "ThisMonth" => TimePeriod::ThisMonth,
         "ThisYear" => TimePeriod::ThisYear,
