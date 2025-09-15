@@ -2813,7 +2813,7 @@ dependencies = [
 [[package]]
 name = "qmx_backend_lib"
 version = "2.2.0"
-source = "git+https://github.com/H-Chris233/qmx_backend_lib#86eb9d349d11be23bfba2fc4813e7ebb6c9d1778"
+source = "git+https://github.com/H-Chris233/qmx_backend_lib#a353a3cad37658baa5398991d0edc314367c66f4"
 dependencies = [
  "anyhow",
  "chrono",
