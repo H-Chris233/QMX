@@ -30,73 +30,66 @@
   </div>
 </template>
 
-<script>
-import { ref, watch } from 'vue';
+<script setup lang="ts">
+import { watch } from 'vue';
 
-export default {
-  name: 'ErrorModal',
-  props: {
-    show: {
-      type: Boolean,
-      default: false,
-    },
-    title: {
-      type: String,
-      default: '错误',
-    },
-    message: {
-      type: String,
-      required: true,
-    },
-    details: {
-      type: String,
-      default: '',
-    },
-    closeOnOverlayClick: {
-      type: Boolean,
-      default: true,
-    },
-    showRetry: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  emits: ['close', 'retry'],
-  setup(props, { emit }) {
-    const closeModal = () => {
-      emit('close');
-    };
+interface Props {
+  show?: boolean;
+  title?: string;
+  message: string;
+  details?: string;
+  closeOnOverlayClick?: boolean;
+  showRetry?: boolean;
+}
 
-    const retry = () => {
-      emit('retry');
-    };
+interface Emits {
+  (e: 'close'): void;
+  (e: 'retry'): void;
+}
 
-    // 监听ESC键关闭弹窗
-    watch(
-      () => props.show,
-      (newVal) => {
-        if (newVal) {
-          const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-              closeModal();
-            }
-          };
-          document.addEventListener('keydown', handleEscape);
+const props = withDefaults(defineProps<Props>(), {
+  show: false,
+  title: '错误',
+  details: '',
+  closeOnOverlayClick: true,
+  showRetry: false,
+});
 
-          // 清理函数
-          return () => {
-            document.removeEventListener('keydown', handleEscape);
-          };
-        }
-      },
-    );
-
-    return {
-      closeModal,
-      retry,
-    };
-  },
+const emit = defineEmits<Emits>();
+const closeModal = (): void => {
+  emit('close');
 };
+
+const retry = (): void => {
+  emit('retry');
+};
+
+// 监听ESC键关闭弹窗
+watch(
+  () => props.show,
+  (newVal: boolean) => {
+    if (newVal) {
+      const handleEscape = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') {
+          closeModal();
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+
+      // 清理函数
+      const cleanup = () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+      
+      // 返回清理函数
+      return cleanup;
+    }
+    // 返回空函数以满足所有代码路径
+    return () => {};
+  },
+);
+
+
 </script>
 
 <style scoped>

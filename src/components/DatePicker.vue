@@ -7,16 +7,8 @@
     
     <div class="date-picker-container" :class="{ 'has-error': hasError, 'disabled': disabled }">
       <input
-        :id="inputId"
         v-model="internalValue"
-        type="date"
-        class="date-picker-input"
-        :min="minDate"
-        :max="maxDate"
-        :disabled="disabled"
-        :placeholder="placeholder"
-        :aria-label="ariaLabel || label"
-        :aria-describedby="hasError ? `${inputId}-error` : undefined"
+        v-bind="inputAttrs"
         @input="handleInput"
         @change="handleChange"
         @blur="handleBlur"
@@ -38,79 +30,85 @@
   </div>
 </template>
 
-<script>
-import { ref, computed, watch, nextTick } from 'vue';
+<script setup lang="ts">
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue';
 
-export default {
-  name: 'DatePicker',
-  props: {
-    modelValue: {
-      type: String,
-      default: '',
-    },
-    label: {
-      type: String,
-      default: '',
-    },
-    placeholder: {
-      type: String,
-      default: '',
-    },
-    required: {
-      type: Boolean,
-      default: false,
-    },
-    disabled: {
-      type: Boolean,
-      default: false,
-    },
-    minDate: {
-      type: String,
-      default: '',
-    },
-    maxDate: {
-      type: String,
-      default: '',
-    },
-    errorMessage: {
-      type: String,
-      default: '',
-    },
-    helpText: {
-      type: String,
-      default: '',
-    },
-    showCalendarIcon: {
-      type: Boolean,
-      default: true,
-    },
-    ariaLabel: {
-      type: String,
-      default: '',
-    },
-    validateOnBlur: {
-      type: Boolean,
-      default: true,
-    },
-    // 预设日期选项
-    preset: {
-      type: String,
-      default: '', // 'today', 'tomorrow', 'nextWeek', 'nextMonth'
-    },
-  },
-  emits: ['update:modelValue', 'change', 'blur', 'focus', 'error'],
-  setup(props, { emit }) {
-    const inputId = ref(`date-picker-${Math.random().toString(36).substr(2, 9)}`);
-    const internalValue = ref(props.modelValue);
-    const isFocused = ref(false);
+interface Props {
+  modelValue?: string;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  minDate?: string;
+  maxDate?: string;
+  errorMessage?: string;
+  helpText?: string;
+  showCalendarIcon?: boolean;
+  ariaLabel?: string;
+  validateOnBlur?: boolean;
+  preset?: string; // 'today', 'tomorrow', 'nextWeek', 'nextMonth'
+}
+
+interface Emits {
+  (e: 'update:modelValue', value: string): void;
+  (e: 'change', value: string): void;
+  (e: 'blur', value: string): void;
+  (e: 'focus', value: string): void;
+  (e: 'error', error: string): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: '',
+  label: '',
+  placeholder: '',
+  required: false,
+  disabled: false,
+  minDate: '',
+  maxDate: '',
+  errorMessage: '',
+  helpText: '',
+  showCalendarIcon: true,
+  ariaLabel: '',
+  validateOnBlur: true,
+  preset: '',
+});
+
+const emit = defineEmits<Emits>();
+const inputId: Ref<string> = ref(`date-picker-${Math.random().toString(36).substr(2, 9)}`);
+const internalValue: Ref<string> = ref(props.modelValue);
+const isFocused: Ref<boolean> = ref(false);
     
-    // 计算属性
-    const hasError = computed(() => Boolean(props.errorMessage));
+// 计算属性
+const hasError: ComputedRef<boolean> = computed(() => Boolean(props.errorMessage));
+
+// 输入框属性计算
+const inputAttrs = computed(() => {
+  const attrs: Record<string, any> = {
+    id: inputId.value,
+    type: 'date',
+    class: 'date-picker-input',
+    disabled: props.disabled || false,
+  };
+  
+  if (props.minDate) attrs.min = props.minDate;
+  if (props.maxDate) attrs.max = props.maxDate;
+  if (props.placeholder) attrs.placeholder = props.placeholder;
+  if (props.ariaLabel || props.label) attrs['aria-label'] = props.ariaLabel || props.label;
+  if (hasError.value) attrs['aria-describedby'] = `${inputId.value}-error`;
+  
+  return attrs;
+});
     
-    // 预设日期计算
-    const getPresetDate = (preset) => {
+// 日期格式化函数
+const formatDate = (date: Date): string => {
+  const isoString = date.toISOString();
+  const datePart = isoString.split('T')[0];
+  return datePart || '';
+};
+
+// 预设日期计算
+const getPresetDate = (preset: string): string => {
       const today = new Date();
-      const formatDate = (date) => date.toISOString().split('T')[0];
       
       switch (preset) {
         case 'today':
@@ -132,8 +130,8 @@ export default {
       }
     };
     
-    // 日期验证
-    const validateDate = (value) => {
+// 日期验证
+const validateDate = (value: string): string => {
       if (!value) {
         return props.required ? '请选择日期' : '';
       }
@@ -144,18 +142,18 @@ export default {
       }
       
       if (props.minDate && value < props.minDate) {
-        return `日期不能早于 ${formatDateForDisplay(props.minDate)}`;
+        return `日期不能早于 ${formatDateForDisplay(props.minDate!)}`;
       }
       
       if (props.maxDate && value > props.maxDate) {
-        return `日期不能晚于 ${formatDateForDisplay(props.maxDate)}`;
+        return `日期不能晚于 ${formatDateForDisplay(props.maxDate!)}`;
       }
       
       return '';
     };
     
-    // 格式化日期用于显示
-    const formatDateForDisplay = (dateStr) => {
+// 格式化日期用于显示
+const formatDateForDisplay = (dateStr: string | undefined): string => {
       if (!dateStr) return '';
       const date = new Date(dateStr);
       return date.toLocaleDateString('zh-CN', {
@@ -165,77 +163,65 @@ export default {
       });
     };
     
-    // 获取今天的日期字符串
-    const getTodayDate = () => {
-      return new Date().toISOString().split('T')[0];
-    };
+// 获取今天的日期字符串
+
     
-    // 事件处理
-    const handleInput = (event) => {
-      const value = event.target.value;
-      internalValue.value = value;
-      emit('update:modelValue', value);
-    };
-    
-    const handleChange = (event) => {
-      const value = event.target.value;
-      const error = validateDate(value);
-      if (error) {
-        emit('error', error);
-      }
-      emit('change', value);
-    };
-    
-    const handleBlur = (event) => {
-      isFocused.value = false;
-      const value = event.target.value;
-      
-      if (props.validateOnBlur) {
-        const error = validateDate(value);
-        if (error) {
-          emit('error', error);
-        }
-      }
-      
-      emit('blur', value);
-    };
-    
-    const handleFocus = (event) => {
-      isFocused.value = true;
-      emit('focus', event.target.value);
-    };
-    
-    // 监听外部值变化
-    watch(() => props.modelValue, (newValue) => {
-      internalValue.value = newValue;
-    });
-    
-    // 监听预设值变化
-    watch(() => props.preset, (newPreset) => {
-      if (newPreset && !internalValue.value) {
-        const presetDate = getPresetDate(newPreset);
-        if (presetDate) {
-          internalValue.value = presetDate;
-          emit('update:modelValue', presetDate);
-        }
-      }
-    }, { immediate: true });
-    
-    return {
-      inputId,
-      internalValue,
-      isFocused,
-      hasError,
-      handleInput,
-      handleChange,
-      handleBlur,
-      handleFocus,
-      validateDate,
-      formatDateForDisplay,
-      getTodayDate,
-    };
-  },
+// 事件处理
+const handleInput = (event: Event): void => {
+  const target = event.target as HTMLInputElement;
+  const value = target.value;
+  internalValue.value = value || '';
+  emit('update:modelValue', value || '');
 };
+    
+const handleChange = (event: Event): void => {
+  const target = event.target as HTMLInputElement;
+  const value = target.value;
+  const error = validateDate(value);
+  if (error) {
+    emit('error', error);
+  }
+  emit('change', value);
+};
+    
+const handleBlur = (event: Event): void => {
+  isFocused.value = false;
+  const target = event.target as HTMLInputElement;
+  const value = target.value;
+  
+  if (props.validateOnBlur) {
+    const error = validateDate(value);
+    if (error) {
+      emit('error', error);
+    }
+  }
+  
+  emit('blur', value);
+};
+    
+const handleFocus = (event: Event): void => {
+  isFocused.value = true;
+  const target = event.target as HTMLInputElement;
+  emit('focus', target.value);
+};
+    
+// 监听外部值变化
+watch(() => props.modelValue, (newValue: string) => {
+  internalValue.value = newValue;
+});
+    
+// 监听预设值变化
+watch(() => props.preset, (newPreset: string) => {
+  if (newPreset && !internalValue.value) {
+    const presetDate = getPresetDate(newPreset);
+    if (presetDate) {
+      internalValue.value = presetDate;
+      emit('update:modelValue', presetDate);
+    }
+  }
+}, { immediate: true });
+    
+
 </script>
 
 <style scoped>

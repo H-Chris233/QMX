@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import Useragent from './components/UserAgreement.vue';
+import UserAgreement from './components/UserAgreement.vue';
 import MainApp from './MainApp.vue';
 
 // 检查是否已经同意协议
@@ -10,5 +10,5 @@ if (agreedToTerms === 'true') {
   createApp(MainApp).mount('#app');
 } else {
   // 未同意协议，显示协议页面
-  createApp(Useragent).mount('#app');
+  createApp(UserAgreement).mount('#app');
 }

@@ -1,11 +1,11 @@
 <template>
-  <div class="student-management">
+  <div class="dashboard">
     <!-- 加载进度条 -->
     <div v-if="loading" class="loading-progress"></div>
 
     <!-- 页面标题 -->
     <div class="section-header">
-      <h2>仪表板</h2>
+      <h2>仪表盘</h2>
       <div class="header-actions">
         <button
           class="refresh-btn"
@@ -124,97 +124,79 @@
   </div>
 </template>
 
-<script>
-import { ref, reactive, onMounted, onUnmounted, inject, watch } from 'vue';
+<script setup lang="ts">
+import { ref, reactive, onMounted, onUnmounted, inject, watch, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
 import ErrorModal from './ErrorModal.vue';
 
-export default {
-  name: 'Dashboard',
-  components: { ErrorModal },
-  setup() {
-    const loading = ref(false);
-    const abortController = ref(null);
-    const lastUpdateTime = ref(null);
-    const errorHandler = inject('errorHandler');
-    const refreshSystem = inject('refreshSystem');
+// 定义类型接口
+interface DashboardData {
+  totalRevenue: number;
+  activeStudents: number;
+  averageGrade: number;
+}
 
-    const showStatsErrorModal = ref(false);
-    const statsErrorTitle = ref('错误');
-    const statsErrorMessage = ref('');
-    const statsErrorDetails = ref('');
+interface Student {
+  uid: number;
+  name: string;
+  membership_days_remaining: number | null;
+  is_membership_active: boolean;
+  membership_start_date?: string;
+  membership_end_date?: string;
+}
 
-    const showMembershipErrorModal = ref(false);
-    const membershipErrorTitle = ref('错误');
-    const membershipErrorMessage = ref('');
-    const membershipErrorDetails = ref('');
 
-    const showStatsError = (title, message, details) => {
-      statsErrorTitle.value = title;
-      statsErrorMessage.value = message;
-      statsErrorDetails.value = details || '';
-      showStatsErrorModal.value = true;
-      console.error(`${title}: ${message}`, details);
-    };
+interface RefreshSystem {
+  refreshTriggers: {
+    dashboard: number;
+  };
+}
+const loading: Ref<boolean> = ref(false);
+const abortController: Ref<AbortController | null> = ref(null);
+const lastUpdateTime: Ref<Date | null> = ref(null);
+const refreshSystem = inject<RefreshSystem>('refreshSystem');
 
-    const showMembershipError = (title, message, details) => {
-      membershipErrorTitle.value = title;
-      membershipErrorMessage.value = message;
-      membershipErrorDetails.value = details || '';
-      showMembershipErrorModal.value = true;
-      console.error(`${title}: ${message}`, details);
-    };
+const showStatsErrorModal: Ref<boolean> = ref(false);
+const statsErrorTitle: Ref<string> = ref('错误');
+const statsErrorMessage: Ref<string> = ref('');
+const statsErrorDetails: Ref<string> = ref('');
 
-    // 仪表盘数据（使用reactive保持响应性）
-    const dashboardData = reactive({
-      totalRevenue: 0,
-      activeStudents: 0,
-      averageGrade: 0,
-    });
+const showMembershipErrorModal: Ref<boolean> = ref(false);
+const membershipErrorTitle: Ref<string> = ref('错误');
+const membershipErrorMessage: Ref<string> = ref('');
+const membershipErrorDetails: Ref<string> = ref('');
 
-    // 会员提醒数据
-    const expiringMemberships = ref([]);
+const showStatsError = (title: string, message: string, details?: string): void => {
+  statsErrorTitle.value = title;
+  statsErrorMessage.value = message;
+  statsErrorDetails.value = details || '';
+  showStatsErrorModal.value = true;
+  console.error(`${title}: ${message}`, details);
+};
 
-    // 增强的数据验证函数
-    const validateDashboardStats = (stats) => {
-      if (!stats || typeof stats !== 'object') {
-        throw new Error('统计数据格式无效');
-      }
-      
-      const requiredFields = ['total_revenue', 'total_students', 'average_score'];
-      const missingFields = requiredFields.filter(field => 
-        stats[field] === undefined || stats[field] === null
-      );
-      
-      if (missingFields.length > 0) {
-        console.warn('缺少统计字段:', missingFields);
-        // 为缺失字段设置默认值
-        missingFields.forEach(field => {
-          stats[field] = 0;
-        });
-      }
-      
-      // 数值范围验证
-      if (stats.total_revenue && (stats.total_revenue < 0 || stats.total_revenue > 999999999999)) {
-        console.warn('总收入数值异常，已重置为0');
-        stats.total_revenue = 0;
-      }
-      
-      if (stats.total_students && (stats.total_students < 0 || stats.total_students > 100000)) {
-        console.warn('学员数量异常，已重置为0');
-        stats.total_students = 0;
-      }
-      
-      if (stats.average_score && (stats.average_score < 0 || stats.average_score > 1000)) {
-        console.warn('平均成绩异常，已重置为0');
-        stats.average_score = 0;
-      }
-      
-      return true;
-    };
+const showMembershipError = (title: string, message: string, details?: string): void => {
+  membershipErrorTitle.value = title;
+  membershipErrorMessage.value = message;
+  membershipErrorDetails.value = details || '';
+  showMembershipErrorModal.value = true;
+  console.error(`${title}: ${message}`, details);
+};
 
-    // 增强的安全数值转换函数
-    const safeParseNumber = (value, defaultValue = 0, options = {}) => {
+// 仪表盘数据（使用reactive保持响应性）
+const dashboardData: DashboardData = reactive({
+  totalRevenue: 0,
+  activeStudents: 0,
+  averageGrade: 0,
+});
+
+// 会员提醒数据
+const expiringMemberships: Ref<Student[]> = ref([]);
+
+// 增强的数据验证函数
+
+
+// 增强的安全数值转换函数
+const safeParseNumber = (value: any, defaultValue: number = 0, options: { min?: number; max?: number; decimals?: number } = {}): number => {
       const { min = -Infinity, max = Infinity, decimals } = options;
       
       if (value === null || value === undefined || value === '') {
@@ -240,8 +222,8 @@ export default {
       return parsed;
     };
 
-    // 加载即将过期的会员 - 简化版，错误处理在调用方
-    const loadExpiringMemberships = async () => {
+// 加载即将过期的会员 - 简化版，错误处理在调用方
+const loadExpiringMemberships = async (): Promise<Student[]> => {
       // 使用新的v2 API方法，直接返回结果，不做错误处理
       const expiring = await ApiService.getMembershipExpiringSoon(7); // 7天内过期
       
@@ -251,14 +233,14 @@ export default {
 
       const validExpiring = expiring.filter(student => 
         student && student.uid && student.name
-      );
+      ) as Student[];
 
       console.log(`找到 ${validExpiring.length} 个即将过期的会员`);
       return validExpiring;
     };
 
-    // 数据获取 - 使用新的v2 API方法
-    const loadDashboardData = async () => {
+// 数据获取 - 使用新的v2 API方法
+const loadDashboardData = async (): Promise<void> => {
       if (loading.value) {
         console.warn('数据正在加载中，跳过重复请求');
         return;
@@ -309,14 +291,14 @@ export default {
         
         // 处理统计数据结果
         let stats;
-        if (statsResult.success) {
+        if (statsResult.success && 'data' in statsResult) {
           stats = statsResult.data;
         } else {
           // 统计数据API失败，显示错误并使用默认值
           showStatsError(
             '统计数据加载失败',
             '无法获取仪表板统计数据，请检查网络连接或稍后重试',
-            statsResult.error.message || '未知错误'
+            ('error' in statsResult ? (statsResult.error as Error).message : '未知错误')
           );
           stats = {
             total_revenue: 0,
@@ -333,7 +315,7 @@ export default {
           showMembershipError(
             '会员数据加载失败',
             '无法获取即将过期的会员信息，请稍后刷新页面重试',
-            membershipResult.error.message || '未知错误'
+            ('error' in membershipResult ? (membershipResult.error as Error).message : '未知错误')
           );
         }
         
@@ -367,7 +349,7 @@ export default {
         lastUpdateTime.value = new Date();
         console.log('仪表板数据加载成功:', dashboardData);
       } catch (error) {
-        if (error.name !== 'AbortError') {
+        if ((error as Error).name !== 'AbortError') {
           console.error('加载仪表盘数据时发生未预期错误:', error);
           
           // 重置为默认值
@@ -381,7 +363,7 @@ export default {
           showStatsError(
             '系统错误',
             '数据加载过程中发生未预期错误，请刷新页面重试',
-            error.message || '未知错误'
+            (error as Error).message || '未知错误'
           );
         }
       } finally {
@@ -390,8 +372,8 @@ export default {
       }
     };
 
-    // 增强的格式化方法
-    const formatNumber = (value) => {
+// 增强的格式化方法
+const formatNumber = (value: number | string): string => {
       try {
         const num = safeParseNumber(value, 0, { min: 0, max: 999999999 });
         
@@ -407,7 +389,7 @@ export default {
       }
     };
 
-    const formatCurrency = (value) => {
+const formatCurrency = (value: number | string): string => {
       try {
         const num = safeParseNumber(value, 0, { min: 0, max: 999999999999, decimals: 2 });
         
@@ -432,7 +414,7 @@ export default {
       }
     };
 
-    const formatDecimal = (value) => {
+const formatDecimal = (value: number | string): string => {
       try {
         const num = safeParseNumber(value, 0, { min: 0, max: 1000, decimals: 1 });
         return num.toFixed(1);
@@ -442,28 +424,17 @@ export default {
       }
     };
 
-    // 时间格式化
-    const formatTime = (date) => {
-      try {
-        return new Intl.DateTimeFormat('zh-CN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        }).format(date);
-      } catch (error) {
-        return '--:--:--';
-      }
-    };
 
-    // 成绩趋势分析
-    const getGradeTrendClass = (grade) => {
+
+// 成绩趋势分析
+const getGradeTrendClass = (grade: number): string => {
       if (grade >= 8) return 'trend-excellent';
       if (grade >= 6) return 'trend-good';
       if (grade >= 4) return 'trend-average';
       return 'trend-poor';
     };
 
-    const getGradeTrendText = (grade) => {
+const getGradeTrendText = (grade: number): string => {
       if (grade >= 8) return '🌟 优秀';
       if (grade >= 6) return '👍 良好';
       if (grade >= 4) return '📊 一般';
@@ -488,15 +459,15 @@ export default {
       loadDashboardData();
     });
 
-    const closeStatsError = () => {
-      showStatsErrorModal.value = false;
-    };
+const closeStatsError = (): void => {
+  showStatsErrorModal.value = false;
+};
 
-    const closeMembershipError = () => {
-      showMembershipErrorModal.value = false;
-    };
+const closeMembershipError = (): void => {
+  showMembershipErrorModal.value = false;
+};
 
-    const retryLoadStats = async () => {
+const retryLoadStats = async (): Promise<void> => {
       showStatsErrorModal.value = false;
       loading.value = true;
       try {
@@ -506,19 +477,19 @@ export default {
         dashboardData.averageGrade = safeParseNumber(statsResult.average_score, 0, { min: 0, max: 1000, decimals: 1 });
         lastUpdateTime.value = new Date();
       } catch (e) {
-        showStatsError('统计数据加载失败', '无法获取仪表板统计数据，请检查网络连接或稍后重试', e.message || '未知错误');
+        showStatsError('统计数据加载失败', '无法获取仪表板统计数据，请检查网络连接或稍后重试', (e as Error).message || '未知错误');
       } finally {
         loading.value = false;
       }
     };
 
-    const retryLoadMembership = async () => {
+const retryLoadMembership = async (): Promise<void> => {
       showMembershipErrorModal.value = false;
       try {
         const result = await loadExpiringMemberships();
         expiringMemberships.value = result;
       } catch (e) {
-        showMembershipError('会员数据加载失败', '无法获取即将过期的会员信息，请稍后刷新页面重试', e.message || '未知错误');
+        showMembershipError('会员数据加载失败', '无法获取即将过期的会员信息，请稍后刷新页面重试', (e as Error).message || '未知错误');
       }
     };
 
@@ -528,39 +499,11 @@ export default {
       }
     });
 
-    return {
-      loading,
-      lastUpdateTime,
-      dashboardData,
-      expiringMemberships,
-      loadDashboardData,
-      loadExpiringMemberships,
-      formatNumber,
-      formatCurrency,
-      formatDecimal,
-      formatTime,
-      getGradeTrendClass,
-      getGradeTrendText,
-      safeParseNumber,
-      showStatsErrorModal,
-      statsErrorTitle,
-      statsErrorMessage,
-      statsErrorDetails,
-      showMembershipErrorModal,
-      membershipErrorTitle,
-      membershipErrorMessage,
-      membershipErrorDetails,
-      closeStatsError,
-      closeMembershipError,
-      retryLoadStats,
-      retryLoadMembership,
-    };
-  },
-};
+
 </script>
 
 <style scoped>
-.student-management {
+.dashboard {
   height: 100%;
   display: flex;
   flex-direction: column;
