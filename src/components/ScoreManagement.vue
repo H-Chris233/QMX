@@ -319,17 +319,17 @@ interface StudentData {
     });
 
     // 格式化方法
-    const getClassText = (classType) => {
-      const classMap = {
+    const getClassText = (classType: 'TenTry' | 'Month' | 'Year' | 'Others' | string): string => {
+      const classMap: { TenTry: string; Month: string; Year: string; Others: string } = {
         TenTry: '体验课',
         Month: '月卡',
         Year: '年卡',
         Others: '其他',
       };
-      return classMap[classType] || classType;
+      return (classMap as Record<string, string>)[classType] || classType;
     };
 
-    const getScoreClass = (score) => {
+    const getScoreClass = (score: number): 'excellent' | 'good' | 'average' | 'poor' => {
       if (score >= 9.0) return 'excellent';
       if (score >= 7.0) return 'good';
       if (score >= 5.0) return 'average';
@@ -337,7 +337,7 @@ interface StudentData {
     };
 
     // 根据学员的运动项目获取最高分数
-    const getMaxScore = () => {
+    const getMaxScore = (): number => {
       if (!selectedStudentData.value) return 10.9; // 默认值
 
       const subject = selectedStudentData.value.subject;
@@ -353,7 +353,7 @@ interface StudentData {
     };
 
     // 获取输入框的占位符文本
-    const getScorePlaceholder = () => {
+    const getScorePlaceholder = (): string => {
       if (!selectedStudentData.value) return '输入成绩';
 
       const subject = selectedStudentData.value.subject;
@@ -399,7 +399,7 @@ interface StudentData {
     };
 
     // 数据加载
-    const loadData = async () => {
+    const loadData = async (): Promise<void> => {
       if (loading.value) {
         console.warn('学员数据正在加载中，跳过重复请求');
         return;
@@ -456,7 +456,7 @@ interface StudentData {
       }
     };
 
-    const onStudentChange = async () => {
+    const onStudentChange = async (): Promise<void> => {
       if (!selectedStudent.value) {
         selectedStudentData.value = null;
         quickScore.value = '';
@@ -521,7 +521,7 @@ interface StudentData {
     };
 
     // 成绩操作
-    const addQuickScore = async () => {
+    const addQuickScore = async (): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理成绩添加，请勿重复提交');
         return;
@@ -575,7 +575,7 @@ interface StudentData {
     };
 
     // 删除成绩
-    const deleteScore = async (scoreIndex, score) => {
+    const deleteScore = async (scoreIndex: number, score: number): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -629,7 +629,7 @@ interface StudentData {
     };
 
     // 编辑成绩 - 使用自定义模态框替代原生prompt
-    const editScore = (scoreIndex, currentScore) => {
+    const editScore = (scoreIndex: number, currentScore: number): void => {
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -659,7 +659,7 @@ interface StudentData {
     };
 
     // 关闭分数编辑模态框
-    const closeScoreEditModal = () => {
+    const closeScoreEditModal = (): void => {
       showScoreEditModal.value = false;
       editingStudentName.value = '';
       editingScoreIndex.value = -1;
@@ -674,7 +674,7 @@ interface StudentData {
     });
 
     // 确认分数编辑
-    const confirmScoreEdit = async () => {
+    const confirmScoreEdit = async (): Promise<void> => {
       if (!isValidScore.value) {
         return;
       }
@@ -718,7 +718,7 @@ interface StudentData {
       }
     };
 
-    const exportScores = () => {
+    const exportScores = (): void => {
       try {
         if (!selectedStudentData.value) {
           showError('导出失败', '请先选择一个学员');

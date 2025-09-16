@@ -312,7 +312,16 @@ interface ErrorHandler {
     const showAddGrade = ref(false);
     const showEditGrade = ref(false);
     const showImportModal = ref(false);
-    const currentGrade = ref({
+    const currentGrade = ref<{
+      id: number | null;
+      studentId: string;
+      studentName: string;
+      course: string;
+      examType: string;
+      score: number;
+      examDate: string;
+      notes: string;
+    }>({
       id: null,
       studentId: '',
       studentName: '',
@@ -488,7 +497,7 @@ interface ErrorHandler {
       return ranges.map((r) => ({ ...r, maxCount }));
     });
 
-    const getScoreClass = (score) => {
+    const getScoreClass = (score: number): 'excellent' | 'good' | 'average' | 'pass' | 'fail' => {
       if (score >= 90) return 'excellent';
       if (score >= 80) return 'good';
       if (score >= 70) return 'average';
@@ -496,8 +505,8 @@ interface ErrorHandler {
       return 'fail';
     };
 
-    const getScoreColor = (score) => {
-      const colors = {
+    const getScoreColor = (score: number): string => {
+      const colors: Record<'excellent' | 'good' | 'average' | 'pass' | 'fail', string> = {
         excellent: '#4caf50',
         good: '#8bc34a',
         average: '#ffc107',
@@ -507,7 +516,7 @@ interface ErrorHandler {
       return colors[getScoreClass(score)];
     };
 
-    const getGradeLevel = (score) => {
+    const getGradeLevel = (score: number): 'A' | 'B' | 'C' | 'D' | 'F' => {
       if (score >= 90) return 'A';
       if (score >= 80) return 'B';
       if (score >= 70) return 'C';
@@ -515,16 +524,25 @@ interface ErrorHandler {
       return 'F';
     };
 
-    const filterGrades = () => {
+    const filterGrades = (): void => {
       // 筛选逻辑已通过computed属性实现
     };
 
-    const editGrade = (grade) => {
-      currentGrade.value = { ...grade };
+    const editGrade = (grade: Grade): void => {
+      currentGrade.value = {
+        id: grade.id,
+        studentId: String(grade.studentId),
+        studentName: grade.studentName || '',
+        course: grade.course || '',
+        examType: grade.examType || '',
+        score: grade.score ?? 0,
+        examDate: grade.examDate || '',
+        notes: grade.notes || '',
+      };
       showEditGrade.value = true;
     };
 
-    const deleteGrade = (id) => {
+    const deleteGrade = (id: number): void => {
       showConfirm({
         title: '删除成绩记录',
         message: '确定要删除这条成绩记录吗？',
@@ -537,11 +555,11 @@ interface ErrorHandler {
       });
     };
 
-    const saveGrade = () => {
+    const saveGrade = (): void => {
       if (
         !currentGrade.value.studentId ||
         !currentGrade.value.course ||
-        !currentGrade.value.score
+        currentGrade.value.score === null || currentGrade.value.score === undefined
       ) {
         showError('输入错误', '请填写必要信息：学员、科目、课程和分数');
         return;
@@ -549,7 +567,7 @@ interface ErrorHandler {
 
       // 获取学员姓名
       const student = students.value.find(
-        (s) => s.id === parseInt(currentGrade.value.studentId),
+        (s) => s.id === parseInt(String(currentGrade.value.studentId || '0')),
       );
       if (student) {
         currentGrade.value.studentName = student.name;
@@ -559,13 +577,13 @@ interface ErrorHandler {
         // 添加新成绩
         const newGrade: Grade = {
           id: Date.now(),
-          studentId: parseInt(currentGrade.value.studentId),
+          studentId: parseInt(String(currentGrade.value.studentId)),
           studentName: currentGrade.value.studentName,
           course: currentGrade.value.course,
           examType: currentGrade.value.examType,
           score: currentGrade.value.score,
-          date: currentGrade.value.examDate || new Date().toISOString().split('T')[0],
-          examDate: currentGrade.value.examDate,
+          date: (currentGrade.value.examDate && currentGrade.value.examDate !== '' ? currentGrade.value.examDate : new Date().toISOString().split('T')[0]) as string,
+          examDate: currentGrade.value.examDate || '',
           notes: currentGrade.value.notes,
         };
         grades.value.push(newGrade);
@@ -574,25 +592,29 @@ interface ErrorHandler {
         const index = grades.value.findIndex(
           (g) => g.id === currentGrade.value.id,
         );
+        if (index === -1) {
+          return;
+        }
         if (index !== -1) {
+          const fallback = grades.value[index]!;
           grades.value[index] = {
-            id: currentGrade.value.id || grades.value[index].id,
-            studentId: parseInt(currentGrade.value.studentId),
-            studentName: currentGrade.value.studentName,
-            course: currentGrade.value.course,
-            examType: currentGrade.value.examType,
-            score: currentGrade.value.score,
-            date: currentGrade.value.examDate || new Date().toISOString().split('T')[0],
-            examDate: currentGrade.value.examDate,
-            notes: currentGrade.value.notes,
-          };
+            id: (currentGrade.value.id ?? fallback.id) as number,
+            studentId: parseInt(String(currentGrade.value.studentId || String(fallback.studentId))),
+            studentName: currentGrade.value.studentName || fallback.studentName,
+            course: currentGrade.value.course || fallback.course,
+            examType: currentGrade.value.examType || fallback.examType,
+            score: currentGrade.value.score ?? fallback.score,
+            date: currentGrade.value.examDate ?? fallback.date ?? new Date().toISOString().split('T')[0],
+            examDate: currentGrade.value.examDate ?? fallback.examDate ?? '',
+            notes: currentGrade.value.notes ?? fallback.notes,
+          } as Grade;
         }
       }
 
       closeModals();
     };
 
-    const closeModals = () => {
+    const closeModals = (): void => {
       showAddGrade.value = false;
       showEditGrade.value = false;
       currentGrade.value = {
@@ -607,19 +629,20 @@ interface ErrorHandler {
       };
     };
 
-    const closeImportModal = () => {
+    const closeImportModal = (): void => {
       showImportModal.value = false;
     };
 
-    const handleFileUpload = (event) => {
-      const file = event.target.files[0];
+    const handleFileUpload = (event: Event): void => {
+      const input = event.target as HTMLInputElement;
+      const file = input.files && input.files[0];
       if (file) {
         console.log('文件上传:', file.name);
         // 这里可以实现文件上传逻辑
       }
     };
 
-    const importGrades = () => {
+    const importGrades = (): void => {
       // 实现导入逻辑
       showError('功能提示', '导入功能正在开发中，敬请期待');
       closeImportModal();

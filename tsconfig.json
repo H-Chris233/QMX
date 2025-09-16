@@ -21,15 +21,15 @@
     "noFallthroughCasesInSwitch": true,
     
     /* Enhanced type safety */
-    "noImplicitAny": false,
-    "noImplicitReturns": false,
-    "noImplicitThis": false,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
-    "strictBindCallApply": false,
-    "strictPropertyInitialization": false,
-    "noUncheckedIndexedAccess": false,
-    "exactOptionalPropertyTypes": false
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "references": [{ "path": "./tsconfig.node.json" }]

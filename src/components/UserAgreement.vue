@@ -100,7 +100,8 @@ const sections: Section[] = [
 ];
 
 const initializeTheme = (): void => {
-  const savedTheme = localStorage.getItem('theme');
+  let savedTheme: string | null = null;
+  try { savedTheme = localStorage.getItem('theme'); } catch {}
   if (savedTheme) {
     theme.value = savedTheme;
   } else {
@@ -110,7 +111,7 @@ const initializeTheme = (): void => {
 
 const toggleTheme = (): void => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('theme', theme.value);
+  try { localStorage.setItem('theme', theme.value); } catch {}
   checkCurrentTheme();
 };
 
@@ -134,7 +135,7 @@ const agreeWithTerms = (): void => {
   if (agreeInProgress.value) return;
   agreeInProgress.value = true;
 
-  localStorage.setItem('agreedToTerms', 'true');
+  try { localStorage.setItem('qmx_agreed_to_terms', 'true'); } catch {}
 
   const btn = document.querySelector('.agree-button') as HTMLButtonElement;
   if (btn) btn.innerText = '✅ 正在处理...';

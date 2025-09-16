@@ -2,11 +2,14 @@
   <div
     v-if="show"
     class="confirm-modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="title || '确认操作'"
     @click="closeOnOverlayClick ? cancelAction() : null"
   >
-    <div class="confirm-modal" @click.stop>
+    <div class="confirm-modal" tabindex="-1" @click.stop>
       <div class="confirm-header">
-        <div class="confirm-icon">❓</div>
+        <div class="confirm-icon" aria-hidden="true">❓</div>
         <h3>{{ title }}</h3>
       </div>
 

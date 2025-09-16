@@ -2,13 +2,15 @@ import { createApp } from 'vue';
 import UserAgreement from './components/UserAgreement.vue';
 import MainApp from './MainApp.vue';
 
-// 检查是否已经同意协议
-const agreedToTerms = localStorage.getItem('agreedToTerms');
+const KEY_AGREED = 'qmx_agreed_to_terms';
+
+let agreedToTerms = 'false';
+try {
+  agreedToTerms = localStorage.getItem(KEY_AGREED) || 'false';
+} catch {}
 
 if (agreedToTerms === 'true') {
-  // 已同意协议，显示主应用
   createApp(MainApp).mount('#app');
 } else {
-  // 未同意协议，显示协议页面
   createApp(UserAgreement).mount('#app');
 }

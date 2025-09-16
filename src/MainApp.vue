@@ -5,7 +5,7 @@
       <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
       <div class="nav-mobile-header">
         <h1>启明星管理系统</h1>
-        <button ref="toggleButtonRef" class="sidebar-toggle" @click.stop="toggleSidebar">☰</button>
+        <button ref="toggleButtonRef" class="sidebar-toggle" type="button" aria-label="打开侧边栏" @click.stop="toggleSidebar">☰</button>
       </div>
 
       <!-- 大屏：原有水平导航菜单（≥769px 显示） -->
@@ -25,7 +25,7 @@
       <aside ref="sidebarRef" class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
         <div class="sidebar-header">
           <h2>启明星</h2>
-          <button class="sidebar-close" @click="toggleSidebar">×</button>
+          <button class="sidebar-close" type="button" aria-label="关闭侧边栏" @click="toggleSidebar">×</button>
         </div>
         <ul class="sidebar-menu">
           <li
@@ -198,7 +198,7 @@ const menuItems: MenuItem[] = [
 const isSidebarOpen: Ref<boolean> = ref(false);
 const toggleSidebar = (): void => {
   isSidebarOpen.value = !isSidebarOpen.value;
-  console.log('侧边栏状态：' + isSidebarOpen.value); // 调试用
+  if (import.meta.env?.MODE !== 'production') console.log('侧边栏状态：' + isSidebarOpen.value);
 };
 const handleSidebarItemClick = (id: string): void => {
   activeTab.value = id; // 切换激活Tab
@@ -210,25 +210,16 @@ const handleSidebarItemClick = (id: string): void => {
 // 错误处理方法
 const showError = (title: string, message: string, details: string = '', showRetry: boolean = false): void => {
       try {
-        // 验证参数
-        if (!title || typeof title !== 'string') {
-          title = '系统错误';
-        }
-        if (!message || typeof message !== 'string') {
-          message = '发生了未知错误';
-        }
+        if (!title || typeof title !== 'string') title = '系统错误';
+        if (!message || typeof message !== 'string' || message.trim() === '') message = '发生了未知错误';
 
-        errorModal.value = {
-          show: true,
-          title: title.substring(0, 100), // 限制长度防止UI问题
-          message: message.substring(0, 500),
-          details: details ? String(details).substring(0, 2000) : '',
-          showRetry: Boolean(showRetry),
-        };
+        errorModal.value.show = true;
+        errorModal.value.title = title.substring(0, 100);
+        errorModal.value.message = message.substring(0, 500);
+        errorModal.value.details = details ? String(details).substring(0, 2000) : '';
+        errorModal.value.showRetry = Boolean(showRetry);
       } catch (error) {
-        console.error('显示错误弹窗失败:', error);
-        // 降级方案
-        alert(`${title}: ${message}`);
+        if (import.meta.env?.MODE !== 'production') console.error('显示错误弹窗失败:', error);
       }
     };
 
@@ -254,30 +245,34 @@ const showConfirm = (options: ConfirmOptions): void => {
         onCancel = null,
       } = options;
 
-      confirmModal.value = {
-        show: true,
-        title,
-        message,
-        details,
-        confirmText,
-        cancelText,
-        confirmType,
-        onConfirm,
-        onCancel,
-      };
+      const safeMessage = (typeof message === 'string' && message.trim() !== '') ? message : '请确认是否继续该操作';
+
+      confirmModal.value.show = true;
+      confirmModal.value.title = title;
+      confirmModal.value.message = safeMessage;
+      confirmModal.value.details = details;
+      confirmModal.value.confirmText = confirmText;
+      confirmModal.value.cancelText = cancelText;
+      confirmModal.value.confirmType = confirmType;
+      confirmModal.value.onConfirm = onConfirm;
+      confirmModal.value.onCancel = onCancel;
     };
 
 const handleConfirm = (): void => {
   confirmModal.value.show = false;
-  if (confirmModal.value.onConfirm) {
-    confirmModal.value.onConfirm();
+  try {
+    if (confirmModal.value.onConfirm) confirmModal.value.onConfirm();
+  } catch (e) {
+    showError('操作失败', '确认操作执行出错');
   }
 };
 
 const handleCancel = (): void => {
   confirmModal.value.show = false;
-  if (confirmModal.value.onCancel) {
-    confirmModal.value.onCancel();
+  try {
+    if (confirmModal.value.onCancel) confirmModal.value.onCancel();
+  } catch (e) {
+    if (import.meta.env?.MODE !== 'production') console.warn('取消回调执行异常', e);
   }
 };
 
@@ -294,15 +289,20 @@ let cleanupFunctions: (() => void)[] = [];
     onMounted(() => {
       try {
         // 恢复页面状态
-        const savedActiveTab = localStorage.getItem('qmx_active_tab');
+        let savedActiveTab: string | null = null;
+        try { savedActiveTab = localStorage.getItem('qmx_active_tab'); } catch {}
         if (savedActiveTab && ['dashboard', 'students', 'finance', 'scores', 'settings'].includes(savedActiveTab)) {
           activeTab.value = savedActiveTab;
           console.log('🔄 恢复到之前的页面:', savedActiveTab);
         }
         
         // 检查并显示上次操作结果
-        const lastOperation = localStorage.getItem('qmx_last_operation');
-        const lastOperationTime = localStorage.getItem('qmx_last_operation_time');
+        let lastOperation: string | null = null;
+        let lastOperationTime: string | null = null;
+        try {
+          lastOperation = localStorage.getItem('qmx_last_operation');
+          lastOperationTime = localStorage.getItem('qmx_last_operation_time');
+        } catch {}
         
         if (lastOperation && lastOperationTime) {
           const timeDiff = Date.now() - parseInt(lastOperationTime);
@@ -313,12 +313,15 @@ let cleanupFunctions: (() => void)[] = [];
           }
           
           // 清除操作记录
-          localStorage.removeItem('qmx_last_operation');
-          localStorage.removeItem('qmx_last_operation_time');
+          try {
+            localStorage.removeItem('qmx_last_operation');
+            localStorage.removeItem('qmx_last_operation_time');
+          } catch {}
         }
         
         // 安全的主题初始化
-        const savedTheme = localStorage.getItem('theme');
+        let savedTheme: string | null = null;
+        try { savedTheme = localStorage.getItem('theme'); } catch {}
         if (savedTheme && ['dark', 'light'].includes(savedTheme)) {
           theme.value = savedTheme;
         } else {
@@ -327,6 +330,7 @@ let cleanupFunctions: (() => void)[] = [];
           theme.value = mediaQuery?.matches ? 'dark' : 'light';
         }
         document.documentElement.className = `${theme.value}-theme`;
+        document.documentElement.setAttribute('data-theme', theme.value);
         
         // 优化的外部点击处理：使用缓存的DOM引用，避免重复查询
         const handleOutsideClick = (e: Event): void => {
@@ -336,6 +340,10 @@ let cleanupFunctions: (() => void)[] = [];
             // 使用缓存的DOM引用，大幅提升性能
             const sidebar = sidebarRef.value;
             const toggleButton = toggleButtonRef.value;
+            if (sidebar) {
+              sidebar.setAttribute('role', 'dialog');
+              sidebar.setAttribute('aria-modal', 'true');
+            }
             
             // 安全的DOM事件检查，避免null引用
             if (target && sidebar && toggleButton && 
@@ -347,28 +355,42 @@ let cleanupFunctions: (() => void)[] = [];
         };
 
         // 防抖处理，避免频繁触发
-        let debounceTimer: number | null = null;
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
         const debouncedHandleClick = (e: Event): void => {
-          if (debounceTimer) window.clearTimeout(debounceTimer);
+          if (debounceTimer) window.clearTimeout(debounceTimer as number);
           debounceTimer = window.setTimeout(() => handleOutsideClick(e), 10);
         };
 
-        document.addEventListener('click', debouncedHandleClick, { passive: true });
+        document.addEventListener('click', debouncedHandleClick);
+        const handleKeydown = (e: KeyboardEvent): void => {
+          if (e.key === 'Escape' && isSidebarOpen.value) {
+            isSidebarOpen.value = false;
+          }
+        };
+        document.addEventListener('keydown', handleKeydown);
+        cleanupFunctions.push(() => {
+          document.removeEventListener('keydown', handleKeydown);
+        });
         
         // 添加清理函数
         cleanupFunctions.push(() => {
           document.removeEventListener('click', debouncedHandleClick);
-          if (debounceTimer) window.clearTimeout(debounceTimer);
+          if (debounceTimer) window.clearTimeout(debounceTimer as number);
         });
 
         // 添加窗口大小变化监听器，自动关闭侧边栏
+        let resizeRaf = 0;
         const handleResize = (): void => {
-          if (window.innerWidth > 768 && isSidebarOpen.value) {
-            isSidebarOpen.value = false;
-          }
+          if (resizeRaf) cancelAnimationFrame(resizeRaf);
+          resizeRaf = requestAnimationFrame(() => {
+            if (window.innerWidth > 768 && isSidebarOpen.value) {
+              isSidebarOpen.value = false;
+            }
+          });
         };
+        cleanupFunctions.push(() => { if (resizeRaf) cancelAnimationFrame(resizeRaf); });
 
-        window.addEventListener('resize', handleResize, { passive: true });
+        window.addEventListener('resize', handleResize);
         cleanupFunctions.push(() => {
           window.removeEventListener('resize', handleResize);
         });
@@ -438,7 +460,7 @@ watch(activeTab, (newTab: string, oldTab: string) => {
         
         // 保存当前页面状态到 localStorage
         try {
-          localStorage.setItem('qmx_active_tab', newTab);
+          try { localStorage.setItem('qmx_active_tab', newTab); } catch {}
           console.log('💾 已保存当前页面状态:', newTab);
         } catch (error) {
           console.warn('保存页面状态失败:', error);
