@@ -51,177 +51,167 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'BusinessAgreement',
-  data() {
-    return {
-      theme: 'light', // 默认主题改为明亮
-      showScrollButton: false,
-      showAgreeButton: false,
-      agreeTimer: null,
-      isAnimationReady: false,
-      agreeInProgress: false,
-      sections: [
-        {
-          title: '1. 协议概述',
-          content:
-            '欢迎使用<code>启明星管理软件</code>（以下简称"本软件"）。本协议适用于所有用户及企业客户，在使用本软件及相关服务前，请您仔细阅读以下条款。',
-        },
-        {
-          title: '2. 软件许可',
-          content:
-            '本软件采用<code>商业授权协议</code>，您可在遵守协议的前提下：<ul><li>在企业内部使用本软件</li><li>获得官方技术支持服务</li><li>访问完整的软件功能模块</li></ul>',
-        },
-        {
-          title: '3. 使用条款',
-          content:
-            '当使用本软件时，您需遵守以下规定：<ol><li>不得逆向工程或破解软件</li><li>不得用于非法商业用途</li><li>不得干扰软件正常运行</li><li>需定期更新软件版本</li></ol>',
-        },
-        {
-          title: '4. 责任声明',
-          content:
-            '本软件按"原样"提供，开发者对以下情况不承担责任：<ul><li>因使用本软件导致的业务中断</li><li>数据丢失或损坏</li><li>软件与第三方系统的兼容性问题</li></ul>',
-        },
-        {
-          title: '5. 数据隐私',
-          content:
-            '我们承诺保护您的数据安全：<ul><li>严格遵守GDPR数据保护条例</li><li>加密存储所有用户数据</li><li>未经许可不会共享任何商业信息</li></ul>',
-        },
-        {
-          title: '6. 协议变更',
-          content:
-            '我们保留随时修改本协议的权利，重大变更将通过官方渠道提前30天通知。',
-        },
-      ],
-    };
-  },
-  mounted() {
-    this.initializeTheme();
-    window.addEventListener('scroll', this.handleScroll);
-    this.checkCurrentTheme();
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, nextTick, type Ref } from 'vue';
 
-    this.agreeTimer = setTimeout(() => {
-      this.showAgreeButton = true;
-      this.$nextTick(() => {
-        this.isAnimationReady = true;
-      });
-    }, 1000);
+interface Section {
+  title: string;
+  content: string;
+}
+
+const theme: Ref<string> = ref('light');
+const showScrollButton: Ref<boolean> = ref(false);
+const showAgreeButton: Ref<boolean> = ref(false);
+const agreeTimer: Ref<number | null> = ref(null);
+const isAnimationReady: Ref<boolean> = ref(false);
+const agreeInProgress: Ref<boolean> = ref(false);
+
+const sections: Section[] = [
+  {
+    title: '1. 协议概述',
+    content:
+      '欢迎使用<code>启明星管理软件</code>（以下简称"本软件"）。本协议适用于所有用户及企业客户，在使用本软件及相关服务前，请您仔细阅读以下条款。',
   },
-  methods: {
-    initializeTheme() {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        this.theme = savedTheme;
+  {
+    title: '2. 软件许可',
+    content:
+      '本软件采用<code>商业授权协议</code>，您可在遵守协议的前提下：<ul><li>在企业内部使用本软件</li><li>获得官方技术支持服务</li><li>访问完整的软件功能模块</li></ul>',
+  },
+  {
+    title: '3. 使用条款',
+    content:
+      '当使用本软件时，您需遵守以下规定：<ol><li>不得逆向工程或破解软件</li><li>不得用于非法商业用途</li><li>不得干扰软件正常运行</li><li>需定期更新软件版本</li></ol>',
+  },
+  {
+    title: '4. 责任声明',
+    content:
+      '本软件按"原样"提供，开发者对以下情况不承担责任：<ul><li>因使用本软件导致的业务中断</li><li>数据丢失或损坏</li><li>软件与第三方系统的兼容性问题</li></ul>',
+  },
+  {
+    title: '5. 数据隐私',
+    content:
+      '我们承诺保护您的数据安全：<ul><li>严格遵守GDPR数据保护条例</li><li>加密存储所有用户数据</li><li>未经许可不会共享任何商业信息</li></ul>',
+  },
+  {
+    title: '6. 协议变更',
+    content:
+      '我们保留随时修改本协议的权利，重大变更将通过官方渠道提前30天通知。',
+  },
+];
+
+const initializeTheme = (): void => {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    theme.value = savedTheme;
+  } else {
+    theme.value = 'light';
+  }
+};
+
+const toggleTheme = (): void => {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', theme.value);
+  checkCurrentTheme();
+};
+
+const handleScroll = (): void => {
+  showScrollButton.value = window.pageYOffset > 300;
+};
+
+const scrollToTop = (): void => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const checkCurrentTheme = (): void => {
+  document.documentElement.classList.remove('dark-theme', 'light-theme');
+  document.documentElement.classList.add(theme.value + '-theme');
+  
+  document.body.style.backgroundColor =
+    theme.value === 'dark' ? '#1e1e2f' : '#f5f5f5';
+};
+
+const agreeWithTerms = (): void => {
+  if (agreeInProgress.value) return;
+  agreeInProgress.value = true;
+
+  localStorage.setItem('agreedToTerms', 'true');
+
+  const btn = document.querySelector('.agree-button') as HTMLButtonElement;
+  if (btn) btn.innerText = '✅ 正在处理...';
+
+  setTimeout(() => {
+    showAgreeButton.value = false;
+    openMainWindow();
+    agreeInProgress.value = true;
+  }, 800);
+};
+
+const sanitizeContent = (content: string): string => {
+  const allowedTags = ['ul', 'ol', 'li', 'code', 'strong', 'em', 'br'];
+  
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = content;
+  
+  const cleanElement = (element: Element): void => {
+    const children = Array.from(element.children);
+    children.forEach(child => {
+      if (!allowedTags.includes(child.tagName.toLowerCase())) {
+        const textNode = document.createTextNode(child.textContent || '');
+        element.replaceChild(textNode, child);
       } else {
-        // 默认使用明亮主题
-        this.theme = 'light';
-      }
-    },
-
-    toggleTheme() {
-      this.theme = this.theme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', this.theme);
-      this.checkCurrentTheme();
-    },
-
-    handleScroll() {
-      this.showScrollButton = window.pageYOffset > 300;
-    },
-
-    scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-
-    checkCurrentTheme() {
-      document.documentElement.classList.remove('dark-theme', 'light-theme');
-      document.documentElement.classList.add(this.theme + '-theme');
-
-      // 更新body背景色
-      document.body.style.backgroundColor =
-        this.theme === 'dark' ? '#1e1e2f' : '#f5f5f5';
-    },
-
-    agreeWithTerms() {
-      if (this.agreeInProgress) return;
-      this.agreeInProgress = true;
-
-      // 保存同意状态
-      localStorage.setItem('agreedToTerms', 'true');
-
-      const btn = this.$el.querySelector('.agree-button');
-      if (btn) btn.innerText = '✅ 正在处理...';
-
-      setTimeout(() => {
-        this.showAgreeButton = false;
-        this.openMainWindow();
-        this.agreeInProgress = true;
-      }, 800);
-    },
-
-    sanitizeContent(content) {
-      // 安全的HTML清理函数 - 只允许安全的标签和属性
-      const allowedTags = ['ul', 'ol', 'li', 'code', 'strong', 'em', 'br'];
-      
-      // 创建一个临时DOM元素来清理内容
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
-      
-      // 递归清理所有元素
-      const cleanElement = (element) => {
-        const children = Array.from(element.children);
-        children.forEach(child => {
-          if (!allowedTags.includes(child.tagName.toLowerCase())) {
-            // 不允许的标签，保留文本内容但移除标签
-            const textNode = document.createTextNode(child.textContent);
-            element.replaceChild(textNode, child);
-          } else {
-            // 清理属性，只保留安全的属性
-            const attributes = Array.from(child.attributes);
-            attributes.forEach(attr => {
-              if (!['class'].includes(attr.name)) {
-                child.removeAttribute(attr.name);
-              }
-            });
-            cleanElement(child);
+        const attributes = Array.from(child.attributes);
+        attributes.forEach(attr => {
+          if (!['class'].includes(attr.name)) {
+            child.removeAttribute(attr.name);
           }
         });
-      };
-      
-      cleanElement(tempDiv);
-      return tempDiv.innerHTML;
-    },
-
-    async openMainWindow() {
-      try {
-        document.body.classList.add('transition-out');
-
-        // Tauri特定代码保留
-        if (window.__TAURI__) {
-          const { invoke } = window.__TAURI__.tauri;
-          await invoke('open_main_window');
-          // 关闭当前协议窗口
-          const { getCurrentWindow } = window.__TAURI__.window;
-          await getCurrentWindow().close();
-        } else {
-          // 开发环境下的处理
-          alert('感谢您的同意！即将进入启明星管理软件主界面');
-          // 重新加载应用显示主界面
-          location.reload();
-        }
-      } catch (error) {
-        console.error('打开主窗口失败:', error);
-        alert('感谢您的同意！主应用启动失败，请重试。');
+        cleanElement(child);
       }
-    },
-  },
-  beforeUmount() {
-    window.removeEventListener('scroll', this.handleScroll);
-    if (this.agreeTimer) {
-      clearTimeout(this.agreeTimer);
-    }
-  },
+    });
+  };
+  
+  cleanElement(tempDiv);
+  return tempDiv.innerHTML;
 };
+
+const openMainWindow = async (): Promise<void> => {
+  try {
+    document.body.classList.add('transition-out');
+
+    if ((window as any).__TAURI__) {
+      const { invoke } = (window as any).__TAURI__.tauri;
+      await invoke('open_main_window');
+      const { getCurrentWindow } = (window as any).__TAURI__.window;
+      await getCurrentWindow().close();
+    } else {
+      alert('感谢您的同意！即将进入启明星管理软件主界面');
+      location.reload();
+    }
+  } catch (error) {
+    console.error('打开主窗口失败:', error);
+    alert('感谢您的同意！主应用启动失败，请重试。');
+  }
+};
+
+onMounted(() => {
+  initializeTheme();
+  window.addEventListener('scroll', handleScroll);
+  checkCurrentTheme();
+
+  agreeTimer.value = window.setTimeout(() => {
+    showAgreeButton.value = true;
+    nextTick(() => {
+      isAnimationReady.value = true;
+    });
+  }, 1000);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll);
+  if (agreeTimer.value) {
+    window.clearTimeout(agreeTimer.value);
+  }
+});
 </script>
 
 <style>

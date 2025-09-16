@@ -406,74 +406,119 @@
   </div>
 </template>
 
-<script>
-import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
+<script setup lang="ts">
+import { ref, computed, onMounted, inject, watch, type Ref, type ComputedRef } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import DatePicker from './DatePicker.vue';
 
-export default {
-  name: 'StudentManagement',
-  components: {
-    DatePicker,
-  },
-  setup() {
-    const loading = ref(false);
-    const students = ref([]);
-    const searchQuery = ref('');
-    const classFilter = ref('');
-    const subjectFilter = ref('');
-    const membershipFilter = ref('');
-    const showAdvancedSearch = ref(false);
-    const advancedSearch = ref({
-      minAge: null,
-      maxAge: null,
-      minScore: null,
-      maxScore: null,
-    });
-    const showAddModal = ref(false);
-    const showEditModal = ref(false);
-    const showMembershipModal = ref(false);
-    const currentStudent = ref({
-      uid: null,
-      name: '',
-      age: '',
-      phone: '',
-      classType: '',
-      note: '',
-      subject: 'Shooting',
-      customMembershipStart: '', // 自定义会员开始时间
-      enableCustomMembership: false, // 是否启用自定义会员时间
-    });
-    const membershipStudent = ref(null);
-    const membershipForm = ref({
-      startDate: '',
-      endDate: '',
-    });
-    const searchInput = ref(null);
-    const errorHandler = inject('errorHandler');
-    const refreshSystem = inject('refreshSystem');
-    
-    // 确保错误处理函数可用
-    const showError = errorHandler?.showError || ((title, message, details) => {
-      console.error(`${title}: ${message}`, details);
-      alert(`${title}\n${message}`);
-    });
-    
-    const showConfirm = errorHandler?.showConfirm || ((options) => {
-      const confirmed = confirm(options.message);
-      if (confirmed && options.onConfirm) {
-        options.onConfirm();
-      } else if (!confirmed && options.onCancel) {
-        options.onCancel();
-      }
-    });
-    
-    const showSuccess = errorHandler?.showSuccess || ((title, message) => {
-      console.log(`✅ ${title}: ${message}`);
-      // 可以使用简单的alert作为降级方案
-      // alert(`${title}: ${message}`);
-    });
+// 定义类型接口
+interface Student {
+  uid: number;
+  name: string;
+  age: number;
+  phone: string;
+  class: string;
+  subject: string;
+  note?: string;
+  rings: number[];
+  is_membership_active?: boolean;
+  membership_days_remaining?: number | null;
+  membership_start_date?: string;
+  membership_end_date?: string;
+}
+
+interface CurrentStudent {
+  uid: number | null;
+  name: string;
+  age: string | number;
+  phone: string;
+  classType: string;
+  note: string;
+  subject: string;
+  customMembershipStart: string;
+  enableCustomMembership: boolean;
+}
+
+interface AdvancedSearch {
+  minAge: number | null;
+  maxAge: number | null;
+  minScore: number | null;
+  maxScore: number | null;
+}
+
+interface MembershipForm {
+  startDate: string;
+  endDate: string;
+}
+
+interface ErrorHandler {
+  showError: (title: string, message: string, details?: string) => void;
+  showSuccess: (title: string, message: string) => void;
+  showConfirm: (options: any) => void;
+}
+
+interface RefreshSystem {
+  refreshTriggers: {
+    students: number;
+  };
+}
+const loading: Ref<boolean> = ref(false);
+const students: Ref<Student[]> = ref([]);
+const searchQuery: Ref<string> = ref('');
+const classFilter: Ref<string> = ref('');
+const subjectFilter: Ref<string> = ref('');
+const membershipFilter: Ref<string> = ref('');
+const showAdvancedSearch: Ref<boolean> = ref(false);
+const advancedSearch: Ref<AdvancedSearch> = ref({
+  minAge: null,
+  maxAge: null,
+  minScore: null,
+  maxScore: null,
+});
+const showAddModal: Ref<boolean> = ref(false);
+const showEditModal: Ref<boolean> = ref(false);
+const showMembershipModal: Ref<boolean> = ref(false);
+const currentStudent: Ref<CurrentStudent> = ref({
+  uid: null,
+  name: '',
+  age: '',
+  phone: '',
+  classType: '',
+  note: '',
+  subject: 'Shooting',
+  customMembershipStart: '', // 自定义会员开始时间
+  enableCustomMembership: false, // 是否启用自定义会员时间
+});
+const membershipStudent: Ref<Student | null> = ref(null);
+const membershipForm: Ref<MembershipForm> = ref({
+  startDate: '',
+  endDate: '',
+});
+const searchInput: Ref<HTMLInputElement | null> = ref(null);
+const errorHandler = inject<ErrorHandler>('errorHandler');
+const refreshSystem = inject<RefreshSystem>('refreshSystem');
+
+// 确保错误处理函数可用
+const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
+  console.error(`${title}: ${message}`, details);
+  alert(`${title}\n${message}`);
+});
+
+const showConfirm = errorHandler?.showConfirm || ((options: any) => {
+  const confirmed = confirm(options.message);
+  if (confirmed && options.onConfirm) {
+    options.onConfirm();
+  } else if (!confirmed && options.onCancel) {
+    options.onCancel();
+  }
+});
+
+const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
+  console.log(`✅ ${title}: ${message}`);
+  // 可以使用简单的alert作为降级方案
+  // alert(`${title}: ${message}`);
+});
     
     // 调试：检查错误处理函数是否正确注入
     if (!errorHandler) {
@@ -482,7 +527,7 @@ export default {
       console.log('✅ errorHandler 已成功注入到 StudentManagement 组件');
     }
 
-    const filteredStudents = computed(() => {
+const filteredStudents: ComputedRef<Student[]> = computed(() => {
       try {
         let filtered = students.value || [];
 
@@ -521,6 +566,7 @@ export default {
               case 'expiring_soon':
                 return student.is_membership_active === true && 
                        student.membership_days_remaining !== null && 
+                       student.membership_days_remaining !== undefined &&
                        student.membership_days_remaining <= 7;
               default:
                 return true;
@@ -536,7 +582,7 @@ export default {
       }
     });
 
-    const totalStudents = computed(() => {
+const totalStudents: ComputedRef<number> = computed(() => {
       try {
         return (students.value || []).length;
       } catch (error) {
@@ -545,7 +591,7 @@ export default {
       }
     });
 
-    const trialStudents = computed(() => {
+const trialStudents: ComputedRef<number> = computed(() => {
       try {
         return (students.value || []).filter((s) => s && s.class === 'TenTry').length;
       } catch (error) {
@@ -554,7 +600,7 @@ export default {
       }
     });
 
-    const monthlyStudents = computed(() => {
+const monthlyStudents: ComputedRef<number> = computed(() => {
       try {
         return (students.value || []).filter((s) => s && s.class === 'Month').length;
       } catch (error) {
@@ -563,7 +609,7 @@ export default {
       }
     });
 
-    const yearlyStudents = computed(() => {
+const yearlyStudents: ComputedRef<number> = computed(() => {
       try {
         return (students.value || []).filter((s) => s && s.class === 'Year').length;
       } catch (error) {
@@ -572,8 +618,8 @@ export default {
       }
     });
 
-    const getClassText = (classType) => {
-      const classMap = {
+const getClassText = (classType: string): string => {
+      const classMap: Record<string, string> = {
         TenTry: '体验课',
         Month: '月卡',
         Year: '年卡',
@@ -582,12 +628,12 @@ export default {
       return classMap[classType] || classType;
     };
 
-    const getClassType = (classType) => {
+const getClassType = (classType: string): string => {
       return classType.toLowerCase();
     };
 
-    const getSubjectText = (subject) => {
-      const subjectMap = {
+const getSubjectText = (subject: string): string => {
+      const subjectMap: Record<string, string> = {
         Shooting: '射击',
         Archery: '射箭',
         Others: '其他',
@@ -595,23 +641,23 @@ export default {
       return subjectMap[subject] || subject;
     };
 
-    const getSubjectType = (subject) => {
+const getSubjectType = (subject: string): string => {
       return subject.toLowerCase();
     };
 
-    // 执行搜索（基础搜索）
-    const performSearch = () => {
+// 执行搜索（基础搜索）
+const performSearch = (): void => {
       try {
         // 基础搜索逻辑已通过computed属性实现
         console.log('执行基础搜索:', { searchQuery: searchQuery.value, classFilter: classFilter.value, subjectFilter: subjectFilter.value });
       } catch (error) {
         console.error('搜索失败:', error);
-        showError('搜索失败', '执行搜索时发生错误', error.message || '未知错误');
+        showError('搜索失败', '执行搜索时发生错误', (error as Error).message || '未知错误');
       }
     };
 
-    // 执行高级搜索
-    const performAdvancedSearch = async () => {
+// 执行高级搜索
+const performAdvancedSearch = async (): Promise<void> => {
       if (loading.value) {
         console.warn('正在加载中，跳过搜索请求');
         return;
@@ -639,19 +685,19 @@ export default {
           throw new Error('搜索结果格式不正确，期望数组格式');
         }
 
-        students.value = searchResults;
+        students.value = searchResults as Student[];
         console.log(`高级搜索完成，找到 ${searchResults.length} 个学员`);
         
       } catch (error) {
         console.error('高级搜索失败:', error);
-        showError('搜索失败', '高级搜索时发生错误', error.message || '未知错误');
+        showError('搜索失败', '高级搜索时发生错误', (error as Error).message || '未知错误');
       } finally {
         loading.value = false;
       }
     };
 
-    // 清除高级搜索条件
-    const clearAdvancedSearch = () => {
+// 清除高级搜索条件
+const clearAdvancedSearch = (): void => {
       advancedSearch.value = {
         minAge: null,
         maxAge: null,
@@ -667,9 +713,8 @@ export default {
       loadStudents();
     };
 
-    const filterStudents = performSearch; // 保持向后兼容
 
-    const loadStudents = async () => {
+const loadStudents = async (): Promise<void> => {
       if (loading.value) {
         console.warn('学员数据正在加载中，跳过重复请求');
         return;
@@ -696,7 +741,7 @@ export default {
           console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
         }
         
-        students.value = validStudents;
+        students.value = validStudents as Student[];
         console.log(`成功加载 ${validStudents.length} 个学员记录`);
       } catch (error) {
         console.error('加载学员数据失败:', error);
@@ -704,14 +749,14 @@ export default {
         showError(
           '加载失败', 
           '加载学员数据时发生错误，请检查网络连接或稍后重试', 
-          error.message || '未知错误'
+          (error as Error).message || '未知错误'
         );
       } finally {
         loading.value = false;
       }
     };
 
-    const editStudent = (student) => {
+const editStudent = (student: Student): void => {
       try {
         if (!student || !student.uid) {
           showError('编辑失败', '学员数据无效，无法编辑');
@@ -726,15 +771,17 @@ export default {
           classType: student.class || 'Others',
           note: student.note || '',
           subject: student.subject || 'Shooting',
+          customMembershipStart: '',
+          enableCustomMembership: false,
         };
         showEditModal.value = true;
       } catch (error) {
         console.error('编辑学员失败:', error);
-        showError('编辑失败', '准备编辑学员信息时发生错误', error.message || '未知错误');
+        showError('编辑失败', '准备编辑学员信息时发生错误', (error as Error).message || '未知错误');
       }
     };
 
-    const deleteStudent = async (uid) => {
+const deleteStudent = async (uid: number): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理其他操作，请稍后再试');
         showError('操作失败', '正在处理其他操作，请稍后再试');
@@ -785,7 +832,7 @@ export default {
         showError(
           '删除失败', 
           '删除学员时发生错误，请稍后重试', 
-          error.message || '未知错误'
+          (error as Error).message || '未知错误'
         );
           } finally {
             loading.value = false;
@@ -794,8 +841,8 @@ export default {
       });
     };
 
-    // 增强的输入验证函数
-    const validateStudentInput = (student) => {
+// 增强的输入验证函数
+const validateStudentInput = (student: CurrentStudent): { isValid: boolean; errors: string[] } => {
       const errors = [];
       
       // 基础对象验证
@@ -860,7 +907,7 @@ export default {
       };
     };
 
-    const validatePhone = (phone) => {
+const validatePhone = (phone: string): boolean => {
       try {
         if (!phone || typeof phone !== 'string') return false;
         
@@ -890,7 +937,7 @@ export default {
       }
     };
 
-    const saveStudent = async () => {
+const saveStudent = async (): Promise<void> => {
       // 防止重复提交
       if (loading.value) {
         console.warn('正在保存中，请勿重复提交');
@@ -1055,18 +1102,18 @@ export default {
         window.location.reload();
       } catch (error) {
         console.error('保存学员失败:', error);
-        const errorMessage = error.message || '未知错误';
+        const errorMessage = (error as Error).message || '未知错误';
         showError(
           '保存失败', 
           `保存学员信息时发生错误: ${errorMessage}`,
-          error.stack
+          (error as Error).stack
         );
       } finally {
         loading.value = false;
       }
     };
 
-    const getHighestScore = (student) => {
+const getHighestScore = (student: Student): string => {
       try {
         // 增强的空值和类型检查
         if (!student || typeof student !== 'object') {
@@ -1112,7 +1159,7 @@ export default {
       }
     };
 
-    const closeModals = () => {
+const closeModals = (): void => {
       try {
         showAddModal.value = false;
         showEditModal.value = false;
@@ -1134,16 +1181,16 @@ export default {
       }
     };
 
-    // 会员管理相关方法
-    const getMembershipStatusClass = (student) => {
+// 会员管理相关方法
+const getMembershipStatusClass = (student: Student | null): string => {
       if (!student) return 'no-membership';
       if (student.is_membership_active) {
-        return student.membership_days_remaining > 7 ? 'active' : 'expiring';
+        return (student.membership_days_remaining ?? 0) > 7 ? 'active' : 'expiring';
       }
       return 'expired';
     };
 
-    const getMembershipStatusText = (student) => {
+const getMembershipStatusText = (student: Student | null): string => {
       if (!student) return '无会员';
       if (student.is_membership_active) {
         return '有效会员';
@@ -1154,7 +1201,7 @@ export default {
       return '无会员';
     };
 
-    const formatDate = (dateString) => {
+const formatDate = (dateString: string): string => {
       if (!dateString) return '';
       try {
         return new Date(dateString).toLocaleDateString('zh-CN');
@@ -1164,11 +1211,11 @@ export default {
       }
     };
 
-    const getTodayDate = () => {
-      return new Date().toISOString().split('T')[0];
+const getTodayDate = (): string => {
+      return new Date().toISOString().split('T')[0] as string;
     };
 
-    const manageMembership = (student) => {
+const manageMembership = (student: Student): void => {
       try {
         if (!student || !student.uid) {
           showError('操作失败', '学员数据无效');
@@ -1182,11 +1229,11 @@ export default {
         showMembershipModal.value = true;
       } catch (error) {
         console.error('打开会员管理失败:', error);
-        showError('操作失败', '打开会员管理时发生错误', error.message);
+        showError('操作失败', '打开会员管理时发生错误', (error as Error).message);
       }
     };
 
-    const closeMembershipModal = () => {
+const closeMembershipModal = (): void => {
       try {
         showMembershipModal.value = false;
         membershipStudent.value = null;
@@ -1199,7 +1246,7 @@ export default {
       }
     };
 
-    const setMembershipByType = async (type) => {
+const setMembershipByType = async (type: string): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -1213,7 +1260,7 @@ export default {
       loading.value = true;
       try {
         const studentName = membershipStudent.value.name; // 保存学员姓名
-        await ApiService.setMembershipByType(membershipStudent.value.uid, type, true);
+        await ApiService.setMembershipByType(membershipStudent.value.uid, type as 'month' | 'year', true);
         
         closeMembershipModal();
         
@@ -1233,13 +1280,13 @@ export default {
         window.location.reload();
       } catch (error) {
         console.error('设置会员失败:', error);
-        showError('设置失败', '设置会员时发生错误', error.message);
+        showError('设置失败', '设置会员时发生错误', (error as Error).message);
       } finally {
         loading.value = false;
       }
     };
 
-    const clearMembership = async () => {
+const clearMembership = async (): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -1260,7 +1307,7 @@ export default {
         onConfirm: async () => {
           loading.value = true;
       try {
-        await ApiService.clearStudentMembership(membershipStudent.value.uid);
+        await ApiService.clearStudentMembership(membershipStudent.value!.uid);
         
         closeMembershipModal();
         
@@ -1279,7 +1326,7 @@ export default {
         window.location.reload();
       } catch (error) {
         console.error('清除会员失败:', error);
-        showError('清除失败', '清除会员时发生错误', error.message);
+        showError('清除失败', '清除会员时发生错误', (error as Error).message);
           } finally {
             loading.value = false;
           }
@@ -1287,7 +1334,7 @@ export default {
       });
     };
 
-    const saveCustomMembership = async () => {
+const saveCustomMembership = async (): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -1333,7 +1380,7 @@ export default {
         window.location.reload();
       } catch (error) {
         console.error('设置自定义会员失败:', error);
-        showError('设置失败', '设置自定义会员时发生错误', error.message);
+        showError('设置失败', '设置自定义会员时发生错误', (error as Error).message);
       } finally {
         loading.value = false;
       }
@@ -1357,12 +1404,12 @@ export default {
         loadStudents();
       } catch (error) {
         console.error('组件初始化失败:', error);
-        showError('初始化失败', '组件初始化时发生错误', error.message || '未知错误');
+        showError('初始化失败', '组件初始化时发生错误', (error as Error).message || '未知错误');
       }
     });
 
-    // 格式化日期用于显示
-    const formatDateForDisplay = (dateString) => {
+// 格式化日期用于显示
+const formatDateForDisplay = (dateString: string): string => {
       if (!dateString) return '';
       const date = new Date(dateString);
       return date.toLocaleDateString('zh-CN', {
@@ -1372,8 +1419,8 @@ export default {
       });
     };
 
-    // 自定义会员时间切换处理
-    const onCustomMembershipToggle = () => {
+// 自定义会员时间切换处理
+const onCustomMembershipToggle = (): void => {
       if (!currentStudent.value.enableCustomMembership) {
         // 如果关闭自定义时间，清空自定义开始时间
         currentStudent.value.customMembershipStart = '';
@@ -1383,55 +1430,7 @@ export default {
       }
     };
 
-    return {
-      loading,
-      students,
-      filteredStudents,
-      searchQuery,
-      classFilter,
-      subjectFilter,
-      membershipFilter,
-      showAdvancedSearch,
-      advancedSearch,
-      showAddModal,
-      showEditModal,
-      showMembershipModal,
-      currentStudent,
-      membershipStudent,
-      membershipForm,
-      searchInput,
-      totalStudents,
-      trialStudents,
-      monthlyStudents,
-      yearlyStudents,
-      getClassText,
-      getClassType,
-      getSubjectText,
-      getSubjectType,
-      filterStudents,
-      performSearch,
-      performAdvancedSearch,
-      clearAdvancedSearch,
-      editStudent,
-      deleteStudent,
-      saveStudent,
-      getHighestScore,
-      closeModals,
-      // 会员管理相关方法
-      getMembershipStatusClass,
-      getMembershipStatusText,
-      formatDate,
-      getTodayDate,
-      formatDateForDisplay,
-      onCustomMembershipToggle,
-      manageMembership,
-      closeMembershipModal,
-      setMembershipByType,
-      clearMembership,
-      saveCustomMembership,
-    };
-  },
-};
+
 </script>
 
 <style scoped>

@@ -103,8 +103,8 @@
   </div>
 </template>
 
-<script>
-import { ref, onMounted, onUnmounted, provide, watch } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, provide, watch, type Ref } from 'vue';
 import StudentManagement from './components/StudentManagement.vue';
 import FinancialStatistics from './components/FinancialStatistics.vue';
 import ScoreManagement from './components/ScoreManagement.vue';
@@ -112,71 +112,99 @@ import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import ErrorModal from './components/ErrorModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
-import DatePicker from './components/DatePicker.vue';
 
-export default {
-  name: 'MainApp',
-  components: {
-    StudentManagement,
-    FinancialStatistics,
-    ScoreManagement,
-    Dashboard,
-    Settings,
-    ErrorModal,
-    ConfirmModal,
-    DatePicker,
-  },
-  setup() {
-    const theme = ref('dark');
-    const activeTab = ref('dashboard');
+// 定义类型接口
+interface ErrorModalState {
+  show: boolean;
+  title: string;
+  message: string;
+  details: string;
+  showRetry: boolean;
+}
 
-    // 错误弹窗状态
-    const errorModal = ref({
-      show: false,
-      title: '错误',
-      message: '',
-      details: '',
-      showRetry: false,
-    });
+interface ConfirmModalState {
+  show: boolean;
+  title: string;
+  message: string;
+  details: string;
+  confirmText: string;
+  cancelText: string;
+  confirmType: string;
+  onConfirm: (() => void) | null;
+  onCancel: (() => void) | null;
+}
 
-    // 确认弹窗状态
-    const confirmModal = ref({
-      show: false,
-      title: '确认操作',
-      message: '',
-      details: '',
-      confirmText: '确定',
-      cancelText: '取消',
-      confirmType: 'primary',
-      onConfirm: null,
-      onCancel: null,
-    });
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: string;
+}
 
-    const menuItems = [
-      { id: 'dashboard', label: '仪表盘', icon: '📊' },
-      { id: 'students', label: '学员管理', icon: '👥' },
-      { id: 'finance', label: '收支统计', icon: '💰' },
-      { id: 'scores', label: '分数管理', icon: '🎯' },
-      { id: 'settings', label: '设置', icon: '⚙️' }, // 新增「设置」菜单项
-    ];
+interface RefreshTriggers {
+  students: number;
+  transactions: number;
+  dashboard: number;
+  scores: number;
+}
 
-    // 新增：侧边栏展开状态 + 交互方法
-    const isSidebarOpen = ref(false);
-    const toggleSidebar = () => {
-      isSidebarOpen.value = !isSidebarOpen.value;
-      console.log('侧边栏状态：' + isSidebarOpen.value); // 调试用
-    };
-    const handleSidebarItemClick = (id) => {
-      activeTab.value = id; // 切换激活Tab
-      toggleSidebar(); // 点击菜单项后自动收起侧边栏
-    };
+interface ConfirmOptions {
+  title?: string;
+  message: string;
+  details?: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmType?: string;
+  onConfirm?: (() => void) | null;
+  onCancel?: (() => void) | null;
+}
+const theme: Ref<string> = ref('dark');
+const activeTab: Ref<string> = ref('dashboard');
 
-    const openSettings = () => {
-      activeTab.value = 'settings';
-    };
+// 错误弹窗状态
+const errorModal: Ref<ErrorModalState> = ref({
+  show: false,
+  title: '错误',
+  message: '',
+  details: '',
+  showRetry: false,
+});
 
-    // 错误处理方法
-    const showError = (title, message, details = '', showRetry = false) => {
+// 确认弹窗状态
+const confirmModal: Ref<ConfirmModalState> = ref({
+  show: false,
+  title: '确认操作',
+  message: '',
+  details: '',
+  confirmText: '确定',
+  cancelText: '取消',
+  confirmType: 'primary',
+  onConfirm: null,
+  onCancel: null,
+});
+
+const menuItems: MenuItem[] = [
+  { id: 'dashboard', label: '仪表盘', icon: '📊' },
+  { id: 'students', label: '学员管理', icon: '👥' },
+  { id: 'finance', label: '收支统计', icon: '💰' },
+  { id: 'scores', label: '分数管理', icon: '🎯' },
+  { id: 'settings', label: '设置', icon: '⚙️' }, // 新增「设置」菜单项
+];
+
+// 新增：侧边栏展开状态 + 交互方法
+const isSidebarOpen: Ref<boolean> = ref(false);
+const toggleSidebar = (): void => {
+  isSidebarOpen.value = !isSidebarOpen.value;
+  console.log('侧边栏状态：' + isSidebarOpen.value); // 调试用
+};
+const handleSidebarItemClick = (id: string): void => {
+  activeTab.value = id; // 切换激活Tab
+  toggleSidebar(); // 点击菜单项后自动收起侧边栏
+};
+
+
+
+// 错误处理方法
+const showError = (title: string, message: string, details: string = '', showRetry: boolean = false): void => {
       try {
         // 验证参数
         if (!title || typeof title !== 'string') {
@@ -200,17 +228,17 @@ export default {
       }
     };
 
-    const hideError = () => {
-      errorModal.value.show = false;
-    };
+const hideError = (): void => {
+  errorModal.value.show = false;
+};
 
-    const retryWithError = () => {
-      errorModal.value.show = false;
-      // 这里可以添加重试逻辑，目前只是关闭弹窗
-    };
+const retryWithError = (): void => {
+  errorModal.value.show = false;
+  // 这里可以添加重试逻辑，目前只是关闭弹窗
+};
 
-    // 确认弹窗方法
-    const showConfirm = (options) => {
+// 确认弹窗方法
+const showConfirm = (options: ConfirmOptions): void => {
       const {
         title = '确认操作',
         message,
@@ -235,28 +263,28 @@ export default {
       };
     };
 
-    const handleConfirm = () => {
-      confirmModal.value.show = false;
-      if (confirmModal.value.onConfirm) {
-        confirmModal.value.onConfirm();
-      }
-    };
+const handleConfirm = (): void => {
+  confirmModal.value.show = false;
+  if (confirmModal.value.onConfirm) {
+    confirmModal.value.onConfirm();
+  }
+};
 
-    const handleCancel = () => {
-      confirmModal.value.show = false;
-      if (confirmModal.value.onCancel) {
-        confirmModal.value.onCancel();
-      }
-    };
+const handleCancel = (): void => {
+  confirmModal.value.show = false;
+  if (confirmModal.value.onCancel) {
+    confirmModal.value.onCancel();
+  }
+};
 
-    // 成功消息处理（简单的控制台日志，可以后续扩展为Toast通知）
-    const showSuccess = (title, message) => {
-      console.log(`✅ ${title}: ${message}`);
-      // 这里可以添加Toast通知或其他成功提示UI
-    };
+// 成功消息处理（简单的控制台日志，可以后续扩展为Toast通知）
+const showSuccess = (title: string, message: string): void => {
+  console.log(`✅ ${title}: ${message}`);
+  // 这里可以添加Toast通知或其他成功提示UI
+};
 
-    // 事件监听器清理函数
-    let cleanupFunctions = [];
+// 事件监听器清理函数
+let cleanupFunctions: (() => void)[] = [];
 
     onMounted(() => {
       try {
@@ -296,24 +324,24 @@ export default {
         document.documentElement.className = `${theme.value}-theme`;
         
         // 修复内存泄漏：正确管理事件监听器
-        const handleOutsideClick = (e) => {
+        const handleOutsideClick = (e: Event): void => {
           if (window.innerWidth <= 768 && isSidebarOpen.value) {
             const sidebar = document.querySelector('.sidebar');
             const toggleButton = document.querySelector('.sidebar-toggle');
             
             // 更安全的DOM查询和事件检查
-            if (sidebar && !sidebar.contains(e.target) && 
-                toggleButton && !toggleButton.contains(e.target)) {
+            if (sidebar && !sidebar.contains(e.target as Node) && 
+                toggleButton && !toggleButton.contains(e.target as Node)) {
               isSidebarOpen.value = false;
             }
           }
         };
 
         // 防抖处理，避免频繁触发
-        let debounceTimer = null;
-        const debouncedHandleClick = (e) => {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => handleOutsideClick(e), 10);
+        let debounceTimer: number | null = null;
+        const debouncedHandleClick = (e: Event): void => {
+          if (debounceTimer) window.clearTimeout(debounceTimer);
+          debounceTimer = window.setTimeout(() => handleOutsideClick(e), 10);
         };
 
         document.addEventListener('click', debouncedHandleClick, { passive: true });
@@ -321,11 +349,11 @@ export default {
         // 添加清理函数
         cleanupFunctions.push(() => {
           document.removeEventListener('click', debouncedHandleClick);
-          if (debounceTimer) clearTimeout(debounceTimer);
+          if (debounceTimer) window.clearTimeout(debounceTimer);
         });
 
         // 添加窗口大小变化监听器，自动关闭侧边栏
-        const handleResize = () => {
+        const handleResize = (): void => {
           if (window.innerWidth > 768 && isSidebarOpen.value) {
             isSidebarOpen.value = false;
           }
@@ -345,7 +373,7 @@ export default {
 
     onUnmounted(() => {
       // 清理所有事件监听器
-      cleanupFunctions.forEach(cleanup => {
+      cleanupFunctions.forEach((cleanup: () => void) => {
         try {
           cleanup();
         } catch (error) {
@@ -355,15 +383,15 @@ export default {
       cleanupFunctions = [];
     });
 
-    // 全局数据刷新事件系统
-    const refreshTriggers = ref({
-      students: 0,
-      transactions: 0,
-      dashboard: 0,
-      scores: 0,
-    });
+// 全局数据刷新事件系统
+const refreshTriggers: Ref<RefreshTriggers> = ref({
+  students: 0,
+  transactions: 0,
+  dashboard: 0,
+  scores: 0,
+});
 
-    const triggerRefresh = (componentType) => {
+const triggerRefresh = (componentType: string): void => {
       try {
         if (componentType === 'all') {
           // 刷新所有组件
@@ -371,8 +399,8 @@ export default {
           refreshTriggers.value.transactions++;
           refreshTriggers.value.dashboard++;
           refreshTriggers.value.scores++;
-        } else if (refreshTriggers.value.hasOwnProperty(componentType)) {
-          refreshTriggers.value[componentType]++;
+        } else if (componentType in refreshTriggers.value) {
+          (refreshTriggers.value as any)[componentType]++;
         }
         console.log(`触发 ${componentType} 组件刷新`);
       } catch (error) {
@@ -394,8 +422,8 @@ export default {
       triggerRefresh,
     });
 
-    // 监听标签页切换，自动刷新对应组件并保存状态
-    watch(activeTab, (newTab, oldTab) => {
+// 监听标签页切换，自动刷新对应组件并保存状态
+watch(activeTab, (newTab: string, oldTab: string) => {
       if (newTab !== oldTab) {
         console.log(`切换到 ${newTab} 标签页，触发刷新`);
         
@@ -425,25 +453,7 @@ export default {
       }
     });
 
-    return {
-      theme,
-      activeTab,
-      menuItems,
-      openSettings,
-      errorModal,
-      showError,
-      hideError,
-      retryWithError,
-      confirmModal,
-      showConfirm,
-      handleConfirm,
-      handleCancel,
-      isSidebarOpen,
-      toggleSidebar,
-      handleSidebarItemClick,
-    };
-  },
-};
+
 </script>
 
 <style>

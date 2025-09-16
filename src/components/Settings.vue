@@ -77,52 +77,42 @@
   </div>
 </template>
 
-<script>
-import { ref, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, type Ref } from 'vue';
 
-export default {
-  name: 'Settings',
-  setup() {
-    const theme = ref('dark');
-    const autoSave = ref(true);
+const theme: Ref<string> = ref('dark');
+const autoSave: Ref<boolean> = ref(true);
 
-    const toggleTheme = () => {
-      theme.value = theme.value === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', theme.value);
-      document.documentElement.className = theme.value + '-theme';
-    };
-
-    const saveSettings = () => {
-      localStorage.setItem('autoSave', autoSave.value.toString());
-    };
-
-    onMounted(() => {
-      // 初始化主题
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        theme.value = savedTheme;
-      } else {
-        theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
-      }
-      document.documentElement.className = theme.value + '-theme';
-
-      // 加载设置
-      const savedAutoSave = localStorage.getItem('autoSave');
-      if (savedAutoSave) {
-        autoSave.value = savedAutoSave === 'true';
-      }
-    });
-
-    return {
-      theme,
-      autoSave,
-      toggleTheme,
-      saveSettings,
-    };
-  },
+const toggleTheme = (): void => {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', theme.value);
+  document.documentElement.className = theme.value + '-theme';
 };
+
+const saveSettings = (): void => {
+  localStorage.setItem('autoSave', autoSave.value.toString());
+};
+
+onMounted(() => {
+  // 初始化主题
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    theme.value = savedTheme;
+  } else {
+    theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  }
+  document.documentElement.className = theme.value + '-theme';
+
+  // 加载设置
+  const savedAutoSave = localStorage.getItem('autoSave');
+  if (savedAutoSave) {
+    autoSave.value = savedAutoSave === 'true';
+  }
+});
+
+
 </script>
 
 <style scoped>
