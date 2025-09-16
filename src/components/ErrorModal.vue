@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue';
+import { watch, onUnmounted } from 'vue';
 
 interface Props {
   show?: boolean;
@@ -64,30 +64,36 @@ const retry = (): void => {
   emit('retry');
 };
 
-// 监听ESC键关闭弹窗
+// 修复内存泄漏：正确管理ESC键监听器
+let escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+
 watch(
   () => props.show,
   (newVal: boolean) => {
+    // 清理之前的监听器
+    if (escapeHandler) {
+      document.removeEventListener('keydown', escapeHandler);
+      escapeHandler = null;
+    }
+    
     if (newVal) {
-      const handleEscape = (e: KeyboardEvent): void => {
+      escapeHandler = (e: KeyboardEvent): void => {
         if (e.key === 'Escape') {
           closeModal();
         }
       };
-      document.addEventListener('keydown', handleEscape);
-
-      // 清理函数
-      const cleanup = () => {
-        document.removeEventListener('keydown', handleEscape);
-      };
-      
-      // 返回清理函数
-      return cleanup;
+      document.addEventListener('keydown', escapeHandler);
     }
-    // 返回空函数以满足所有代码路径
-    return () => {};
   },
 );
+
+// 组件卸载时清理
+onUnmounted(() => {
+  if (escapeHandler) {
+    document.removeEventListener('keydown', escapeHandler);
+    escapeHandler = null;
+  }
+});
 
 
 </script>

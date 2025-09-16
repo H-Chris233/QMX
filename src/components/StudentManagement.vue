@@ -499,10 +499,10 @@ const searchInput: Ref<HTMLInputElement | null> = ref(null);
 const errorHandler = inject<ErrorHandler>('errorHandler');
 const refreshSystem = inject<RefreshSystem>('refreshSystem');
 
-// 确保错误处理函数可用
+// 统一错误处理 - 移除alert降级，强制使用统一系统
 const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
   console.error(`${title}: ${message}`, details);
-  alert(`${title}\n${message}`);
+  // 如果没有错误处理系统，只记录到控制台，不使用alert
 });
 
 const showConfirm = errorHandler?.showConfirm || ((options: any) => {
@@ -843,7 +843,7 @@ const deleteStudent = async (uid: number): Promise<void> => {
 
 // 增强的输入验证函数
 const validateStudentInput = (student: CurrentStudent): { isValid: boolean; errors: string[] } => {
-      const errors = [];
+      const errors: string[] = [];
       
       // 基础对象验证
       if (!student || typeof student !== 'object') {
@@ -860,8 +860,16 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
           errors.push('姓名长度不能超过50个字符');
         }
         // 检查特殊字符和潜在的注入攻击
-        if (/<script|javascript:|data:|vbscript:/i.test(trimmedName)) {
+        if (/<script|javascript:|data:|vbscript:|on\w+=/i.test(trimmedName)) {
           errors.push('姓名包含非法字符');
+        }
+        // 检查SQL注入模式
+        if (/('|(\\x27)|(\\x2D\\x2D)|(\;)|(\|)|(\*)|(\%))/.test(trimmedName)) {
+          errors.push('姓名包含不安全字符');
+        }
+        // 检查是否只包含合法字符（中文、英文、数字、常见符号）
+        if (!/^[\u4e00-\u9fa5a-zA-Z0-9\s\.\-_]+$/.test(trimmedName)) {
+          errors.push('姓名只能包含中文、英文、数字和常见符号');
         }
       }
       
@@ -959,14 +967,29 @@ const saveStudent = async (): Promise<void> => {
       loading.value = true;
       
       try {
+        // 增强的输入净化和安全处理
+        const sanitizeString = (input: string): string => {
+          if (!input || typeof input !== 'string') return '';
+          return input
+            .trim()
+            .replace(/[<>'"&]/g, '') // 移除HTML特殊字符
+            .replace(/javascript:/gi, '') // 移除JavaScript协议
+            .replace(/data:/gi, '') // 移除data协议
+            .replace(/vbscript:/gi, '') // 移除VBScript协议
+            .replace(/on\w+=/gi, '') // 移除事件处理器
+            .substring(0, 200); // 限制最大长度
+        };
+
         const sanitizedStudent = {
           ...currentStudent.value,
-          name: currentStudent.value.name.trim(),
-          age: Number(currentStudent.value.age),
-          classType: currentStudent.value.classType || 'Others',
-          phone: currentStudent.value.phone.trim(),
-          note: currentStudent.value.note?.trim() || '',
-          subject: currentStudent.value.subject || 'Shooting',
+          name: sanitizeString(currentStudent.value.name),
+          age: Math.max(3, Math.min(120, Number(currentStudent.value.age) || 0)),
+          classType: ['TenTry', 'Month', 'Year', 'Others'].includes(currentStudent.value.classType) 
+            ? currentStudent.value.classType : 'Others',
+          phone: currentStudent.value.phone.trim().replace(/[^\d\-\+\s\(\)]/g, '').substring(0, 20),
+          note: sanitizeString(currentStudent.value.note || '').substring(0, 500),
+          subject: ['Shooting', 'Archery', 'Others'].includes(currentStudent.value.subject) 
+            ? currentStudent.value.subject : 'Shooting',
         };
 
         if (showAddModal.value) {

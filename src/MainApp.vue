@@ -5,7 +5,7 @@
       <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
       <div class="nav-mobile-header">
         <h1>启明星管理系统</h1>
-        <button class="sidebar-toggle" @click.stop="toggleSidebar">☰</button>
+        <button ref="toggleButtonRef" class="sidebar-toggle" @click.stop="toggleSidebar">☰</button>
       </div>
 
       <!-- 大屏：原有水平导航菜单（≥769px 显示） -->
@@ -22,7 +22,7 @@
       </div>
 
       <!-- 移动端：侧边栏（≤768px 显示，抽屉式展开） -->
-      <aside class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
+      <aside ref="sidebarRef" class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
         <div class="sidebar-header">
           <h2>启明星</h2>
           <button class="sidebar-close" @click="toggleSidebar">×</button>
@@ -159,6 +159,10 @@ interface ConfirmOptions {
 }
 const theme: Ref<string> = ref('dark');
 const activeTab: Ref<string> = ref('dashboard');
+
+// DOM元素引用 - 优化性能，避免重复查询
+const sidebarRef = ref<HTMLElement | null>(null);
+const toggleButtonRef = ref<HTMLElement | null>(null);
 
 // 错误弹窗状态
 const errorModal: Ref<ErrorModalState> = ref({
@@ -323,15 +327,19 @@ let cleanupFunctions: (() => void)[] = [];
         }
         document.documentElement.className = `${theme.value}-theme`;
         
-        // 修复内存泄漏：正确管理事件监听器
+        // 优化的外部点击处理：使用缓存的DOM引用，避免重复查询
         const handleOutsideClick = (e: Event): void => {
           if (window.innerWidth <= 768 && isSidebarOpen.value) {
-            const sidebar = document.querySelector('.sidebar');
-            const toggleButton = document.querySelector('.sidebar-toggle');
+            const target = e.target as Node;
             
-            // 更安全的DOM查询和事件检查
-            if (sidebar && !sidebar.contains(e.target as Node) && 
-                toggleButton && !toggleButton.contains(e.target as Node)) {
+            // 使用缓存的DOM引用，大幅提升性能
+            const sidebar = sidebarRef.value;
+            const toggleButton = toggleButtonRef.value;
+            
+            // 安全的DOM事件检查，避免null引用
+            if (target && sidebar && toggleButton && 
+                !sidebar.contains(target) && 
+                !toggleButton.contains(target)) {
               isSidebarOpen.value = false;
             }
           }
