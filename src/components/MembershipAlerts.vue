@@ -103,7 +103,7 @@ const errorHandler = inject<ErrorHandler>('errorHandler');
 
 const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
   console.error(`${title}: ${message}`, details);
-  alert(`${title}\n${message}`);
+  // 统一错误处理：移除alert降级
 });
 
 const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
@@ -200,7 +200,7 @@ const loadExpiringMemberships = async (): Promise<void> => {
             showSuccess('已复制', `电话号码 ${student.phone} 已复制到剪贴板`);
           });
         } else {
-          alert(`学员电话: ${student.phone}`);
+          showError('复制失败', `无法复制电话号码，请手动复制: ${student.phone}`);
         }
       }
     };

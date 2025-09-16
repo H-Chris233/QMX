@@ -23,4 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+# Tauri data files (runtime generated)
+src-tauri/data/
+src-tauri/data/*
+
 commit.sh

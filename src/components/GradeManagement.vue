@@ -109,7 +109,7 @@
                 {{ getGradeLevel(grade.score) }}
               </span>
             </td>
-            <td>{{ grade.examDate }}</td>
+            <td>{{ grade.examDate || grade.date }}</td>
             <td class="notes">{{ grade.notes || '-' }}</td>
             <td class="actions">
               <button class="edit-btn" @click="editGrade(grade)">✏️</button>
@@ -137,7 +137,7 @@
               <div
                 class="range-fill"
                 :style="{
-                  width: (range.count / maxCount) * 100 + '%',
+                  width: (range.count / range.maxCount) * 100 + '%',
                   backgroundColor: range.color,
                 }"
               ></div>
@@ -276,18 +276,36 @@
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue';
 import DatePicker from './DatePicker.vue';
 
-export default {
-  name: 'GradeManagement',
-  components: {
-    DatePicker,
-  },
-  setup() {
-    const grades = ref([]);
-    const students = ref([]);
+// TypeScript类型定义
+interface Grade {
+  id: number;
+  studentName: string;
+  course: string;
+  examType: string;
+  score: number;
+  date: string;
+  studentId: number;
+  examDate?: string;
+  notes?: string;
+}
+
+interface Student {
+  id: number;
+  name: string;
+}
+
+interface ErrorHandler {
+  showError: (title: string, message: string, details?: string) => void;
+  showConfirm: (options: any) => void;
+}
+
+// 使用script setup提高类型安全
+    const grades = ref<Grade[]>([]);
+    const students = ref<Student[]>([]);
     const selectedCourse = ref('');
     const selectedExamType = ref('');
     const studentSearch = ref('');
@@ -306,8 +324,14 @@ export default {
     });
 
     // 注入错误处理函数
-    const errorHandler = inject('errorHandler');
-    const showConfirm = errorHandler?.showConfirm || ((options) => {
+    const errorHandler = inject<ErrorHandler>('errorHandler');
+    
+    const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
+      console.error(`${title}: ${message}`, details);
+      // 统一错误处理：移除alert降级
+    });
+    
+    const showConfirm = errorHandler?.showConfirm || ((options: any) => {
       const confirmed = confirm(options.message);
       if (confirmed && options.onConfirm) {
         options.onConfirm();
@@ -325,7 +349,7 @@ export default {
       { id: 5, name: '孙七' },
     ];
 
-    const mockGrades = [
+    const mockGrades: Grade[] = [
       {
         id: 1,
         studentId: 1,
@@ -333,6 +357,7 @@ export default {
         course: 'Python基础',
         examType: '期末考试',
         score: 85,
+        date: '2024-01-15',
         examDate: '2024-01-15',
         notes: '表现良好',
       },
@@ -343,6 +368,7 @@ export default {
         course: 'Java进阶',
         examType: '期末考试',
         score: 92,
+        date: '2024-01-16',
         examDate: '2024-01-16',
         notes: '优秀',
       },
@@ -353,6 +379,7 @@ export default {
         course: 'Web前端',
         examType: '期中考试',
         score: 78,
+        date: '2024-01-20',
         examDate: '2024-01-20',
         notes: '需要加强',
       },
@@ -363,6 +390,7 @@ export default {
         course: '数据分析',
         examType: '期末考试',
         score: 88,
+        date: '2024-01-25',
         examDate: '2024-01-25',
         notes: '稳定发挥',
       },
@@ -373,6 +401,7 @@ export default {
         course: 'Python基础',
         examType: '平时测验',
         score: 95,
+        date: '2024-01-28',
         examDate: '2024-01-28',
         notes: '非常优秀',
       },
@@ -514,13 +543,13 @@ export default {
         !currentGrade.value.course ||
         !currentGrade.value.score
       ) {
-        alert('请填写必要信息');
+        showError('输入错误', '请填写必要信息：学员、科目、课程和分数');
         return;
       }
 
       // 获取学员姓名
       const student = students.value.find(
-        (s) => s.id === currentGrade.value.studentId,
+        (s) => s.id === parseInt(currentGrade.value.studentId),
       );
       if (student) {
         currentGrade.value.studentName = student.name;
@@ -528,12 +557,16 @@ export default {
 
       if (showAddGrade.value) {
         // 添加新成绩
-        const newGrade = {
-          ...currentGrade.value,
+        const newGrade: Grade = {
           id: Date.now(),
-          examDate:
-            currentGrade.value.examDate ||
-            new Date().toISOString().split('T')[0],
+          studentId: parseInt(currentGrade.value.studentId),
+          studentName: currentGrade.value.studentName,
+          course: currentGrade.value.course,
+          examType: currentGrade.value.examType,
+          score: currentGrade.value.score,
+          date: currentGrade.value.examDate || new Date().toISOString().split('T')[0],
+          examDate: currentGrade.value.examDate,
+          notes: currentGrade.value.notes,
         };
         grades.value.push(newGrade);
       } else {
@@ -542,7 +575,17 @@ export default {
           (g) => g.id === currentGrade.value.id,
         );
         if (index !== -1) {
-          grades.value[index] = { ...currentGrade.value };
+          grades.value[index] = {
+            id: currentGrade.value.id || grades.value[index].id,
+            studentId: parseInt(currentGrade.value.studentId),
+            studentName: currentGrade.value.studentName,
+            course: currentGrade.value.course,
+            examType: currentGrade.value.examType,
+            score: currentGrade.value.score,
+            date: currentGrade.value.examDate || new Date().toISOString().split('T')[0],
+            examDate: currentGrade.value.examDate,
+            notes: currentGrade.value.notes,
+          };
         }
       }
 
@@ -578,7 +621,7 @@ export default {
 
     const importGrades = () => {
       // 实现导入逻辑
-      alert('导入功能开发中...');
+      showError('功能提示', '导入功能正在开发中，敬请期待');
       closeImportModal();
     };
 
@@ -587,41 +630,7 @@ export default {
       grades.value = mockGrades;
     });
 
-    return {
-      grades,
-      filteredGrades,
-      students,
-      courses,
-      selectedCourse,
-      selectedExamType,
-      studentSearch,
-      showAddGrade,
-      showEditGrade,
-      showImportModal,
-      currentGrade,
-      totalCount,
-      passedCount,
-      excellentCount,
-      averageScore,
-      highestScore,
-      highestScorer,
-      passRate,
-      excellentRate,
-      scoreRanges,
-      getScoreClass,
-      getScoreColor,
-      getGradeLevel,
-      filterGrades,
-      editGrade,
-      deleteGrade,
-      saveGrade,
-      closeModals,
-      closeImportModal,
-      handleFileUpload,
-      importGrades,
-    };
-  },
-};
+// script setup格式自动导出所有响应式变量和函数
 </script>
 
 <style scoped>
