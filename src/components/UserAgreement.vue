@@ -126,6 +126,7 @@ const scrollToTop = (): void => {
 const checkCurrentTheme = (): void => {
   document.documentElement.classList.remove('dark-theme', 'light-theme');
   document.documentElement.classList.add(theme.value + '-theme');
+  document.documentElement.setAttribute('data-theme', theme.value);
   
   document.body.style.backgroundColor =
     theme.value === 'dark' ? '#1e1e2f' : '#f5f5f5';
@@ -227,12 +228,25 @@ const openMainWindow = async (): Promise<void> => {
       const { getCurrentWindow } = (window as any).__TAURI__.window;
       await getCurrentWindow().close();
     } else {
-      alert('感谢您的同意！即将进入启明星管理软件主界面');
+      console.log('感谢您的同意！即将进入启明星管理软件主界面');
       location.reload();
     }
   } catch (error) {
-    console.error('打开主窗口失败:', error);
-    alert('感谢您的同意！主应用启动失败，请重试。');
+    if (import.meta.env?.MODE !== 'production') console.error('打开主窗口失败:', error);
+    // 在Web环境下使用页面内通知替代alert
+    const notice = document.createElement('div');
+    notice.textContent = '感谢您的同意！主应用启动失败，请重试。';
+    notice.style.position = 'fixed';
+    notice.style.bottom = '20px';
+    notice.style.left = '50%';
+    notice.style.transform = 'translateX(-50%)';
+    notice.style.background = '#f44336';
+    notice.style.color = '#fff';
+    notice.style.padding = '8px 12px';
+    notice.style.borderRadius = '6px';
+    notice.style.zIndex = '1000';
+    document.body.appendChild(notice);
+    setTimeout(() => notice.remove(), 2000);
   }
 };
 

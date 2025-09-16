@@ -789,7 +789,7 @@ const deleteStudent = async (uid: number): Promise<void> => {
         return;
       }
 
-      if (!uid || isNaN(Number(uid)) || Number(uid) <= 0) {
+      if (uid == null || isNaN(Number(uid)) || Number(uid) <= 0) {
         showError('删除失败', '无效的学员ID');
         return;
       }
@@ -942,7 +942,7 @@ const validatePhone = (phone: string): boolean => {
 
         // 国际号码校验 - 增强异常处理
         try {
-          const phoneObj = parsePhoneNumberFromString(phone);
+          const phoneObj = parsePhoneNumberFromString(phone, 'CN');
           return phoneObj?.isValid() === true;
         } catch (parseError) {
           console.warn('国际号码解析失败:', parseError);
@@ -976,27 +976,16 @@ const saveStudent = async (): Promise<void> => {
       loading.value = true;
       
       try {
-        // 增强的输入净化和安全处理
-        const sanitizeString = (input: string): string => {
-          if (!input || typeof input !== 'string') return '';
-          return input
-            .trim()
-            .replace(/[<>'"&]/g, '') // 移除HTML特殊字符
-            .replace(/javascript:/gi, '') // 移除JavaScript协议
-            .replace(/data:/gi, '') // 移除data协议
-            .replace(/vbscript:/gi, '') // 移除VBScript协议
-            .replace(/on\w+=/gi, '') // 移除事件处理器
-            .substring(0, 200); // 限制最大长度
-        };
+        
 
         const sanitizedStudent = {
           ...currentStudent.value,
-          name: sanitizeString(currentStudent.value.name),
+          name: currentStudent.value.name.trim().substring(0, 50),
           age: Math.max(3, Math.min(120, Number(currentStudent.value.age) || 0)),
           classType: ['TenTry', 'Month', 'Year', 'Others'].includes(currentStudent.value.classType) 
             ? currentStudent.value.classType : 'Others',
           phone: currentStudent.value.phone.trim().replace(/[^\d\-\+\s\(\)]/g, '').substring(0, 20),
-          note: sanitizeString(currentStudent.value.note || '').substring(0, 500),
+          note: (currentStudent.value.note || '').trim().substring(0, 500),
           subject: ['Shooting', 'Archery', 'Others'].includes(currentStudent.value.subject) 
             ? currentStudent.value.subject : 'Shooting',
         };
@@ -1288,6 +1277,11 @@ const closeMembershipModal = (): void => {
     };
 
 const setMembershipByType = async (type: string): Promise<void> => {
+      const allowed = ['month','year'];
+      if (!allowed.includes(type)) {
+        showError('设置失败', '无效的会员类型');
+        return;
+      }
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;

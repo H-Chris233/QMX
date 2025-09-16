@@ -293,7 +293,7 @@ let cleanupFunctions: (() => void)[] = [];
         try { savedActiveTab = localStorage.getItem('qmx_active_tab'); } catch {}
         if (savedActiveTab && ['dashboard', 'students', 'finance', 'scores', 'settings'].includes(savedActiveTab)) {
           activeTab.value = savedActiveTab;
-          console.log('🔄 恢复到之前的页面:', savedActiveTab);
+          if (import.meta.env?.MODE !== 'production') console.log('🔄 恢复到之前的页面:', savedActiveTab);
         }
         
         // 检查并显示上次操作结果
@@ -308,7 +308,7 @@ let cleanupFunctions: (() => void)[] = [];
           const timeDiff = Date.now() - parseInt(lastOperationTime);
           // 如果操作是在5秒内完成的，显示成功消息
           if (timeDiff < 5000) {
-            console.log('✅ 页面刷新完成，上次操作:', lastOperation);
+            if (import.meta.env?.MODE !== 'production') console.log('✅ 页面刷新完成，上次操作:', lastOperation);
             showSuccess('操作成功', lastOperation);
           }
           
@@ -396,8 +396,8 @@ let cleanupFunctions: (() => void)[] = [];
         });
 
       } catch (error) {
-        console.error('主题初始化失败:', error);
-        theme.value = 'dark'; // 安全的降级方案
+        if (import.meta.env?.MODE !== 'production') console.error('主题初始化失败:', error);
+        theme.value = 'dark';
         document.documentElement.className = 'dark-theme';
       }
     });
@@ -408,7 +408,7 @@ let cleanupFunctions: (() => void)[] = [];
         try {
           cleanup();
         } catch (error) {
-          console.warn('清理事件监听器失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('清理事件监听器失败:', error);
         }
       });
       cleanupFunctions = [];
@@ -433,9 +433,9 @@ const triggerRefresh = (componentType: string): void => {
         } else if (componentType in refreshTriggers.value) {
           (refreshTriggers.value as any)[componentType]++;
         }
-        console.log(`触发 ${componentType} 组件刷新`);
+        if (import.meta.env?.MODE !== 'production') console.log(`触发 ${componentType} 组件刷新`);
       } catch (error) {
-        console.error('触发刷新失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('触发刷新失败:', error);
       }
     };
 
@@ -456,14 +456,13 @@ const triggerRefresh = (componentType: string): void => {
 // 监听标签页切换，自动刷新对应组件并保存状态
 watch(activeTab, (newTab: string, oldTab: string) => {
       if (newTab !== oldTab) {
-        console.log(`切换到 ${newTab} 标签页，触发刷新`);
+        if (import.meta.env?.MODE !== 'production') console.log(`切换到 ${newTab} 标签页，触发刷新`);
         
-        // 保存当前页面状态到 localStorage
         try {
           try { localStorage.setItem('qmx_active_tab', newTab); } catch {}
-          console.log('💾 已保存当前页面状态:', newTab);
+          if (import.meta.env?.MODE !== 'production') console.log('💾 已保存当前页面状态:', newTab);
         } catch (error) {
-          console.warn('保存页面状态失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
         // 根据切换的标签页触发对应的刷新
@@ -479,6 +478,9 @@ watch(activeTab, (newTab: string, oldTab: string) => {
             break;
           case 'scores':
             triggerRefresh('scores');
+            break;
+          case 'settings':
+            triggerRefresh('all');
             break;
         }
       }
@@ -498,6 +500,7 @@ watch(activeTab, (newTab: string, oldTab: string) => {
   --accent-primary: #2196f3;
   --accent-secondary: #4caf50;
   --accent-danger: #f44336;
+  --accent-warning: #ff9800;
   --border-color: #333333;
   --shadow-color: rgba(0, 0, 0, 0.3);
 }
@@ -511,6 +514,7 @@ watch(activeTab, (newTab: string, oldTab: string) => {
   --accent-primary: #1976d2;
   --accent-secondary: #388e3c;
   --accent-danger: #d32f2f;
+  --accent-warning: #fb8c00;
   --border-color: #dddddd;
   --shadow-color: rgba(0, 0, 0, 0.1);
 }

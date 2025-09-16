@@ -142,12 +142,20 @@ const validateDate = (value: string): string => {
         return '请输入有效的日期';
       }
       
-      if (props.minDate && value < props.minDate) {
-        return `日期不能早于 ${formatDateForDisplay(props.minDate!)}`;
+      if (props.minDate) {
+        const v = new Date(value);
+        const min = new Date(props.minDate);
+        if (!isNaN(v.getTime()) && !isNaN(min.getTime()) && v < min) {
+          return `日期不能早于 ${formatDateForDisplay(props.minDate!)}`;
+        }
       }
       
-      if (props.maxDate && value > props.maxDate) {
-        return `日期不能晚于 ${formatDateForDisplay(props.maxDate!)}`;
+      if (props.maxDate) {
+        const v = new Date(value);
+        const max = new Date(props.maxDate);
+        if (!isNaN(v.getTime()) && !isNaN(max.getTime()) && v > max) {
+          return `日期不能晚于 ${formatDateForDisplay(props.maxDate!)}`;
+        }
       }
       
       return '';

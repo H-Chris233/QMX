@@ -432,8 +432,9 @@ interface ErrorHandler {
       }
 
       if (studentSearch.value) {
+        const q = studentSearch.value.toLowerCase();
         filtered = filtered.filter((g) =>
-          g.studentName.includes(studentSearch.value),
+          g.studentName.toLowerCase().includes(q),
         );
       }
 
