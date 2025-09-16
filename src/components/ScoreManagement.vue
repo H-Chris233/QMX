@@ -172,32 +172,99 @@
         <p>请从上方下拉菜单中选择一个学员来查看和管理其射击成绩</p>
       </div>
     </div>
+
+    <!-- 分数编辑模态框 -->
+    <div v-if="showScoreEditModal" class="score-edit-modal-overlay" @click="closeScoreEditModal">
+      <div class="score-edit-modal" @click.stop>
+        <div class="modal-header">
+          <h3>编辑成绩</h3>
+          <button class="close-btn" @click="closeScoreEditModal">×</button>
+        </div>
+        
+        <div class="modal-content">
+          <p>修改 <strong>{{ editingStudentName }}</strong> 的第 {{ editingScoreIndex + 1 }} 次成绩：</p>
+          
+          <div class="score-input-group">
+            <label for="edit-score-input">新成绩：</label>
+            <input
+              id="edit-score-input"
+              ref="scoreEditInput"
+              v-model.number="editingScoreValue"
+              type="number"
+              :min="0"
+              :max="getMaxScore()"
+              step="0.1"
+              :placeholder="`0-${getMaxScore()}`"
+              @keyup.enter="confirmScoreEdit"
+              @keyup.escape="closeScoreEditModal"
+            />
+            <span class="score-range">范围: 0-{{ getMaxScore() }}</span>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button class="btn-cancel" @click="closeScoreEditModal">取消</button>
+          <button class="btn-confirm" @click="confirmScoreEdit" :disabled="!isValidScore">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
+import type { Student } from '../types/api';
 
-export default {
-  name: 'ScoreManagement',
-  setup() {
+// TypeScript类型定义
+interface ErrorHandler {
+  showError: (title: string, message: string, details?: string) => void;
+  showConfirm: (options: any) => void;
+  showSuccess: (title: string, message: string) => void;
+}
+
+interface StudentData {
+  rings: number[];
+  uid: number;
+  name: string;
+  age: number;
+  class: string;
+  phone: string;
+  note: string;
+  cash: string;
+  subject: string;
+  lesson_left?: number;
+  membership_start_date?: string | null;
+  membership_end_date?: string | null;
+  is_membership_active: boolean;
+  membership_days?: number;
+}
+
+// 使用script setup提高类型安全
     const loading = ref(false);
-    const students = ref([]);
+    const students = ref<Student[]>([]);
     const selectedStudent = ref('');
-    const selectedStudentData = ref(null);
+    const selectedStudentData = ref<StudentData | null>(null);
     const quickScore = ref('');
-    const studentSelect = ref(null);
-    const abortController = ref(null);
-    const errorHandler = inject('errorHandler');
-    const refreshSystem = inject('refreshSystem');
+    const studentSelect = ref<HTMLElement | null>(null);
+    const abortController = ref<AbortController | null>(null);
     
-    const showError = errorHandler?.showError || ((title, message, details) => {
+    // 分数编辑模态框相关数据
+    const showScoreEditModal = ref(false);
+    const editingStudentName = ref('');
+    const editingScoreIndex = ref(-1);
+    const editingScoreValue = ref(0);
+    const editingOriginalScore = ref(0);
+    const scoreEditInput = ref<HTMLInputElement | null>(null);
+    const errorHandler = inject<ErrorHandler>('errorHandler');
+    const refreshSystem = inject<any>('refreshSystem');
+    
+    const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
       console.error(`${title}: ${message}`, details);
-      alert(`${title}\n${message}`);
+      // 统一错误处理：移除alert降级
     });
     
-    const showConfirm = errorHandler?.showConfirm || ((options) => {
+    const showConfirm = errorHandler?.showConfirm || ((options: any) => {
       const confirmed = confirm(options.message);
       if (confirmed && options.onConfirm) {
         options.onConfirm();
@@ -206,7 +273,7 @@ export default {
       }
     });
     
-    const showSuccess = errorHandler?.showSuccess || ((title, message) => {
+    const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
       console.log(`✅ ${title}: ${message}`);
     });
     
@@ -302,8 +369,8 @@ export default {
     };
 
     // 输入验证函数
-    const validateScoreInput = (score, studentData) => {
-      const errors = [];
+    const validateScoreInput = (score: any, _studentData?: StudentData | null): { isValid: boolean; errors: string[] } => {
+      const errors: string[] = [];
       
       if (score === null || score === undefined || score === '') {
         errors.push('成绩不能为空');
@@ -373,7 +440,7 @@ export default {
         
         students.value = validStudents;
         console.log(`成功加载 ${validStudents.length} 个学员记录`);
-      } catch (error) {
+      } catch (error: any) {
         if (error.name !== 'AbortError') {
           console.error('加载学员数据失败:', error);
           students.value = []; // 确保有默认值
@@ -411,14 +478,14 @@ export default {
         }
 
         const scores = await ApiService.getStudentScores(studentUid);
-        const student = students.value.find(s => s.uid == studentUid);
+        const student = students.value.find(s => s.uid === studentUid);
         
         if (!student) {
           throw new Error('找不到对应的学员信息');
         }
 
         // 验证成绩数据
-        let validScores = [];
+        let validScores: number[] = [];
         if (Array.isArray(scores)) {
           validScores = scores.filter(score => 
             typeof score === 'number' && !isNaN(score) && isFinite(score)
@@ -434,10 +501,10 @@ export default {
         selectedStudentData.value = {
           ...student,
           rings: validScores,
-        };
+        } as StudentData;
         
         console.log(`加载学员 ${student.name} 的 ${validScores.length} 条成绩记录`);
-      } catch (error) {
+      } catch (error: any) {
         if (error.name !== 'AbortError') {
           console.error('加载学员成绩失败:', error);
           selectedStudentData.value = null;
@@ -487,7 +554,7 @@ export default {
           localStorage.setItem('qmx_active_tab', 'scores');
           localStorage.setItem('qmx_last_operation', `已为${studentName}添加成绩${score}`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
-        } catch (error) {
+        } catch (error: any) {
           console.warn('保存页面状态失败:', error);
         }
         
@@ -495,7 +562,7 @@ export default {
         
         // 直接刷新整个页面
         window.location.reload();
-      } catch (error) {
+      } catch (error: any) {
         console.error('添加成绩失败:', error);
         showError(
           '添加失败', 
@@ -519,7 +586,7 @@ export default {
         return;
       }
 
-      const studentName = students.value.find(s => s.uid == selectedStudent.value)?.name || '未知学员';
+      const studentName = students.value.find(s => s.uid === Number(selectedStudent.value))?.name || '未知学员';
       showConfirm({
         title: '删除成绩',
         message: `确定要删除${studentName}的第${scoreIndex + 1}次成绩 ${score} 吗？`,
@@ -539,7 +606,7 @@ export default {
           localStorage.setItem('qmx_active_tab', 'scores');
           localStorage.setItem('qmx_last_operation', `已删除${studentName}的第${scoreIndex + 1}次成绩${score}`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
-        } catch (error) {
+        } catch (error: any) {
           console.warn('保存页面状态失败:', error);
         }
         
@@ -547,7 +614,7 @@ export default {
         
         // 直接刷新整个页面
         window.location.reload();
-      } catch (error) {
+      } catch (error: any) {
         console.error('删除成绩失败:', error);
         showError(
           '删除失败', 
@@ -561,8 +628,8 @@ export default {
       });
     };
 
-    // 编辑成绩
-    const editScore = async (scoreIndex, currentScore) => {
+    // 编辑成绩 - 使用自定义模态框替代原生prompt
+    const editScore = (scoreIndex, currentScore) => {
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -573,24 +640,53 @@ export default {
         return;
       }
 
-      const studentName = students.value.find(s => s.uid == selectedStudent.value)?.name || '未知学员';
-      const newScoreStr = prompt(`修改${studentName}的第${scoreIndex + 1}次成绩：`, currentScore.toString());
+      const studentName = students.value.find(s => s.uid === Number(selectedStudent.value))?.name || '未知学员';
       
-      if (newScoreStr === null) {
-        return; // 用户取消
-      }
+      // 设置模态框数据
+      editingStudentName.value = studentName;
+      editingScoreIndex.value = scoreIndex;
+      editingScoreValue.value = currentScore;
+      editingOriginalScore.value = currentScore;
+      showScoreEditModal.value = true;
+      
+      // 聚焦输入框
+      setTimeout(() => {
+        if (scoreEditInput.value) {
+          scoreEditInput.value.focus();
+          scoreEditInput.value.select();
+        }
+      }, 100);
+    };
 
-      const newScore = Number(newScoreStr);
-      if (isNaN(newScore) || newScore < 0 || newScore > getMaxScore()) {
-        showError('输入错误', `成绩必须是0-${getMaxScore()}之间的数字`);
+    // 关闭分数编辑模态框
+    const closeScoreEditModal = () => {
+      showScoreEditModal.value = false;
+      editingStudentName.value = '';
+      editingScoreIndex.value = -1;
+      editingScoreValue.value = 0;
+      editingOriginalScore.value = 0;
+    };
+
+    // 验证分数是否有效
+    const isValidScore = computed(() => {
+      const score = Number(editingScoreValue.value);
+      return !isNaN(score) && score >= 0 && score <= getMaxScore() && score !== editingOriginalScore.value;
+    });
+
+    // 确认分数编辑
+    const confirmScoreEdit = async () => {
+      if (!isValidScore.value) {
         return;
       }
 
-      if (newScore === currentScore) {
-        return; // 没有变化
-      }
-
+      const newScore = Number(editingScoreValue.value);
+      const scoreIndex = editingScoreIndex.value;
+      const currentScore = editingOriginalScore.value;
+      const studentName = editingStudentName.value;
+      
+      closeScoreEditModal();
       loading.value = true;
+      
       try {
         const studentUid = Number(selectedStudent.value);
         await ApiService.updateStudentScore(studentUid, scoreIndex, newScore);
@@ -602,7 +698,7 @@ export default {
           localStorage.setItem('qmx_active_tab', 'scores');
           localStorage.setItem('qmx_last_operation', `已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
-        } catch (error) {
+        } catch (error: any) {
           console.warn('保存页面状态失败:', error);
         }
         
@@ -610,7 +706,7 @@ export default {
         
         // 直接刷新整个页面
         window.location.reload();
-      } catch (error) {
+      } catch (error: any) {
         console.error('更新成绩失败:', error);
         showError(
           '更新失败', 
@@ -701,7 +797,7 @@ export default {
         if (showSuccess) {
           showSuccess('导出成功', `${selectedStudentData.value.name} 的成绩表已导出`);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('导出成绩失败:', error);
         showError('导出失败', '导出成绩表时发生错误', error.message || '未知错误');
       }
@@ -731,30 +827,7 @@ export default {
       }
     });
 
-    return {
-      loading,
-      students,
-      selectedStudent,
-      selectedStudentData,
-      quickScore,
-      studentSelect,
-      recentScores,
-      averageScore,
-      maxScore,
-      minScore,
-      getClassText,
-      getScoreClass,
-      getMaxScore,
-      getScorePlaceholder,
-      loadData,
-      onStudentChange,
-      addQuickScore,
-      deleteScore,
-      editScore,
-      exportScores,
-    };
-  },
-};
+// script setup格式自动导出所有响应式变量和函数
 </script>
 
 <style scoped>
@@ -1208,6 +1281,178 @@ export default {
 
   .batch-buttons {
     flex-direction: column;
+  }
+}
+
+/* 分数编辑模态框样式 */
+.score-edit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.score-edit-modal {
+  background-color: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modal-content {
+  margin-bottom: 1.5rem;
+}
+
+.modal-content p {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.score-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.score-input-group label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.score-input-group input {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.score-input-group input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.score-range {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.btn-cancel {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-cancel:hover {
+  background-color: var(--border-color);
+  transform: translateY(-1px);
+}
+
+.btn-confirm {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background-color: #1976d2;
+  transform: translateY(-1px);
+}
+
+.btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .score-edit-modal {
+    padding: 1rem;
+    margin: 1rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .btn-cancel,
+  .btn-confirm {
+    width: 100%;
   }
 }
 </style>

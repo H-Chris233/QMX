@@ -367,11 +367,12 @@
 
             <div class="form-group">
               <DatePicker
-                v-model="currentTransaction.installment_due_date"
+                :model-value="currentTransaction.installment_due_date || ''"
+                @update:model-value="(value) => currentTransaction.installment_due_date = value"
                 label="首次到期日"
                 placeholder="选择到期日期"
-                :min-date="getTodayDate()"
-                required
+                :min-date="getTodayDate() || ''"
+                :required="true"
               />
             </div>
           </div>
@@ -449,37 +450,65 @@
   </div>
 </template>
 
-<script>
-import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } from 'vue';
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 import DatePicker from './DatePicker.vue';
+import type { Student, InstallmentStatus } from '../types/api';
 
-export default {
-  name: 'FinancialStatistics',
-  components: {
-    DatePicker,
-  },
-  setup() {
-    const loading = ref(false);
-    const transactions = ref([]);
-    const students = ref([]);
-    const transactionFilter = ref('all');
-    const transactionSearch = ref('');
-    const dateFrom = ref('');
-    const dateTo = ref('');
-    const showAddTransaction = ref(false);
-    const showUpdateStatusModal = ref(false);
-    const isInstallmentMode = ref(false);
-    const selectedTransaction = ref(null);
-    const selectedStatus = ref('Pending');
-    const abortController = ref(null);
-    const errorHandler = inject('errorHandler');
-    const refreshSystem = inject('refreshSystem');
+// 前端Transaction类型（基于API Transaction但添加了前端特有字段）
+interface Transaction {
+  id: number;
+  type: 'income' | 'expense';
+  description: string;
+  amount: number;
+  note: string;
+  is_installment: boolean;
+  installment_current: number | null;
+  installment_total: number | null;
+  installment_status: InstallmentStatus | null;
+  student_id: number | null;
+  date?: string;
+}
+
+// 使用导入的Student类型
+
+interface ErrorHandler {
+  showError: (title: string, message: string, details?: string) => void;
+  showSuccess: (title: string, message: string) => void;
+  showConfirm: (options: any) => void;
+}
+
+interface RefreshSystem {
+  refreshTriggers: {
+    transactions: number;
+  };
+  triggerRefresh?: (component: string) => void;
+}
+
+// 使用导入的InstallmentStatus类型
+
+// 使用script setup提高类型安全
+    const loading = ref<boolean>(false);
+    const transactions = ref<Transaction[]>([]);
+    const students = ref<Student[]>([]);
+    const transactionFilter = ref<string>('all');
+    const transactionSearch = ref<string>('');
+    const dateFrom = ref<string>('');
+    const dateTo = ref<string>('');
+    const showAddTransaction = ref<boolean>(false);
+    const showUpdateStatusModal = ref<boolean>(false);
+    const isInstallmentMode = ref<boolean>(false);
+    const selectedTransaction = ref<Transaction | null>(null);
+    const selectedStatus = ref<InstallmentStatus>('Pending');
+    const abortController = ref<AbortController | null>(null);
+    const errorHandler = inject<ErrorHandler>('errorHandler');
+    const refreshSystem = inject<RefreshSystem>('refreshSystem');
     
     // 时间周期相关状态
-    const selectedPeriod = ref('ThisMonth');
-    const customStartDate = ref('');
-    const customEndDate = ref('');
+    const selectedPeriod = ref<string>('ThisMonth');
+    const customStartDate = ref<string>('');
+    const customEndDate = ref<string>('');
     
     // 时间周期选项
     const timePeriods = [
@@ -495,7 +524,7 @@ export default {
     
     const showError = errorHandler?.showError || ((title, message, details) => {
       console.error(`${title}: ${message}`, details);
-      alert(`${title}\n${message}`);
+      // 统一错误处理：移除alert降级
     });
     
     const showConfirm = errorHandler?.showConfirm || ((options) => {
@@ -507,9 +536,7 @@ export default {
       }
     });
     
-    const showSuccess = errorHandler?.showSuccess || ((title, message) => {
-      console.log(`✅ ${title}: ${message}`);
-    });
+    // showSuccess 已在 errorHandler 中定义，这里不需要重复声明
     
     if (!errorHandler) {
       console.warn('⚠️ errorHandler 未正确注入到 FinancialStatistics 组件');
@@ -521,7 +548,7 @@ export default {
     };
     
     // 时间周期相关方法
-    const selectTimePeriod = async (period) => {
+    const selectTimePeriod = async (period: string): Promise<void> => {
       if (loading.value) return;
       
       selectedPeriod.value = period;
@@ -558,7 +585,7 @@ export default {
     };
     
     // 根据时间周期加载财务统计
-    const loadFinancialStatsByPeriod = async (period) => {
+    const loadFinancialStatsByPeriod = async (period: string | { start: string; end: string }): Promise<void> => {
       if (loading.value) return;
       
       loading.value = true;
@@ -566,7 +593,7 @@ export default {
       try {
         console.log('加载财务统计，周期:', period);
         
-        const financialStats = await ApiService.getFinancialStats(period);
+        const financialStats = await ApiService.getFinancialStats(period as 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear' | { start: string; end: string });
         console.log('获取到的财务统计:', financialStats);
         
         // 这里可以根据需要更新统计显示
@@ -574,7 +601,7 @@ export default {
         
       } catch (error) {
         console.error('加载财务统计失败:', error);
-        showError('加载失败', '获取财务统计时发生错误', error.message || '未知错误');
+        showError('加载失败', '获取财务统计时发生错误', (error as Error).message || '未知错误');
       } finally {
         loading.value = false;
       }
@@ -713,7 +740,7 @@ export default {
     });
 
     // 增强的格式化方法 - 防止数值溢出
-    const formatCurrency = (value) => {
+    const formatCurrency = (value: number): string => {
       try {
         // 数值验证和范围检查
         if (typeof value !== 'number' || !isFinite(value)) {
@@ -740,7 +767,7 @@ export default {
       }
     };
 
-    const formatTransactionAmount = (transaction) => {
+    const formatTransactionAmount = (transaction: Transaction): string => {
       const amount =
         transaction.type === 'income'
           ? transaction.amount
@@ -752,7 +779,7 @@ export default {
     };
 
     // 状态处理方法
-    const getStatusClass = (status) => {
+    const getStatusClass = (status: InstallmentStatus | null): string => {
       switch (status) {
         case 'Paid':
           return 'status-paid';
@@ -767,7 +794,7 @@ export default {
       }
     };
 
-    const getStatusText = (status) => {
+    const getStatusText = (status: InstallmentStatus | null): string => {
       switch (status) {
         case 'Paid':
           return '已支付';
@@ -789,7 +816,7 @@ export default {
         console.log('执行交易搜索:', { search: transactionSearch.value, filter: transactionFilter.value });
       } catch (error) {
         console.error('搜索失败:', error);
-        showError('搜索失败', '执行搜索时发生错误', error.message || '未知错误');
+        showError('搜索失败', '执行搜索时发生错误', (error as Error).message || '未知错误');
       }
     };
 
@@ -826,7 +853,7 @@ export default {
           .filter(transaction => validateTransactionData(transaction))
           .map((transaction) => ({
             id: transaction.uid,
-            type: transaction.amount > 0 ? 'income' : 'expense',
+            type: (transaction.amount > 0 ? 'income' : 'expense') as 'income' | 'expense',
             description: transaction.student_id
               ? `学员${transaction.student_id}缴费`
               : '其他交易',
@@ -835,7 +862,7 @@ export default {
             is_installment: !!transaction.is_installment,
             installment_current: transaction.installment_current || null,
             installment_total: transaction.installment_total || null,
-            installment_status: transaction.installment_status || null,
+            installment_status: (transaction.installment_status || null) as InstallmentStatus | null,
             student_id: transaction.student_id || null,
           }));
 
@@ -843,9 +870,9 @@ export default {
         console.log(`高级搜索完成，找到 ${validTransactions.length} 条交易记录`);
         
       } catch (error) {
-        if (error.name !== 'AbortError') {
+        if ((error as Error).name !== 'AbortError') {
           console.error('高级搜索失败:', error);
-          showError('搜索失败', '高级搜索时发生错误', error.message || '未知错误');
+          showError('搜索失败', '高级搜索时发生错误', (error as Error).message || '未知错误');
         }
       } finally {
         loading.value = false;
@@ -887,12 +914,12 @@ export default {
       } catch (error) {
         console.error('加载学员数据失败:', error);
         students.value = []; // 确保有默认值
-        showError('加载失败', '加载学员数据时发生错误', error.message || '未知错误');
+        showError('加载失败', '加载学员数据时发生错误', (error as Error).message || '未知错误');
       }
     };
 
     // 数据验证函数
-    const validateTransactionData = (transaction) => {
+    const validateTransactionData = (transaction: any): boolean => {
       if (!transaction || typeof transaction !== 'object') return false;
       if (typeof transaction.uid !== 'number' || transaction.uid <= 0) return false;
       if (typeof transaction.amount !== 'number' || !isFinite(transaction.amount)) return false;
@@ -900,8 +927,8 @@ export default {
     };
 
     // 增强的交易输入验证 - 防止溢出和注入攻击
-    const validateTransactionInput = (transaction) => {
-      const errors = [];
+    const validateTransactionInput = (transaction: any): { isValid: boolean; errors: string[] } => {
+      const errors: string[] = [];
       
       // 基础对象验证
       if (!transaction || typeof transaction !== 'object') {
@@ -1019,7 +1046,7 @@ export default {
           ApiService.getFinancialStats(selectedPeriod.value === 'custom' ? {
             start: new Date(customStartDate.value + 'T00:00:00Z').toISOString(),
             end: new Date(customEndDate.value + 'T23:59:59Z').toISOString()
-          } : selectedPeriod.value)
+          } : selectedPeriod.value as 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear')
         ]);
         
         console.log('获取到的财务统计:', financialStats);
@@ -1042,7 +1069,7 @@ export default {
             try {
               return {
                 id: transaction.uid,
-                type: transaction.amount > 0 ? 'income' : 'expense',
+                type: (transaction.amount > 0 ? 'income' : 'expense') as 'income' | 'expense',
                 description: transaction.student_id
                   ? `学员${transaction.student_id}缴费`
                   : '其他交易',
@@ -1051,7 +1078,7 @@ export default {
                 is_installment: !!transaction.is_installment,
                 installment_current: transaction.installment_current || null,
                 installment_total: transaction.installment_total || null,
-                installment_status: transaction.installment_status || null,
+                installment_status: (transaction.installment_status || null) as InstallmentStatus | null,
                 student_id: transaction.student_id || null,
               };
             } catch (error) {
@@ -1070,13 +1097,13 @@ export default {
         
         console.log(`✅ 成功加载 ${validTransactions.length} 条交易记录`);
       } catch (error) {
-        if (error.name !== 'AbortError') {
+        if ((error as Error).name !== 'AbortError') {
           console.error('加载交易数据失败:', error);
           transactions.value = []; // 确保有默认值
           showError(
             '加载失败',
             '加载交易数据时发生错误，请检查网络连接或稍后重试',
-            error.message || '未知错误',
+            (error as Error).message || '未知错误',
           );
         }
       } finally {
@@ -1178,18 +1205,18 @@ export default {
         window.location.reload();
       } catch (error) {
         console.error('保存交易失败:', error);
-        const errorMessage = error.message || '未知错误';
+        const errorMessage = (error as Error).message || '未知错误';
         showError(
           '保存失败', 
           `保存交易时发生错误: ${errorMessage}`,
-          error.stack
+          (error as Error).stack
         );
       } finally {
         loading.value = false;
       }
     };
 
-    const deleteTransaction = async (id) => {
+    const deleteTransaction = async (id: number): Promise<void> => {
       if (loading.value) {
         console.warn('正在处理其他操作，请稍后再试');
         return;
@@ -1237,7 +1264,7 @@ export default {
         showError(
           '删除失败', 
           '删除交易记录时发生错误，请稍后重试', 
-          error.message || '未知错误'
+          (error as Error).message || '未知错误'
         );
           } finally {
             loading.value = false;
@@ -1246,7 +1273,7 @@ export default {
       });
     };
 
-    const showUpdateStatus = (transaction) => {
+    const showUpdateStatus = (transaction: Transaction): void => {
       selectedTransaction.value = transaction;
       selectedStatus.value = transaction.installment_status || 'Pending';
       showUpdateStatusModal.value = true;
@@ -1278,7 +1305,7 @@ export default {
         window.location.reload();
       } catch (error) {
         console.error('更新分期状态失败:', error);
-        showError('更新失败', '更新分期状态时发生错误', error.message);
+        showError('更新失败', '更新分期状态时发生错误', (error as Error).message);
       } finally {
         loading.value = false;
       }
@@ -1314,21 +1341,26 @@ export default {
       );
     }
     
-    // 添加直接监听 transactions 数据变化
+    // 优化的transactions监听：使用浅层监听和计算属性，避免深度监听性能问题
+    const transactionIds = computed(() => 
+      transactions.value.map(t => `${t.id}-${t.amount}-${t.date}`).join(',')
+    );
+    
     watch(
-      () => transactions.value,
-      (newTransactions, oldTransactions) => {
-        console.log('🔄 transactions 数据发生变化:', {
-          oldLength: oldTransactions?.length || 0,
-          newLength: newTransactions?.length || 0,
-          timestamp: Date.now()
-        });
-        
-        // 强制触发计算属性更新
-        forceUpdateTrigger.value++;
-        console.log('🔄 因数据变化强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
-      },
-      { deep: true }
+      transactionIds,
+      (newIds, oldIds) => {
+        if (newIds !== oldIds) {
+          console.log('🔄 transactions 数据发生变化:', {
+            oldCount: oldIds?.split(',').length || 0,
+            newCount: newIds?.split(',').length || 0,
+            timestamp: Date.now()
+          });
+          
+          // 强制触发计算属性更新
+          forceUpdateTrigger.value++;
+          console.log('🔄 因数据变化强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
+        }
+      }
     );
     
     // 添加强制刷新函数
@@ -1364,52 +1396,7 @@ export default {
       }
     });
 
-    return {
-      loading,
-      transactions,
-      students,
-      filteredTransactions,
-      transactionFilter,
-      transactionSearch,
-      dateFrom,
-      dateTo,
-      showAddTransaction,
-      showUpdateStatusModal,
-      isInstallmentMode,
-      currentTransaction,
-      totalIncome,
-      totalExpense,
-      netProfit,
-      installmentCount,
-      pendingInstallments,
-      selectedStatus,
-      formatCurrency,
-      formatTransactionAmount,
-      filterTransactions,
-      performSearch,
-      performAdvancedSearch,
-      clearDateFilter,
-      deleteTransaction,
-      saveTransaction,
-      showUpdateStatus,
-      updateInstallmentStatus,
-      closeModals,
-      getStatusClass,
-      getStatusText,
-      forceRefresh,
-      getTodayDate,
-      // 时间周期相关
-      selectedPeriod,
-      customStartDate,
-      customEndDate,
-      timePeriods,
-      selectTimePeriod,
-      applyCustomPeriod,
-      getCurrentPeriodLabel,
-      loadFinancialStatsByPeriod,
-    };
-  },
-};
+// script setup格式自动导出所有响应式变量和函数
 </script>
 
 <style scoped>

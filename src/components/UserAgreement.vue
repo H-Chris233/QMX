@@ -147,31 +147,69 @@ const agreeWithTerms = (): void => {
 };
 
 const sanitizeContent = (content: string): string => {
+  // 安全的HTML净化函数，防止XSS攻击
   const allowedTags = ['ul', 'ol', 'li', 'code', 'strong', 'em', 'br'];
+  const allowedAttributes = ['class'];
   
+  // 创建临时DOM元素进行安全处理
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = content;
   
+  // 使用textContent先转义所有HTML，然后只允许特定标签
+  const escapedContent = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+  
+  // 只允许特定的安全标签重新解析
+  let safeContent = escapedContent;
+  allowedTags.forEach(tag => {
+    const openTagRegex = new RegExp(`&lt;${tag}(&gt;|\\s[^&gt;]*&gt;)`, 'gi');
+    const closeTagRegex = new RegExp(`&lt;/${tag}&gt;`, 'gi');
+    
+    safeContent = safeContent
+      .replace(openTagRegex, (match) => {
+        // 只保留class属性
+        const cleanMatch = match.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        const hasClass = /class\s*=\s*["'][^"']*["']/.test(cleanMatch);
+        if (hasClass) {
+          return cleanMatch.replace(/\s+(?!class)[a-zA-Z-]+\s*=\s*["'][^"']*["']/g, '');
+        }
+        return `<${tag}>`;
+      })
+      .replace(closeTagRegex, `</${tag}>`);
+  });
+  
+  // 验证最终内容的安全性
+  tempDiv.innerHTML = safeContent;
+  
+  // 递归清理所有不安全的属性和脚本
   const cleanElement = (element: Element): void => {
-    const children = Array.from(element.children);
-    children.forEach(child => {
-      if (!allowedTags.includes(child.tagName.toLowerCase())) {
-        const textNode = document.createTextNode(child.textContent || '');
-        element.replaceChild(textNode, child);
-      } else {
-        const attributes = Array.from(child.attributes);
-        attributes.forEach(attr => {
-          if (!['class'].includes(attr.name)) {
-            child.removeAttribute(attr.name);
-          }
-        });
-        cleanElement(child);
-      }
+    Array.from(element.children).forEach(child => {
+      // 移除所有事件处理属性和危险属性
+      Array.from(child.attributes).forEach(attr => {
+        if (!allowedAttributes.includes(attr.name.toLowerCase()) || 
+            attr.name.startsWith('on') || 
+            attr.value.toLowerCase().includes('javascript:') ||
+            attr.value.toLowerCase().includes('data:')) {
+          child.removeAttribute(attr.name);
+        }
+      });
+      cleanElement(child);
     });
   };
   
   cleanElement(tempDiv);
-  return tempDiv.innerHTML;
+  
+  // 最终安全检查：移除任何可能的脚本内容
+  const finalContent = tempDiv.innerHTML
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .replace(/data:\s*text\/html/gi, '');
+  
+  return finalContent;
 };
 
 const openMainWindow = async (): Promise<void> => {
