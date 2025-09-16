@@ -1177,9 +1177,8 @@ interface RefreshSystem {
         
         // 显示成功消息
         const transactionType = isInstallmentMode.value ? '分期付款' : '交易';
-        console.log(`✅ ${transactionType}保存成功，即将刷新页面`);
+        console.log(`✅ ${transactionType}保存成功，刷新交易列表`);
         
-        // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
           localStorage.setItem('qmx_last_operation', `${transactionType}保存成功`);
@@ -1188,8 +1187,7 @@ interface RefreshSystem {
           console.warn('保存页面状态失败:', error);
         }
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await loadTransactions();
       } catch (error) {
         console.error('保存交易失败:', error);
         const errorMessage = (error as Error).message || '未知错误';
@@ -1233,9 +1231,8 @@ interface RefreshSystem {
         
         console.log(`成功删除交易记录 ID: ${id}`);
         
-        console.log('✅ 交易删除成功，即将刷新页面');
+        console.log('✅ 交易删除成功，刷新交易列表');
         
-        // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
           localStorage.setItem('qmx_last_operation', '交易删除成功');
@@ -1244,8 +1241,7 @@ interface RefreshSystem {
           console.warn('保存页面状态失败:', error);
         }
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await loadTransactions();
       } catch (error) {
         console.error('删除交易失败:', error);
         showError(

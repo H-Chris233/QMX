@@ -27,7 +27,7 @@
         <button class="confirm-btn secondary" @click="cancelAction">
           {{ cancelText }}
         </button>
-        <button class="confirm-btn primary" @click="confirmAction">
+        <button class="confirm-btn primary" :data-type="props.confirmType" @click="confirmAction">
           {{ confirmText }}
         </button>
       </div>

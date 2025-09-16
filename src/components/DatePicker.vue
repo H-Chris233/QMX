@@ -20,7 +20,7 @@
       </div>
     </div>
     
-    <div v-if="hasError && errorMessage" :id="`${inputId}-error`" class="date-picker-error">
+    <div v-if="hasError && liveError" :id="`${inputId}-error`" class="date-picker-error">
       {{ errorMessage }}
     </div>
     
@@ -79,7 +79,8 @@ const internalValue: Ref<string> = ref(props.modelValue);
 const isFocused: Ref<boolean> = ref(false);
     
 // 计算属性
-const hasError: ComputedRef<boolean> = computed(() => Boolean(props.errorMessage));
+const liveError: Ref<string> = ref(props.errorMessage);
+const hasError: ComputedRef<boolean> = computed(() => Boolean(liveError.value));
 
 // 输入框属性计算
 const inputAttrs = computed(() => {
@@ -179,6 +180,7 @@ const handleChange = (event: Event): void => {
   const value = target.value;
   const error = validateDate(value);
   if (error) {
+    liveError.value = error;
     emit('error', error);
   }
   emit('change', value);
@@ -192,7 +194,10 @@ const handleBlur = (event: Event): void => {
   if (props.validateOnBlur) {
     const error = validateDate(value);
     if (error) {
+      liveError.value = error;
       emit('error', error);
+    } else {
+      liveError.value = '';
     }
   }
   
@@ -208,6 +213,10 @@ const handleFocus = (event: Event): void => {
 // 监听外部值变化
 watch(() => props.modelValue, (newValue: string) => {
   internalValue.value = newValue;
+});
+
+watch(() => props.errorMessage, (msg: string) => {
+  liveError.value = msg || '';
 });
     
 // 监听预设值变化

@@ -149,10 +149,10 @@ const agreeWithTerms = (): void => {
 
 const sanitizeContent = (content: string): string => {
   // 安全的HTML净化函数，防止XSS攻击
-  const allowedTags = ['ul', 'ol', 'li', 'code', 'strong', 'em', 'br'];
-  const allowedAttributes = ['class'];
+  const allowedTags = ['ul', 'ol', 'li', 'code', 'strong', 'em', 'br', 'p'];
+  const allowedAttributes = ['class', 'aria-label'];
   
-  // 创建临时DOM元素进行安全处理
+  // 严格拒绝不在白名单中的标签、属性和协议
   const tempDiv = document.createElement('div');
   
   // 使用textContent先转义所有HTML，然后只允许特定标签
@@ -163,7 +163,7 @@ const sanitizeContent = (content: string): string => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;');
   
-  // 只允许特定的安全标签重新解析
+  // 只允许特定的安全标签重新解析（严格白名单）
   let safeContent = escapedContent;
   allowedTags.forEach(tag => {
     const openTagRegex = new RegExp(`&lt;${tag}(&gt;|\\s[^&gt;]*&gt;)`, 'gi');
@@ -175,7 +175,9 @@ const sanitizeContent = (content: string): string => {
         const cleanMatch = match.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
         const hasClass = /class\s*=\s*["'][^"']*["']/.test(cleanMatch);
         if (hasClass) {
-          return cleanMatch.replace(/\s+(?!class)[a-zA-Z-]+\s*=\s*["'][^"']*["']/g, '');
+          return cleanMatch
+            .replace(/\s+(?!class|aria-label)[a-zA-Z-]+\s*=\s*["'][^"']*["']/g, '')
+            .replace(/on\w+\s*=\s*['"][^'"]*['"]/gi, '');
         }
         return `<${tag}>`;
       })
@@ -191,9 +193,9 @@ const sanitizeContent = (content: string): string => {
       // 移除所有事件处理属性和危险属性
       Array.from(child.attributes).forEach(attr => {
         if (!allowedAttributes.includes(attr.name.toLowerCase()) || 
-            attr.name.startsWith('on') || 
-            attr.value.toLowerCase().includes('javascript:') ||
-            attr.value.toLowerCase().includes('data:')) {
+            attr.name.toLowerCase().startsWith('on') || 
+            /\bjavascript:/i.test(attr.value) ||
+            /^data:/i.test(attr.value)) {
           child.removeAttribute(attr.name);
         }
       });
@@ -206,9 +208,11 @@ const sanitizeContent = (content: string): string => {
   // 最终安全检查：移除任何可能的脚本内容
   const finalContent = tempDiv.innerHTML
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+\s*=/gi, '')
-    .replace(/data:\s*text\/html/gi, '');
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/\son\w+\s*=\s*['"][^'"]*['"]/gi, '')
+    .replace(/\sstyle\s*=\s*['"][^'"]*['"]/gi, '')
+    .replace(/\s(src|href)\s*=\s*['"][^'"]*['"]/gi, (m) => (/javascript:|^data:/i.test(m) ? '' : m));
   
   return finalContent;
 };

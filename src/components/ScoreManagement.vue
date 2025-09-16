@@ -558,10 +558,10 @@ interface StudentData {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已为${studentName}添加成绩${score}，即将刷新页面`);
+        console.log(`✅ 已为${studentName}添加成绩${score}，刷新当前学员数据`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await onStudentChange();
+        quickScore.value = '';
       } catch (error: any) {
         console.error('添加成绩失败:', error);
         showError(
@@ -610,10 +610,9 @@ interface StudentData {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已删除${studentName}的第${scoreIndex + 1}次成绩${score}，即将刷新页面`);
+        console.log(`✅ 已删除${studentName}的第${scoreIndex + 1}次成绩${score}，刷新当前学员数据`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await onStudentChange();
       } catch (error: any) {
         console.error('删除成绩失败:', error);
         showError(
@@ -702,10 +701,9 @@ interface StudentData {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}，即将刷新页面`);
+        console.log(`✅ 已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}，刷新当前学员数据`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await onStudentChange();
       } catch (error: any) {
         console.error('更新成绩失败:', error);
         showError(
