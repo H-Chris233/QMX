@@ -505,14 +505,15 @@ const showError = errorHandler?.showError || ((title: string, message: string, d
   // 如果没有错误处理系统，只记录到控制台，不使用alert
 });
 
-const showConfirm = errorHandler?.showConfirm || ((options: any) => {
-  const confirmed = confirm(options.message);
-  if (confirmed && options.onConfirm) {
-    options.onConfirm();
-  } else if (!confirmed && options.onCancel) {
-    options.onCancel();
+if (!errorHandler?.showConfirm) {
+  console.warn('缺少自定义确认对话框实现，已禁用回退 confirm');
+}
+const showConfirm = (options: any) => {
+  if (errorHandler?.showConfirm) {
+    return errorHandler.showConfirm(options);
   }
-});
+  console.error('无法显示确认对话框：未提供 errorHandler.showConfirm');
+};
 
 const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
   console.log(`✅ ${title}: ${message}`);
@@ -823,10 +824,18 @@ const deleteStudent = async (uid: number): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 学员"${studentName}"删除成功，即将刷新页面`);
+        console.log(`✅ 学员"${studentName}"删除成功，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('删除学员失败:', error);
         showError(
@@ -1119,10 +1128,18 @@ const saveStudent = async (): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ ${operationType}，即将刷新页面`);
+        console.log(`✅ ${operationType}，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('保存学员失败:', error);
         const errorMessage = (error as Error).message || '未知错误';
@@ -1148,13 +1165,14 @@ const getHighestScore = (student: Student): string => {
         }
         
         // 防止数组过大导致性能问题
-        if (student.rings.length > 10000) {
+        let rings = Array.isArray(student.rings) ? student.rings : [];
+        if (rings.length > 10000) {
           console.warn('成绩数组过大，截取前10000条记录');
-          student.rings = student.rings.slice(0, 10000);
+          rings = rings.slice(0, 10000);
         }
         
         // 过滤出有效的数字成绩，增强验证
-        const validScores = student.rings.filter(score => {
+        const validScores = rings.filter(score => {
           return typeof score === 'number' && 
                  !isNaN(score) && 
                  isFinite(score) && 
@@ -1297,10 +1315,18 @@ const setMembershipByType = async (type: string): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已为${studentName}设置${membershipType}会员，即将刷新页面`);
+        console.log(`✅ 已为${studentName}设置${membershipType}会员，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('设置会员失败:', error);
         showError('设置失败', '设置会员时发生错误', (error as Error).message);
@@ -1343,10 +1369,18 @@ const clearMembership = async (): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已清除${studentName}的会员信息，即将刷新页面`);
+        console.log(`✅ 已清除${studentName}的会员信息，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('清除会员失败:', error);
         showError('清除失败', '清除会员时发生错误', (error as Error).message);
@@ -1397,10 +1431,18 @@ const saveCustomMembership = async (): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已为${studentName}设置自定义会员时间，即将刷新页面`);
+        console.log(`✅ 已为${studentName}设置自定义会员时间，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('设置自定义会员失败:', error);
         showError('设置失败', '设置自定义会员时发生错误', (error as Error).message);

@@ -253,6 +253,7 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
+        aria-describedby="modal-body"
       >
         <div class="modal-header">
           <h3 id="modal-title">添加交易</h3>
@@ -609,7 +610,7 @@ interface RefreshSystem {
 
     const currentTransaction = ref({
       type: 'income',
-      amount: '',
+      amount: 0,
       student_id: null,
       note: '',
       // 分期付款特定字段
@@ -768,14 +769,8 @@ interface RefreshSystem {
     };
 
     const formatTransactionAmount = (transaction: Transaction): string => {
-      const amount =
-        transaction.type === 'income'
-          ? transaction.amount
-          : -transaction.amount;
-      return new Intl.NumberFormat('zh-CN', {
-        style: 'currency',
-        currency: 'CNY',
-      }).format(amount);
+      const raw = transaction.type === 'income' ? transaction.amount : -transaction.amount;
+      return formatCurrency(raw);
     };
 
     // 状态处理方法
@@ -1041,15 +1036,7 @@ interface RefreshSystem {
 
       try {
         // 使用新的v2 API获取财务统计和交易数据
-        const [cashTransactions, financialStats] = await Promise.all([
-          ApiService.getAllTransactions(),
-          ApiService.getFinancialStats(selectedPeriod.value === 'custom' ? {
-            start: new Date(customStartDate.value + 'T00:00:00Z').toISOString(),
-            end: new Date(customEndDate.value + 'T23:59:59Z').toISOString()
-          } : selectedPeriod.value as 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear')
-        ]);
-        
-        console.log('获取到的财务统计:', financialStats);
+        const cashTransactions = await ApiService.getAllTransactions();
 
         // 验证返回的数据
         if (!Array.isArray(cashTransactions)) {
@@ -1290,9 +1277,8 @@ interface RefreshSystem {
         );
 
         closeModals();
-        console.log('✅ 分期状态更新成功，即将刷新页面');
+        console.log('✅ 分期状态更新成功，触发局部刷新');
         
-        // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
           localStorage.setItem('qmx_last_operation', '分期状态更新成功');
@@ -1301,8 +1287,16 @@ interface RefreshSystem {
           console.warn('保存页面状态失败:', error);
         }
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.transactions++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadTransactions();
+          }
+        } else {
+          loadTransactions();
+        }
       } catch (error) {
         console.error('更新分期状态失败:', error);
         showError('更新失败', '更新分期状态时发生错误', (error as Error).message);
@@ -1318,7 +1312,7 @@ interface RefreshSystem {
       selectedTransaction.value = null;
       currentTransaction.value = {
         type: 'income',
-        amount: '',
+        amount: 0,
         student_id: null,
         note: '',
         installment_total: 2,

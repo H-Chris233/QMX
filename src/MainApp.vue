@@ -283,8 +283,9 @@ const handleCancel = (): void => {
 
 // 成功消息处理（简单的控制台日志，可以后续扩展为Toast通知）
 const showSuccess = (title: string, message: string): void => {
-  console.log(`✅ ${title}: ${message}`);
-  // 这里可以添加Toast通知或其他成功提示UI
+  if (import.meta.env?.MODE !== 'production') {
+    console.log(`✅ ${title}: ${message}`);
+  }
 };
 
 // 事件监听器清理函数
