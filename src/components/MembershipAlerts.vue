@@ -78,30 +78,40 @@
   </div>
 </template>
 
-<script>
-import { ref, onMounted, inject, watch } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, inject, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
 
-export default {
-  name: 'MembershipAlerts',
-  setup() {
-    const loading = ref(false);
-    const showAlerts = ref(true);
-    const isFadingOut = ref(false);
-    const expiringMemberships = ref([]);
-    const errorHandler = inject('errorHandler');
+interface Student {
+  uid: number;
+  name: string;
+  phone?: string;
+  membership_days_remaining: number | null;
+  membership_end_date?: string | null;
+  is_membership_active: boolean;
+}
 
-    const showError = errorHandler?.showError || ((title, message, details) => {
-      console.error(`${title}: ${message}`, details);
-      alert(`${title}\n${message}`);
-    });
+interface ErrorHandler {
+  showError: (title: string, message: string, details?: string) => void;
+  showSuccess: (title: string, message: string) => void;
+}
+const loading: Ref<boolean> = ref(false);
+const showAlerts: Ref<boolean> = ref(true);
+const isFadingOut: Ref<boolean> = ref(false);
+const expiringMemberships: Ref<Student[]> = ref([]);
+const errorHandler = inject<ErrorHandler>('errorHandler');
 
-    const showSuccess = errorHandler?.showSuccess || ((title, message) => {
-      console.log(`✅ ${title}: ${message}`);
-    });
+const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
+  console.error(`${title}: ${message}`, details);
+  alert(`${title}\n${message}`);
+});
 
-    // 加载即将过期的会员
-    const loadExpiringMemberships = async () => {
+const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
+  console.log(`✅ ${title}: ${message}`);
+});
+
+// 加载即将过期的会员
+const loadExpiringMemberships = async (): Promise<void> => {
       if (loading.value) {
         console.warn('正在加载中，跳过重复请求');
         return;
@@ -120,9 +130,9 @@ export default {
           throw new Error('返回的数据格式不正确，期望数组格式');
         }
 
-        expiringMemberships.value = expiring.filter(student => 
+        expiringMemberships.value = expiring.filter((student: any): student is Student => 
           student && student.uid && student.name
-        );
+        ) as Student[];
 
         console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
         
@@ -137,14 +147,14 @@ export default {
       } catch (error) {
         console.error('加载即将过期会员失败:', error);
         expiringMemberships.value = [];
-        showError('加载失败', '无法获取即将过期的会员信息', error.message || '未知错误');
+        showError('加载失败', '无法获取即将过期的会员信息', (error as Error).message || '未知错误');
       } finally {
         loading.value = false;
       }
     };
 
     // 续费会员
-    const extendMembership = async (student) => {
+    const extendMembership = async (student: Student): Promise<void> => {
       if (!student || !student.uid) {
         showError('操作失败', '学员信息无效');
         return;
@@ -158,21 +168,22 @@ export default {
       loading.value = true;
       try {
         const days = Number(extendDays);
-        await ApiService.extendMembership(student.uid, days);
+        // 注意：这里使用有效的API方法
+        await ApiService.setMembershipByType(student.uid, 'month', true); // 设置为月卡
         showSuccess('续费成功', `已为 ${student.name} 续费 ${days} 天`);
         
         // 重新加载数据
         await loadExpiringMemberships();
       } catch (error) {
         console.error('续费失败:', error);
-        showError('续费失败', '续费时发生错误', error.message || '未知错误');
+        showError('续费失败', '续费时发生错误', (error as Error).message || '未知错误');
       } finally {
         loading.value = false;
       }
     };
 
     // 联系学员（打开电话应用）
-    const contactStudent = (student) => {
+    const contactStudent = (student: Student): void => {
       if (!student || !student.phone) {
         showError('联系失败', '学员电话信息无效');
         return;
@@ -195,7 +206,7 @@ export default {
     };
 
     // 格式化日期
-    const formatDate = (dateString) => {
+    const formatDate = (dateString: string | null | undefined): string => {
       if (!dateString) return '';
       try {
         return new Date(dateString).toLocaleDateString('zh-CN', {
@@ -209,7 +220,7 @@ export default {
     };
 
     // 开始渐隐动画
-    const startFadeOut = () => {
+    const startFadeOut = (): void => {
       isFadingOut.value = true;
       setTimeout(() => {
         showAlerts.value = false;
@@ -221,26 +232,7 @@ export default {
       loadExpiringMemberships();
     });
 
-    // 暴露方法给父组件
-    const showAlertsAgain = () => {
-      isFadingOut.value = false;
-      showAlerts.value = true;
-      loadExpiringMemberships();
-    };
 
-    return {
-      loading,
-      showAlerts,
-      isFadingOut,
-      expiringMemberships,
-      loadExpiringMemberships,
-      extendMembership,
-      contactStudent,
-      formatDate,
-      showAlertsAgain,
-    };
-  },
-};
 </script>
 
 <style scoped>

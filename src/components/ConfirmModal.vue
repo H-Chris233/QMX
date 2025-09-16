@@ -32,81 +32,70 @@
   </div>
 </template>
 
-<script>
-import { ref, watch } from 'vue';
+<script setup lang="ts">
+import { watch } from 'vue';
 
-export default {
-  name: 'ConfirmModal',
-  props: {
-    show: {
-      type: Boolean,
-      default: false,
-    },
-    title: {
-      type: String,
-      default: '确认操作',
-    },
-    message: {
-      type: String,
-      required: true,
-    },
-    details: {
-      type: String,
-      default: '',
-    },
-    closeOnOverlayClick: {
-      type: Boolean,
-      default: true,
-    },
-    confirmText: {
-      type: String,
-      default: '确定',
-    },
-    cancelText: {
-      type: String,
-      default: '取消',
-    },
-    confirmType: {
-      type: String,
-      default: 'primary', // primary, danger, warning
-    },
-  },
-  emits: ['confirm', 'cancel'],
-  setup(props, { emit }) {
-    const confirmAction = () => {
-      emit('confirm');
-    };
+interface Props {
+  show?: boolean;
+  title?: string;
+  message: string;
+  details?: string;
+  closeOnOverlayClick?: boolean;
+  confirmText?: string;
+  cancelText?: string;
+  confirmType?: string;
+}
 
-    const cancelAction = () => {
-      emit('cancel');
-    };
+interface Emits {
+  (e: 'confirm'): void;
+  (e: 'cancel'): void;
+}
 
-    // 监听ESC键关闭弹窗
-    watch(
-      () => props.show,
-      (newVal) => {
-        if (newVal) {
-          const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-              cancelAction();
-            }
-          };
-          document.addEventListener('keydown', handleEscape);
+const props = withDefaults(defineProps<Props>(), {
+  show: false,
+  title: '确认操作',
+  details: '',
+  closeOnOverlayClick: true,
+  confirmText: '确定',
+  cancelText: '取消',
+  confirmType: 'primary',
+});
 
-          // 清理函数
-          return () => {
-            document.removeEventListener('keydown', handleEscape);
-          };
-        }
-      },
-    );
-
-    return {
-      confirmAction,
-      cancelAction,
-    };
-  },
+const emit = defineEmits<Emits>();
+const confirmAction = (): void => {
+  emit('confirm');
 };
+
+const cancelAction = (): void => {
+  emit('cancel');
+};
+
+// 监听ESC键关闭弹窗
+watch(
+  () => props.show,
+  (newVal: boolean) => {
+    if (newVal) {
+      const handleEscape = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') {
+          cancelAction();
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+
+      // 清理函数
+      const cleanup = () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+      
+      // 返回清理函数
+      return cleanup;
+    }
+    // 返回空函数以满足所有代码路径
+    return () => {};
+  },
+);
+
+
 </script>
 
 <style scoped>
