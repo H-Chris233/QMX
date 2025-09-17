@@ -92,27 +92,29 @@ export interface FinancialStats {
   total_income: number;
   total_expense: number;
   net_income: number;
+  net_profit?: number;
+  is_profitable?: boolean;
   installment_total: number;
   installment_paid: number;
   installment_pending: number;
 }
 
 export interface StudentSearchOptions {
-  name_contains?: string;
-  min_age?: number;
-  max_age?: number;
-  class_type?: string;
-  subject?: string;
-  has_membership?: boolean;
+  name_contains?: string | null;
+  min_age?: number | null;
+  max_age?: number | null;
+  class_type?: string | null;
+  subject?: string | null;
+  has_membership?: boolean | null;
 }
 
 export interface CashSearchOptions {
-  student_id?: number;
-  min_amount?: number;
-  max_amount?: number;
-  has_installment?: boolean;
-  date_from?: string;
-  date_to?: string;
+  student_id?: number | null;
+  min_amount?: number | null;
+  max_amount?: number | null;
+  has_installment?: boolean | null;
+  date_from?: string | null;
+  date_to?: string | null;
 }
 
 export interface StudentUpdateBatch {

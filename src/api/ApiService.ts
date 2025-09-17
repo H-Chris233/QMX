@@ -1,6 +1,18 @@
 // API服务 - 封装所有后端调用
 import { invoke } from '@tauri-apps/api/core';
-import type { Student, StudentUpdateData, TauriCommand, StudentScoresResponse } from '../types/api';
+import type { 
+  Student, 
+  StudentUpdateData, 
+  TauriCommand, 
+  StudentScoresResponse,
+  Transaction,
+  DashboardStats,
+  InstallmentStatus,
+  StudentStats,
+  FinancialStats,
+  StudentSearchOptions,
+  CashSearchOptions
+} from '../types/api';
 import { assertIsStudent } from '../utils/typeGuards';
 import {
   transformStudentData,
@@ -306,7 +318,7 @@ export class ApiService {
     studentUid: number | null,
     amount: number,
     note: string = '',
-  ) {
+  ): Promise<Transaction> {
     try {
       // 输入验证增强
       if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
@@ -319,10 +331,10 @@ export class ApiService {
         throw new Error('备注长度不能超过1000字符');
       }
 
-      const rawData = await invoke<any>('add_cash_transaction', {
-        studentUid: studentUid || null,
+      const rawData = await invokeWithEnhancements<any>('add_cash_transaction' as TauriCommand, {
+        studentUid: studentUid === null ? null : Number(studentUid),
         amount,
-        note: note || null,
+        note: note || '',
         isInstallment: false,
       });
 
@@ -349,12 +361,32 @@ export class ApiService {
     frequency: string,
     dueDate: string,
     planId?: number,
-  ) {
+  ): Promise<Transaction> {
     try {
-      const rawData = await invoke<any>('add_cash_transaction', {
-        studentUid: studentUid || null,
+      // 输入验证增强
+      if (typeof totalAmount !== 'number' || !isFinite(totalAmount) || totalAmount <= 0) {
+        throw new Error('总金额必须是大于0的有效数字');
+      }
+      if (typeof totalInstallments !== 'number' || totalInstallments <= 0 || totalInstallments > 120) {
+        throw new Error('分期总数必须在1-120之间');
+      }
+      if (!frequency || typeof frequency !== 'string') {
+        throw new Error('频率参数无效');
+      }
+      if (!dueDate || typeof dueDate !== 'string') {
+        throw new Error('到期日期无效');
+      }
+      if (planId !== undefined && (typeof planId !== 'number' || planId <= 0)) {
+        throw new Error('计划ID无效');
+      }
+      if (note && note.length > 1000) {
+        throw new Error('备注长度不能超过1000字符');
+      }
+
+      const rawData = await invokeWithEnhancements<any>('add_cash_transaction' as TauriCommand, {
+        studentUid: studentUid === null ? null : Number(studentUid),
         amount: totalAmount,
-        note: note || null,
+        note: note || '',
         isInstallment: true,
         totalAmount,
         totalInstallments,
@@ -381,7 +413,7 @@ export class ApiService {
     }
   }
 
-  static async getAllTransactions() {
+  static async getAllTransactions(): Promise<Transaction[]> {
     try {
       const rawDataArray = await invokeWithEnhancements<any[]>('get_all_transactions', {}, {
         timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 获取所有交易可能需要更长时间
@@ -409,14 +441,14 @@ export class ApiService {
     }
   }
 
-  static async deleteCashTransaction(transactionUid: number) {
+  static async deleteCashTransaction(transactionUid: number): Promise<void> {
     try {
       // 输入验证
       if (!transactionUid || transactionUid <= 0) {
         throw new Error('交易ID无效');
       }
 
-      return await invoke<null>('delete_cash_transaction', {
+      await invoke<void>('delete_cash_transaction', {
         transactionUid,
       });
     } catch (error) {
@@ -426,9 +458,9 @@ export class ApiService {
   }
 
   // 分期付款管理
-  static async updateInstallmentStatus(transactionUid: number, status: string) {
+  static async updateInstallmentStatus(transactionUid: number, status: InstallmentStatus): Promise<void> {
     try {
-      return await invoke<null>('update_installment_status', {
+      await invoke<void>('update_installment_status', {
         transactionUid,
         status,
       });
@@ -438,7 +470,7 @@ export class ApiService {
     }
   }
 
-  static async generateNextInstallment(planId: number, dueDate: string) {
+  static async generateNextInstallment(planId: number, dueDate: string): Promise<number> {
     try {
       return await invoke<number>('generate_next_installment', {
         planId,
@@ -450,7 +482,7 @@ export class ApiService {
     }
   }
 
-  static async cancelInstallmentPlan(planId: number) {
+  static async cancelInstallmentPlan(planId: number): Promise<number> {
     try {
       return await invoke<number>('cancel_installment_plan', {
         planId,
@@ -461,7 +493,7 @@ export class ApiService {
     }
   }
 
-  static async getInstallmentsByPlan(planId: number) {
+  static async getInstallmentsByPlan(planId: number): Promise<Transaction[]> {
     try {
       const rawDataArray = await invoke<any[]>('get_installments_by_plan', {
         planId,
@@ -474,7 +506,7 @@ export class ApiService {
   }
 
   // 统计数据
-  static async getDashboardStats() {
+  static async getDashboardStats(): Promise<DashboardStats> {
     try {
       const rawData = await invokeWithEnhancements<any>('get_dashboard_stats', {}, {
         timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 统计计算可能需要更长时间
@@ -562,9 +594,9 @@ export class ApiService {
   }
 
   // 窗口管理
-  static async openMainWindow() {
+  static async openMainWindow(): Promise<void> {
     try {
-      return await invoke<null>('open_main_window');
+      await invoke<void>('open_main_window');
     } catch (error) {
       console.error('❌ [ApiService.openMainWindow] 调用失败:', error);
       throw new Error(`打开主窗口失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -573,13 +605,21 @@ export class ApiService {
 
   // v2 API - 高级功能
   // 获取特定学员的统计信息
-  static async getStudentStats(studentUid: number) {
+  static async getStudentStats(studentUid: number): Promise<StudentStats> {
     try {
       if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
       
-      return await invokeWithEnhancements<any>('get_student_stats' as TauriCommand, {
+      const rawData = await invokeWithEnhancements<unknown>('get_student_stats' as TauriCommand, {
         studentUid,
       });
+      
+      // 这里需要添加数据转换和验证逻辑
+      if (!rawData || typeof rawData !== 'object') {
+        throw new Error('返回的学员统计数据格式不正确');
+      }
+      
+      // 简单类型断言，实际应该添加更严格的验证
+      return rawData as StudentStats;
     } catch (error) {
       console.error('❌ [ApiService.getStudentStats] 调用失败:', error);
       throw new Error(`获取学员统计失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -587,7 +627,12 @@ export class ApiService {
   }
 
   // 获取全局学员统计信息（用于仪表板）
-  static async getGlobalStudentStats() {
+  static async getGlobalStudentStats(): Promise<{
+    total_students: number;
+    average_score: number;
+    max_score: number;
+    active_courses: number;
+  }> {
     try {
       const dashboardStats = await this.getDashboardStats();
       
@@ -616,14 +661,22 @@ export class ApiService {
   }
 
   // 获取全局财务统计信息（用于仪表板）
-  static async getGlobalFinancialStats() {
+  static async getGlobalFinancialStats(): Promise<FinancialStats> {
     try {
       const dashboardStats = await this.getDashboardStats();
       
+      const revenue = dashboardStats.total_revenue || 0;
+      const expense = dashboardStats.total_expense || 0;
+      
       return {
-        total_income: dashboardStats.total_revenue || 0,
-        total_expense: dashboardStats.total_expense || 0,
-        net_profit: (dashboardStats.total_revenue || 0) - (dashboardStats.total_expense || 0),
+        total_income: revenue,
+        total_expense: expense,
+        net_income: revenue - expense,
+        net_profit: revenue - expense,
+        is_profitable: revenue > expense,
+        installment_total: 0,
+        installment_paid: 0,
+        installment_pending: 0,
       };
     } catch (error) {
       console.error('❌ [ApiService.getGlobalFinancialStats] 调用失败:', error);
@@ -631,7 +684,7 @@ export class ApiService {
     }
   }
 
-  static async searchStudents(options: any) {
+  static async searchStudents(options: StudentSearchOptions): Promise<Student[]> {
     try {
       const rawDataArray = await invokeWithEnhancements<unknown[]>('search_students' as TauriCommand, {
         nameContains: options.name_contains,
@@ -653,7 +706,7 @@ export class ApiService {
     }
   }
 
-  static async searchCash(options: any) {
+  static async searchCash(options: CashSearchOptions): Promise<Transaction[]> {
     try {
       // 验证日期格式
       if (options.date_from && !options.date_to) {
