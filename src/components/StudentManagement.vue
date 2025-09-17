@@ -452,10 +452,21 @@ interface MembershipForm {
   endDate: string;
 }
 
+interface ConfirmOptions {
+  title?: string;
+  message: string;
+  details?: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmType?: string;
+  onConfirm?: (() => void) | null;
+  onCancel?: (() => void) | null;
+}
+
 interface ErrorHandler {
   showError: (title: string, message: string, details?: string) => void;
   showSuccess: (title: string, message: string) => void;
-  showConfirm: (options: any) => void;
+  showConfirm: (options: ConfirmOptions) => void;
 }
 
 interface RefreshSystem {
@@ -499,25 +510,27 @@ const searchInput: Ref<HTMLInputElement | null> = ref(null);
 const errorHandler = inject<ErrorHandler>('errorHandler');
 const refreshSystem = inject<RefreshSystem>('refreshSystem');
 
-// 统一错误处理 - 移除alert降级，强制使用统一系统
+// 统一错误处理 - 提供完整的降级方案
 const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
   console.error(`${title}: ${message}`, details);
-  // 如果没有错误处理系统，只记录到控制台，不使用alert
+  // 降级方案：使用原生alert
+  alert(`${title}: ${message}${details ? '\n\n详情: ' + details : ''}`);
 });
 
-const showConfirm = errorHandler?.showConfirm || ((options: any) => {
-  const confirmed = confirm(options.message);
+const showConfirm = errorHandler?.showConfirm || ((options: ConfirmOptions) => {
+  const confirmed = confirm(`${options.title || '确认操作'}: ${options.message || '请确认是否继续该操作'}${options.details ? '\n\n' + options.details : ''}`);
   if (confirmed && options.onConfirm) {
     options.onConfirm();
   } else if (!confirmed && options.onCancel) {
     options.onCancel();
   }
+  return confirmed;
 });
 
 const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
   console.log(`✅ ${title}: ${message}`);
-  // 可以使用简单的alert作为降级方案
-  // alert(`${title}: ${message}`);
+  // 降级方案：使用alert显示成功消息
+  alert(`${title}: ${message}`);
 });
     
     // 调试：检查错误处理函数是否正确注入
@@ -788,7 +801,7 @@ const deleteStudent = async (uid: number): Promise<void> => {
         return;
       }
 
-      if (!uid || isNaN(Number(uid)) || Number(uid) <= 0) {
+      if (uid == null || isNaN(Number(uid)) || Number(uid) <= 0) {
         showError('删除失败', '无效的学员ID');
         return;
       }
@@ -823,10 +836,18 @@ const deleteStudent = async (uid: number): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 学员"${studentName}"删除成功，即将刷新页面`);
+        console.log(`✅ 学员"${studentName}"删除成功，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
+          try {
+            refreshSystem.refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('删除学员失败:', error);
         showError(
@@ -933,7 +954,7 @@ const validatePhone = (phone: string): boolean => {
 
         // 国际号码校验 - 增强异常处理
         try {
-          const phoneObj = parsePhoneNumberFromString(phone);
+          const phoneObj = parsePhoneNumberFromString(phone, 'CN');
           return phoneObj?.isValid() === true;
         } catch (parseError) {
           console.warn('国际号码解析失败:', parseError);
@@ -967,27 +988,16 @@ const saveStudent = async (): Promise<void> => {
       loading.value = true;
       
       try {
-        // 增强的输入净化和安全处理
-        const sanitizeString = (input: string): string => {
-          if (!input || typeof input !== 'string') return '';
-          return input
-            .trim()
-            .replace(/[<>'"&]/g, '') // 移除HTML特殊字符
-            .replace(/javascript:/gi, '') // 移除JavaScript协议
-            .replace(/data:/gi, '') // 移除data协议
-            .replace(/vbscript:/gi, '') // 移除VBScript协议
-            .replace(/on\w+=/gi, '') // 移除事件处理器
-            .substring(0, 200); // 限制最大长度
-        };
+        
 
         const sanitizedStudent = {
           ...currentStudent.value,
-          name: sanitizeString(currentStudent.value.name),
+          name: currentStudent.value.name.trim().substring(0, 50),
           age: Math.max(3, Math.min(120, Number(currentStudent.value.age) || 0)),
           classType: ['TenTry', 'Month', 'Year', 'Others'].includes(currentStudent.value.classType) 
             ? currentStudent.value.classType : 'Others',
           phone: currentStudent.value.phone.trim().replace(/[^\d\-\+\s\(\)]/g, '').substring(0, 20),
-          note: sanitizeString(currentStudent.value.note || '').substring(0, 500),
+          note: (currentStudent.value.note || '').trim().substring(0, 500),
           subject: ['Shooting', 'Archery', 'Others'].includes(currentStudent.value.subject) 
             ? currentStudent.value.subject : 'Shooting',
         };
@@ -1019,9 +1029,19 @@ const saveStudent = async (): Promise<void> => {
               const endDate = new Date(startDate);
               
               if (sanitizedStudent.classType === 'Month') {
-                endDate.setDate(endDate.getDate() + 30);
+                // 正确处理月份计算，避免跨月问题
+                endDate.setMonth(endDate.getMonth() + 1);
+                // 如果日期超过目标月份的天数，调整到最后一天
+                if (endDate.getDate() !== startDate.getDate()) {
+                  endDate.setDate(0); // 设置为上个月的最后一天
+                }
               } else {
-                endDate.setDate(endDate.getDate() + 365);
+                // 正确处理年份计算，考虑闰年
+                endDate.setFullYear(endDate.getFullYear() + 1);
+                // 如果日期超过目标年份的2月29日（闰年），调整到2月28日
+                if (endDate.getMonth() === 1 && endDate.getDate() > 28) {
+                  endDate.setDate(28);
+                }
               }
               
               await ApiService.setStudentMembership(
@@ -1074,9 +1094,19 @@ const saveStudent = async (): Promise<void> => {
                 const endDate = new Date(startDate);
                 
                 if (sanitizedStudent.classType === 'Month') {
-                  endDate.setDate(endDate.getDate() + 30);
+                  // 正确处理月份计算，避免跨月问题
+                  endDate.setMonth(endDate.getMonth() + 1);
+                  // 如果日期超过目标月份的天数，调整到最后一天
+                  if (endDate.getDate() !== startDate.getDate()) {
+                    endDate.setDate(0); // 设置为上个月的最后一天
+                  }
                 } else {
-                  endDate.setDate(endDate.getDate() + 365);
+                  // 正确处理年份计算，考虑闰年
+                  endDate.setFullYear(endDate.getFullYear() + 1);
+                  // 如果日期超过目标年份的2月29日（闰年），调整到2月28日
+                  if (endDate.getMonth() === 1 && endDate.getDate() > 28) {
+                    endDate.setDate(28);
+                  }
                 }
                 
                 await ApiService.setStudentMembership(
@@ -1119,10 +1149,18 @@ const saveStudent = async (): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ ${operationType}，即将刷新页面`);
+        console.log(`✅ ${operationType}，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
+          try {
+            refreshSystem.refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('保存学员失败:', error);
         const errorMessage = (error as Error).message || '未知错误';
@@ -1148,13 +1186,14 @@ const getHighestScore = (student: Student): string => {
         }
         
         // 防止数组过大导致性能问题
-        if (student.rings.length > 10000) {
+        let rings = Array.isArray(student.rings) ? student.rings : [];
+        if (rings.length > 10000) {
           console.warn('成绩数组过大，截取前10000条记录');
-          student.rings = student.rings.slice(0, 10000);
+          rings = rings.slice(0, 10000);
         }
         
         // 过滤出有效的数字成绩，增强验证
-        const validScores = student.rings.filter(score => {
+        const validScores = rings.filter(score => {
           return typeof score === 'number' && 
                  !isNaN(score) && 
                  isFinite(score) && 
@@ -1270,6 +1309,11 @@ const closeMembershipModal = (): void => {
     };
 
 const setMembershipByType = async (type: string): Promise<void> => {
+      const allowed = ['month','year'];
+      if (!allowed.includes(type)) {
+        showError('设置失败', '无效的会员类型');
+        return;
+      }
       if (loading.value) {
         console.warn('正在处理中，请勿重复操作');
         return;
@@ -1297,10 +1341,18 @@ const setMembershipByType = async (type: string): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已为${studentName}设置${membershipType}会员，即将刷新页面`);
+        console.log(`✅ 已为${studentName}设置${membershipType}会员，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
+          try {
+            refreshSystem.refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('设置会员失败:', error);
         showError('设置失败', '设置会员时发生错误', (error as Error).message);
@@ -1343,10 +1395,18 @@ const clearMembership = async (): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已清除${studentName}的会员信息，即将刷新页面`);
+        console.log(`✅ 已清除${studentName}的会员信息，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
+          try {
+            refreshSystem.refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('清除会员失败:', error);
         showError('清除失败', '清除会员时发生错误', (error as Error).message);
@@ -1397,10 +1457,18 @@ const saveCustomMembership = async (): Promise<void> => {
           console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已为${studentName}设置自定义会员时间，即将刷新页面`);
+        console.log(`✅ 已为${studentName}设置自定义会员时间，触发局部刷新`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
+          try {
+            refreshSystem.refreshTriggers.students++;
+          } catch (e) {
+            console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadStudents();
+          }
+        } else {
+          loadStudents();
+        }
       } catch (error) {
         console.error('设置自定义会员失败:', error);
         showError('设置失败', '设置自定义会员时发生错误', (error as Error).message);

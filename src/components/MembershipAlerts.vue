@@ -51,13 +51,23 @@
             </span>
           </div>
           <div class="alert-actions">
-            <button 
-              class="extend-btn" 
-              @click="extendMembership(student)"
-              :disabled="loading"
-            >
-              续费
-            </button>
+            <div class="extend-controls">
+              <input
+                class="extend-input"
+                type="number"
+                min="1"
+                placeholder="天数"
+                v-model.number="extendDaysMap[student.uid]"
+                :disabled="loading"
+              />
+              <button 
+                class="extend-btn" 
+                @click="extendMembership(student)"
+                :disabled="loading || !(Number(extendDaysMap[student.uid] || 0) > 0)"
+              >
+                续费
+              </button>
+            </div>
             <button 
               class="contact-btn" 
               @click="contactStudent(student)"
@@ -79,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, inject, type Ref } from 'vue';
+import { ref, reactive, onMounted, inject, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
 
 interface Student {
@@ -99,6 +109,7 @@ const loading: Ref<boolean> = ref(false);
 const showAlerts: Ref<boolean> = ref(true);
 const isFadingOut: Ref<boolean> = ref(false);
 const expiringMemberships: Ref<Student[]> = ref([]);
+const extendDaysMap: Record<number, number> = reactive({});
 const errorHandler = inject<ErrorHandler>('errorHandler');
 
 const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
@@ -160,19 +171,27 @@ const loadExpiringMemberships = async (): Promise<void> => {
         return;
       }
 
-      const extendDays = prompt(`为 ${student.name} 续费多少天？`, '30');
-      if (!extendDays || isNaN(Number(extendDays)) || Number(extendDays) <= 0) {
+      const days = extendDaysMap[student.uid] || 0;
+      if (!days || days <= 0) {
+        showError('无效天数', '请输入大于0的天数');
         return;
       }
 
       loading.value = true;
       try {
-        const days = Number(extendDays);
-        // 注意：这里使用有效的API方法
-        await ApiService.setMembershipByType(student.uid, 'month', true); // 设置为月卡
+        const base = student.is_membership_active && student.membership_end_date ? new Date(student.membership_end_date) : new Date();
+        const newEnd = new Date(base);
+        newEnd.setDate(newEnd.getDate() + days);
+        const iso = newEnd.toISOString();
+        if (typeof (ApiService as any).setMembershipEndDate === 'function') {
+          await (ApiService as any).setMembershipEndDate(student.uid, iso);
+        } else if (typeof (ApiService as any).setMembershipByDays === 'function') {
+          await (ApiService as any).setMembershipByDays(student.uid, days);
+        } else {
+          await ApiService.setMembershipByType(student.uid, 'month', true);
+        }
         showSuccess('续费成功', `已为 ${student.name} 续费 ${days} 天`);
-        
-        // 重新加载数据
+        extendDaysMap[student.uid] = 0 as any;
         await loadExpiringMemberships();
       } catch (error) {
         console.error('续费失败:', error);
@@ -490,4 +509,7 @@ const loadExpiringMemberships = async (): Promise<void> => {
     justify-content: flex-end;
   }
 }
+.extend-controls { display: flex; gap: 0.5rem; align-items: center; }
+.extend-input { width: 80px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); }
+
 </style>

@@ -253,6 +253,7 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
+        aria-describedby="modal-body"
       >
         <div class="modal-header">
           <h3 id="modal-title">添加交易</h3>
@@ -591,16 +592,16 @@ interface RefreshSystem {
       loading.value = true;
       
       try {
-        console.log('加载财务统计，周期:', period);
+        if (import.meta.env?.MODE !== 'production') console.log('加载财务统计，周期:', period);
         
         const financialStats = await ApiService.getFinancialStats(period as 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear' | { start: string; end: string });
-        console.log('获取到的财务统计:', financialStats);
+        if (import.meta.env?.MODE !== 'production') console.log('获取到的财务统计:', financialStats);
         
         // 这里可以根据需要更新统计显示
         // 目前主要是为了验证API调用正常工作
         
       } catch (error) {
-        console.error('加载财务统计失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('加载财务统计失败:', error);
         showError('加载失败', '获取财务统计时发生错误', (error as Error).message || '未知错误');
       } finally {
         loading.value = false;
@@ -609,7 +610,7 @@ interface RefreshSystem {
 
     const currentTransaction = ref({
       type: 'income',
-      amount: '',
+      amount: 0,
       student_id: null,
       note: '',
       // 分期付款特定字段
@@ -668,10 +669,10 @@ interface RefreshSystem {
           }
         }
         
-        console.log('💰 总收入计算完成:', total, '(来自', incomeTransactions.length, '笔收入交易)', '时间戳:', Date.now());
+        if (import.meta.env?.MODE !== 'production') console.log('💰 总收入计算完成:', total, '(来自', incomeTransactions.length, '笔收入交易)', '时间戳:', Date.now());
         return total;
       } catch (error) {
-        console.error('计算总收入失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('计算总收入失败:', error);
         return 0;
       }
     });
@@ -694,15 +695,15 @@ interface RefreshSystem {
           total += amount;
           
           if (total > MAX_SAFE_AMOUNT) {
-            console.warn('总支出超出安全范围，限制为最大值');
+            if (import.meta.env?.MODE !== 'production') console.warn('总支出超出安全范围，限制为最大值');
             return MAX_SAFE_AMOUNT;
           }
         }
         
-        console.log('💸 总支出计算完成:', total, '(来自', expenseTransactions.length, '笔支出交易)', '时间戳:', Date.now());
+        if (import.meta.env?.MODE !== 'production') console.log('💸 总支出计算完成:', total, '(来自', expenseTransactions.length, '笔支出交易)', '时间戳:', Date.now());
         return total;
       } catch (error) {
-        console.error('计算总支出失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('计算总支出失败:', error);
         return 0;
       }
     });
@@ -717,13 +718,13 @@ interface RefreshSystem {
         const result = income - expense;
         
         if (!isFinite(result)) {
-          console.warn('净收益计算结果无效');
+          if (import.meta.env?.MODE !== 'production') console.warn('净收益计算结果无效');
           return 0;
         }
         
         return Math.max(-MAX_SAFE_AMOUNT, Math.min(MAX_SAFE_AMOUNT, result));
       } catch (error) {
-        console.error('计算净收益失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('计算净收益失败:', error);
         return 0;
       }
     });
@@ -762,20 +763,14 @@ interface RefreshSystem {
           minimumFractionDigits: 2
         }).format(clampedValue);
       } catch (error) {
-        console.error('格式化货币失败:', error, value);
+        if (import.meta.env?.MODE !== 'production') console.error('格式化货币失败:', error, value);
         return '¥--';
       }
     };
 
     const formatTransactionAmount = (transaction: Transaction): string => {
-      const amount =
-        transaction.type === 'income'
-          ? transaction.amount
-          : -transaction.amount;
-      return new Intl.NumberFormat('zh-CN', {
-        style: 'currency',
-        currency: 'CNY',
-      }).format(amount);
+      const raw = transaction.type === 'income' ? transaction.amount : -transaction.amount;
+      return formatCurrency(raw);
     };
 
     // 状态处理方法
@@ -813,9 +808,9 @@ interface RefreshSystem {
     const performSearch = () => {
       try {
         // 基础搜索逻辑已通过computed属性实现
-        console.log('执行交易搜索:', { search: transactionSearch.value, filter: transactionFilter.value });
+        if (import.meta.env?.MODE !== 'production') console.log('执行交易搜索:', { search: transactionSearch.value, filter: transactionFilter.value });
       } catch (error) {
-        console.error('搜索失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('搜索失败:', error);
         showError('搜索失败', '执行搜索时发生错误', (error as Error).message || '未知错误');
       }
     };
@@ -823,7 +818,7 @@ interface RefreshSystem {
     // 执行高级搜索（使用v2 API）
     const performAdvancedSearch = async () => {
       if (loading.value) {
-        console.warn('正在加载中，跳过搜索请求');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在加载中，跳过搜索请求');
         return;
       }
 
@@ -839,7 +834,7 @@ interface RefreshSystem {
           date_to: dateTo.value || null,
         };
 
-        console.log('执行高级交易搜索:', searchOptions);
+        if (import.meta.env?.MODE !== 'production') console.log('执行高级交易搜索:', searchOptions);
         
         // 使用新的v2 API搜索方法
         const searchResults = await ApiService.searchCash(searchOptions);
@@ -871,7 +866,7 @@ interface RefreshSystem {
         
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-          console.error('高级搜索失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.error('高级搜索失败:', error);
           showError('搜索失败', '高级搜索时发生错误', (error as Error).message || '未知错误');
         }
       } finally {
@@ -1032,7 +1027,7 @@ interface RefreshSystem {
 
     const loadTransactions = async () => {
       if (loading.value) {
-        console.warn('交易数据正在加载中，跳过重复请求');
+        if (import.meta.env?.MODE !== 'production') console.warn('交易数据正在加载中，跳过重复请求');
         return;
       }
 
@@ -1041,15 +1036,7 @@ interface RefreshSystem {
 
       try {
         // 使用新的v2 API获取财务统计和交易数据
-        const [cashTransactions, financialStats] = await Promise.all([
-          ApiService.getAllTransactions(),
-          ApiService.getFinancialStats(selectedPeriod.value === 'custom' ? {
-            start: new Date(customStartDate.value + 'T00:00:00Z').toISOString(),
-            end: new Date(customEndDate.value + 'T23:59:59Z').toISOString()
-          } : selectedPeriod.value as 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear')
-        ]);
-        
-        console.log('获取到的财务统计:', financialStats);
+        const cashTransactions = await ApiService.getAllTransactions();
 
         // 验证返回的数据
         if (!Array.isArray(cashTransactions)) {
@@ -1061,7 +1048,7 @@ interface RefreshSystem {
           .filter(transaction => {
             const isValid = validateTransactionData(transaction);
             if (!isValid) {
-              console.warn('过滤无效交易记录:', transaction);
+              if (import.meta.env?.MODE !== 'production') console.warn('过滤无效交易记录:', transaction);
             }
             return isValid;
           })
@@ -1092,13 +1079,13 @@ interface RefreshSystem {
         transactions.value = validTransactions;
         
         if (validTransactions.length !== cashTransactions.length) {
-          console.warn(`过滤了 ${cashTransactions.length - validTransactions.length} 个无效交易记录`);
+          if (import.meta.env?.MODE !== 'production') console.warn(`过滤了 ${cashTransactions.length - validTransactions.length} 个无效交易记录`);
         }
         
-        console.log(`✅ 成功加载 ${validTransactions.length} 条交易记录`);
+        if (import.meta.env?.MODE !== 'production') console.log(`✅ 成功加载 ${validTransactions.length} 条交易记录`);
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-          console.error('加载交易数据失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.error('加载交易数据失败:', error);
           transactions.value = []; // 确保有默认值
           showError(
             '加载失败',
@@ -1115,7 +1102,7 @@ interface RefreshSystem {
     const saveTransaction = async () => {
       // 防止重复提交
       if (loading.value) {
-        console.warn('正在保存交易，请勿重复提交');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在保存交易，请勿重复提交');
         return;
       }
 
@@ -1165,7 +1152,7 @@ interface RefreshSystem {
             throw new Error('分期付款创建失败，返回数据无效');
           }
           
-          console.log('分期付款创建成功:', result);
+          if (import.meta.env?.MODE !== 'production') console.log('分期付款创建成功:', result);
         } else {
           // 处理普通付款
           const amount = Math.round(Math.abs(sanitizedTransaction.amount));
@@ -1182,7 +1169,7 @@ interface RefreshSystem {
             throw new Error('交易创建失败，返回数据无效');
           }
           
-          console.log('普通交易创建成功:', result);
+          if (import.meta.env?.MODE !== 'production') console.log('普通交易创建成功:', result);
         }
 
         // 关闭模态框
@@ -1190,21 +1177,19 @@ interface RefreshSystem {
         
         // 显示成功消息
         const transactionType = isInstallmentMode.value ? '分期付款' : '交易';
-        console.log(`✅ ${transactionType}保存成功，即将刷新页面`);
+        if (import.meta.env?.MODE !== 'production') console.log(`✅ ${transactionType}保存成功，刷新交易列表`);
         
-        // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
           localStorage.setItem('qmx_last_operation', `${transactionType}保存成功`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error) {
-          console.warn('保存页面状态失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await loadTransactions();
       } catch (error) {
-        console.error('保存交易失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('保存交易失败:', error);
         const errorMessage = (error as Error).message || '未知错误';
         showError(
           '保存失败', 
@@ -1218,7 +1203,7 @@ interface RefreshSystem {
 
     const deleteTransaction = async (id: number): Promise<void> => {
       if (loading.value) {
-        console.warn('正在处理其他操作，请稍后再试');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在处理其他操作，请稍后再试');
         return;
       }
 
@@ -1244,23 +1229,21 @@ interface RefreshSystem {
       try {
         await ApiService.deleteCashTransaction(Number(id));
         
-        console.log(`成功删除交易记录 ID: ${id}`);
+        if (import.meta.env?.MODE !== 'production') console.log(`成功删除交易记录 ID: ${id}`);
         
-        console.log('✅ 交易删除成功，即将刷新页面');
+        if (import.meta.env?.MODE !== 'production') console.log('✅ 交易删除成功，刷新交易列表');
         
-        // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
           localStorage.setItem('qmx_last_operation', '交易删除成功');
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error) {
-          console.warn('保存页面状态失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await loadTransactions();
       } catch (error) {
-        console.error('删除交易失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('删除交易失败:', error);
         showError(
           '删除失败', 
           '删除交易记录时发生错误，请稍后重试', 
@@ -1290,9 +1273,8 @@ interface RefreshSystem {
         );
 
         closeModals();
-        console.log('✅ 分期状态更新成功，即将刷新页面');
+        if (import.meta.env?.MODE !== 'production') console.log('✅ 分期状态更新成功，触发局部刷新');
         
-        // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
           localStorage.setItem('qmx_last_operation', '分期状态更新成功');
@@ -1301,10 +1283,18 @@ interface RefreshSystem {
           console.warn('保存页面状态失败:', error);
         }
         
-        // 直接刷新整个页面
-        window.location.reload();
+        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+          try {
+            (refreshSystem as any).refreshTriggers.transactions++;
+          } catch (e) {
+            if (import.meta.env?.MODE !== 'production') console.warn('触发局部刷新失败，回退为重新加载数据:', e);
+            loadTransactions();
+          }
+        } else {
+          loadTransactions();
+        }
       } catch (error) {
-        console.error('更新分期状态失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('更新分期状态失败:', error);
         showError('更新失败', '更新分期状态时发生错误', (error as Error).message);
       } finally {
         loading.value = false;
@@ -1318,7 +1308,7 @@ interface RefreshSystem {
       selectedTransaction.value = null;
       currentTransaction.value = {
         type: 'income',
-        amount: '',
+        amount: 0,
         student_id: null,
         note: '',
         installment_total: 2,
@@ -1334,7 +1324,7 @@ interface RefreshSystem {
         () => refreshSystem.refreshTriggers.transactions,
         (newValue, oldValue) => {
           if (newValue > oldValue) {
-            console.log('FinancialStatistics 收到刷新信号，重新加载数据');
+            if (import.meta.env?.MODE !== 'production') console.log('FinancialStatistics 收到刷新信号，重新加载数据');
             loadTransactions();
           }
         }
@@ -1350,7 +1340,7 @@ interface RefreshSystem {
       transactionIds,
       (newIds, oldIds) => {
         if (newIds !== oldIds) {
-          console.log('🔄 transactions 数据发生变化:', {
+          if (import.meta.env?.MODE !== 'production') console.log('🔄 transactions 数据发生变化:', {
             oldCount: oldIds?.split(',').length || 0,
             newCount: newIds?.split(',').length || 0,
             timestamp: Date.now()
@@ -1358,31 +1348,31 @@ interface RefreshSystem {
           
           // 强制触发计算属性更新
           forceUpdateTrigger.value++;
-          console.log('🔄 因数据变化强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
+          if (import.meta.env?.MODE !== 'production') console.log('🔄 因数据变化强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
         }
       }
     );
     
     // 添加强制刷新函数
     const forceRefresh = async () => {
-      console.log('🔄 强制刷新FinancialStatistics数据');
+      if (import.meta.env?.MODE !== 'production') console.log('🔄 强制刷新FinancialStatistics数据');
       
       // 重新加载数据
       await loadTransactions();
       
       // 强制触发计算属性更新
       forceUpdateTrigger.value++;
-      console.log('🔄 强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
+      if (import.meta.env?.MODE !== 'production') console.log('🔄 强制触发计算属性更新，触发器值:', forceUpdateTrigger.value);
       
       // 触发其他组件刷新
       if (refreshSystem?.triggerRefresh) {
         refreshSystem.triggerRefresh('dashboard');
         refreshSystem.triggerRefresh('transactions');
         refreshSystem.triggerRefresh('students');
-        console.log('✅ 已触发所有相关组件刷新');
+        if (import.meta.env?.MODE !== 'production') console.log('✅ 已触发所有相关组件刷新');
       }
       
-      console.log('✅ 强制刷新完成');
+      if (import.meta.env?.MODE !== 'production') console.log('✅ 强制刷新完成');
     };
 
     onMounted(() => {
