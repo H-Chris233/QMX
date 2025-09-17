@@ -193,7 +193,13 @@ const dashboardData: DashboardData = reactive({
 const expiringMemberships: Ref<Student[]> = ref([]);
 
 // 增强的数据验证函数
-
+const validateDashboardData = (data: any): boolean => {
+  return data && 
+         typeof data === 'object' &&
+         'total_revenue' in data &&
+         'total_students' in data &&
+         'average_score' in data;
+};
 
 // 增强的安全数值转换函数
 const safeParseNumber = (value: any, defaultValue: number = 0, options: { min?: number; max?: number; decimals?: number } = {}): number => {
@@ -322,7 +328,7 @@ const loadDashboardData = async (): Promise<void> => {
         if (import.meta.env?.MODE !== 'production') console.log('获取到的仪表板统计数据:', stats);
 
         // 验证返回的数据
-        if (!stats || typeof stats !== 'object') {
+        if (!validateDashboardData(stats)) {
           throw new Error('返回的统计数据格式无效');
         }
 

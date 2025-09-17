@@ -60,9 +60,9 @@
         <FinancialStatistics />
       </div>
 
-      <!-- 分数管理 -->
-      <div v-if="activeTab === 'scores'" class="tab-content">
-        <ScoreManagement />
+      <!-- 成绩管理 -->
+      <div v-if="activeTab === 'grades'" class="tab-content">
+        <GradeManagement />
       </div>
 
       <!-- 仪表盘 -->
@@ -107,7 +107,7 @@
 import { ref, onMounted, onUnmounted, provide, watch, type Ref } from 'vue';
 import StudentManagement from './components/StudentManagement.vue';
 import FinancialStatistics from './components/FinancialStatistics.vue';
-import ScoreManagement from './components/ScoreManagement.vue';
+import GradeManagement from './components/GradeManagement.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import ErrorModal from './components/ErrorModal.vue';
@@ -144,7 +144,7 @@ interface RefreshTriggers {
   students: number;
   transactions: number;
   dashboard: number;
-  scores: number;
+  grades: number;
 }
 
 interface ConfirmOptions {
@@ -190,7 +190,7 @@ const menuItems: MenuItem[] = [
   { id: 'dashboard', label: '仪表盘', icon: '📊' },
   { id: 'students', label: '学员管理', icon: '👥' },
   { id: 'finance', label: '收支统计', icon: '💰' },
-  { id: 'scores', label: '分数管理', icon: '🎯' },
+  { id: 'grades', label: '成绩管理', icon: '📝' },
   { id: 'settings', label: '设置', icon: '⚙️' }, // 新增「设置」菜单项
 ];
 
@@ -307,7 +307,7 @@ let cleanupFunctions: (() => void)[] = [];
         // 恢复页面状态
         let savedActiveTab: string | null = null;
         try { savedActiveTab = localStorage.getItem('qmx_active_tab'); } catch {}
-        if (savedActiveTab && ['dashboard', 'students', 'finance', 'scores', 'settings'].includes(savedActiveTab)) {
+        if (savedActiveTab && ['dashboard', 'students', 'finance', 'grades', 'settings'].includes(savedActiveTab)) {
           activeTab.value = savedActiveTab;
           if (import.meta.env?.MODE !== 'production') console.log('🔄 恢复到之前的页面:', savedActiveTab);
         }
@@ -374,21 +374,23 @@ let cleanupFunctions: (() => void)[] = [];
         };
 
         document.addEventListener('click', debouncedHandleClick);
+        
+        // 使用具名函数以便正确清理
         const handleKeydown = (e: KeyboardEvent): void => {
           if (e.key === 'Escape' && isSidebarOpen.value) {
             isSidebarOpen.value = false;
           }
         };
         document.addEventListener('keydown', handleKeydown);
-        cleanupFunctions.push(() => {
-          document.removeEventListener('keydown', handleKeydown);
-        });
         
-        // 添加清理函数
-        cleanupFunctions.push(() => {
-          document.removeEventListener('click', debouncedHandleClick);
-          if (debounceTimer) window.clearTimeout(debounceTimer as number);
-        });
+        // 一次性添加所有清理函数
+        cleanupFunctions.push(
+          () => document.removeEventListener('click', debouncedHandleClick),
+          () => {
+            if (debounceTimer) window.clearTimeout(debounceTimer as number);
+          },
+          () => document.removeEventListener('keydown', handleKeydown)
+        );
 
         // 添加窗口大小变化监听器，自动关闭侧边栏
         let resizeRaf = 0;
@@ -431,7 +433,7 @@ const refreshTriggers: Ref<RefreshTriggers> = ref({
   students: 0,
   transactions: 0,
   dashboard: 0,
-  scores: 0,
+  grades: 0,
 });
 
 const triggerRefresh = (componentType: string): void => {
@@ -441,7 +443,7 @@ const triggerRefresh = (componentType: string): void => {
           refreshTriggers.value.students++;
           refreshTriggers.value.transactions++;
           refreshTriggers.value.dashboard++;
-          refreshTriggers.value.scores++;
+          refreshTriggers.value.grades++;
         } else if (componentType in refreshTriggers.value) {
           (refreshTriggers.value as any)[componentType]++;
         }
@@ -488,8 +490,8 @@ watch(activeTab, (newTab: string, oldTab: string) => {
           case 'finance':
             triggerRefresh('transactions');
             break;
-          case 'scores':
-            triggerRefresh('scores');
+          case 'grades':
+            triggerRefresh('grades');
             break;
           case 'settings':
             triggerRefresh('all');
