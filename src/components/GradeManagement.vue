@@ -56,7 +56,7 @@
             :key="student.uid"
             :value="student.uid"
           >
-            {{ student.name }} ({{ student.age }}岁)
+            {{ student.name }} ({{ getStudentAge() }}岁)
           </option>
         </select>
       </div>
@@ -394,6 +394,7 @@ import DatePicker from './DatePicker.vue';
 import { ApiService } from '../api/ApiService';
 import type { Student } from '../types/api';
 
+
 // TypeScript类型定义
 interface Grade {
   id: number;
@@ -406,10 +407,7 @@ interface Grade {
   notes?: string;
 }
 
-interface Student {
-  id: number;
-  name: string;
-}
+
 
 interface ErrorHandler {
   showError: (title: string, message: string, details?: string) => void;
@@ -449,7 +447,6 @@ interface StudentData {
     const studentSearch = ref('');
     const showAddGrade = ref(false);
     const showEditGrade = ref(false);
-    const showImportModal = ref(false);
     const currentGrade = ref<{
       id: number | null;
       studentId: string;
@@ -802,6 +799,11 @@ interface StudentData {
     };
 
     // 格式化方法
+    const getStudentAge = (): string => {
+      // 这里需要从API或其他地方获取学生的实际年龄
+      // 暂时返回默认值
+      return '未知';
+    };
     const getClassText = (classType: 'TenTry' | 'Month' | 'Year' | 'Others' | string): string => {
       const classMap: { TenTry: string; Month: string; Year: string; Others: string } = {
         TenTry: '体验课',
@@ -845,7 +847,7 @@ interface StudentData {
     };
 
     // 根据课程类型获取分数上限
-    const getMaxScoreForCourse = (course: string): number | undefined => {
+    const getMaxScoreForCourse = (course: string): number => {
       switch (course) {
         case '射击':
           return 645;
@@ -853,7 +855,7 @@ interface StudentData {
           return 600;
         case '其他':
         default:
-          return undefined; // 无限制
+          return 1000; // 设置一个较大的上限值
       }
     };
 
@@ -985,7 +987,7 @@ interface StudentData {
           course: currentGrade.value.course,
           examType: currentGrade.value.examType,
           score: currentGrade.value.score,
-          date: currentGrade.value.date || new Date().toISOString().split('T')[0],
+          date: currentGrade.value.date ? currentGrade.value.date : new Date().toISOString().split('T')[0] as string,
           notes: currentGrade.value.notes,
         };
         grades.value.push(newGrade);
@@ -1030,24 +1032,7 @@ interface StudentData {
       };
     };
 
-    const closeImportModal = (): void => {
-      showImportModal.value = false;
-    };
 
-    const handleFileUpload = (event: Event): void => {
-      const input = event.target as HTMLInputElement;
-      const file = input.files && input.files[0];
-      if (file) {
-        console.log('文件上传:', file.name);
-        // 这里可以实现文件上传逻辑
-      }
-    };
-
-    const importGrades = (): void => {
-      // 实现导入逻辑
-      showError('功能提示', '导入功能正在开发中，敬请期待');
-      closeImportModal();
-    };
 
     // 删除成绩
     const deleteScore = async (scoreIndex: number, score: number): Promise<void> => {
