@@ -97,7 +97,7 @@ export class ApiService {
       if (!name?.trim()) throw new Error('学员姓名不能为空');
       if (!age || age < 1 || age > 120) throw new Error('年龄必须在1-120之间');
       if (!phone?.trim()) throw new Error('电话号码不能为空');
-      if (note && note.length > 500) throw new Error('备注长度不能超过500字符');
+      if (note && note.length > 1000) throw new Error('备注长度不能超过1000字符');
       
       const rawData = await invokeWithEnhancements<unknown>('add_student' as TauriCommand, {
         name: name.trim(),
@@ -259,8 +259,8 @@ export class ApiService {
       if (updates.phone !== undefined && (!updates.phone?.trim())) {
         throw new Error('电话号码不能为空');
       }
-      if (updates.note !== undefined && updates.note.length > 500) {
-        throw new Error('备注长度不能超过500字符');
+      if (updates.note !== undefined && updates.note.length > 1000) {
+        throw new Error('备注长度不能超过1000字符');
       }
       
       await invokeWithEnhancements<null>('update_student_info' as TauriCommand, {
@@ -315,8 +315,8 @@ export class ApiService {
       if (studentUid !== null && (!studentUid || studentUid <= 0)) {
         throw new Error('学员ID无效');
       }
-      if (note && note.length > 500) {
-        throw new Error('备注长度不能超过500字符');
+      if (note && note.length > 1000) {
+        throw new Error('备注长度不能超过1000字符');
       }
 
       const rawData = await invoke<any>('add_cash_transaction', {
