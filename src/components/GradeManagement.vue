@@ -499,7 +499,7 @@ interface StudentData {
     // 课程列表
     const courses = ['射击', '射箭', '其他'];
 
-    // 计算属性 - 从 ScoreManagement 组件添加
+    // 计算属性
     const recentScores = computed(() => {
       if (!selectedStudentData.value) return [];
       return selectedStudentData.value.rings.slice(-20); // 最近20次成绩
@@ -801,7 +801,7 @@ interface StudentData {
       return 'F';
     };
 
-    // 格式化方法 - 从 ScoreManagement 组件添加
+    // 格式化方法
     const getClassText = (classType: 'TenTry' | 'Month' | 'Year' | 'Others' | string): string => {
       const classMap: { TenTry: string; Month: string; Year: string; Others: string } = {
         TenTry: '体验课',
@@ -1049,7 +1049,7 @@ interface StudentData {
       closeImportModal();
     };
 
-    // 删除成绩 - 从 ScoreManagement 组件添加
+    // 删除成绩
     const deleteScore = async (scoreIndex: number, score: number): Promise<void> => {
       if (loading.value) {
         if (import.meta.env?.MODE !== 'production') console.warn('正在处理中，请勿重复操作');
@@ -1102,7 +1102,7 @@ interface StudentData {
       });
     };
 
-    // 编辑成绩 - 从 ScoreManagement 组件添加
+    // 编辑成绩
     const editScore = (scoreIndex: number, currentScore: number): void => {
       if (loading.value) {
         if (import.meta.env?.MODE !== 'production') console.warn('正在处理中，请勿重复操作');
@@ -1166,7 +1166,7 @@ interface StudentData {
       }
     };
 
-    // 数据加载 - 从 ScoreManagement 组件添加
+    // 数据加载
     const loadData = async (): Promise<void> => {
       if (loading.value) {
         if (import.meta.env?.MODE !== 'production') console.warn('学员数据正在加载中，跳过重复请求');
@@ -1288,7 +1288,7 @@ interface StudentData {
       }
     };
 
-    // 成绩操作 - 从 ScoreManagement 组件添加
+    // 成绩操作
     const addQuickScore = async (): Promise<void> => {
       if (loading.value) {
         if (import.meta.env?.MODE !== 'production') console.warn('正在处理成绩添加，请勿重复提交');
@@ -1342,7 +1342,7 @@ interface StudentData {
       }
     };
 
-    // 导出功能 - 从 ScoreManagement 组件添加
+    // 导出功能
     const exportScores = (): void => {
       try {
         if (!selectedStudentData.value) {
@@ -1428,7 +1428,7 @@ interface StudentData {
       }
     };
 
-    // 生命周期钩子 - 从 ScoreManagement 组件添加
+    // 生命周期钩子
     // 监听刷新触发器
     if (refreshSystem?.refreshTriggers) {
       watch(
