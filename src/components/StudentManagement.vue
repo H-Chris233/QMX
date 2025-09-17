@@ -452,10 +452,21 @@ interface MembershipForm {
   endDate: string;
 }
 
+interface ConfirmOptions {
+  title?: string;
+  message: string;
+  details?: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmType?: string;
+  onConfirm?: (() => void) | null;
+  onCancel?: (() => void) | null;
+}
+
 interface ErrorHandler {
   showError: (title: string, message: string, details?: string) => void;
   showSuccess: (title: string, message: string) => void;
-  showConfirm: (options: any) => void;
+  showConfirm: (options: ConfirmOptions) => void;
 }
 
 interface RefreshSystem {
@@ -499,26 +510,27 @@ const searchInput: Ref<HTMLInputElement | null> = ref(null);
 const errorHandler = inject<ErrorHandler>('errorHandler');
 const refreshSystem = inject<RefreshSystem>('refreshSystem');
 
-// 统一错误处理 - 移除alert降级，强制使用统一系统
+// 统一错误处理 - 提供完整的降级方案
 const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
   console.error(`${title}: ${message}`, details);
-  // 如果没有错误处理系统，只记录到控制台，不使用alert
+  // 降级方案：使用原生alert
+  alert(`${title}: ${message}${details ? '\n\n详情: ' + details : ''}`);
 });
 
-if (!errorHandler?.showConfirm) {
-  console.warn('缺少自定义确认对话框实现，已禁用回退 confirm');
-}
-const showConfirm = (options: any) => {
-  if (errorHandler?.showConfirm) {
-    return errorHandler.showConfirm(options);
+const showConfirm = errorHandler?.showConfirm || ((options: ConfirmOptions) => {
+  const confirmed = confirm(`${options.title || '确认操作'}: ${options.message || '请确认是否继续该操作'}${options.details ? '\n\n' + options.details : ''}`);
+  if (confirmed && options.onConfirm) {
+    options.onConfirm();
+  } else if (!confirmed && options.onCancel) {
+    options.onCancel();
   }
-  console.error('无法显示确认对话框：未提供 errorHandler.showConfirm');
-};
+  return confirmed;
+});
 
 const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
   console.log(`✅ ${title}: ${message}`);
-  // 可以使用简单的alert作为降级方案
-  // alert(`${title}: ${message}`);
+  // 降级方案：使用alert显示成功消息
+  alert(`${title}: ${message}`);
 });
     
     // 调试：检查错误处理函数是否正确注入
@@ -826,9 +838,9 @@ const deleteStudent = async (uid: number): Promise<void> => {
         
         console.log(`✅ 学员"${studentName}"删除成功，触发局部刷新`);
         
-        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
           try {
-            (refreshSystem as any).refreshTriggers.students++;
+            refreshSystem.refreshTriggers.students++;
           } catch (e) {
             console.warn('触发局部刷新失败，回退为重新加载数据:', e);
             loadStudents();
@@ -1017,9 +1029,19 @@ const saveStudent = async (): Promise<void> => {
               const endDate = new Date(startDate);
               
               if (sanitizedStudent.classType === 'Month') {
-                endDate.setDate(endDate.getDate() + 30);
+                // 正确处理月份计算，避免跨月问题
+                endDate.setMonth(endDate.getMonth() + 1);
+                // 如果日期超过目标月份的天数，调整到最后一天
+                if (endDate.getDate() !== startDate.getDate()) {
+                  endDate.setDate(0); // 设置为上个月的最后一天
+                }
               } else {
-                endDate.setDate(endDate.getDate() + 365);
+                // 正确处理年份计算，考虑闰年
+                endDate.setFullYear(endDate.getFullYear() + 1);
+                // 如果日期超过目标年份的2月29日（闰年），调整到2月28日
+                if (endDate.getMonth() === 1 && endDate.getDate() > 28) {
+                  endDate.setDate(28);
+                }
               }
               
               await ApiService.setStudentMembership(
@@ -1072,9 +1094,19 @@ const saveStudent = async (): Promise<void> => {
                 const endDate = new Date(startDate);
                 
                 if (sanitizedStudent.classType === 'Month') {
-                  endDate.setDate(endDate.getDate() + 30);
+                  // 正确处理月份计算，避免跨月问题
+                  endDate.setMonth(endDate.getMonth() + 1);
+                  // 如果日期超过目标月份的天数，调整到最后一天
+                  if (endDate.getDate() !== startDate.getDate()) {
+                    endDate.setDate(0); // 设置为上个月的最后一天
+                  }
                 } else {
-                  endDate.setDate(endDate.getDate() + 365);
+                  // 正确处理年份计算，考虑闰年
+                  endDate.setFullYear(endDate.getFullYear() + 1);
+                  // 如果日期超过目标年份的2月29日（闰年），调整到2月28日
+                  if (endDate.getMonth() === 1 && endDate.getDate() > 28) {
+                    endDate.setDate(28);
+                  }
                 }
                 
                 await ApiService.setStudentMembership(
@@ -1119,9 +1151,9 @@ const saveStudent = async (): Promise<void> => {
         
         console.log(`✅ ${operationType}，触发局部刷新`);
         
-        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
           try {
-            (refreshSystem as any).refreshTriggers.students++;
+            refreshSystem.refreshTriggers.students++;
           } catch (e) {
             console.warn('触发局部刷新失败，回退为重新加载数据:', e);
             loadStudents();
@@ -1311,9 +1343,9 @@ const setMembershipByType = async (type: string): Promise<void> => {
         
         console.log(`✅ 已为${studentName}设置${membershipType}会员，触发局部刷新`);
         
-        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
           try {
-            (refreshSystem as any).refreshTriggers.students++;
+            refreshSystem.refreshTriggers.students++;
           } catch (e) {
             console.warn('触发局部刷新失败，回退为重新加载数据:', e);
             loadStudents();
@@ -1365,9 +1397,9 @@ const clearMembership = async (): Promise<void> => {
         
         console.log(`✅ 已清除${studentName}的会员信息，触发局部刷新`);
         
-        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
           try {
-            (refreshSystem as any).refreshTriggers.students++;
+            refreshSystem.refreshTriggers.students++;
           } catch (e) {
             console.warn('触发局部刷新失败，回退为重新加载数据:', e);
             loadStudents();
@@ -1427,9 +1459,9 @@ const saveCustomMembership = async (): Promise<void> => {
         
         console.log(`✅ 已为${studentName}设置自定义会员时间，触发局部刷新`);
         
-        if (refreshSystem && typeof (refreshSystem as any).refreshTriggers !== 'undefined') {
+        if (refreshSystem && 'refreshTriggers' in refreshSystem) {
           try {
-            (refreshSystem as any).refreshTriggers.students++;
+            refreshSystem.refreshTriggers.students++;
           } catch (e) {
             console.warn('触发局部刷新失败，回退为重新加载数据:', e);
             loadStudents();

@@ -197,8 +197,24 @@ const menuItems: MenuItem[] = [
 // 新增：侧边栏展开状态 + 交互方法
 const isSidebarOpen: Ref<boolean> = ref(false);
 const toggleSidebar = (): void => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-  if (import.meta.env?.MODE !== 'production') console.log('侧边栏状态：' + isSidebarOpen.value);
+  const newState = !isSidebarOpen.value;
+  isSidebarOpen.value = newState;
+  
+  // 设置ARIA属性
+  const sidebar = sidebarRef.value;
+  if (sidebar) {
+    if (newState) {
+      sidebar.setAttribute('role', 'dialog');
+      sidebar.setAttribute('aria-modal', 'true');
+      sidebar.setAttribute('aria-label', '导航菜单');
+    } else {
+      sidebar.removeAttribute('role');
+      sidebar.removeAttribute('aria-modal');
+      sidebar.removeAttribute('aria-label');
+    }
+  }
+  
+  if (import.meta.env?.MODE !== 'production') console.log('侧边栏状态：' + newState);
 };
 const handleSidebarItemClick = (id: string): void => {
   activeTab.value = id; // 切换激活Tab
@@ -340,10 +356,6 @@ let cleanupFunctions: (() => void)[] = [];
             // 使用缓存的DOM引用，大幅提升性能
             const sidebar = sidebarRef.value;
             const toggleButton = toggleButtonRef.value;
-            if (sidebar) {
-              sidebar.setAttribute('role', 'dialog');
-              sidebar.setAttribute('aria-modal', 'true');
-            }
             
             // 安全的DOM事件检查，避免null引用
             if (target && sidebar && toggleButton && 
@@ -355,9 +367,9 @@ let cleanupFunctions: (() => void)[] = [];
         };
 
         // 防抖处理，避免频繁触发
-        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        let debounceTimer: number | null = null;
         const debouncedHandleClick = (e: Event): void => {
-          if (debounceTimer) window.clearTimeout(debounceTimer as number);
+          if (debounceTimer) window.clearTimeout(debounceTimer);
           debounceTimer = window.setTimeout(() => handleOutsideClick(e), 10);
         };
 
