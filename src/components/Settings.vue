@@ -68,7 +68,7 @@
         <div class="card-content">
           <div class="about-info">
             <h4>启明星管理系统</h4>
-            <p class="version">版本: 0.8.9</p>
+            <p class="version">版本: 0.10.3</p>
             <p class="tech-stack">基于 Tauri + Vue 3 构建</p>
           </div>
         </div>
@@ -86,7 +86,9 @@ const autoSave: Ref<boolean> = ref(true);
 const toggleTheme = (): void => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark';
   localStorage.setItem('theme', theme.value);
-  document.documentElement.className = theme.value + '-theme';
+  document.documentElement.classList.remove('light-theme', 'dark-theme');
+  document.documentElement.classList.add(theme.value + '-theme');
+  document.documentElement.setAttribute('data-theme', theme.value);
 };
 
 const saveSettings = (): void => {
@@ -103,7 +105,9 @@ onMounted(() => {
       ? 'dark'
       : 'light';
   }
-  document.documentElement.className = theme.value + '-theme';
+  document.documentElement.classList.remove('light-theme', 'dark-theme');
+  document.documentElement.classList.add(theme.value + '-theme');
+  document.documentElement.setAttribute('data-theme', theme.value);
 
   // 加载设置
   const savedAutoSave = localStorage.getItem('autoSave');

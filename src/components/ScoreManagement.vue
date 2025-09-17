@@ -52,7 +52,7 @@
         <button
           class="add-score-btn"
           @click="addQuickScore"
-          :disabled="!selectedStudent || !quickScore || loading"
+          :disabled="!selectedStudent || quickScore === '' || quickScore === null || loading"
           :title="loading ? '请稍候...' : '添加成绩'"
           aria-label="添加成绩"
         >
@@ -306,7 +306,9 @@ interface StudentData {
         selectedStudentData.value.rings.length === 0
       )
         return 0;
-      return Math.max(...selectedStudentData.value.rings);
+      let max = -Infinity;
+      for (const s of selectedStudentData.value.rings) if (s > max) max = s;
+      return max === -Infinity ? 0 : max;
     });
 
     const minScore = computed(() => {
@@ -315,21 +317,23 @@ interface StudentData {
         selectedStudentData.value.rings.length === 0
       )
         return 0;
-      return Math.min(...selectedStudentData.value.rings);
+      let min = Infinity;
+      for (const s of selectedStudentData.value.rings) if (s < min) min = s;
+      return min === Infinity ? 0 : min;
     });
 
     // 格式化方法
-    const getClassText = (classType) => {
-      const classMap = {
+    const getClassText = (classType: 'TenTry' | 'Month' | 'Year' | 'Others' | string): string => {
+      const classMap: { TenTry: string; Month: string; Year: string; Others: string } = {
         TenTry: '体验课',
         Month: '月卡',
         Year: '年卡',
         Others: '其他',
       };
-      return classMap[classType] || classType;
+      return (classMap as Record<string, string>)[classType] || classType;
     };
 
-    const getScoreClass = (score) => {
+    const getScoreClass = (score: number): 'excellent' | 'good' | 'average' | 'poor' => {
       if (score >= 9.0) return 'excellent';
       if (score >= 7.0) return 'good';
       if (score >= 5.0) return 'average';
@@ -337,7 +341,7 @@ interface StudentData {
     };
 
     // 根据学员的运动项目获取最高分数
-    const getMaxScore = () => {
+    const getMaxScore = (): number => {
       if (!selectedStudentData.value) return 10.9; // 默认值
 
       const subject = selectedStudentData.value.subject;
@@ -348,12 +352,12 @@ interface StudentData {
           return 600;
         case 'Others':
         default:
-          return 999999; // 其他项目无限制，设置一个很大的数
+          return 100000;
       }
     };
 
     // 获取输入框的占位符文本
-    const getScorePlaceholder = () => {
+    const getScorePlaceholder = (): string => {
       if (!selectedStudentData.value) return '输入成绩';
 
       const subject = selectedStudentData.value.subject;
@@ -399,9 +403,9 @@ interface StudentData {
     };
 
     // 数据加载
-    const loadData = async () => {
+    const loadData = async (): Promise<void> => {
       if (loading.value) {
-        console.warn('学员数据正在加载中，跳过重复请求');
+        if (import.meta.env?.MODE !== 'production') console.warn('学员数据正在加载中，跳过重复请求');
         return;
       }
 
@@ -435,14 +439,14 @@ interface StudentData {
         });
         
         if (validStudents.length !== data.length) {
-          console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
+          if (import.meta.env?.MODE !== 'production') console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
         }
         
         students.value = validStudents;
-        console.log(`成功加载 ${validStudents.length} 个学员记录`);
+        if (import.meta.env?.MODE !== 'production') console.log(`成功加载 ${validStudents.length} 个学员记录`);
       } catch (error: any) {
         if (error.name !== 'AbortError') {
-          console.error('加载学员数据失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.error('加载学员数据失败:', error);
           students.value = []; // 确保有默认值
           showError(
             '数据加载失败',
@@ -456,7 +460,7 @@ interface StudentData {
       }
     };
 
-    const onStudentChange = async () => {
+    const onStudentChange = async (): Promise<void> => {
       if (!selectedStudent.value) {
         selectedStudentData.value = null;
         quickScore.value = '';
@@ -464,7 +468,7 @@ interface StudentData {
       }
 
       if (loading.value) {
-        console.warn('正在加载学员成绩，跳过重复请求');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在加载学员成绩，跳过重复请求');
         return;
       }
 
@@ -492,10 +496,10 @@ interface StudentData {
           );
           
           if (validScores.length !== scores.length) {
-            console.warn(`过滤了 ${scores.length - validScores.length} 个无效成绩`);
+            if (import.meta.env?.MODE !== 'production') console.warn(`过滤了 ${scores.length - validScores.length} 个无效成绩`);
           }
         } else {
-          console.warn('返回的成绩数据不是数组格式，使用空数组');
+          if (import.meta.env?.MODE !== 'production') console.warn('返回的成绩数据不是数组格式，使用空数组');
         }
 
         selectedStudentData.value = {
@@ -503,10 +507,10 @@ interface StudentData {
           rings: validScores,
         } as StudentData;
         
-        console.log(`加载学员 ${student.name} 的 ${validScores.length} 条成绩记录`);
+        if (import.meta.env?.MODE !== 'production') console.log(`加载学员 ${student.name} 的 ${validScores.length} 条成绩记录`);
       } catch (error: any) {
         if (error.name !== 'AbortError') {
-          console.error('加载学员成绩失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.error('加载学员成绩失败:', error);
           selectedStudentData.value = null;
           showError(
             '获取失败',
@@ -521,9 +525,9 @@ interface StudentData {
     };
 
     // 成绩操作
-    const addQuickScore = async () => {
+    const addQuickScore = async (): Promise<void> => {
       if (loading.value) {
-        console.warn('正在处理成绩添加，请勿重复提交');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在处理成绩添加，请勿重复提交');
         return;
       }
 
@@ -547,7 +551,7 @@ interface StudentData {
         const studentName = students.value.find(s => s.uid == studentUid)?.name || '未知学员';
         await ApiService.addScore(studentUid, score);
         
-        console.log(`成功为学员 ${studentUid} 添加成绩 ${score}`);
+        if (import.meta.env?.MODE !== 'production') console.log(`成功为学员 ${studentUid} 添加成绩 ${score}`);
         
         // 保存当前页面状态
         try {
@@ -555,15 +559,15 @@ interface StudentData {
           localStorage.setItem('qmx_last_operation', `已为${studentName}添加成绩${score}`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error: any) {
-          console.warn('保存页面状态失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已为${studentName}添加成绩${score}，即将刷新页面`);
+        if (import.meta.env?.MODE !== 'production') console.log(`✅ 已为${studentName}添加成绩${score}，刷新当前学员数据`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await onStudentChange();
+        quickScore.value = '';
       } catch (error: any) {
-        console.error('添加成绩失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('添加成绩失败:', error);
         showError(
           '添加失败', 
           '添加学员成绩时发生错误，请稍后重试', 
@@ -575,9 +579,9 @@ interface StudentData {
     };
 
     // 删除成绩
-    const deleteScore = async (scoreIndex, score) => {
+    const deleteScore = async (scoreIndex: number, score: number): Promise<void> => {
       if (loading.value) {
-        console.warn('正在处理中，请勿重复操作');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在处理中，请勿重复操作');
         return;
       }
 
@@ -599,7 +603,7 @@ interface StudentData {
         const studentUid = Number(selectedStudent.value);
         await ApiService.deleteStudentScore(studentUid, scoreIndex);
         
-        console.log(`成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
+        if (import.meta.env?.MODE !== 'production') console.log(`成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
         
         // 保存当前页面状态
         try {
@@ -607,15 +611,14 @@ interface StudentData {
           localStorage.setItem('qmx_last_operation', `已删除${studentName}的第${scoreIndex + 1}次成绩${score}`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error: any) {
-          console.warn('保存页面状态失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已删除${studentName}的第${scoreIndex + 1}次成绩${score}，即将刷新页面`);
+        if (import.meta.env?.MODE !== 'production') console.log(`✅ 已删除${studentName}的第${scoreIndex + 1}次成绩${score}，刷新当前学员数据`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await onStudentChange();
       } catch (error: any) {
-        console.error('删除成绩失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('删除成绩失败:', error);
         showError(
           '删除失败', 
           '删除学员成绩时发生错误，请稍后重试', 
@@ -629,9 +632,9 @@ interface StudentData {
     };
 
     // 编辑成绩 - 使用自定义模态框替代原生prompt
-    const editScore = (scoreIndex, currentScore) => {
+    const editScore = (scoreIndex: number, currentScore: number): void => {
       if (loading.value) {
-        console.warn('正在处理中，请勿重复操作');
+        if (import.meta.env?.MODE !== 'production') console.warn('正在处理中，请勿重复操作');
         return;
       }
 
@@ -659,7 +662,7 @@ interface StudentData {
     };
 
     // 关闭分数编辑模态框
-    const closeScoreEditModal = () => {
+    const closeScoreEditModal = (): void => {
       showScoreEditModal.value = false;
       editingStudentName.value = '';
       editingScoreIndex.value = -1;
@@ -674,7 +677,7 @@ interface StudentData {
     });
 
     // 确认分数编辑
-    const confirmScoreEdit = async () => {
+    const confirmScoreEdit = async (): Promise<void> => {
       if (!isValidScore.value) {
         return;
       }
@@ -699,13 +702,12 @@ interface StudentData {
           localStorage.setItem('qmx_last_operation', `已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}`);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error: any) {
-          console.warn('保存页面状态失败:', error);
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}，即将刷新页面`);
+        console.log(`✅ 已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}，刷新当前学员数据`);
         
-        // 直接刷新整个页面
-        window.location.reload();
+        await onStudentChange();
       } catch (error: any) {
         console.error('更新成绩失败:', error);
         showError(
@@ -718,7 +720,7 @@ interface StudentData {
       }
     };
 
-    const exportScores = () => {
+    const exportScores = (): void => {
       try {
         if (!selectedStudentData.value) {
           showError('导出失败', '请先选择一个学员');
@@ -792,13 +794,13 @@ interface StudentData {
           URL.revokeObjectURL(url);
         }, 100);
         
-        console.log(`成功导出 ${selectedStudentData.value.name} 的成绩表 (${selectedStudentData.value.rings.length} 条记录)`);
+        if (import.meta.env?.MODE !== 'production') console.log(`成功导出 ${selectedStudentData.value.name} 的成绩表 (${selectedStudentData.value.rings.length} 条记录)`);
         
         if (showSuccess) {
           showSuccess('导出成功', `${selectedStudentData.value.name} 的成绩表已导出`);
         }
       } catch (error: any) {
-        console.error('导出成绩失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('导出成绩失败:', error);
         showError('导出失败', '导出成绩表时发生错误', error.message || '未知错误');
       }
     };
@@ -810,7 +812,7 @@ interface StudentData {
         () => refreshSystem.refreshTriggers.scores,
         (newValue, oldValue) => {
           if (newValue > oldValue) {
-            console.log('ScoreManagement 收到刷新信号，重新加载数据');
+            if (import.meta.env?.MODE !== 'production') console.log('ScoreManagement 收到刷新信号，重新加载数据');
             loadData();
           }
         }

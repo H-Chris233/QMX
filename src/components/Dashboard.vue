@@ -171,7 +171,7 @@ const showStatsError = (title: string, message: string, details?: string): void 
   statsErrorMessage.value = message;
   statsErrorDetails.value = details || '';
   showStatsErrorModal.value = true;
-  console.error(`${title}: ${message}`, details);
+  if (import.meta.env?.MODE !== 'production') console.error(`${title}: ${message}`, details);
 };
 
 const showMembershipError = (title: string, message: string, details?: string): void => {
@@ -179,7 +179,7 @@ const showMembershipError = (title: string, message: string, details?: string): 
   membershipErrorMessage.value = message;
   membershipErrorDetails.value = details || '';
   showMembershipErrorModal.value = true;
-  console.error(`${title}: ${message}`, details);
+  if (import.meta.env?.MODE !== 'production') console.error(`${title}: ${message}`, details);
 };
 
 // 仪表盘数据（使用reactive保持响应性）
@@ -207,7 +207,7 @@ const safeParseNumber = (value: any, defaultValue: number = 0, options: { min?: 
       
       // 检查是否为有效数字
       if (isNaN(parsed) || !isFinite(parsed)) {
-        console.warn('无效数值，使用默认值:', value, '->', defaultValue);
+        if (import.meta.env?.MODE !== 'production') console.warn('无效数值，使用默认值:', value, '->', defaultValue);
         return defaultValue;
       }
       
@@ -225,7 +225,7 @@ const safeParseNumber = (value: any, defaultValue: number = 0, options: { min?: 
 // 加载即将过期的会员 - 简化版，错误处理在调用方
 const loadExpiringMemberships = async (): Promise<Student[]> => {
       // 使用新的v2 API方法，直接返回结果，不做错误处理
-      const expiring = await ApiService.getMembershipExpiringSoon(7); // 7天内过期
+      const expiring = await ApiService.getMembershipExpiringSoon(7);
       
       if (!Array.isArray(expiring)) {
         throw new Error('返回的数据格式不正确，期望数组格式');
@@ -235,14 +235,14 @@ const loadExpiringMemberships = async (): Promise<Student[]> => {
         student && student.uid && student.name
       ) as Student[];
 
-      console.log(`找到 ${validExpiring.length} 个即将过期的会员`);
+      if (import.meta.env?.MODE !== 'production') console.log(`找到 ${validExpiring.length} 个即将过期的会员`);
       return validExpiring;
     };
 
 // 数据获取 - 使用新的v2 API方法
 const loadDashboardData = async (): Promise<void> => {
       if (loading.value) {
-        console.warn('数据正在加载中，跳过重复请求');
+        if (import.meta.env?.MODE !== 'production') console.warn('数据正在加载中，跳过重复请求');
         return;
       }
 
@@ -251,17 +251,17 @@ const loadDashboardData = async (): Promise<void> => {
 
       try {
         // 分别处理两个API调用，让每个API调用都能独立失败并显示错误
-        console.log('🔄 开始并行调用两个API...');
+        if (import.meta.env?.MODE !== 'production') console.log('🔄 开始并行调用两个API...');
         
         // 统计数据API调用 - 不做内部错误处理，让错误抛出到组件层
         const statsPromise = ApiService.getDashboardStats()
           .then(result => {
-            console.log('✅ getDashboardStats 调用成功:', result);
+            if (import.meta.env?.MODE !== 'production') console.log('✅ getDashboardStats 调用成功:', result);
             return { success: true, data: result };
           })
           .catch(error => {
-            console.error('❌ getDashboardStats 调用失败:', error);
-            console.error('getDashboardStats 错误详情:', error.message, error.stack);
+            if (import.meta.env?.MODE !== 'production') console.error('❌ getDashboardStats 调用失败:', error);
+            if (import.meta.env?.MODE !== 'production') console.error('getDashboardStats 错误详情:', error.message, error.stack);
             // 确保错误被正确传递，包括错误消息
             const errorObj = error instanceof Error ? error : new Error(String(error));
             return { success: false, error: errorObj };
@@ -270,13 +270,13 @@ const loadDashboardData = async (): Promise<void> => {
         // 会员数据API调用 - 不做内部错误处理，让错误抛出到组件层  
         const membershipPromise = loadExpiringMemberships()
           .then(result => {
-            console.log('✅ loadExpiringMemberships 调用成功:', result);
+            if (import.meta.env?.MODE !== 'production') console.log('✅ loadExpiringMemberships 调用成功:', result);
             expiringMemberships.value = result;
             return { success: true, data: result };
           })
           .catch(error => {
-            console.error('❌ loadExpiringMemberships 调用失败:', error);
-            console.error('loadExpiringMemberships 错误详情:', error.message, error.stack);
+            if (import.meta.env?.MODE !== 'production') console.error('❌ loadExpiringMemberships 调用失败:', error);
+            if (import.meta.env?.MODE !== 'production') console.error('loadExpiringMemberships 错误详情:', error.message, error.stack);
             expiringMemberships.value = [];
             // 确保错误被正确传递，包括错误消息
             const errorObj = error instanceof Error ? error : new Error(String(error));
@@ -286,8 +286,8 @@ const loadDashboardData = async (): Promise<void> => {
         // 等待两个API调用完成
         const [statsResult, membershipResult] = await Promise.all([statsPromise, membershipPromise]);
         
-        console.log('statsResult:', statsResult);
-        console.log('membershipResult:', membershipResult);
+        if (import.meta.env?.MODE !== 'production') console.log('statsResult:', statsResult);
+        if (import.meta.env?.MODE !== 'production') console.log('membershipResult:', membershipResult);
         
         // 处理统计数据结果
         let stats;
@@ -319,27 +319,31 @@ const loadDashboardData = async (): Promise<void> => {
           );
         }
         
-        console.log('获取到的仪表板统计数据:', stats);
+        if (import.meta.env?.MODE !== 'production') console.log('获取到的仪表板统计数据:', stats);
 
         // 验证返回的数据
         if (!stats || typeof stats !== 'object') {
           throw new Error('返回的统计数据格式无效');
         }
 
-        // 安全更新仪表板数据
-        dashboardData.totalRevenue = safeParseNumber(stats.total_revenue, 0, {
+        // 安全更新仪表板数据（兼容下划线/驼峰字段）
+        const totalRevenueRaw = (stats as any).total_revenue ?? (stats as any).totalRevenue ?? 0;
+        const totalStudentsRaw = (stats as any).total_students ?? (stats as any).activeStudents ?? (stats as any).totalStudents ?? 0;
+        const averageScoreRaw = (stats as any).average_score ?? (stats as any).averageGrade ?? (stats as any).average_score ?? 0;
+
+        dashboardData.totalRevenue = safeParseNumber(totalRevenueRaw, 0, {
           min: 0,
           max: 999999999999,
           decimals: 2
         });
         
-        dashboardData.activeStudents = safeParseNumber(stats.total_students, 0, {
+        dashboardData.activeStudents = safeParseNumber(totalStudentsRaw, 0, {
           min: 0,
           max: 100000,
           decimals: 0
         });
         
-        dashboardData.averageGrade = safeParseNumber(stats.average_score, 0, {
+        dashboardData.averageGrade = safeParseNumber(averageScoreRaw, 0, {
           min: 0,
           max: 1000,
           decimals: 1
@@ -347,10 +351,10 @@ const loadDashboardData = async (): Promise<void> => {
 
         // 更新最后刷新时间
         lastUpdateTime.value = new Date();
-        console.log('仪表板数据加载成功:', dashboardData);
+        if (import.meta.env?.MODE !== 'production') console.log('仪表板数据加载成功:', dashboardData);
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-          console.error('加载仪表盘数据时发生未预期错误:', error);
+          if (import.meta.env?.MODE !== 'production') console.error('加载仪表盘数据时发生未预期错误:', error);
           
           // 重置为默认值
           Object.assign(dashboardData, {
@@ -384,7 +388,7 @@ const formatNumber = (value: number | string): string => {
         
         return new Intl.NumberFormat('zh-CN').format(num);
       } catch (error) {
-        console.warn('数字格式化失败:', value, error);
+        if (import.meta.env?.MODE !== 'production') console.warn('数字格式化失败:', value, error);
         return '0';
       }
     };
@@ -409,7 +413,7 @@ const formatCurrency = (value: number | string): string => {
           maximumFractionDigits: 2,
         }).format(num);
       } catch (error) {
-        console.warn('货币格式化失败:', value, error);
+        if (import.meta.env?.MODE !== 'production') console.warn('货币格式化失败:', value, error);
         return '¥0';
       }
     };
@@ -419,7 +423,7 @@ const formatDecimal = (value: number | string): string => {
         const num = safeParseNumber(value, 0, { min: 0, max: 1000, decimals: 1 });
         return num.toFixed(1);
       } catch (error) {
-        console.warn('小数格式化失败:', value, error);
+        if (import.meta.env?.MODE !== 'production') console.warn('小数格式化失败:', value, error);
         return '0.0';
       }
     };
@@ -448,7 +452,7 @@ const getGradeTrendText = (grade: number): string => {
         () => refreshSystem.refreshTriggers.dashboard,
         (newValue, oldValue) => {
           if (newValue > oldValue) {
-            console.log('Dashboard 收到刷新信号，重新加载数据');
+            if (import.meta.env?.MODE !== 'production') console.log('Dashboard 收到刷新信号，重新加载数据');
             loadDashboardData();
           }
         }
