@@ -308,6 +308,17 @@ export class ApiService {
     note: string = '',
   ) {
     try {
+      // 输入验证增强
+      if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
+        throw new Error('金额必须是大于0的有效数字');
+      }
+      if (studentUid !== null && (!studentUid || studentUid <= 0)) {
+        throw new Error('学员ID无效');
+      }
+      if (note && note.length > 500) {
+        throw new Error('备注长度不能超过500字符');
+      }
+
       const rawData = await invoke<any>('add_cash_transaction', {
         studentUid: studentUid || null,
         amount,
@@ -325,7 +336,7 @@ export class ApiService {
       return transaction;
     } catch (error) {
       console.error('❌ [ApiService.addCashTransaction] 调用失败:', error);
-      throw new Error(`添加财务记录失败: ${error}`);
+      throw new Error(`添加财务记录失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -366,7 +377,7 @@ export class ApiService {
         '❌ [ApiService.addInstallmentTransaction] 调用失败:',
         error,
       );
-      throw new Error(`添加分期付款失败: ${error}`);
+      throw new Error(`添加分期付款失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -400,12 +411,17 @@ export class ApiService {
 
   static async deleteCashTransaction(transactionUid: number) {
     try {
+      // 输入验证
+      if (!transactionUid || transactionUid <= 0) {
+        throw new Error('交易ID无效');
+      }
+
       return await invoke<null>('delete_cash_transaction', {
         transactionUid,
       });
     } catch (error) {
       console.error('❌ [ApiService.deleteCashTransaction] 调用失败:', error);
-      throw new Error(`删除财务记录失败: ${error}`);
+      throw new Error(`删除财务记录失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -418,7 +434,7 @@ export class ApiService {
       });
     } catch (error) {
       console.error('❌ [ApiService.updateInstallmentStatus] 调用失败:', error);
-      throw new Error(`更新分期付款状态失败: ${error}`);
+      throw new Error(`更新分期付款状态失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -430,7 +446,7 @@ export class ApiService {
       });
     } catch (error) {
       console.error('❌ [ApiService.generateNextInstallment] 调用失败:', error);
-      throw new Error(`生成下一期分期失败: ${error}`);
+      throw new Error(`生成下一期分期失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -441,7 +457,7 @@ export class ApiService {
       });
     } catch (error) {
       console.error('❌ [ApiService.cancelInstallmentPlan] 调用失败:', error);
-      throw new Error(`取消分期计划失败: ${error}`);
+      throw new Error(`取消分期计划失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -453,7 +469,7 @@ export class ApiService {
       return transformTransactionDataArray(rawDataArray);
     } catch (error) {
       console.error('❌ [ApiService.getInstallmentsByPlan] 调用失败:', error);
-      throw new Error(`获取分期计划详情失败: ${error}`);
+      throw new Error(`获取分期计划详情失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -551,7 +567,7 @@ export class ApiService {
       return await invoke<null>('open_main_window');
     } catch (error) {
       console.error('❌ [ApiService.openMainWindow] 调用失败:', error);
-      throw new Error(`打开主窗口失败: ${error}`);
+      throw new Error(`打开主窗口失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

@@ -374,21 +374,23 @@ let cleanupFunctions: (() => void)[] = [];
         };
 
         document.addEventListener('click', debouncedHandleClick);
+        
+        // 使用具名函数以便正确清理
         const handleKeydown = (e: KeyboardEvent): void => {
           if (e.key === 'Escape' && isSidebarOpen.value) {
             isSidebarOpen.value = false;
           }
         };
         document.addEventListener('keydown', handleKeydown);
-        cleanupFunctions.push(() => {
-          document.removeEventListener('keydown', handleKeydown);
-        });
         
-        // 添加清理函数
-        cleanupFunctions.push(() => {
-          document.removeEventListener('click', debouncedHandleClick);
-          if (debounceTimer) window.clearTimeout(debounceTimer as number);
-        });
+        // 一次性添加所有清理函数
+        cleanupFunctions.push(
+          () => document.removeEventListener('click', debouncedHandleClick),
+          () => {
+            if (debounceTimer) window.clearTimeout(debounceTimer as number);
+          },
+          () => document.removeEventListener('keydown', handleKeydown)
+        );
 
         // 添加窗口大小变化监听器，自动关闭侧边栏
         let resizeRaf = 0;
