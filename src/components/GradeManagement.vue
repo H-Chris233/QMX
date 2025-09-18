@@ -970,9 +970,15 @@ interface StudentData {
         return;
       }
 
-      // 获取学员姓名
+      // 获取学员姓名 - 改进学员ID转换
+      const studentId = Number(currentGrade.value.studentId);
+      if (isNaN(studentId) || studentId <= 0) {
+        showError('输入错误', '学员ID无效');
+        return;
+      }
+      
       const student = students.value.find(
-        (s) => s.uid === parseInt(String(currentGrade.value.studentId || '0')),
+        (s) => s.uid === studentId,
       );
       if (student) {
         currentGrade.value.studentName = student.name;
@@ -982,7 +988,7 @@ interface StudentData {
         // 添加新成绩
         const newGrade: Grade = {
           id: Date.now(),
-          studentId: parseInt(String(currentGrade.value.studentId)),
+          studentId: currentGrade.value.studentId ? Number(currentGrade.value.studentId) : 0,
           studentName: currentGrade.value.studentName,
           course: currentGrade.value.course,
           examType: currentGrade.value.examType,
@@ -1003,7 +1009,7 @@ interface StudentData {
           const fallback = grades.value[index]!;
           grades.value[index] = {
             id: (currentGrade.value.id ?? fallback.id) as number,
-            studentId: parseInt(String(currentGrade.value.studentId || String(fallback.studentId))),
+            studentId: currentGrade.value.studentId ? Number(currentGrade.value.studentId) : (fallback.studentId ? Number(fallback.studentId) : 0),
             studentName: currentGrade.value.studentName || fallback.studentName,
             course: currentGrade.value.course || fallback.course,
             examType: currentGrade.value.examType || fallback.examType,
@@ -1226,7 +1232,7 @@ interface StudentData {
 
       try {
         const studentUid = Number(selectedStudent.value);
-        if (isNaN(studentUid) || studentUid <= 0) {
+        if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) {
           throw new Error('无效的学员ID');
         }
 

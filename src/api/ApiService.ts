@@ -23,6 +23,10 @@ import {
   validateTransactionData,
   validateDashboardStatsData,
 } from './dataTransformers';
+import {
+  handleApiOperation,
+  handleValidationError
+} from '../utils/errorHandler';
 
 // API 配置常量
 const API_CONFIG = {
@@ -104,13 +108,15 @@ export class ApiService {
     note: string,
     subject: string,
   ): Promise<Student> {
-    try {
-      // 输入验证增强
-      if (!name?.trim()) throw new Error('学员姓名不能为空');
-      if (!age || age < 1 || age > 120) throw new Error('年龄必须在1-120之间');
-      if (!phone?.trim()) throw new Error('电话号码不能为空');
-      if (note && note.length > 1000) throw new Error('备注长度不能超过1000字符');
-      
+    // 输入验证 - 改进验证
+    if (!name?.trim()) handleValidationError('name', '学员姓名不能为空');
+    if (typeof age !== 'number' || !Number.isInteger(age) || age < 1 || age > 120) handleValidationError('age', '年龄必须是1-120之间的整数');
+    if (!phone?.trim()) handleValidationError('phone', '电话号码不能为空');
+    if (note && (typeof note !== 'string' || note.length > 1000)) handleValidationError('note', '备注长度不能超过1000字符');
+    if (!subject || typeof subject !== 'string') handleValidationError('subject', '科目不能为空');
+    if (!classType || typeof classType !== 'string') handleValidationError('classType', '课程类型不能为空');
+    
+    return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<unknown>('add_student' as TauriCommand, {
         name: name.trim(),
         age,
@@ -124,14 +130,13 @@ export class ApiService {
       assertIsStudent(student);
 
       return student;
-    } catch (error) {
-      console.error('❌ [ApiService.addStudent] 调用失败:', error);
-      throw new Error(`添加学员失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '添加学员', {
+      context: { name, age, classType, phone, subject }
+    });
   }
 
   static async getAllStudents(): Promise<Student[]> {
-    try {
+    return handleApiOperation(async () => {
       const rawDataArray = await invokeWithEnhancements<unknown[]>('get_all_students' as TauriCommand, {}, {
         timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 获取所有学员可能需要更长时间
       });
@@ -147,36 +152,32 @@ export class ApiService {
 
       console.log(`✅ 成功获取 ${students.length} 个学员记录`);
       return students;
-    } catch (error) {
-      console.error('❌ [ApiService.getAllStudents] 调用失败:', error);
-      throw new Error(`获取学员列表失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取学员列表');
   }
 
   static async addScore(studentUid: number, score: number): Promise<void> {
-    try {
-      // 输入验证增强
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      if (typeof score !== 'number' || !isFinite(score)) throw new Error('成绩必须是有效数字');
-      if (score < 0 || score > 1000) throw new Error('成绩范围无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    if (typeof score !== 'number' || !isFinite(score)) handleValidationError('score', '成绩必须是有效数字');
+    if (score < 0 || score > 1000) handleValidationError('score', '成绩范围无效');
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('add_score' as TauriCommand, {
         studentUid,
         score,
       });
       
       console.log(`✅ 成功为学员 ${studentUid} 添加成绩 ${score}`);
-    } catch (error) {
-      console.error('❌ [ApiService.addScore] 调用失败:', error);
-      throw new Error(`添加成绩失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '添加成绩', {
+      context: { studentUid, score }
+    });
   }
 
   static async getStudentScores(studentUid: number): Promise<number[]> {
-    try {
-      // 输入验证
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    
+    return handleApiOperation(async () => {
       const response = await invokeWithEnhancements<StudentScoresResponse>('get_student_scores' as TauriCommand, {
         studentUid,
       });
@@ -185,14 +186,12 @@ export class ApiService {
       
       // 检查响应格式
       if (!response || typeof response !== 'object') {
-        console.error('❌ [getStudentScores] 响应不是对象格式:', response);
         throw new Error('返回的成绩数据格式不正确');
       }
       
       // 提取 rings 数组
       const scores = response.rings;
       if (!Array.isArray(scores)) {
-        console.error('❌ [getStudentScores] rings 不是数组格式:', scores);
         throw new Error('返回的成绩数据格式不正确');
       }
       
@@ -207,38 +206,37 @@ export class ApiService {
       
       console.log(`✅ 获取学员 ${studentUid} 的 ${validScores.length} 条成绩记录`);
       return validScores;
-    } catch (error) {
-      console.error('❌ [ApiService.getStudentScores] 调用失败:', error);
-      throw new Error(`获取学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取学员成绩', {
+      context: { studentUid }
+    });
   }
 
   static async deleteStudentScore(studentUid: number, scoreIndex: number): Promise<void> {
-    try {
-      // 输入验证
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      if (scoreIndex < 0) throw new Error('成绩索引无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) handleValidationError('scoreIndex', '成绩索引无效');
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('delete_student_score' as TauriCommand, {
         studentUid,
         scoreIndex,
       });
       
       console.log(`✅ 成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
-    } catch (error) {
-      console.error('❌ [ApiService.deleteStudentScore] 调用失败:', error);
-      throw new Error(`删除学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '删除学员成绩', {
+      context: { studentUid, scoreIndex },
+      retryable: false // 删除操作不重试
+    });
   }
 
   static async updateStudentScore(studentUid: number, scoreIndex: number, newScore: number): Promise<void> {
-    try {
-      // 输入验证
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      if (scoreIndex < 0) throw new Error('成绩索引无效');
-      if (typeof newScore !== 'number' || !isFinite(newScore)) throw new Error('成绩必须是有效数字');
-      if (newScore < 0 || newScore > 1000) throw new Error('成绩范围无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) handleValidationError('scoreIndex', '成绩索引无效');
+    if (typeof newScore !== 'number' || !isFinite(newScore)) handleValidationError('newScore', '成绩必须是有效数字');
+    if (newScore < 0 || newScore > 1000) handleValidationError('newScore', '成绩范围无效');
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('update_student_score' as TauriCommand, {
         studentUid,
         scoreIndex,
@@ -246,35 +244,34 @@ export class ApiService {
       });
       
       console.log(`✅ 成功更新学员 ${studentUid} 的第 ${scoreIndex} 个成绩为 ${newScore}`);
-    } catch (error) {
-      console.error('❌ [ApiService.updateStudentScore] 调用失败:', error);
-      throw new Error(`更新学员成绩失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '更新学员成绩', {
+      context: { studentUid, scoreIndex, newScore }
+    });
   }
 
   static async updateStudentInfo(
     studentUid: number,
     updates: StudentUpdateData,
   ): Promise<void> {
-    try {
-      // 输入验证增强
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      if (!updates || typeof updates !== 'object') throw new Error('更新数据无效');
-      
-      // 验证更新字段
-      if (updates.name !== undefined && (!updates.name?.trim())) {
-        throw new Error('学员姓名不能为空');
-      }
-      if (updates.age !== undefined && (updates.age < 1 || updates.age > 120)) {
-        throw new Error('年龄必须在1-120之间');
-      }
-      if (updates.phone !== undefined && (!updates.phone?.trim())) {
-        throw new Error('电话号码不能为空');
-      }
-      if (updates.note !== undefined && updates.note.length > 1000) {
-        throw new Error('备注长度不能超过1000字符');
-      }
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    if (!updates || typeof updates !== 'object') handleValidationError('updates', '更新数据无效');
+    
+    // 验证更新字段
+    if (updates.name !== undefined && (!updates.name?.trim())) {
+      handleValidationError('name', '学员姓名不能为空');
+    }
+    if (updates.age !== undefined && (updates.age < 1 || updates.age > 120)) {
+      handleValidationError('age', '年龄必须在1-120之间');
+    }
+    if (updates.phone !== undefined && (!updates.phone?.trim())) {
+      handleValidationError('phone', '电话号码不能为空');
+    }
+    if (updates.note !== undefined && updates.note.length > 1000) {
+      handleValidationError('note', '备注长度不能超过1000字符');
+    }
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('update_student_info' as TauriCommand, {
         studentUid,
         name: updates.name?.trim(),
@@ -289,17 +286,16 @@ export class ApiService {
       });
       
       console.log(`✅ 成功更新学员 ${studentUid} 的信息`);
-    } catch (error) {
-      console.error('❌ [ApiService.updateStudentInfo] 调用失败:', error);
-      throw new Error(`更新学员信息失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '更新学员信息', {
+      context: { studentUid, updates }
+    });
   }
 
   static async deleteStudent(studentUid: number): Promise<void> {
-    try {
-      // 输入验证
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('delete_student' as TauriCommand, {
         studentUid,
       }, {
@@ -307,10 +303,10 @@ export class ApiService {
       });
       
       console.log(`✅ 成功删除学员 ${studentUid}`);
-    } catch (error) {
-      console.error('❌ [ApiService.deleteStudent] 调用失败:', error);
-      throw new Error(`删除学员失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '删除学员', {
+      context: { studentUid },
+      retryable: false // 删除操作不可重试
+    });
   }
 
   // 财务管理 - 普通交易
@@ -319,18 +315,18 @@ export class ApiService {
     amount: number,
     note: string = '',
   ): Promise<Transaction> {
-    try {
-      // 输入验证增强
-      if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
-        throw new Error('金额必须是大于0的有效数字');
-      }
-      if (studentUid !== null && (!studentUid || studentUid <= 0)) {
-        throw new Error('学员ID无效');
-      }
-      if (note && note.length > 1000) {
-        throw new Error('备注长度不能超过1000字符');
-      }
+    // 输入验证
+    if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
+      handleValidationError('amount', '金额必须是大于0的有效数字');
+    }
+    if (studentUid !== null && (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0)) {
+      handleValidationError('studentUid', '学员ID无效');
+    }
+    if (note && note.length > 1000) {
+      handleValidationError('note', '备注长度不能超过1000字符');
+    }
 
+    return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<any>('add_cash_transaction' as TauriCommand, {
         studentUid: studentUid === null ? null : Number(studentUid),
         amount,
@@ -346,10 +342,9 @@ export class ApiService {
       }
 
       return transaction;
-    } catch (error) {
-      console.error('❌ [ApiService.addCashTransaction] 调用失败:', error);
-      throw new Error(`添加财务记录失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '添加财务记录', {
+      context: { studentUid, amount, note }
+    });
   }
 
   // 财务管理 - 分期付款
@@ -362,27 +357,30 @@ export class ApiService {
     dueDate: string,
     planId?: number,
   ): Promise<Transaction> {
-    try {
-      // 输入验证增强
-      if (typeof totalAmount !== 'number' || !isFinite(totalAmount) || totalAmount <= 0) {
-        throw new Error('总金额必须是大于0的有效数字');
-      }
-      if (typeof totalInstallments !== 'number' || totalInstallments <= 0 || totalInstallments > 120) {
-        throw new Error('分期总数必须在1-120之间');
-      }
-      if (!frequency || typeof frequency !== 'string') {
-        throw new Error('频率参数无效');
-      }
-      if (!dueDate || typeof dueDate !== 'string') {
-        throw new Error('到期日期无效');
-      }
-      if (planId !== undefined && (typeof planId !== 'number' || planId <= 0)) {
-        throw new Error('计划ID无效');
-      }
-      if (note && note.length > 1000) {
-        throw new Error('备注长度不能超过1000字符');
-      }
+    // 输入验证
+    if (typeof totalAmount !== 'number' || !isFinite(totalAmount) || totalAmount <= 0) {
+      handleValidationError('totalAmount', '总金额必须是大于0的有效数字');
+    }
+    if (typeof totalInstallments !== 'number' || !Number.isInteger(totalInstallments) || totalInstallments <= 0 || totalInstallments > 120) {
+      handleValidationError('totalInstallments', '分期总数必须在1-120之间');
+    }
+    if (!frequency || typeof frequency !== 'string') {
+      handleValidationError('frequency', '频率参数无效');
+    }
+    if (!dueDate || typeof dueDate !== 'string') {
+      handleValidationError('dueDate', '到期日期无效');
+    }
+    if (planId !== undefined && (typeof planId !== 'number' || !Number.isInteger(planId) || planId <= 0)) {
+      handleValidationError('planId', '计划ID无效');
+    }
+    if (studentUid !== null && (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0)) {
+      handleValidationError('studentUid', '学员ID无效');
+    }
+    if (note && note.length > 1000) {
+      handleValidationError('note', '备注长度不能超过1000字符');
+    }
 
+    return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<any>('add_cash_transaction' as TauriCommand, {
         studentUid: studentUid === null ? null : Number(studentUid),
         amount: totalAmount,
@@ -404,17 +402,13 @@ export class ApiService {
       }
 
       return transaction;
-    } catch (error) {
-      console.error(
-        '❌ [ApiService.addInstallmentTransaction] 调用失败:',
-        error,
-      );
-      throw new Error(`添加分期付款失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '添加分期付款', {
+      context: { studentUid, totalAmount, totalInstallments, frequency, dueDate, planId }
+    });
   }
 
   static async getAllTransactions(): Promise<Transaction[]> {
-    try {
+    return handleApiOperation(async () => {
       const rawDataArray = await invokeWithEnhancements<any[]>('get_all_transactions', {}, {
         timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 获取所有交易可能需要更长时间
       });
@@ -435,79 +429,73 @@ export class ApiService {
 
       console.log(`✅ 成功获取 ${validTransactions.length} 条交易记录`);
       return validTransactions;
-    } catch (error) {
-      console.error('❌ [ApiService.getAllTransactions] 调用失败:', error);
-      throw new Error(`获取财务记录失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取财务记录');
   }
 
   static async deleteCashTransaction(transactionUid: number): Promise<void> {
-    try {
-      // 输入验证
-      if (!transactionUid || transactionUid <= 0) {
-        throw new Error('交易ID无效');
-      }
+    // 输入验证
+    if (!transactionUid || transactionUid <= 0) {
+      handleValidationError('transactionUid', '交易ID无效');
+    }
 
+    return handleApiOperation(async () => {
       await invoke<void>('delete_cash_transaction', {
         transactionUid,
       });
-    } catch (error) {
-      console.error('❌ [ApiService.deleteCashTransaction] 调用失败:', error);
-      throw new Error(`删除财务记录失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '删除财务记录', {
+      context: { transactionUid },
+      retryable: false // 删除操作不可重试
+    });
   }
 
   // 分期付款管理
   static async updateInstallmentStatus(transactionUid: number, status: InstallmentStatus): Promise<void> {
-    try {
+    return handleApiOperation(async () => {
       await invoke<void>('update_installment_status', {
         transactionUid,
         status,
       });
-    } catch (error) {
-      console.error('❌ [ApiService.updateInstallmentStatus] 调用失败:', error);
-      throw new Error(`更新分期付款状态失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '更新分期付款状态', {
+      context: { transactionUid, status }
+    });
   }
 
   static async generateNextInstallment(planId: number, dueDate: string): Promise<number> {
-    try {
+    return handleApiOperation(async () => {
       return await invoke<number>('generate_next_installment', {
         planId,
         dueDate,
       });
-    } catch (error) {
-      console.error('❌ [ApiService.generateNextInstallment] 调用失败:', error);
-      throw new Error(`生成下一期分期失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '生成下一期分期', {
+      context: { planId, dueDate }
+    });
   }
 
   static async cancelInstallmentPlan(planId: number): Promise<number> {
-    try {
+    return handleApiOperation(async () => {
       return await invoke<number>('cancel_installment_plan', {
         planId,
       });
-    } catch (error) {
-      console.error('❌ [ApiService.cancelInstallmentPlan] 调用失败:', error);
-      throw new Error(`取消分期计划失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '取消分期计划', {
+      context: { planId },
+      retryable: false // 取消操作不可重试
+    });
   }
 
   static async getInstallmentsByPlan(planId: number): Promise<Transaction[]> {
-    try {
+    return handleApiOperation(async () => {
       const rawDataArray = await invoke<any[]>('get_installments_by_plan', {
         planId,
       });
       return transformTransactionDataArray(rawDataArray);
-    } catch (error) {
-      console.error('❌ [ApiService.getInstallmentsByPlan] 调用失败:', error);
-      throw new Error(`获取分期计划详情失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取分期计划详情', {
+      context: { planId }
+    });
   }
 
   // 统计数据
   static async getDashboardStats(): Promise<DashboardStats> {
-    try {
+    return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<any>('get_dashboard_stats', {}, {
         timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 统计计算可能需要更长时间
       });
@@ -525,10 +513,7 @@ export class ApiService {
 
       console.log('✅ 成功获取仪表板统计数据');
       return stats;
-    } catch (error) {
-      console.error('❌ [ApiService.getDashboardStats] 调用失败:', error);
-      throw new Error(`获取统计数据失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取统计数据');
   }
 
   // 会员管理
@@ -537,9 +522,10 @@ export class ApiService {
     startDate?: string,
     endDate?: string
   ): Promise<void> {
-    try {
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('set_student_membership' as TauriCommand, {
         studentUid,
         startDate: startDate || null,
@@ -547,25 +533,25 @@ export class ApiService {
       });
       
       console.log(`✅ 成功设置学员 ${studentUid} 的会员信息`);
-    } catch (error) {
-      console.error('❌ [ApiService.setStudentMembership] 调用失败:', error);
-      throw new Error(`设置会员信息失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '设置会员信息', {
+      context: { studentUid, startDate, endDate }
+    });
   }
 
   static async clearStudentMembership(studentUid: number): Promise<void> {
-    try {
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('clear_student_membership' as TauriCommand, {
         studentUid,
       });
       
       console.log(`✅ 成功清除学员 ${studentUid} 的会员信息`);
-    } catch (error) {
-      console.error('❌ [ApiService.clearStudentMembership] 调用失败:', error);
-      throw new Error(`清除会员信息失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '清除会员信息', {
+      context: { studentUid },
+      retryable: false
+    });
   }
 
   static async setMembershipByType(
@@ -573,12 +559,13 @@ export class ApiService {
     membershipType: 'month' | 'year',
     startFromToday: boolean = true
   ): Promise<void> {
-    try {
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      if (!['month', 'year'].includes(membershipType)) {
-        throw new Error('会员类型无效，只支持 month 或 year');
-      }
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    if (!['month', 'year'].includes(membershipType)) {
+      handleValidationError('membershipType', '会员类型无效，只支持 month 或 year');
+    }
+    
+    return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('set_membership_by_type' as TauriCommand, {
         studentUid,
         membershipType,
@@ -587,28 +574,25 @@ export class ApiService {
       
       const typeText = membershipType === 'month' ? '月卡' : '年卡';
       console.log(`✅ 成功为学员 ${studentUid} 设置${typeText}会员`);
-    } catch (error) {
-      console.error('❌ [ApiService.setMembershipByType] 调用失败:', error);
-      throw new Error(`设置会员类型失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '设置会员类型', {
+      context: { studentUid, membershipType, startFromToday }
+    });
   }
 
   // 窗口管理
   static async openMainWindow(): Promise<void> {
-    try {
+    return handleApiOperation(async () => {
       await invoke<void>('open_main_window');
-    } catch (error) {
-      console.error('❌ [ApiService.openMainWindow] 调用失败:', error);
-      throw new Error(`打开主窗口失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '打开主窗口');
   }
 
   // v2 API - 高级功能
   // 获取特定学员的统计信息
   static async getStudentStats(studentUid: number): Promise<StudentStats> {
-    try {
-      if (!studentUid || studentUid <= 0) throw new Error('学员ID无效');
-      
+    // 输入验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    
+    return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<unknown>('get_student_stats' as TauriCommand, {
         studentUid,
       });
@@ -620,10 +604,9 @@ export class ApiService {
       
       // 简单类型断言，实际应该添加更严格的验证
       return rawData as StudentStats;
-    } catch (error) {
-      console.error('❌ [ApiService.getStudentStats] 调用失败:', error);
-      throw new Error(`获取学员统计失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取学员统计', {
+      context: { studentUid }
+    });
   }
 
   // 获取全局学员统计信息（用于仪表板）
@@ -633,7 +616,7 @@ export class ApiService {
     max_score: number;
     active_courses: number;
   }> {
-    try {
+    return handleApiOperation(async () => {
       const dashboardStats = await this.getDashboardStats();
       
       return {
@@ -642,27 +625,23 @@ export class ApiService {
         max_score: dashboardStats.max_score || 0,
         active_courses: dashboardStats.active_courses || 0,
       };
-    } catch (error) {
-      console.error('❌ [ApiService.getGlobalStudentStats] 调用失败:', error);
-      throw new Error(`获取全局学员统计失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取全局学员统计');
   }
 
   // 获取特定周期的财务统计
   static async getFinancialStats(period: 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear' | { start: string; end: string } = 'ThisMonth') {
-    try {
+    return handleApiOperation(async () => {
       return await invokeWithEnhancements<any>('get_financial_stats' as TauriCommand, {
         period,
       });
-    } catch (error) {
-      console.error('❌ [ApiService.getFinancialStats] 调用失败:', error);
-      throw new Error(`获取财务统计失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取财务统计', {
+      context: { period }
+    });
   }
 
   // 获取全局财务统计信息（用于仪表板）
   static async getGlobalFinancialStats(): Promise<FinancialStats> {
-    try {
+    return handleApiOperation(async () => {
       const dashboardStats = await this.getDashboardStats();
       
       const revenue = dashboardStats.total_revenue || 0;
@@ -678,14 +657,26 @@ export class ApiService {
         installment_paid: 0,
         installment_pending: 0,
       };
-    } catch (error) {
-      console.error('❌ [ApiService.getGlobalFinancialStats] 调用失败:', error);
-      throw new Error(`获取全局财务统计失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取全局财务统计');
   }
 
   static async searchStudents(options: StudentSearchOptions): Promise<Student[]> {
-    try {
+    return handleApiOperation(async () => {
+      // 参数验证
+      if (options.min_age !== null && options.min_age !== undefined && (typeof options.min_age !== 'number' || options.min_age < 0)) {
+        handleValidationError('min_age', '最小年龄必须是非负数');
+      }
+      
+      if (options.max_age !== null && options.max_age !== undefined && (typeof options.max_age !== 'number' || options.max_age < 0)) {
+        handleValidationError('max_age', '最大年龄必须是非负数');
+      }
+      
+      if (options.min_age !== null && options.min_age !== undefined && 
+          options.max_age !== null && options.max_age !== undefined && 
+          options.min_age > options.max_age) {
+        handleValidationError('age_range', '最小年龄不能大于最大年龄');
+      }
+      
       const rawDataArray = await invokeWithEnhancements<unknown[]>('search_students' as TauriCommand, {
         nameContains: options.name_contains,
         minAge: options.min_age,
@@ -700,22 +691,42 @@ export class ApiService {
       }
       
       return transformStudentDataArray(rawDataArray);
-    } catch (error) {
-      console.error('❌ [ApiService.searchStudents] 调用失败:', error);
-      throw new Error(`搜索学员失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '搜索学员', {
+      context: { options }
+    });
   }
 
   static async searchCash(options: CashSearchOptions): Promise<Transaction[]> {
-    try {
-      // 验证日期格式
-      if (options.date_from && !options.date_to) {
-        throw new Error('如果指定开始日期，必须同时指定结束日期');
-      }
-      if (options.date_to && !options.date_from) {
-        throw new Error('如果指定结束日期，必须同时指定开始日期');
-      }
-      
+    // 验证日期格式
+    if (options.date_from && !options.date_to) {
+      handleValidationError('date_to', '如果指定开始日期，必须同时指定结束日期');
+    }
+    if (options.date_to && !options.date_from) {
+      handleValidationError('date_from', '如果指定结束日期，必须同时指定开始日期');
+    }
+    
+    // 验证金额范围
+    if (options.min_amount !== null && options.min_amount !== undefined && (typeof options.min_amount !== 'number' || options.min_amount < 0)) {
+      handleValidationError('min_amount', '最小金额必须是非负数');
+    }
+    
+    if (options.max_amount !== null && options.max_amount !== undefined && (typeof options.max_amount !== 'number' || options.max_amount < 0)) {
+      handleValidationError('max_amount', '最大金额必须是非负数');
+    }
+    
+    if (options.min_amount !== null && options.min_amount !== undefined && 
+        options.max_amount !== null && options.max_amount !== undefined && 
+        options.min_amount > options.max_amount) {
+      handleValidationError('amount_range', '最小金额不能大于最大金额');
+    }
+    
+    // 验证学员ID
+    if (options.student_id !== null && options.student_id !== undefined && 
+        (typeof options.student_id !== 'number' || !Number.isInteger(options.student_id) || options.student_id <= 0)) {
+      handleValidationError('student_id', '学员ID必须是正整数');
+    }
+    
+    return handleApiOperation(async () => {
       const rawDataArray = await invokeWithEnhancements<unknown[]>('search_cash' as TauriCommand, {
         studentId: options.student_id,
         minAmount: options.min_amount,
@@ -730,16 +741,16 @@ export class ApiService {
       }
       
       return transformTransactionDataArray(rawDataArray);
-    } catch (error) {
-      console.error('❌ [ApiService.searchCash] 调用失败:', error);
-      throw new Error(`搜索现金记录失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '搜索现金记录', {
+      context: { options }
+    });
   }
 
   static async getMembershipExpiringSoon(days: number) {
-    try {
-      if (days <= 0) throw new Error('天数必须大于0');
-      
+    // 输入验证
+    if (days <= 0) handleValidationError('days', '天数必须大于0');
+    
+    return handleApiOperation(async () => {
       const rawDataArray = await invokeWithEnhancements<unknown[]>('get_membership_expiring_soon' as TauriCommand, {
         days,
       });
@@ -749,10 +760,9 @@ export class ApiService {
       }
       
       return transformStudentDataArray(rawDataArray);
-    } catch (error) {
-      console.error('❌ [ApiService.getMembershipExpiringSoon] 调用失败:', error);
-      throw new Error(`获取即将到期会员失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, '获取即将到期会员', {
+      context: { days }
+    });
   }
 }
 
