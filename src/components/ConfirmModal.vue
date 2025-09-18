@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, onUnmounted } from 'vue';
+import { watch, onUnmounted, ref } from 'vue';
 
 interface Props {
   show?: boolean;

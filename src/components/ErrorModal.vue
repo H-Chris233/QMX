@@ -6,12 +6,15 @@
   >
     <div class="error-modal" @click.stop>
       <div class="error-header">
-        <div class="error-icon">❌</div>
+        <div class="error-icon" :class="priorityClass">❌</div>
         <h3>{{ title }}</h3>
       </div>
 
       <div class="error-content">
         <p>{{ message }}</p>
+        <div v-if="priorityText" class="error-priority">
+          优先级: {{ priorityText }}
+        </div>
         <div v-if="details" class="error-details">
           <details>
             <summary>详细信息</summary>
@@ -31,7 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { watch, onUnmounted, ref } from 'vue';
+import { watch, onUnmounted, ref, computed } from 'vue';
+import { getPriorityDescription, getPriorityClass } from '../utils/errorHandler';
 
 interface Props {
   show?: boolean;
@@ -40,6 +44,7 @@ interface Props {
   details?: string;
   closeOnOverlayClick?: boolean;
   showRetry?: boolean;
+  priority?: string;
 }
 
 interface Emits {
@@ -53,6 +58,34 @@ const props = withDefaults(defineProps<Props>(), {
   details: '',
   closeOnOverlayClick: true,
   showRetry: false,
+  priority: 'medium',
+});
+
+// 计算属性：优先级描述和样式类
+const priorityText = computed(() => {
+  if (!props.priority) return '';
+  // 将字符串转换为ErrorPriority枚举值
+  const priorityMap: Record<string, any> = {
+    'critical': 'critical',
+    'high': 'high',
+    'medium': 'medium',
+    'low': 'low'
+  };
+  const enumValue = priorityMap[props.priority.toLowerCase()] || 'medium';
+  return getPriorityDescription(enumValue);
+});
+
+const priorityClass = computed(() => {
+  if (!props.priority) return 'error-medium';
+  // 将字符串转换为ErrorPriority枚举值
+  const priorityMap: Record<string, any> = {
+    'critical': 'critical',
+    'high': 'high',
+    'medium': 'medium',
+    'low': 'low'
+  };
+  const enumValue = priorityMap[props.priority.toLowerCase()] || 'medium';
+  return getPriorityClass(enumValue);
 });
 
 const emit = defineEmits<Emits>();
@@ -170,14 +203,31 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-.error-details {
-  margin-top: 1rem;
+.error-priority {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  font-weight: 500;
 }
 
-.error-details details {
-  background-color: var(--bg-tertiary);
-  border-radius: 6px;
-  padding: 0.75rem;
+/* 优先级样式 */
+.error-critical {
+  color: #ff0000;
+}
+
+.error-high {
+  color: #ff9800;
+}
+
+.error-medium {
+  color: #ffc107;
+}
+
+.error-low {
+  color: #4caf50;
 }
 
 .error-details summary {

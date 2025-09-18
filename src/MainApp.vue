@@ -83,6 +83,7 @@
       :message="errorModal.message"
       :details="errorModal.details"
       :show-retry="errorModal.showRetry"
+      :priority="errorModal.priority || 'medium'"
       @close="hideError"
       @retry="retryWithError"
     />
@@ -121,6 +122,7 @@ interface ErrorModalState {
   message: string;
   details: string;
   showRetry: boolean;
+  priority?: string;
 }
 
 interface ConfirmModalState {
@@ -191,6 +193,7 @@ watch(globalErrors, (errors) => {
         message: latestError.message,
         details: latestError.details || '',
         showRetry: latestError.retryable && !!latestError.retryCallback,
+        priority: latestError.priority as string,
       };
     }
   }
