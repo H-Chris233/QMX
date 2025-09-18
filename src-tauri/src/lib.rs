@@ -1,15 +1,19 @@
 // src-tauri/src/lib.rs
 
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Duration, Utc};
+use qmx_backend_lib::cash::{Installment, InstallmentStatus, PaymentFrequency};
+use qmx_backend_lib::student::{Class, Subject};
 use qmx_backend_lib::{
-    QmxManager, StudentBuilder, StudentUpdater, StudentQuery, CashBuilder, CashUpdater, CashQuery,
+    CashBuilder, CashQuery, CashUpdater, QmxManager, StudentBuilder, StudentQuery, StudentUpdater,
     TimePeriod,
 };
-use qmx_backend_lib::student::{Class, Subject};
-use qmx_backend_lib::cash::{InstallmentStatus, PaymentFrequency, Installment};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 use tauri::WindowBuilder;
+
+// 引入验证模块
+mod validation;
+use validation::*;
 
 // v2 API - 全局QmxManager实例
 // 使用Arc<QmxManager>确保线程安全，自动保存启用
@@ -54,50 +58,12 @@ fn parse_installment_status(status: &str) -> Result<InstallmentStatus, String> {
     }
 }
 
-// v2 API - 输入验证函数（增强版）
-fn validate_student_name(name: &str) -> Result<(), String> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err("姓名不能为空".to_string());
-    }
-    if name.len() > 50 {
-        return Err("姓名长度不能超过50个字符".to_string());
-    }
-    if name.chars().any(|c| c.is_control() || c == '<' || c == '>' || c == '&') {
-        return Err("姓名包含非法字符".to_string());
-    }
-    Ok(())
-}
-
-fn validate_note(note: &str) -> Result<(), String> {
-    if note.len() > 1000 {
-        return Err("备注长度不能超过1000个字符".to_string());
-    }
-    if note.chars().any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t') {
-        return Err("备注包含非法字符".to_string());
-    }
-    Ok(())
-}
-
-fn validate_age(age: u8) -> Result<(), String> {
-    if age < 3 || age > 120 {
-        return Err("年龄必须在3-120岁之间".to_string());
-    }
-    Ok(())
-}
-
-fn validate_amount(amount: i64) -> Result<(), String> {
-    if amount.abs() > 1_000_000_00 {
-        return Err("金额不能超过100万".to_string());
-    }
-    Ok(())
-}
-
 // v2 API - 初始化QmxManager（优化版）
 fn init_manager() -> Result<(), String> {
     // 使用v2 API的线程安全初始化，启用自动保存
     if MANAGER.get().is_none() {
-        match QmxManager::new(true) { // 启用自动保存
+        match QmxManager::new(true) {
+            // 启用自动保存
             Ok(manager) => {
                 MANAGER.get_or_init(|| Arc::new(manager));
                 log::info!("v2 API QmxManager初始化成功，自动保存已启用");
@@ -115,13 +81,10 @@ fn init_manager() -> Result<(), String> {
 
 // v2 API - 获取管理器实例（优化版）
 fn get_manager() -> Result<Arc<QmxManager>, String> {
-    MANAGER
-        .get()
-        .cloned()
-        .ok_or_else(|| {
-            log::error!("QmxManager未初始化，请先调用init_manager()");
-            "QmxManager未初始化".to_string()
-        })
+    MANAGER.get().cloned().ok_or_else(|| {
+        log::error!("QmxManager未初始化，请先调用init_manager()");
+        "QmxManager未初始化".to_string()
+    })
 }
 
 // v2 API - 学生数据转换辅助函数
@@ -164,10 +127,7 @@ fn convert_cash_to_response(cash: &qmx_backend_lib::cash::Cash) -> TransactionRe
         amount: cash.cash,
         note: cash.note.clone(),
         description: if is_installment {
-            format!("分期付款 {}/{}", 
-                current.unwrap_or(0), 
-                total.unwrap_or(0)
-            )
+            format!("分期付款 {}/{}", current.unwrap_or(0), total.unwrap_or(0))
         } else {
             "普通付款".to_string()
         },
@@ -207,10 +167,13 @@ fn add_student(
 ) -> Result<StudentResponse, String> {
     init_manager()?;
 
-    // v2 API - 增强输入验证
+    // v2 API - 增强输入验证（完整的后端验证）
     validate_student_name(&name)?;
     validate_age(age)?;
+    validate_phone_number(&phone)?;
     validate_note(&note)?;
+    validate_class_type(&class_type)?;
+    validate_subject_type(&subject)?;
 
     // v2 API - 使用枚举转换辅助函数
     let class = parse_class_type(&class_type)?;
@@ -224,12 +187,10 @@ fn add_student(
         .subject(subject_enum)
         .note(note.trim());
 
-    let uid = manager
-        .create_student(builder)
-        .map_err(|e| {
-            log::error!("v2 API创建学生失败: {}", e);
-            format!("创建学生失败: {}", e)
-        })?;
+    let uid = manager.create_student(builder).map_err(|e| {
+        log::error!("v2 API创建学生失败: {}", e);
+        format!("创建学生失败: {}", e)
+    })?;
 
     // v2 API - 获取创建的学生信息（自动保存已处理）
     let student = manager
@@ -261,12 +222,10 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
     init_manager()?;
 
     let manager = get_manager()?;
-    let students = manager
-        .list_students()
-        .map_err(|e| {
-            log::error!("v2 API获取学生列表失败: {}", e);
-            format!("获取学生列表失败: {}", e)
-        })?;
+    let students = manager.list_students().map_err(|e| {
+        log::error!("v2 API获取学生列表失败: {}", e);
+        format!("获取学生列表失败: {}", e)
+    })?;
 
     // v2 API - 使用迭代器和辅助函数进行高效转换
     let student_responses: Vec<StudentResponse> = students
@@ -283,23 +242,28 @@ fn get_all_students() -> Result<Vec<StudentResponse>, String> {
 fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
     init_manager()?;
 
-    // v2 API - 输入验证
-    if score < 0.0 || score > 1000.0 {
-        return Err("成绩必须在0-1000范围内".to_string());
-    }
-    if !score.is_finite() {
-        return Err("成绩必须是有效数字".to_string());
-    }
+    // v2 API - 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
+    validate_score(score)?;
 
     let manager = get_manager()?;
     manager
         .update_student(student_uid, StudentUpdater::new().add_ring(score))
         .map_err(|e| {
-            log::error!("v2 API添加成绩失败 - 学生UID: {}, 成绩: {}, 错误: {}", student_uid, score, e);
+            log::error!(
+                "v2 API添加成绩失败 - 学生UID: {}, 成绩: {}, 错误: {}",
+                student_uid,
+                score,
+                e
+            );
             format!("添加分数失败: {}", e)
         })?;
 
-    log::info!("v2 API成功添加成绩 - 学生UID: {}, 成绩: {}", student_uid, score);
+    log::info!(
+        "v2 API成功添加成绩 - 学生UID: {}, 成绩: {}",
+        student_uid,
+        score
+    );
     Ok(())
 }
 
@@ -308,52 +272,72 @@ fn add_score(student_uid: u64, score: f64) -> Result<(), String> {
 fn delete_student_score(student_uid: u64, score_index: usize) -> Result<(), String> {
     init_manager()?;
 
-    // 输入验证
-    if student_uid == 0 {
-        return Err("学生UID无效".to_string());
-    }
+    // 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
 
     let manager = get_manager()?;
-    
+
     // 使用新的 remove_ring_at 方法直接删除指定索引的成绩
     manager
-        .update_student(student_uid, StudentUpdater::new().remove_ring_at(score_index))
+        .update_student(
+            student_uid,
+            StudentUpdater::new().remove_ring_at(score_index),
+        )
         .map_err(|e| {
-            log::error!("v2 API删除成绩失败 - 学生UID: {}, 索引: {}, 错误: {}", student_uid, score_index, e);
+            log::error!(
+                "v2 API删除成绩失败 - 学生UID: {}, 索引: {}, 错误: {}",
+                student_uid,
+                score_index,
+                e
+            );
             format!("删除成绩失败: {}", e)
         })?;
 
-    log::info!("v2 API成功删除成绩 - 学生UID: {}, 索引: {}", student_uid, score_index);
+    log::info!(
+        "v2 API成功删除成绩 - 学生UID: {}, 索引: {}",
+        student_uid,
+        score_index
+    );
     Ok(())
 }
 
 // v2 API - 更新学生成绩（使用 update_ring_at 方法）
 #[tauri::command]
-fn update_student_score(student_uid: u64, score_index: usize, new_score: f64) -> Result<(), String> {
+fn update_student_score(
+    student_uid: u64,
+    score_index: usize,
+    new_score: f64,
+) -> Result<(), String> {
     init_manager()?;
 
-    // 输入验证
-    if student_uid == 0 {
-        return Err("学生UID无效".to_string());
-    }
-    if new_score < 0.0 || new_score > 1000.0 {
-        return Err("成绩必须在0-1000范围内".to_string());
-    }
-    if !new_score.is_finite() {
-        return Err("成绩必须是有效数字".to_string());
-    }
+    // 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
+    validate_score(new_score)?;
 
     let manager = get_manager()?;
-    
+
     // 使用新的 update_ring_at 方法直接更新指定索引的成绩
     manager
-        .update_student(student_uid, StudentUpdater::new().update_ring_at(score_index, new_score))
+        .update_student(
+            student_uid,
+            StudentUpdater::new().update_ring_at(score_index, new_score),
+        )
         .map_err(|e| {
-            log::error!("v2 API更新成绩失败 - 学生UID: {}, 索引: {}, 错误: {}", student_uid, score_index, e);
+            log::error!(
+                "v2 API更新成绩失败 - 学生UID: {}, 索引: {}, 错误: {}",
+                student_uid,
+                score_index,
+                e
+            );
             format!("更新成绩失败: {}", e)
         })?;
 
-    log::info!("v2 API成功更新成绩 - 学生UID: {}, 索引: {}, 新成绩: {}", student_uid, score_index, new_score);
+    log::info!(
+        "v2 API成功更新成绩 - 学生UID: {}, 索引: {}, 新成绩: {}",
+        student_uid,
+        score_index,
+        new_score
+    );
     Ok(())
 }
 
@@ -375,8 +359,12 @@ fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String>
         })?;
 
     let rings = student.rings().to_vec();
-    log::info!("v2 API成功获取学生成绩 - UID: {}, 成绩数量: {}", student_uid, rings.len());
-    
+    log::info!(
+        "v2 API成功获取学生成绩 - UID: {}, 成绩数量: {}",
+        student_uid,
+        rings.len()
+    );
+
     Ok(StudentScoresResponse { rings })
 }
 
@@ -395,15 +383,27 @@ fn update_student_info(
 ) -> Result<(), String> {
     init_manager()?;
 
-    // 输入验证
+    // 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
+
+    // 验证可选字段
     if let Some(name_str) = &name {
         validate_student_name(name_str)?;
     }
     if let Some(age_val) = age {
         validate_age(age_val)?;
     }
+    if let Some(phone_str) = &phone {
+        validate_phone_number(phone_str)?;
+    }
     if let Some(note_str) = &note {
         validate_note(note_str)?;
+    }
+    if let Some(class_str) = &class_type {
+        validate_class_type(class_str)?;
+    }
+    if let Some(subject_str) = &subject {
+        validate_subject_type(subject_str)?;
     }
     if let Some(lessons) = lesson_left {
         if lessons > 9999 {
@@ -455,7 +455,10 @@ fn update_student_info(
                 .map_err(|e| format!("会员开始日期格式错误: {}", e))?
                 .with_timezone(&Utc);
             // 需要获取当前的结束日期
-            if let Some(student) = manager.get_student(student_uid).map_err(|e| format!("获取学生失败: {}", e))? {
+            if let Some(student) = manager
+                .get_student(student_uid)
+                .map_err(|e| format!("获取学生失败: {}", e))?
+            {
                 updater = updater.membership(Some(start_date), student.membership_end_date());
             }
         }
@@ -464,7 +467,10 @@ fn update_student_info(
                 .map_err(|e| format!("会员结束日期格式错误: {}", e))?
                 .with_timezone(&Utc);
             // 需要获取当前的开始日期
-            if let Some(student) = manager.get_student(student_uid).map_err(|e| format!("获取学生失败: {}", e))? {
+            if let Some(student) = manager
+                .get_student(student_uid)
+                .map_err(|e| format!("获取学生失败: {}", e))?
+            {
                 updater = updater.membership(student.membership_start_date(), Some(end_date));
             }
         }
@@ -489,25 +495,32 @@ fn set_student_membership(
 ) -> Result<(), String> {
     init_manager()?;
 
+    // v2 API - 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
+
     // v2 API - 日期解析和验证
     let parsed_start = if let Some(start_str) = start_date {
-        Some(DateTime::parse_from_rfc3339(&start_str)
-            .map_err(|e| {
-                log::error!("v2 API会员开始日期格式错误: {}, 错误: {}", start_str, e);
-                format!("会员开始日期格式错误: {}", e)
-            })?
-            .with_timezone(&Utc))
+        Some(
+            DateTime::parse_from_rfc3339(&start_str)
+                .map_err(|e| {
+                    log::error!("v2 API会员开始日期格式错误: {}, 错误: {}", start_str, e);
+                    format!("会员开始日期格式错误: {}", e)
+                })?
+                .with_timezone(&Utc),
+        )
     } else {
         None
     };
 
     let parsed_end = if let Some(end_str) = end_date {
-        Some(DateTime::parse_from_rfc3339(&end_str)
-            .map_err(|e| {
-                log::error!("v2 API会员结束日期格式错误: {}, 错误: {}", end_str, e);
-                format!("会员结束日期格式错误: {}", e)
-            })?
-            .with_timezone(&Utc))
+        Some(
+            DateTime::parse_from_rfc3339(&end_str)
+                .map_err(|e| {
+                    log::error!("v2 API会员结束日期格式错误: {}, 错误: {}", end_str, e);
+                    format!("会员结束日期格式错误: {}", e)
+                })?
+                .with_timezone(&Utc),
+        )
     } else {
         None
     };
@@ -521,14 +534,21 @@ fn set_student_membership(
 
     let manager = get_manager()?;
     manager
-        .update_student(student_uid, StudentUpdater::new().membership(parsed_start, parsed_end))
+        .update_student(
+            student_uid,
+            StudentUpdater::new().membership(parsed_start, parsed_end),
+        )
         .map_err(|e| {
             log::error!("v2 API设置会员时间失败 - UID: {}, 错误: {}", student_uid, e);
             format!("设置会员时间失败: {}", e)
         })?;
 
-    log::info!("v2 API成功设置学生会员时间 - UID: {}, 开始: {:?}, 结束: {:?}", 
-               student_uid, parsed_start, parsed_end);
+    log::info!(
+        "v2 API成功设置学生会员时间 - UID: {}, 开始: {:?}, 结束: {:?}",
+        student_uid,
+        parsed_start,
+        parsed_end
+    );
     Ok(())
 }
 
@@ -536,6 +556,9 @@ fn set_student_membership(
 #[tauri::command]
 fn clear_student_membership(student_uid: u64) -> Result<(), String> {
     init_manager()?;
+
+    // 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
 
     let manager = get_manager()?;
     manager
@@ -550,7 +573,7 @@ fn clear_student_membership(student_uid: u64) -> Result<(), String> {
 }
 
 // v2 API - 批量设置会员（月卡/年卡）（优化版）
-#[tauri::command]  
+#[tauri::command]
 fn set_membership_by_type(
     student_uid: u64,
     membership_type: String, // "month" 或 "year"
@@ -558,19 +581,20 @@ fn set_membership_by_type(
 ) -> Result<(), String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
+
     let manager = get_manager()?;
-    
+
     // v2 API - 智能确定开始日期
     let start_date = if start_from_today.unwrap_or(true) {
         Utc::now()
     } else {
         // 如果已有会员，从现有结束时间开始
-        if let Some(student) = manager
-            .get_student(student_uid)
-            .map_err(|e| {
-                log::error!("v2 API获取学生失败 - UID: {}, 错误: {}", student_uid, e);
-                format!("获取学生失败: {}", e)
-            })? {
+        if let Some(student) = manager.get_student(student_uid).map_err(|e| {
+            log::error!("v2 API获取学生失败 - UID: {}, 错误: {}", student_uid, e);
+            format!("获取学生失败: {}", e)
+        })? {
             student.membership_end_date().unwrap_or(Utc::now())
         } else {
             log::warn!("v2 API学员不存在 - UID: {}", student_uid);
@@ -589,14 +613,27 @@ fn set_membership_by_type(
     };
 
     manager
-        .update_student(student_uid, StudentUpdater::new().membership(Some(start_date), Some(end_date)))
+        .update_student(
+            student_uid,
+            StudentUpdater::new().membership(Some(start_date), Some(end_date)),
+        )
         .map_err(|e| {
-            log::error!("v2 API设置{}会员失败 - UID: {}, 错误: {}", membership_type, student_uid, e);
+            log::error!(
+                "v2 API设置{}会员失败 - UID: {}, 错误: {}",
+                membership_type,
+                student_uid,
+                e
+            );
             format!("设置{}会员失败: {}", membership_type, e)
         })?;
 
-    log::info!("v2 API成功设置{}会员 - UID: {}, 开始: {}, 结束: {}", 
-               membership_type, student_uid, start_date.to_rfc3339(), end_date.to_rfc3339());
+    log::info!(
+        "v2 API成功设置{}会员 - UID: {}, 开始: {}, 结束: {}",
+        membership_type,
+        student_uid,
+        start_date.to_rfc3339(),
+        end_date.to_rfc3339()
+    );
     Ok(())
 }
 
@@ -605,13 +642,14 @@ fn set_membership_by_type(
 fn delete_student(student_uid: u64) -> Result<(), String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_student_uid(student_uid)?;
+
     let manager = get_manager()?;
-    let deleted = manager
-        .delete_student(student_uid)
-        .map_err(|e| {
-            log::error!("v2 API删除学员失败 - UID: {}, 错误: {}", student_uid, e);
-            format!("删除学员失败: {}", e)
-        })?;
+    let deleted = manager.delete_student(student_uid).map_err(|e| {
+        log::error!("v2 API删除学员失败 - UID: {}, 错误: {}", student_uid, e);
+        format!("删除学员失败: {}", e)
+    })?;
 
     if deleted {
         log::info!("v2 API成功删除学员 - UID: {}", student_uid);
@@ -638,7 +676,7 @@ fn add_cash_transaction(
 ) -> Result<TransactionResponse, String> {
     init_manager()?;
 
-    // v2 API - 增强输入验证
+    // v2 API - 增强输入验证（完整的后端验证）
     validate_amount(amount)?;
     if let Some(total) = total_amount {
         validate_amount(total)?;
@@ -647,13 +685,14 @@ fn add_cash_transaction(
         validate_note(note_str)?;
     }
     if let Some(installments) = total_installments {
-        if installments == 0 || installments > 360 {
-            return Err("分期数必须在1-360之间".to_string());
-        }
+        validate_installment_count(installments)?;
+    }
+    if let Some(sid) = student_uid {
+        validate_student_uid(sid)?;
     }
 
     let manager = get_manager()?;
-    
+
     // v2 API - 使用构建器模式创建现金记录
     let mut builder = CashBuilder::new(amount);
 
@@ -678,17 +717,23 @@ fn add_cash_transaction(
 
         // 解析付款频率
         let frequency_enum = match frequency.as_deref() {
-            Some("Weekly") => PaymentFrequency::Weekly,
-            Some("Monthly") => PaymentFrequency::Monthly,
-            Some("Quarterly") => PaymentFrequency::Quarterly,
-            Some(custom) if custom.starts_with("Custom") => {
-                let days = custom
-                    .trim_start_matches("Custom")
-                    .parse()
-                    .map_err(|_| "自定义频率格式错误，应为Custom<天数>")?;
-                PaymentFrequency::Custom(days)
+            Some(freq) => {
+                validate_frequency(freq)?;
+                match freq {
+                    "Weekly" => PaymentFrequency::Weekly,
+                    "Monthly" => PaymentFrequency::Monthly,
+                    "Quarterly" => PaymentFrequency::Quarterly,
+                    custom if custom.starts_with("Custom") => {
+                        let days = custom
+                            .trim_start_matches("Custom")
+                            .parse()
+                            .map_err(|_| "自定义频率格式错误，应为Custom<天数>")?;
+                        PaymentFrequency::Custom(days)
+                    }
+                    _ => PaymentFrequency::Monthly, // 默认月度
+                }
             }
-            _ => PaymentFrequency::Monthly, // 默认月度
+            None => PaymentFrequency::Monthly, // 默认月度
         };
 
         let installment = Installment {
@@ -735,10 +780,7 @@ fn add_cash_transaction(
         amount: cash.cash,
         note: cash.note.clone(),
         description: if is_installment {
-            format!("分期付款 {}/{}", 
-                current.unwrap_or(0), 
-                total.unwrap_or(0)
-            )
+            format!("分期付款 {}/{}", current.unwrap_or(0), total.unwrap_or(0))
         } else {
             "普通付款".to_string()
         },
@@ -779,13 +821,18 @@ fn get_all_transactions() -> Result<Vec<TransactionResponse>, String> {
 fn delete_cash_transaction(transaction_uid: u64) -> Result<(), String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_transaction_uid(transaction_uid)?;
+
     let manager = get_manager()?;
-    let deleted = manager
-        .delete_cash(transaction_uid)
-        .map_err(|e| {
-            log::error!("v2 API删除交易记录失败 - UID: {}, 错误: {}", transaction_uid, e);
-            format!("删除交易记录失败: {}", e)
-        })?;
+    let deleted = manager.delete_cash(transaction_uid).map_err(|e| {
+        log::error!(
+            "v2 API删除交易记录失败 - UID: {}, 错误: {}",
+            transaction_uid,
+            e
+        );
+        format!("删除交易记录失败: {}", e)
+    })?;
 
     if deleted {
         log::info!("v2 API成功删除交易记录 - UID: {}", transaction_uid);
@@ -809,10 +856,12 @@ fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
             format!("获取仪表盘统计失败: {}", e)
         })?;
 
-    log::info!("v2 API成功获取仪表盘统计 - 学生数: {}, 总收入: {}, 总支出: {}", 
-               dashboard_stats.total_students, 
-               dashboard_stats.total_revenue, 
-               dashboard_stats.total_expense);
+    log::info!(
+        "v2 API成功获取仪表盘统计 - 学生数: {}, 总收入: {}, 总支出: {}",
+        dashboard_stats.total_students,
+        dashboard_stats.total_revenue,
+        dashboard_stats.total_expense
+    );
 
     Ok(DashboardStatsResponse {
         total_students: dashboard_stats.total_students,
@@ -829,16 +878,21 @@ fn get_dashboard_stats() -> Result<DashboardStatsResponse, String> {
 fn update_installment_status(transaction_uid: u64, status: String) -> Result<(), String> {
     init_manager()?;
 
-    // v2 API - 状态枚举转换
+    // v2 API - 状态枚举转换和验证
+    validate_transaction_uid(transaction_uid)?;
     let status_enum = parse_installment_status(&status)?;
 
     let manager = get_manager()?;
-    
+
     // v2 API - 获取现金记录并更新分期状态
     let cash = manager
         .get_cash(transaction_uid)
         .map_err(|e| {
-            log::error!("v2 API获取交易记录失败 - UID: {}, 错误: {}", transaction_uid, e);
+            log::error!(
+                "v2 API获取交易记录失败 - UID: {}, 错误: {}",
+                transaction_uid,
+                e
+            );
             format!("获取交易记录失败: {}", e)
         })?
         .ok_or_else(|| {
@@ -849,13 +903,25 @@ fn update_installment_status(transaction_uid: u64, status: String) -> Result<(),
     if let Some(mut installment) = cash.installment {
         installment.status = status_enum;
         manager
-            .update_cash(transaction_uid, CashUpdater::new().installment(Some(installment)))
+            .update_cash(
+                transaction_uid,
+                CashUpdater::new().installment(Some(installment)),
+            )
             .map_err(|e| {
-                log::error!("v2 API更新分期状态失败 - UID: {}, 状态: {}, 错误: {}", transaction_uid, status, e);
+                log::error!(
+                    "v2 API更新分期状态失败 - UID: {}, 状态: {}, 错误: {}",
+                    transaction_uid,
+                    status,
+                    e
+                );
                 format!("更新分期状态失败: {}", e)
             })?;
-        
-        log::info!("v2 API成功更新分期状态 - UID: {}, 新状态: {}", transaction_uid, status);
+
+        log::info!(
+            "v2 API成功更新分期状态 - UID: {}, 新状态: {}",
+            transaction_uid,
+            status
+        );
         Ok(())
     } else {
         log::warn!("v2 API尝试更新非分期付款记录 - UID: {}", transaction_uid);
@@ -867,8 +933,11 @@ fn update_installment_status(transaction_uid: u64, status: String) -> Result<(),
 fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_plan_id(plan_id)?;
+
     let manager = get_manager()?;
-    
+
     // 解析日期字符串
     let due_date = DateTime::parse_from_rfc3339(&due_date)
         .map_err(|e| format!("日期格式错误: {}", e))?
@@ -901,7 +970,8 @@ fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, Stri
 
     // 按期数排序，找到最新的分期
     plan_installments.sort_by_key(|(_, installment)| installment.current_installment);
-    let (_, latest_installment) = plan_installments.last()
+    let (_, latest_installment) = plan_installments
+        .last()
         .ok_or("分期计划数据异常，无法找到最新分期")?;
 
     // 检查是否已经是最后一期
@@ -910,7 +980,8 @@ fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, Stri
     }
 
     // 计算下一期的金额（平均分配剩余金额）
-    let amount_per_installment = latest_installment.total_amount / latest_installment.total_installments as i64;
+    let amount_per_installment =
+        latest_installment.total_amount / latest_installment.total_installments as i64;
 
     // 创建下一期分期
     let next_installment = Installment {
@@ -928,7 +999,10 @@ fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, Stri
             CashBuilder::new(amount_per_installment)
                 .student_id(plan_installments[0].0.student_id.unwrap_or(0))
                 .installment(next_installment)
-                .note(format!("分期付款第{}期", latest_installment.current_installment + 1))
+                .note(format!(
+                    "分期付款第{}期",
+                    latest_installment.current_installment + 1
+                )),
         )
         .map_err(|e| format!("生成下一期分期失败: {}", e))?;
 
@@ -939,8 +1013,11 @@ fn generate_next_installment(plan_id: u64, due_date: String) -> Result<u64, Stri
 fn cancel_installment_plan(plan_id: u64) -> Result<usize, String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_plan_id(plan_id)?;
+
     let manager = get_manager()?;
-    
+
     // 查找该计划的所有分期付款
     let installments = manager
         .search_cash(CashQuery::new().has_installment(true))
@@ -950,14 +1027,15 @@ fn cancel_installment_plan(plan_id: u64) -> Result<usize, String> {
 
     for cash in installments {
         if let Some(mut installment) = cash.installment {
-            if installment.plan_id == plan_id && installment.status != InstallmentStatus::Cancelled {
+            if installment.plan_id == plan_id && installment.status != InstallmentStatus::Cancelled
+            {
                 // 更新状态为已取消
                 installment.status = InstallmentStatus::Cancelled;
-                
+
                 manager
                     .update_cash(cash.uid, CashUpdater::new().installment(Some(installment)))
                     .map_err(|e| format!("取消分期付款失败: {}", e))?;
-                
+
                 cancelled_count += 1;
             }
         }
@@ -974,8 +1052,11 @@ fn cancel_installment_plan(plan_id: u64) -> Result<usize, String> {
 fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_plan_id(plan_id)?;
+
     let manager = get_manager()?;
-    
+
     // 使用CashQuery查询具有分期付款的记录，然后手动筛选plan_id
     let all_installments = manager
         .search_cash(CashQuery::new().has_installment(true))
@@ -990,7 +1071,10 @@ fn get_installments_by_plan(plan_id: u64) -> Result<Vec<TransactionResponse>, St
                     student_id: cash.student_id,
                     amount: cash.cash,
                     note: cash.note.clone(),
-                    description: format!("分期付款 {}/{}", installment.current_installment, installment.total_installments),
+                    description: format!(
+                        "分期付款 {}/{}",
+                        installment.current_installment, installment.total_installments
+                    ),
                     is_installment: true,
                     installment_plan_id: Some(installment.plan_id),
                     installment_current: Some(installment.current_installment),
@@ -1071,9 +1155,12 @@ fn search_students(
         query = query.name_contains(name);
     }
     if let (Some(min), Some(max)) = (min_age, max_age) {
+        // 验证年龄范围
+        validate_age_range(min, max)?;
         query = query.age_range(min, max);
     }
     if let Some(class_str) = class_type {
+        validate_class_type(&class_str)?;
         let class = match class_str.as_str() {
             "TenTry" => Class::TenTry,
             "Month" => Class::Month,
@@ -1083,6 +1170,7 @@ fn search_students(
         query = query.class(class);
     }
     if let Some(subject_str) = subject {
+        validate_subject_type(&subject_str)?;
         let subject_enum = match subject_str.as_str() {
             "Shooting" => Subject::Shooting,
             "Archery" => Subject::Archery,
@@ -1151,10 +1239,7 @@ fn get_student_cash(student_uid: u64) -> Result<Vec<TransactionResponse>, String
             amount: cash.cash,
             note: cash.note.clone(),
             description: if is_installment {
-                format!("分期付款 {}/{}", 
-                    current.unwrap_or(0), 
-                    total.unwrap_or(0)
-                )
+                format!("分期付款 {}/{}", current.unwrap_or(0), total.unwrap_or(0))
             } else {
                 "普通付款".to_string()
             },
@@ -1186,15 +1271,18 @@ fn search_cash(
     let mut query = CashQuery::new();
 
     if let Some(sid) = student_id {
+        validate_student_uid(sid)?;
         query = query.student_id(sid);
     }
     if let (Some(min), Some(max)) = (min_amount, max_amount) {
+        // 验证金额范围
+        validate_amount_range(min, max)?;
         query = query.amount_range(min, max);
     }
     if let Some(has_inst) = has_installment {
         query = query.has_installment(has_inst);
     }
-    
+
     // 添加日期范围查询支持
     if let (Some(from_str), Some(to_str)) = (date_from, date_to) {
         let start_date = DateTime::parse_from_rfc3339(&from_str)
@@ -1203,6 +1291,10 @@ fn search_cash(
         let end_date = DateTime::parse_from_rfc3339(&to_str)
             .map_err(|e| format!("结束日期格式错误: {}", e))?
             .with_timezone(&Utc);
+
+        // 验证日期范围
+        validate_date_range(&start_date, &end_date)?;
+
         query = query.date_range(start_date, end_date);
     }
 
@@ -1232,10 +1324,7 @@ fn search_cash(
             amount: cash.cash,
             note: cash.note.clone(),
             description: if is_installment {
-                format!("分期付款 {}/{}", 
-                    current.unwrap_or(0), 
-                    total.unwrap_or(0)
-                )
+                format!("分期付款 {}/{}", current.unwrap_or(0), total.unwrap_or(0))
             } else {
                 "普通付款".to_string()
             },
@@ -1258,13 +1347,13 @@ fn update_multiple_students(
     updates: StudentUpdateBatch,
 ) -> Result<usize, String> {
     init_manager()?;
-    
+
     let manager = get_manager()?;
     let mut success_count = 0;
-    
+
     for uid in student_uids {
         let mut updater = StudentUpdater::new();
-        
+
         if let Some(ref name) = updates.name {
             updater = updater.name(name.clone());
         }
@@ -1288,12 +1377,12 @@ fn update_multiple_students(
             };
             updater = updater.subject(subject_enum);
         }
-        
+
         if manager.update_student(uid, updater).is_ok() {
             success_count += 1;
         }
     }
-    
+
     Ok(success_count)
 }
 
@@ -1302,9 +1391,12 @@ fn update_multiple_students(
 fn get_membership_expiring_soon(days: i64) -> Result<Vec<StudentResponse>, String> {
     init_manager()?;
 
+    // 输入验证（完整的后端验证）
+    validate_days(days)?;
+
     let manager = get_manager()?;
     let cutoff_date = Utc::now() + Duration::days(days);
-    
+
     let students = manager
         .search_students(StudentQuery::new().has_membership(true))
         .map_err(|e| format!("搜索会员学生失败: {}", e))?;
@@ -1340,7 +1432,7 @@ pub fn run() {
         eprintln!("Warning: Failed to initialize logger: {}", e);
     }
     log::info!("启明星管理系统启动，日志系统已初始化");
-    
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
