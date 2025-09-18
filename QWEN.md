@@ -36,19 +36,12 @@
 ## Important Development Notes
 
 ### Rust Backend Compilation
-**DO NOT compile the Rust backend during development** - Use frontend-only development mode instead.
+**Current Practice**: Use frontend-only development mode during development.
 
-**Reasons:**
-- Rust compilation takes extremely long time (several minutes)
-- Tauri build process is resource-intensive
-- Frontend development can be done independently using `pnpm dev`
-- Backend changes are infrequent compared to frontend iterations
-
-**Recommended workflow:**
+**Workflow:**
 - Use `pnpm dev` for frontend development and testing (port 1420)
-- **DO NOT use `pnpm tauri dev`/'cargo build'/'cargo check'** - This triggers Rust backend compilation
-- Only use `pnpm tauri dev` when backend changes are absolutely necessary
-- Reserve `pnpm tauri build` for final production builds only
+- Only use `pnpm tauri dev` when backend changes are necessary
+- Reserve `pnpm tauri build` for final production builds
 
 ## Project Structure
 
@@ -65,6 +58,7 @@ QMX/
 │   ├── src/
 │   │   ├── main.rs         # Tauri app entry point
 │   │   └── lib.rs          # Command definitions
+│   │   └── validation.rs   # Validation functions
 │   ├── tauri.conf.json     # Tauri configuration
 │   └── Cargo.toml          # Rust dependencies
 ├── public/                 # Static assets
@@ -80,34 +74,13 @@ QMX/
 
 ### Key Commands
 
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-
-2. Development:
-   - Frontend development server (Vite, port 1420):
-     ```bash
-     pnpm dev
-     ```
-   - Start Tauri development mode (includes frontend):
-     ```bash
-     pnpm tauri dev
-     ```
-
-3. Building:
-   - Build frontend and perform TypeScript type checking:
-     ```bash
-     pnpm build
-     ```
-   - Build desktop application:
-     ```bash
-     pnpm tauri build
-     ```
-   - Preview frontend build:
-     ```bash
-     pnpm preview
-     ```
+- Install dependencies: `pnpm install`
+- Frontend development server (Vite, port 1420): `pnpm dev`
+- Start Tauri development mode (includes frontend): `pnpm tauri dev`
+- Build frontend and perform TypeScript type checking: `pnpm build`
+- Build desktop application: `pnpm tauri build`
+- Preview frontend build: `pnpm preview`
+- TypeScript type checking: `pnpm vue-tsc --noEmit`
 
 ### Frontend (Vue + Vite)
 - `pnpm dev` - Start development server (port 1420)
@@ -129,51 +102,11 @@ QMX/
 - **Responsive Design** - Desktop navigation + mobile sidebar
 - **Component-based** - Each feature is a separate Vue component
 
-### Main Components
-- `MainApp.vue` - Root component with navigation and routing
-- `StudentManagement.vue` - Student CRUD operations
-- `FinancialStatistics.vue` - Revenue/expense tracking
-- `ScoreManagement.vue` - Student score tracking
-- `Dashboard.vue` - Overview statistics
-- `Settings.vue` - Application settings
-- `UserAgreement.vue` - Initial user agreement screen
-
-### Frontend Architecture
-- Entry point: `src/main.ts` - Shows user agreement or main app based on local storage
-- Main component: `src/MainApp.vue` - Provides top navigation/mobile sidebar, error modal, and tab switching
-- Components:
-  - StudentManagement.vue - Student management functionality
-  - FinancialStatistics.vue - Financial tracking and statistics
-  - ScoreManagement.vue - Score recording and management
-  - Dashboard.vue - Dashboard with statistics
-  - Settings.vue - Application settings
-  - ErrorModal.vue - Error display component
-  - UserAgreement.vue - Terms of service
-- API Layer: `src/api/ApiService.ts` - Encapsulates all backend calls with error handling and data validation
-- Error Handling: `src/utils/errorHandler.ts` - Standardized error management
-
-### Backend Structure (Rust)
+### Backend Structure
 - **Tauri Commands** - Bridge between frontend and backend
 - **Database Layer** - Uses `qmx_backend_lib` for data persistence
 - **Thread-safe State** - Global database instance with Mutex
 - **Domain Models** - Student, Cash (transactions), Installments
-
-### Backend Architecture
-- Entry point: `src-tauri/src/main.rs` - Calls library entry `run()`
-- Core logic: `src-tauri/src/lib.rs` - Defines Tauri commands and manages global database instance through `OnceLock<Mutex<Database>>`
-- Domain models and storage: Depends on local library `qmx_backend_lib` (students, transactions, installments, etc.)
-- Dependencies declared in: `src-tauri/Cargo.toml`
-
-### Data Flow
-1. Frontend components call Tauri commands via `@tauri-apps/api`
-2. Rust backend processes requests using domain logic from `qmx_backend_lib`
-3. Database operations are thread-safe using `OnceLock<Mutex<Database>>`
-4. All changes are persisted to disk via `save()` function
-
-### Frontend-Backend Communication Flow
-1. Frontend uses `@tauri-apps/api` to trigger `invoke` calls
-2. Backend commands in `lib.rs` process requests, read/modify database and persist changes
-3. Serialized responses are returned to frontend components for display
 
 ## Key Backend Commands
 - Student Management: `add_student`, `get_all_students`, `update_student_info`, `delete_student`
@@ -207,12 +140,53 @@ QMX/
 - **Date Handling**: `chrono` for date/time operations in Rust
 
 ### Data Validation
-- Extensive input validation on both frontend and backend
+- **Centralized Backend Validation**: All validation logic is centralized in the backend for consistency and security
+- **Frontend Basic Checks**: Frontend only performs basic type checking and lets the backend handle detailed validation
+- **Modular Validation**: Validation functions are organized in a separate module (`src-tauri/src/validation.rs`)
 - Phone number validation using libphonenumber-js
 - Age validation (3-120 years)
 - Score validation (0-1000 range)
 - Amount validation (up to 1 million)
 - Date validation and formatting
+- Custom validation functions for various data types (student UID, transaction UID, plan ID, etc.)
+
+## Validation Logic Architecture
+
+### Current State
+All validation logic is centralized in the backend, with the frontend only performing basic type checks. This ensures consistency, security, and maintainability.
+
+### Implementation
+1. **Validation Module**: All validation functions located in `src-tauri/src/validation.rs`
+2. **Backend Validation**: All business logic validation handled by backend
+3. **Frontend Validation**: Basic type checking only in frontend API service
+
+### Validation Module
+- **File Location**: `src-tauri/src/validation.rs`
+- **Functions**: 17 validation functions covering all data types:
+  - `validate_student_name` - Validates student names (non-empty, max 50 chars, no control characters)
+  - `validate_phone_number` - Validates phone numbers (non-empty, max 20 chars)
+  - `validate_note` - Validates notes (max 1000 chars, no control characters)
+  - `validate_age` - Validates age (3-120 years)
+  - `validate_amount` - Validates amounts (up to 1 million)
+  - `validate_class_type` - Validates class types (TenTry, Month, Year, Others)
+  - `validate_subject_type` - Validates subject types (Shooting, Archery, Others)
+  - `validate_score` - Validates scores (0-1000 range, finite numbers)
+  - `validate_student_uid` - Validates student UIDs (non-zero)
+  - `validate_transaction_uid` - Validates transaction UIDs (non-zero)
+  - `validate_plan_id` - Validates plan IDs (non-zero)
+  - `validate_installment_count` - Validates installment counts (1-360)
+  - `validate_frequency` - Validates payment frequencies (Weekly, Monthly, Quarterly, Custom)
+  - `validate_date_range` - Validates date ranges (start before end)
+  - `validate_amount_range` - Validates amount ranges (min ≤ max)
+  - `validate_age_range` - Validates age ranges (min ≤ max)
+  - `validate_days` - Validates days (positive numbers)
+- **Usage**: Imported in `lib.rs` with `use validation::*;`
+- **Future Direction**: Continue expanding validation coverage and improving error messages
+
+### Frontend Validation
+- **Current State**: Frontend performs basic type checking only (e.g., `typeof studentUid !== 'number'`), error handling through backend responses
+- **Implementation**: Uses simple `throw new Error()` statements instead of `handleValidationError` calls
+- **Future Direction**: Continue minimizing frontend validation to reduce complexity and improve performance
 
 ## License
 No license declared.
