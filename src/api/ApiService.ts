@@ -24,8 +24,7 @@ import {
   validateDashboardStatsData,
 } from './dataTransformers';
 import {
-  handleApiOperation,
-  handleValidationError
+  handleApiOperation
 } from '../utils/errorHandler';
 
 // API 配置常量
@@ -108,13 +107,8 @@ export class ApiService {
     note: string,
     subject: string,
   ): Promise<Student> {
-    // 输入验证 - 改进验证
-    if (!name?.trim()) handleValidationError('name', '学员姓名不能为空');
-    if (typeof age !== 'number' || !Number.isInteger(age) || age < 1 || age > 120) handleValidationError('age', '年龄必须是1-120之间的整数');
-    if (!phone?.trim()) handleValidationError('phone', '电话号码不能为空');
-    if (note && (typeof note !== 'string' || note.length > 1000)) handleValidationError('note', '备注长度不能超过1000字符');
-    if (!subject || typeof subject !== 'string') handleValidationError('subject', '科目不能为空');
-    if (!classType || typeof classType !== 'string') handleValidationError('classType', '课程类型不能为空');
+    // 只做最基本的非空检查，让后端处理详细验证
+    if (!name || typeof name !== 'string') throw new Error('学员姓名无效');
     
     return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<unknown>('add_student' as TauriCommand, {
@@ -156,10 +150,9 @@ export class ApiService {
   }
 
   static async addScore(studentUid: number, score: number): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
-    if (typeof score !== 'number' || !isFinite(score)) handleValidationError('score', '成绩必须是有效数字');
-    if (score < 0 || score > 1000) handleValidationError('score', '成绩范围无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
+    if (typeof score !== 'number' || !isFinite(score)) throw new Error('成绩必须是有效数字');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('add_score' as TauriCommand, {
@@ -174,8 +167,8 @@ export class ApiService {
   }
 
   static async getStudentScores(studentUid: number): Promise<number[]> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
       const response = await invokeWithEnhancements<StudentScoresResponse>('get_student_scores' as TauriCommand, {
@@ -212,9 +205,9 @@ export class ApiService {
   }
 
   static async deleteStudentScore(studentUid: number, scoreIndex: number): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
-    if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) handleValidationError('scoreIndex', '成绩索引无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
+    if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) throw new Error('成绩索引无效');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('delete_student_score' as TauriCommand, {
@@ -230,11 +223,10 @@ export class ApiService {
   }
 
   static async updateStudentScore(studentUid: number, scoreIndex: number, newScore: number): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
-    if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) handleValidationError('scoreIndex', '成绩索引无效');
-    if (typeof newScore !== 'number' || !isFinite(newScore)) handleValidationError('newScore', '成绩必须是有效数字');
-    if (newScore < 0 || newScore > 1000) handleValidationError('newScore', '成绩范围无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
+    if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) throw new Error('成绩索引无效');
+    if (typeof newScore !== 'number' || !isFinite(newScore)) throw new Error('成绩必须是有效数字');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('update_student_score' as TauriCommand, {
@@ -253,23 +245,9 @@ export class ApiService {
     studentUid: number,
     updates: StudentUpdateData,
   ): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
-    if (!updates || typeof updates !== 'object') handleValidationError('updates', '更新数据无效');
-    
-    // 验证更新字段
-    if (updates.name !== undefined && (!updates.name?.trim())) {
-      handleValidationError('name', '学员姓名不能为空');
-    }
-    if (updates.age !== undefined && (updates.age < 1 || updates.age > 120)) {
-      handleValidationError('age', '年龄必须在1-120之间');
-    }
-    if (updates.phone !== undefined && (!updates.phone?.trim())) {
-      handleValidationError('phone', '电话号码不能为空');
-    }
-    if (updates.note !== undefined && updates.note.length > 1000) {
-      handleValidationError('note', '备注长度不能超过1000字符');
-    }
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
+    if (!updates || typeof updates !== 'object') throw new Error('更新数据无效');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('update_student_info' as TauriCommand, {
@@ -292,8 +270,8 @@ export class ApiService {
   }
 
   static async deleteStudent(studentUid: number): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('delete_student' as TauriCommand, {
@@ -315,15 +293,15 @@ export class ApiService {
     amount: number,
     note: string = '',
   ): Promise<Transaction> {
-    // 输入验证
+    // 只做最基本的类型检查，让后端处理详细验证
     if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
-      handleValidationError('amount', '金额必须是大于0的有效数字');
+      throw new Error('金额必须是大于0的有效数字');
     }
     if (studentUid !== null && (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0)) {
-      handleValidationError('studentUid', '学员ID无效');
+      throw new Error('学员ID无效');
     }
     if (note && note.length > 1000) {
-      handleValidationError('note', '备注长度不能超过1000字符');
+      throw new Error('备注长度不能超过1000字符');
     }
 
     return handleApiOperation(async () => {
@@ -357,27 +335,24 @@ export class ApiService {
     dueDate: string,
     planId?: number,
   ): Promise<Transaction> {
-    // 输入验证
+    // 只做最基本的类型检查，让后端处理详细验证
     if (typeof totalAmount !== 'number' || !isFinite(totalAmount) || totalAmount <= 0) {
-      handleValidationError('totalAmount', '总金额必须是大于0的有效数字');
+      throw new Error('总金额必须是大于0的有效数字');
     }
-    if (typeof totalInstallments !== 'number' || !Number.isInteger(totalInstallments) || totalInstallments <= 0 || totalInstallments > 120) {
-      handleValidationError('totalInstallments', '分期总数必须在1-120之间');
+    if (typeof totalInstallments !== 'number' || !Number.isInteger(totalInstallments) || totalInstallments <= 0) {
+      throw new Error('分期总数必须是大于0的整数');
     }
     if (!frequency || typeof frequency !== 'string') {
-      handleValidationError('frequency', '频率参数无效');
+      throw new Error('频率参数无效');
     }
     if (!dueDate || typeof dueDate !== 'string') {
-      handleValidationError('dueDate', '到期日期无效');
-    }
-    if (planId !== undefined && (typeof planId !== 'number' || !Number.isInteger(planId) || planId <= 0)) {
-      handleValidationError('planId', '计划ID无效');
+      throw new Error('到期日期无效');
     }
     if (studentUid !== null && (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0)) {
-      handleValidationError('studentUid', '学员ID无效');
+      throw new Error('学员ID无效');
     }
     if (note && note.length > 1000) {
-      handleValidationError('note', '备注长度不能超过1000字符');
+      throw new Error('备注长度不能超过1000字符');
     }
 
     return handleApiOperation(async () => {
@@ -433,9 +408,9 @@ export class ApiService {
   }
 
   static async deleteCashTransaction(transactionUid: number): Promise<void> {
-    // 输入验证
+    // 只做最基本的类型检查，让后端处理详细验证
     if (!transactionUid || transactionUid <= 0) {
-      handleValidationError('transactionUid', '交易ID无效');
+      throw new Error('交易ID无效');
     }
 
     return handleApiOperation(async () => {
@@ -450,6 +425,14 @@ export class ApiService {
 
   // 分期付款管理
   static async updateInstallmentStatus(transactionUid: number, status: InstallmentStatus): Promise<void> {
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (!transactionUid || transactionUid <= 0) {
+      throw new Error('交易ID无效');
+    }
+    if (!status || typeof status !== 'string') {
+      throw new Error('状态参数无效');
+    }
+    
     return handleApiOperation(async () => {
       await invoke<void>('update_installment_status', {
         transactionUid,
@@ -461,6 +444,14 @@ export class ApiService {
   }
 
   static async generateNextInstallment(planId: number, dueDate: string): Promise<number> {
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (!planId || planId <= 0) {
+      throw new Error('计划ID无效');
+    }
+    if (!dueDate || typeof dueDate !== 'string') {
+      throw new Error('到期日期无效');
+    }
+    
     return handleApiOperation(async () => {
       return await invoke<number>('generate_next_installment', {
         planId,
@@ -472,6 +463,11 @@ export class ApiService {
   }
 
   static async cancelInstallmentPlan(planId: number): Promise<number> {
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (!planId || planId <= 0) {
+      throw new Error('计划ID无效');
+    }
+    
     return handleApiOperation(async () => {
       return await invoke<number>('cancel_installment_plan', {
         planId,
@@ -483,6 +479,11 @@ export class ApiService {
   }
 
   static async getInstallmentsByPlan(planId: number): Promise<Transaction[]> {
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (!planId || planId <= 0) {
+      throw new Error('计划ID无效');
+    }
+    
     return handleApiOperation(async () => {
       const rawDataArray = await invoke<any[]>('get_installments_by_plan', {
         planId,
@@ -522,8 +523,8 @@ export class ApiService {
     startDate?: string,
     endDate?: string
   ): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('set_student_membership' as TauriCommand, {
@@ -539,8 +540,8 @@ export class ApiService {
   }
 
   static async clearStudentMembership(studentUid: number): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
       await invokeWithEnhancements<null>('clear_student_membership' as TauriCommand, {
@@ -559,10 +560,10 @@ export class ApiService {
     membershipType: 'month' | 'year',
     startFromToday: boolean = true
   ): Promise<void> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     if (!['month', 'year'].includes(membershipType)) {
-      handleValidationError('membershipType', '会员类型无效，只支持 month 或 year');
+      throw new Error('会员类型无效，只支持 month 或 year');
     }
     
     return handleApiOperation(async () => {
@@ -589,8 +590,8 @@ export class ApiService {
   // v2 API - 高级功能
   // 获取特定学员的统计信息
   static async getStudentStats(studentUid: number): Promise<StudentStats> {
-    // 输入验证
-    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) handleValidationError('studentUid', '学员ID无效');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
       const rawData = await invokeWithEnhancements<unknown>('get_student_stats' as TauriCommand, {
@@ -661,22 +662,22 @@ export class ApiService {
   }
 
   static async searchStudents(options: StudentSearchOptions): Promise<Student[]> {
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (options.min_age !== null && options.min_age !== undefined && (typeof options.min_age !== 'number' || options.min_age < 0)) {
+      throw new Error('最小年龄必须是非负数');
+    }
+    
+    if (options.max_age !== null && options.max_age !== undefined && (typeof options.max_age !== 'number' || options.max_age < 0)) {
+      throw new Error('最大年龄必须是非负数');
+    }
+    
+    if (options.min_age !== null && options.min_age !== undefined && 
+        options.max_age !== null && options.max_age !== undefined && 
+        options.min_age > options.max_age) {
+      throw new Error('最小年龄不能大于最大年龄');
+    }
+    
     return handleApiOperation(async () => {
-      // 参数验证
-      if (options.min_age !== null && options.min_age !== undefined && (typeof options.min_age !== 'number' || options.min_age < 0)) {
-        handleValidationError('min_age', '最小年龄必须是非负数');
-      }
-      
-      if (options.max_age !== null && options.max_age !== undefined && (typeof options.max_age !== 'number' || options.max_age < 0)) {
-        handleValidationError('max_age', '最大年龄必须是非负数');
-      }
-      
-      if (options.min_age !== null && options.min_age !== undefined && 
-          options.max_age !== null && options.max_age !== undefined && 
-          options.min_age > options.max_age) {
-        handleValidationError('age_range', '最小年龄不能大于最大年龄');
-      }
-      
       const rawDataArray = await invokeWithEnhancements<unknown[]>('search_students' as TauriCommand, {
         nameContains: options.name_contains,
         minAge: options.min_age,
@@ -697,33 +698,34 @@ export class ApiService {
   }
 
   static async searchCash(options: CashSearchOptions): Promise<Transaction[]> {
+    // 只做最基本的类型检查，让后端处理详细验证
     // 验证日期格式
     if (options.date_from && !options.date_to) {
-      handleValidationError('date_to', '如果指定开始日期，必须同时指定结束日期');
+      throw new Error('如果指定开始日期，必须同时指定结束日期');
     }
     if (options.date_to && !options.date_from) {
-      handleValidationError('date_from', '如果指定结束日期，必须同时指定开始日期');
+      throw new Error('如果指定结束日期，必须同时指定开始日期');
     }
     
     // 验证金额范围
     if (options.min_amount !== null && options.min_amount !== undefined && (typeof options.min_amount !== 'number' || options.min_amount < 0)) {
-      handleValidationError('min_amount', '最小金额必须是非负数');
+      throw new Error('最小金额必须是非负数');
     }
     
     if (options.max_amount !== null && options.max_amount !== undefined && (typeof options.max_amount !== 'number' || options.max_amount < 0)) {
-      handleValidationError('max_amount', '最大金额必须是非负数');
+      throw new Error('最大金额必须是非负数');
     }
     
     if (options.min_amount !== null && options.min_amount !== undefined && 
         options.max_amount !== null && options.max_amount !== undefined && 
         options.min_amount > options.max_amount) {
-      handleValidationError('amount_range', '最小金额不能大于最大金额');
+      throw new Error('最小金额不能大于最大金额');
     }
     
     // 验证学员ID
     if (options.student_id !== null && options.student_id !== undefined && 
         (typeof options.student_id !== 'number' || !Number.isInteger(options.student_id) || options.student_id <= 0)) {
-      handleValidationError('student_id', '学员ID必须是正整数');
+      throw new Error('学员ID必须是正整数');
     }
     
     return handleApiOperation(async () => {
@@ -747,8 +749,8 @@ export class ApiService {
   }
 
   static async getMembershipExpiringSoon(days: number) {
-    // 输入验证
-    if (days <= 0) handleValidationError('days', '天数必须大于0');
+    // 只做最基本的类型检查，让后端处理详细验证
+    if (days <= 0) throw new Error('天数必须大于0');
     
     return handleApiOperation(async () => {
       const rawDataArray = await invokeWithEnhancements<unknown[]>('get_membership_expiring_soon' as TauriCommand, {
