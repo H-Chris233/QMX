@@ -73,34 +73,36 @@ const cancelAction = (): void => {
   emit('cancel');
 };
 
-// 修复内存泄漏：正确管理ESC键监听器
-let escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+// 修复内存泄漏：使用ref跟踪监听器状态
+const escapeHandler = ref<((e: KeyboardEvent) => void) | null>(null);
 
 watch(
   () => props.show,
   (newVal: boolean) => {
     // 清理之前的监听器
-    if (escapeHandler) {
-      document.removeEventListener('keydown', escapeHandler);
-      escapeHandler = null;
+    if (escapeHandler.value) {
+      document.removeEventListener('keydown', escapeHandler.value);
+      escapeHandler.value = null;
     }
     
     if (newVal) {
-      escapeHandler = (e: KeyboardEvent): void => {
+      const handler = (e: KeyboardEvent): void => {
         if (e.key === 'Escape') {
           cancelAction();
         }
       };
-      document.addEventListener('keydown', escapeHandler);
+      document.addEventListener('keydown', handler);
+      escapeHandler.value = handler;
     }
   },
+  { immediate: true }
 );
 
 // 组件卸载时清理
 onUnmounted(() => {
-  if (escapeHandler) {
-    document.removeEventListener('keydown', escapeHandler);
-    escapeHandler = null;
+  if (escapeHandler.value) {
+    document.removeEventListener('keydown', escapeHandler.value);
+    escapeHandler.value = null;
   }
 });
 
