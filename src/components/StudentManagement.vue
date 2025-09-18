@@ -678,15 +678,15 @@ const performAdvancedSearch = async (): Promise<void> => {
 
       loading.value = true;
       try {
-        // 构建搜索选项
+        // 构建搜索选项 - 改进参数构建
         const searchOptions = {
-          query: searchQuery.value?.trim() || '',
+          name_contains: searchQuery.value?.trim() || null,
           subject: subjectFilter.value || null,
           class_type: classFilter.value || null,
-          min_age: advancedSearch.value.minAge || null,
-          max_age: advancedSearch.value.maxAge || null,
-          min_score: advancedSearch.value.minScore || null,
-          max_score: advancedSearch.value.maxScore || null,
+          min_age: advancedSearch.value.minAge && advancedSearch.value.minAge > 0 ? advancedSearch.value.minAge : null,
+          max_age: advancedSearch.value.maxAge && advancedSearch.value.maxAge > 0 ? advancedSearch.value.maxAge : null,
+          min_score: advancedSearch.value.minScore && advancedSearch.value.minScore > 0 ? advancedSearch.value.minScore : null,
+          max_score: advancedSearch.value.maxScore && advancedSearch.value.maxScore > 0 ? advancedSearch.value.maxScore : null,
         };
 
         console.log('执行高级搜索:', searchOptions);
@@ -801,7 +801,7 @@ const deleteStudent = async (uid: number): Promise<void> => {
         return;
       }
 
-      if (uid == null || isNaN(Number(uid)) || Number(uid) <= 0) {
+      if (typeof uid !== 'number' || !Number.isInteger(uid) || uid <= 0) {
         showError('删除失败', '无效的学员ID');
         return;
       }

@@ -826,10 +826,13 @@ interface RefreshSystem {
       abortController.value = new AbortController();
 
       try {
-        // 构建搜索选项
+        // 构建搜索选项 - 改进参数构建
         const searchOptions = {
-          query: transactionSearch.value?.trim() || '',
-          transaction_type: transactionFilter.value !== 'all' ? transactionFilter.value : null,
+          student_id: null, // 学员ID将在后续处理中添加
+          min_amount: null, // 最小金额将在后续处理中添加
+          max_amount: null, // 最大金额将在后续处理中添加
+          has_installment: transactionFilter.value === 'installment' ? true : 
+                          transactionFilter.value !== 'all' ? false : null,
           date_from: dateFrom.value || null,
           date_to: dateTo.value || null,
         };
@@ -1131,12 +1134,24 @@ interface RefreshSystem {
               ? `Custom${sanitizedTransaction.custom_frequency_days || 30}`
               : sanitizedTransaction.installment_frequency;
 
-          // 安全的日期处理
+          // 改进的日期处理 - 使用更安全的方法
           let dueDate;
           try {
-            dueDate = new Date(sanitizedTransaction.installment_due_date + 'T00:00:00Z').toISOString();
+            // 确保日期字符串是有效的
+            const dateStr = String(sanitizedTransaction.installment_due_date);
+            if (!dateStr) {
+              throw new Error('到期日期不能为空');
+            }
+            
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) {
+              throw new Error('无效的日期');
+            }
+            
+            // 使用toISOString确保日期格式正确
+            dueDate = date.toISOString();
           } catch (dateError) {
-            throw new Error('无效的到期日期格式');
+            throw new Error('无效的到期日期格式: ' + (dateError instanceof Error ? dateError.message : String(dateError)));
           }
 
           const result = await ApiService.addInstallmentTransaction(
@@ -1207,7 +1222,7 @@ interface RefreshSystem {
         return;
       }
 
-      if (!id || isNaN(Number(id)) || Number(id) <= 0) {
+      if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
         showError('删除失败', '无效的交易ID');
         return;
       }
