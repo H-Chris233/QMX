@@ -112,6 +112,7 @@ import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import ErrorModal from './components/ErrorModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import { globalErrors, removeError, type AppError } from './utils/errorHandler';
 
 // 定义类型接口
 interface ErrorModalState {
@@ -172,6 +173,28 @@ const errorModal: Ref<ErrorModalState> = ref({
   details: '',
   showRetry: false,
 });
+
+// 当前显示的错误
+const currentError = ref<AppError | null>(null);
+
+// 监听全局错误状态
+watch(globalErrors, (errors) => {
+  if (errors.length > 0 && !errorModal.value.show) {
+    // 显示最新的错误
+    const latestError = errors[errors.length - 1];
+    if (latestError) {
+      currentError.value = latestError;
+      
+      errorModal.value = {
+        show: true,
+        title: latestError.title,
+        message: latestError.message,
+        details: latestError.details || '',
+        showRetry: latestError.retryable && !!latestError.retryCallback,
+      };
+    }
+  }
+}, { deep: true });
 
 // 确认弹窗状态
 const confirmModal: Ref<ConfirmModalState> = ref({
@@ -241,11 +264,30 @@ const showError = (title: string, message: string, details: string = '', showRet
 
 const hideError = (): void => {
   errorModal.value.show = false;
+  // 从全局错误列表中移除当前错误
+  if (currentError.value) {
+    removeError(currentError.value.id);
+    currentError.value = null;
+  }
 };
 
-const retryWithError = (): void => {
+const retryWithError = async (): Promise<void> => {
   errorModal.value.show = false;
-  // 这里可以添加重试逻辑，目前只是关闭弹窗
+  
+  if (currentError.value?.retryCallback) {
+    try {
+      await currentError.value.retryCallback();
+    } catch (error) {
+      // 重试失败，重新显示错误
+      errorModal.value.show = true;
+    }
+  }
+  
+  // 从全局错误列表中移除当前错误
+  if (currentError.value) {
+    removeError(currentError.value.id);
+    currentError.value = null;
+  }
 };
 
 // 确认弹窗方法
