@@ -414,25 +414,16 @@ import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
 
 // 定义类型接口
-interface Student {
-  uid: number;
-  name: string;
-  age: number;
-  phone: string;
-  class: string;
-  subject: string;
-  note?: string;
-  rings: number[];
-  is_membership_active?: boolean;
-  membership_days_remaining?: number | null;
-  membership_start_date?: string;
-  membership_end_date?: string;
+import type { Student as ApiStudent } from '../types/api';
+
+interface Student extends ApiStudent {
+  // 继承所有属性，可添加组件特有的属性
 }
 
 interface CurrentStudent {
   uid: number | null;
   name: string;
-  age: string | number;
+  age: number; // 统一为数字类型
   phone: string;
   classType: string;
   note: string;
@@ -494,7 +485,7 @@ const showMembershipModal: Ref<boolean> = ref(false);
 const currentStudent: Ref<CurrentStudent> = ref({
   uid: null,
   name: '',
-  age: '',
+  age: 0, // 改为数字类型
   phone: '',
   classType: '',
   note: '',
@@ -780,7 +771,7 @@ const editStudent = (student: Student): void => {
         currentStudent.value = {
           uid: student.uid,
           name: student.name || '',
-          age: student.age || '',
+          age: student.age || 0,
           phone: student.phone || '',
           classType: student.class || 'Others',
           note: student.note || '',
@@ -890,9 +881,9 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
           errors.push('姓名包含不安全字符');
         }
         // 年龄验证 - 只做基本类型检查
-      const age = Number(student.age);
-      if (isNaN(age) || !isFinite(age)) {
-        errors.push('年龄必须是有效数字');
+      const age = typeof student.age === 'number' ? student.age : Number(student.age);
+      if (isNaN(age) || age < 3 || age > 120) {
+        errors.push('年龄必须是3-120之间的数字');
       }
       
       // 电话验证 - 只做基本检查
@@ -1059,7 +1050,7 @@ const saveStudent = async (): Promise<void> => {
           
           await ApiService.updateStudentInfo(sanitizedStudent.uid, {
             name: sanitizedStudent.name,
-            age: sanitizedStudent.age,
+            age: Number(currentStudent.value.age),
             classType: sanitizedStudent.classType,
             phone: sanitizedStudent.phone,
             note: sanitizedStudent.note,
@@ -1213,7 +1204,7 @@ const closeModals = (): void => {
         currentStudent.value = {
           uid: null,
           name: '',
-          age: '',
+          age: 0,
           phone: '',
           classType: '',
           note: '',

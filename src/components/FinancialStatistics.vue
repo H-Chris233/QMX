@@ -459,17 +459,10 @@ import DatePicker from './DatePicker.vue';
 import type { Student, InstallmentStatus } from '../types/api';
 
 // 前端Transaction类型（基于API Transaction但添加了前端特有字段）
-interface Transaction {
-  id: number;
-  type: 'income' | 'expense';
-  description: string;
-  amount: number;
-  note: string;
-  is_installment: boolean;
-  installment_current: number | null;
-  installment_total: number | null;
-  installment_status: InstallmentStatus | null;
-  student_id: number | null;
+import type { FrontendTransaction } from '../types/frontend';
+
+interface Transaction extends FrontendTransaction {
+  // 继承所有属性，可添加组件特有的属性
   date?: string;
 }
 
@@ -609,7 +602,19 @@ interface RefreshSystem {
       }
     };
 
-    const currentTransaction = ref({
+    interface CurrentTransaction {
+      type: 'income' | 'expense';
+      amount: number;
+      student_id: number | null;
+      note: string;
+      // 分期付款特定字段
+      installment_total: number | null;
+      installment_frequency: string;
+      custom_frequency_days: number | null;
+      installment_due_date: string | null;
+    }
+
+    const currentTransaction = ref<CurrentTransaction>({
       type: 'income',
       amount: 0,
       student_id: null,
@@ -618,7 +623,7 @@ interface RefreshSystem {
       installment_total: 2,
       installment_frequency: 'Monthly',
       custom_frequency_days: 30,
-      installment_due_date: new Date().toISOString().split('T')[0],
+      installment_due_date: new Date().toISOString().split('T')[0] || null,
     });
 
     // 计算属性
@@ -863,6 +868,8 @@ interface RefreshSystem {
             installment_total: transaction.installment_total || null,
             installment_status: (transaction.installment_status || null) as InstallmentStatus | null,
             student_id: transaction.student_id || null,
+            installment_plan_id: (transaction.installment_plan_id || null) as number | null,
+            installment_due_date: (transaction.installment_due_date || null) as string | null,
           }));
 
         transactions.value = validTransactions;
@@ -1022,6 +1029,8 @@ interface RefreshSystem {
                 installment_total: transaction.installment_total || null,
                 installment_status: (transaction.installment_status || null) as InstallmentStatus | null,
                 student_id: transaction.student_id || null,
+                installment_plan_id: (transaction.installment_plan_id || null) as number | null,
+                installment_due_date: (transaction.installment_due_date || null) as string | null,
               };
             } catch (error) {
               console.warn('转换交易数据失败:', transaction, error);
@@ -1281,7 +1290,7 @@ interface RefreshSystem {
         installment_total: 2,
         installment_frequency: 'Monthly',
         custom_frequency_days: 30,
-        installment_due_date: new Date().toISOString().split('T')[0],
+        installment_due_date: new Date().toISOString().split('T')[0] || null,
       };
     };
 

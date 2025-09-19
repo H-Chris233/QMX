@@ -115,16 +115,19 @@ export function transformTransactionDataArray(
  * @param student Student 对象
  * @returns 验证结果
  */
-export function validateStudentData(student: any): boolean {
+export function validateStudentData(student: unknown): boolean {
+  if (!student || typeof student !== 'object') return false;
+  const s = student as Record<string, unknown>;
+  
   return (
-    typeof student.uid === 'number' &&
-    typeof student.name === 'string' &&
-    typeof student.age === 'number' &&
-    typeof student.class === 'string' &&
-    typeof student.phone === 'string' &&
-    typeof student.subject === 'string' &&
-    (student.lesson_left === undefined ||
-      typeof student.lesson_left === 'number')
+    typeof s.uid === 'number' &&
+    typeof s.name === 'string' &&
+    typeof s.age === 'number' &&
+    typeof s.class === 'string' &&
+    typeof s.phone === 'string' &&
+    typeof s.subject === 'string' &&
+    (s.lesson_left === undefined ||
+      typeof s.lesson_left === 'number')
   );
 }
 
@@ -133,26 +136,29 @@ export function validateStudentData(student: any): boolean {
  * @param transaction Transaction 对象
  * @returns 验证结果
  */
-export function validateTransactionData(transaction: any): boolean {
+export function validateTransactionData(transaction: unknown): boolean {
+  if (!transaction || typeof transaction !== 'object') return false;
+  const t = transaction as Record<string, unknown>;
+  
   const basicValidation =
-    typeof transaction.uid === 'number' &&
-    (typeof transaction.student_id === 'number' ||
-      transaction.student_id === null) &&
-    typeof transaction.amount === 'number' &&
-    typeof transaction.description === 'string' &&
-    (typeof transaction.note === 'string' || transaction.note === null) &&
-    typeof transaction.is_installment === 'boolean';
+    typeof t.uid === 'number' &&
+    (typeof t.student_id === 'number' ||
+      t.student_id === null) &&
+    typeof t.amount === 'number' &&
+    typeof t.description === 'string' &&
+    (typeof t.note === 'string' || t.note === null) &&
+    typeof t.is_installment === 'boolean';
   if (!basicValidation) return false;
 
-  if (transaction.is_installment) {
+  if (t.is_installment) {
     return (
-      typeof transaction.installment_plan_id === 'number' &&
-      typeof transaction.installment_current === 'number' &&
-      typeof transaction.installment_total === 'number' &&
-      (typeof transaction.installment_due_date === 'string' ||
-        transaction.installment_due_date === null) &&
-      (typeof transaction.installment_status === 'string' ||
-        transaction.installment_status === null)
+      typeof t.installment_plan_id === 'number' &&
+      typeof t.installment_current === 'number' &&
+      typeof t.installment_total === 'number' &&
+      (typeof t.installment_due_date === 'string' ||
+        t.installment_due_date === null) &&
+      (typeof t.installment_status === 'string' ||
+        t.installment_status === null)
     );
   }
   return true;
@@ -163,14 +169,17 @@ export function validateTransactionData(transaction: any): boolean {
  * @param stats DashboardStats 对象
  * @returns 验证结果
  */
-export function validateDashboardStatsData(stats: any): boolean {
+export function validateDashboardStatsData(stats: unknown): boolean {
+  if (!stats || typeof stats !== 'object') return false;
+  const s = stats as Record<string, unknown>;
+  
   return (
-    typeof stats.total_students === 'number' &&
-    typeof stats.total_revenue === 'number' &&
-    typeof stats.total_expense === 'number' &&
-    typeof stats.average_score === 'number' &&
-    typeof stats.max_score === 'number' &&
-    typeof stats.active_courses === 'number'
+    typeof s.total_students === 'number' &&
+    typeof s.total_revenue === 'number' &&
+    typeof s.total_expense === 'number' &&
+    typeof s.average_score === 'number' &&
+    typeof s.max_score === 'number' &&
+    typeof s.active_courses === 'number'
   );
 }
 

@@ -13,7 +13,7 @@ import type {
   StudentSearchOptions,
   CashSearchOptions
 } from '../types/api';
-import { assertIsStudent } from '../utils/typeGuards';
+import { assertIsStudent, assertIsTransaction, assertIsDashboardStats } from '../utils/typeGuards';
 import {
   transformStudentData,
   transformStudentDataArray,
@@ -318,6 +318,9 @@ export class ApiService {
       if (!validateTransactionData(transaction)) {
         throw new Error('交易数据验证失败');
       }
+      
+      // 类型断言确保类型安全
+      assertIsTransaction(transaction);
 
       return transaction;
     }, '添加财务记录', {
@@ -375,6 +378,9 @@ export class ApiService {
       if (!validateTransactionData(transaction)) {
         throw new Error('分期付款数据验证失败');
       }
+      
+      // 类型断言确保类型安全
+      assertIsTransaction(transaction);
 
       return transaction;
     }, '添加分期付款', {
@@ -401,6 +407,9 @@ export class ApiService {
       if (invalidCount > 0) {
         console.warn(`⚠️ 过滤了 ${invalidCount} 个无效交易记录`);
       }
+
+      // 类型断言确保类型安全
+      validTransactions.forEach(transaction => assertIsTransaction(transaction));
 
       console.log(`✅ 成功获取 ${validTransactions.length} 条交易记录`);
       return validTransactions;
@@ -511,6 +520,9 @@ export class ApiService {
       if (!validateDashboardStatsData(stats)) {
         throw new Error('统计数据验证失败');
       }
+      
+      // 类型断言确保类型安全
+      assertIsDashboardStats(stats);
 
       console.log('✅ 成功获取仪表板统计数据');
       return stats;

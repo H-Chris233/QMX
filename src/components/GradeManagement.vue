@@ -416,30 +416,13 @@ interface ErrorHandler {
   showSuccess: (title: string, message: string) => void;
 }
 
-interface StudentData {
-  rings: number[];
-  uid: number;
-  name: string;
-  age: number;
-  class: string;
-  phone: string;
-  note: string;
-  cash: string;
-  subject: string;
-  lesson_left?: number;
-  membership_start_date?: string | null;
-  membership_end_date?: string | null;
-  is_membership_active: boolean;
-  membership_days?: number;
-}
-
 // 使用script setup提高类型安全
     const loading = ref(false);
     const grades = ref<Grade[]>([]);
     const students = ref<Student[]>([]);
 
     const selectedStudent = ref('');
-    const selectedStudentData = ref<StudentData | null>(null);
+    const selectedStudentData = ref<Student | null>(null);
     const quickScore = ref('');
     const studentSelect = ref<HTMLElement | null>(null);
     const abortController = ref<AbortController | null>(null);
@@ -470,7 +453,13 @@ interface StudentData {
 
     // 注入错误处理函数
     const errorHandler = inject<ErrorHandler>('errorHandler');
-    const refreshSystem = inject<any>('refreshSystem');
+    interface RefreshSystem {
+      refreshTriggers: {
+        grades: number;
+      };
+    }
+    
+    const refreshSystem = inject<RefreshSystem>('refreshSystem');
     
     const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
       console.error(`${title}: ${message}`, details);
@@ -890,7 +879,7 @@ interface StudentData {
 
     // 输入验证函数
     // 简化的成绩验证函数 - 只做最基本的类型检查
-    const validateScoreInput = (score: any, _studentData?: StudentData | null): { isValid: boolean; errors: string[] } => {
+    const validateScoreInput = (score: any, _studentData?: Student | null): { isValid: boolean; errors: string[] } => {
       const errors: string[] = [];
       
       if (score === null || score === undefined || score === '') {
@@ -1253,7 +1242,7 @@ interface StudentData {
         selectedStudentData.value = {
           ...student,
           rings: validScores,
-        } as StudentData;
+        } as Student;
         
         if (import.meta.env?.MODE !== 'production') console.log(`加载学员 ${student.name} 的 ${validScores.length} 条成绩记录`);
       } catch (error: any) {
