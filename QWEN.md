@@ -150,43 +150,25 @@ QMX/
 - Date validation and formatting
 - Custom validation functions for various data types (student UID, transaction UID, plan ID, etc.)
 
-## Validation Logic Architecture
+## 错误处理架构 (当前状态)
 
-### Current State
-All validation logic is centralized in the backend, with the frontend only performing basic type checks. This ensures consistency, security, and maintainability.
+### 当前实现
+1. **简化错误处理机制** - 所有错误通过模态框显示，不使用全局错误状态管理
+2. **优先级区分** - 三种错误类型具有不同优先级：
+   - 验证错误：低优先级
+   - 网络错误：中优先级
+   - API错误：高优先级
+3. **模态框显示** - 使用ErrorModal组件显示所有错误，带有优先级标识
+4. **跨环境兼容** - 浏览器环境使用UI显示，Node.js环境使用控制台记录
 
-### Implementation
-1. **Validation Module**: All validation functions located in `src-tauri/src/validation.rs`
-2. **Backend Validation**: All business logic validation handled by backend
-3. **Frontend Validation**: Basic type checking only in frontend API service
-
-### Validation Module
-- **File Location**: `src-tauri/src/validation.rs`
-- **Functions**: 17 validation functions covering all data types:
-  - `validate_student_name` - Validates student names (non-empty, max 50 chars, no control characters)
-  - `validate_phone_number` - Validates phone numbers (non-empty, max 20 chars)
-  - `validate_note` - Validates notes (max 1000 chars, no control characters)
-  - `validate_age` - Validates age (3-120 years)
-  - `validate_amount` - Validates amounts (up to 1 million)
-  - `validate_class_type` - Validates class types (TenTry, Month, Year, Others)
-  - `validate_subject_type` - Validates subject types (Shooting, Archery, Others)
-  - `validate_score` - Validates scores (0-1000 range, finite numbers)
-  - `validate_student_uid` - Validates student UIDs (non-zero)
-  - `validate_transaction_uid` - Validates transaction UIDs (non-zero)
-  - `validate_plan_id` - Validates plan IDs (non-zero)
-  - `validate_installment_count` - Validates installment counts (1-360)
-  - `validate_frequency` - Validates payment frequencies (Weekly, Monthly, Quarterly, Custom)
-  - `validate_date_range` - Validates date ranges (start before end)
-  - `validate_amount_range` - Validates amount ranges (min ≤ max)
-  - `validate_age_range` - Validates age ranges (min ≤ max)
-  - `validate_days` - Validates days (positive numbers)
-- **Usage**: Imported in `lib.rs` with `use validation::*;`
-- **Future Direction**: Continue expanding validation coverage and improving error messages
-
-### Frontend Validation
-- **Current State**: Frontend performs basic type checking only (e.g., `typeof studentUid !== 'number'`), error handling through backend responses
-- **Implementation**: Uses simple `throw new Error()` statements instead of `handleValidationError` calls
-- **Future Direction**: Continue minimizing frontend validation to reduce complexity and improve performance
+### 未来改进方向
+1. **增强错误上下文** - 为不同类型错误提供更丰富的上下文信息
+2. **错误分组和过滤** - 在UI中提供错误分类和过滤功能
+3. **错误统计和分析** - 添加错误发生频率统计和趋势分析
+4. **用户反馈集成** - 允许用户直接从错误模态框报告问题
+5. **错误自动恢复** - 实现智能错误恢复机制，减少用户干预
+6. **本地化支持** - 为错误消息提供多语言支持
+7. **错误导出功能** - 允许用户导出错误日志用于调试
 
 ## License
 No license declared.
