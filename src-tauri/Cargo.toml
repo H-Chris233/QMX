@@ -1,6 +1,6 @@
 [package]
 name = "qmx-chris233"
-version = "0.11.2"
+version = "0.11.3"
 description = "A Tauri App"
 authors = ["Chris233 <https://github.com/H-Chris233>"]
 edition = "2021"
