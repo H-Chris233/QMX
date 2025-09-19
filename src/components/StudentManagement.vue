@@ -410,6 +410,7 @@
 import { ref, computed, onMounted, inject, watch, type Ref, type ComputedRef } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
 
 // 定义类型接口
@@ -862,7 +863,7 @@ const deleteStudent = async (uid: number): Promise<void> => {
       });
     };
 
-// 增强的输入验证函数
+// 简化的输入验证函数 - 只做最基本的类型检查
 const validateStudentInput = (student: CurrentStudent): { isValid: boolean; errors: string[] } => {
       const errors: string[] = [];
       
@@ -872,10 +873,10 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
         return { isValid: false, errors };
       }
       
-      // 姓名验证 - 增强安全检查
-      if (!student.name || typeof student.name !== 'string' || student.name.trim().length === 0) {
+      // 姓名验证 - 只做基本检查
+      if (!student.name || typeof student.name !== 'string') {
         errors.push('姓名不能为空');
-      } else {
+      }
         const trimmedName = student.name.trim();
         if (trimmedName.length > 50) {
           errors.push('姓名长度不能超过50个字符');
@@ -888,45 +889,29 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
         if (/('|(\\x27)|(\\x2D\\x2D)|(\;)|(\|)|(\*)|(\%))/.test(trimmedName)) {
           errors.push('姓名包含不安全字符');
         }
-        // 检查是否只包含合法字符（中文、英文、数字、常见符号）
-        if (!/^[\u4e00-\u9fa5a-zA-Z0-9\s\.\-_]+$/.test(trimmedName)) {
-          errors.push('姓名只能包含中文、英文、数字和常见符号');
-        }
-      }
-      
-      // 年龄验证 - 增强类型检查
+        // 年龄验证 - 只做基本类型检查
       const age = Number(student.age);
-      if (!age || isNaN(age) || !isFinite(age) || age < 3 || age > 120) {
-        errors.push('年龄必须是3-120之间的有效数字');
+      if (isNaN(age) || !isFinite(age)) {
+        errors.push('年龄必须是有效数字');
       }
       
-      // 电话验证 - 增强类型和长度检查
+      // 电话验证 - 只做基本检查
       if (!student.phone || typeof student.phone !== 'string') {
         errors.push('电话号码不能为空');
-      } else if (student.phone.length > 20) {
-        errors.push('电话号码长度不能超过20个字符');
       }
       
-      // 备注验证 - 增强安全检查
-      if (student.note) {
-        if (typeof student.note !== 'string') {
-          errors.push('备注格式无效');
-        } else if (student.note.length > 500) {
-          errors.push('备注长度不能超过500个字符');
-        } else if (/<script|javascript:|data:|vbscript:/i.test(student.note)) {
-          errors.push('备注包含非法字符');
-        }
+      // 备注验证 - 只做基本检查
+      if (student.note && typeof student.note !== 'string') {
+        errors.push('备注格式无效');
       }
       
-      // 科目验证
-      const validSubjects = ['Shooting', 'Archery', 'Others'];
-      if (!validSubjects.includes(student.subject)) {
+      // 科目验证 - 只做基本检查
+      if (typeof student.subject !== 'string') {
         errors.push('科目选择无效');
       }
       
-      // 课程类型验证
-      const validClassTypes = ['TenTry', 'Month', 'Year', 'Others'];
-      if (!validClassTypes.includes(student.classType)) {
+      // 课程类型验证 - 只做基本检查
+      if (typeof student.classType !== 'string') {
         errors.push('课程类型选择无效');
       }
       
@@ -976,12 +961,12 @@ const saveStudent = async (): Promise<void> => {
       // 输入验证
       const validation = validateStudentInput(currentStudent.value);
       if (!validation.isValid) {
-        showError('输入错误', validation.errors.join('；'));
+        handleValidationError('student_form', validation.errors.join('；'));
         return;
       }
 
       if (!validatePhone(currentStudent.value.phone)) {
-        showError('输入错误', '请输入有效的手机号码');
+        handleValidationError('phone', '请输入有效的手机号码');
         return;
       }
 

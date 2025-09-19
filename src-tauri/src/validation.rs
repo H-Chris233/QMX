@@ -90,6 +90,16 @@ pub fn validate_score(score: f64) -> Result<(), String> {
     Ok(())
 }
 
+/// 验证成绩范围（用于搜索）
+pub fn validate_score_range(min: f64, max: f64) -> Result<(), String> {
+    validate_score(min)?;
+    validate_score(max)?;
+    if min > max {
+        return Err("最小分数不能大于最大分数".to_string());
+    }
+    Ok(())
+}
+
 
 
 /// 验证学生UID

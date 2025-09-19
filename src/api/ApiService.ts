@@ -682,6 +682,8 @@ export class ApiService {
         nameContains: options.name_contains,
         minAge: options.min_age,
         maxAge: options.max_age,
+        minScore: options.min_score,
+        maxScore: options.max_score,
         classType: options.class_type,
         subject: options.subject,
         hasMembership: options.has_membership,

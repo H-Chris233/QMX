@@ -454,6 +454,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
+import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
 import type { Student, InstallmentStatus } from '../types/api';
 
@@ -561,7 +562,7 @@ interface RefreshSystem {
     
     const applyCustomPeriod = async () => {
       if (!customStartDate.value || !customEndDate.value) {
-        showError('输入错误', '请选择开始和结束日期');
+        handleValidationError('date_selection', '请选择开始和结束日期');
         return;
       }
       
@@ -925,6 +926,7 @@ interface RefreshSystem {
     };
 
     // 增强的交易输入验证 - 防止溢出和注入攻击
+    // 简化的交易验证函数 - 只做最基本的类型检查
     const validateTransactionInput = (transaction: any): { isValid: boolean; errors: string[] } => {
       const errors: string[] = [];
       
@@ -934,91 +936,41 @@ interface RefreshSystem {
         return { isValid: false, errors };
       }
       
-      // 金额验证 - 增强范围和类型检查
+      // 金额验证 - 只做基本类型检查
       const amount = Number(transaction.amount);
-      if (!transaction.amount || isNaN(amount) || !isFinite(amount) || amount <= 0) {
-        errors.push('金额必须是大于0的有效数字');
-      } else {
-        const MAX_AMOUNT = 999999999; // 约10亿
-        const MIN_AMOUNT = 0.01; // 最小1分钱
-        
-        if (amount > MAX_AMOUNT) {
-          errors.push(`金额不能超过 ${MAX_AMOUNT.toLocaleString()}`);
-        }
-        
-        if (amount < MIN_AMOUNT) {
-          errors.push(`金额不能小于 ${MIN_AMOUNT}`);
-        }
-        
-        // 检查小数位数
-        const decimalPlaces = (amount.toString().split('.')[1] || '').length;
-        if (decimalPlaces > 2) {
-          errors.push('金额最多支持2位小数');
-        }
+      if (isNaN(amount) || !isFinite(amount)) {
+        errors.push('金额必须是有效数字');
       }
       
-      // 分期付款验证
+      // 分期付款验证 - 只做基本检查
       if (isInstallmentMode.value) {
         const installmentTotal = Number(transaction.installment_total);
-        if (!installmentTotal || installmentTotal < 2 || installmentTotal > 120) {
-          errors.push('分期付款期数必须在2-120之间');
+        if (isNaN(installmentTotal) || !isFinite(installmentTotal)) {
+          errors.push('分期付款期数必须是有效数字');
         }
         
         if (!transaction.installment_due_date) {
           errors.push('请选择首次到期日');
-        } else {
-          try {
-            const dueDate = new Date(transaction.installment_due_date);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            // 检查日期有效性
-            if (isNaN(dueDate.getTime())) {
-              errors.push('到期日格式无效');
-            } else if (dueDate < today) {
-              errors.push('到期日不能早于今天');
-            } else {
-              // 检查日期不能过于久远
-              const maxDate = new Date();
-              maxDate.setFullYear(maxDate.getFullYear() + 10);
-              if (dueDate > maxDate) {
-                errors.push('到期日不能超过10年后');
-              }
-            }
-          } catch (error) {
-            errors.push('到期日处理失败');
-          }
         }
         
         if (transaction.installment_frequency === 'Custom') {
           const days = Number(transaction.custom_frequency_days);
-          if (!days || days < 1 || days > 365) {
-            errors.push('自定义频率天数必须在1-365之间');
+          if (isNaN(days) || !isFinite(days)) {
+            errors.push('自定义频率天数必须是有效数字');
           }
         }
       }
       
-      // 备注验证 - 增强安全检查
-      if (transaction.note) {
-        if (typeof transaction.note !== 'string') {
-          errors.push('备注格式无效');
-        } else {
-          if (transaction.note.length > 500) {
-            errors.push('备注长度不能超过500个字符');
-          }
-          
-          // 检查潜在的脚本注入
-          if (/<script|javascript:|data:|vbscript:/i.test(transaction.note)) {
-            errors.push('备注包含非法字符');
-          }
-        }
+      // 备注验证 - 只做基本检查
+      if (transaction.note && typeof transaction.note !== 'string') {
+        errors.push('备注格式无效');
       }
       
-      // 学员ID验证
+      // 学员ID验证 - 只做基本检查
       if (transaction.student_id !== null && transaction.student_id !== undefined) {
         const studentId = Number(transaction.student_id);
-        if (isNaN(studentId) || studentId <= 0) {
-          errors.push('学员ID无效');
+        if (isNaN(studentId)) {
+          errors.push('学员ID必须是有效数字');
         }
       }
       
@@ -1112,7 +1064,7 @@ interface RefreshSystem {
       // 输入验证
       const validation = validateTransactionInput(currentTransaction.value);
       if (!validation.isValid) {
-        showError('输入错误', validation.errors.join('；'));
+        handleValidationError('transaction_input', validation.errors.join('；'));
         return;
       }
 
