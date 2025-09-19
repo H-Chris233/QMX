@@ -98,12 +98,36 @@ export async function handleApiOperation<T>(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
-    // 直接显示错误，设置高优先级
+    // 直接显示错误模态框，设置高优先级
     const displayMessage = `操作失败: ${errorMessage}`;
     const displayTitle = `${operationName}失败 (高优先级)`;
     
-    if (typeof window !== 'undefined' && window.alert) {
-      window.alert(`${displayTitle}: ${displayMessage}`);
+    // 在浏览器环境中，我们希望通过UI显示错误
+    // 但在Node.js环境中（如SSR），我们只能记录到控制台
+    if (typeof window !== 'undefined' && (window as any).showError) {
+      (window as any).showError(displayTitle, displayMessage, JSON.stringify({
+        operation: operationName,
+        context: options.context,
+        originalError: errorMessage,
+        timestamp: new Date().toISOString()
+      }), options.retryable, 'high');
+    } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+      // 尝试通过全局事件发送错误
+      const event = new CustomEvent('showAppError', {
+        detail: {
+          title: displayTitle,
+          message: displayMessage,
+          details: JSON.stringify({
+            operation: operationName,
+            context: options.context,
+            originalError: errorMessage,
+            timestamp: new Date().toISOString()
+          }),
+          showRetry: options.retryable,
+          priority: 'high'
+        }
+      });
+      window.dispatchEvent(event);
     } else {
       console.error(`${displayTitle}: ${displayMessage}`, {
         operation: operationName,
@@ -124,12 +148,25 @@ export function handleValidationError(
   message: string,
   value?: any
 ): void {
-  // 直接显示错误，设置低优先级
+  // 直接显示错误模态框，设置低优先级
   const displayMessage = `输入验证错误: ${message}`;
-  const displayTitle = '验证错误';
+  const displayTitle = '验证错误 (低优先级)';
   
-  if (typeof window !== 'undefined' && window.alert) {
-    window.alert(`${displayTitle}: ${displayMessage}`);
+  // 在浏览器环境中，我们希望通过UI显示错误
+  // 但在Node.js环境中（如SSR），我们只能记录到控制台
+  if (typeof window !== 'undefined' && (window as any).showError) {
+    (window as any).showError(displayTitle, displayMessage, JSON.stringify({ field, value }), false, 'low');
+  } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    // 尝试通过全局事件发送错误
+    const event = new CustomEvent('showAppError', {
+      detail: {
+        title: displayTitle,
+        message: displayMessage,
+        details: JSON.stringify({ field, value }),
+        priority: 'low'
+      }
+    });
+    window.dispatchEvent(event);
   } else {
     console.error(`${displayTitle} - ${field}: ${displayMessage}`, { field, value });
   }
@@ -143,12 +180,34 @@ export function handleNetworkError(
 ): never {
   const errorMessage = error instanceof Error ? error.message : String(error);
   
-  // 直接显示错误，设置中优先级
+  // 直接显示错误模态框，设置中优先级
   const displayMessage = `网络连接失败: ${errorMessage}`;
   const displayTitle = '网络错误 (中优先级)';
   
-  if (typeof window !== 'undefined' && window.alert) {
-    window.alert(`${displayTitle}: ${displayMessage}`);
+  // 在浏览器环境中，我们希望通过UI显示错误
+  // 但在Node.js环境中（如SSR），我们只能记录到控制台
+  if (typeof window !== 'undefined' && (window as any).showError) {
+    (window as any).showError(displayTitle, displayMessage, JSON.stringify({
+      operation: operationName,
+      error: errorMessage,
+      timestamp: new Date().toISOString()
+    }), true, 'medium');
+  } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    // 尝试通过全局事件发送错误
+    const event = new CustomEvent('showAppError', {
+      detail: {
+        title: displayTitle,
+        message: displayMessage,
+        details: JSON.stringify({
+          operation: operationName,
+          error: errorMessage,
+          timestamp: new Date().toISOString()
+        }),
+        showRetry: true,
+        priority: 'medium'
+      }
+    });
+    window.dispatchEvent(event);
   } else {
     console.error(`${displayTitle}: ${displayMessage}`, {
       operation: operationName,
