@@ -68,33 +68,14 @@ export function createError(
 
 // 添加错误到全局状态
 export function addError(error: AppError): void {
-  errors.value.push(error);
-  
-  // 自动清理旧错误（保留最近20个）
-  if (errors.value.length > 20) {
-    // 优先保留高优先级错误
-    const sortedErrors = [...errors.value].sort((a, b) => {
-      const priorityOrder = {
-        [ErrorPriority.CRITICAL]: 4,
-        [ErrorPriority.HIGH]: 3,
-        [ErrorPriority.MEDIUM]: 2,
-        [ErrorPriority.LOW]: 1
-      };
-      
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
-    });
-    
-    errors.value = sortedErrors.slice(-20);
-  }
-  
-  // 触发错误上报
-  reportError(error);
+  // 移除全局错误状态管理，只记录到控制台
+  console.log('Error recorded (global error state removed):', error);
 }
 
-// 清除特定错误
-export function removeError(errorId: string): void {
-  errors.value = errors.value.filter(error => error.id !== errorId);
-}
+// 移除removeError函数（已简化错误处理机制）
+// export function removeError(errorId: string): void {
+//   errors.value = errors.value.filter(error => error.id !== errorId);
+// }
 
 // 清除所有错误
 export function clearAllErrors(): void {
@@ -116,27 +97,45 @@ export async function handleApiOperation<T>(
     return await operation();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
     
-    const appError = createError(
-      `操作失败: ${errorMessage}`,
-      {
-        title: `${operationName}失败`,
-        details: JSON.stringify({
-          operation: operationName,
-          context: options.context,
-          originalError: errorMessage,
-          timestamp: new Date().toISOString()
-        }, null, 2),
-        retryable: options.retryable ?? false,
-        retryCallback: options.retryCallback,
-        category: 'api',
-        priority: options.priority ?? ErrorPriority.MEDIUM,
-        stack: errorStack || undefined
-      }
-    );
-
-    addError(appError);
+    // 直接显示错误模态框，设置高优先级
+    const displayMessage = `操作失败: ${errorMessage}`;
+    const displayTitle = `${operationName}失败 (高优先级)`;
+    
+    // 在浏览器环境中，我们希望通过UI显示错误
+    // 但在Node.js环境中（如SSR），我们只能记录到控制台
+    if (typeof window !== 'undefined' && (window as any).showError) {
+      (window as any).showError(displayTitle, displayMessage, JSON.stringify({
+        operation: operationName,
+        context: options.context,
+        originalError: errorMessage,
+        timestamp: new Date().toISOString()
+      }), options.retryable, 'high');
+    } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+      // 尝试通过全局事件发送错误
+      const event = new CustomEvent('showAppError', {
+        detail: {
+          title: displayTitle,
+          message: displayMessage,
+          details: JSON.stringify({
+            operation: operationName,
+            context: options.context,
+            originalError: errorMessage,
+            timestamp: new Date().toISOString()
+          }),
+          showRetry: options.retryable,
+          priority: 'high'
+        }
+      });
+      window.dispatchEvent(event);
+    } else {
+      console.error(`${displayTitle}: ${displayMessage}`, {
+        operation: operationName,
+        context: options.context,
+        originalError: errorMessage,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     // 重新抛出错误以确保调用方知道操作失败
     throw new Error(`${operationName}失败: ${errorMessage}`);
@@ -148,24 +147,30 @@ export function handleValidationError(
   field: string,
   message: string,
   value?: any
-): never {
-  const error = createError(
-    `验证失败: ${message}`,
-    {
-      title: '输入验证错误',
-      details: JSON.stringify({
-        field,
-        value,
-        message,
-        timestamp: new Date().toISOString()
-      }, null, 2),
-      category: 'validation',
-      priority: ErrorPriority.HIGH
-    }
-  );
-
-  addError(error);
-  throw new Error(message);
+): void {
+  // 直接显示错误模态框，设置低优先级
+  const displayMessage = `输入验证错误: ${message}`;
+  const displayTitle = '验证错误 (低优先级)';
+  
+  // 在浏览器环境中，我们希望通过UI显示错误
+  // 但在Node.js环境中（如SSR），我们只能记录到控制台
+  if (typeof window !== 'undefined' && (window as any).showError) {
+    (window as any).showError(displayTitle, displayMessage, JSON.stringify({ field, value }), false, 'low');
+  } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    // 尝试通过全局事件发送错误
+    const event = new CustomEvent('showAppError', {
+      detail: {
+        title: displayTitle,
+        message: displayMessage,
+        details: JSON.stringify({ field, value }),
+        priority: 'low'
+      }
+    });
+    window.dispatchEvent(event);
+  } else {
+    console.error(`${displayTitle} - ${field}: ${displayMessage}`, { field, value });
+  }
+  // 不抛出异常，只显示错误
 }
 
 // 网络错误处理
@@ -174,46 +179,51 @@ export function handleNetworkError(
   operationName: string
 ): never {
   const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorStack = error instanceof Error ? error.stack : undefined;
   
-  const appError = createError(
-    `网络连接失败: ${errorMessage}`,
-    {
-      title: '网络错误',
-      details: JSON.stringify({
-        operation: operationName,
-        error: errorMessage,
-        timestamp: new Date().toISOString()
-      }, null, 2),
-      retryable: true,
-      category: 'network',
-      priority: ErrorPriority.HIGH,
-      stack: errorStack || undefined
-    }
-  );
-
-  addError(appError);
+  // 直接显示错误模态框，设置中优先级
+  const displayMessage = `网络连接失败: ${errorMessage}`;
+  const displayTitle = '网络错误 (中优先级)';
+  
+  // 在浏览器环境中，我们希望通过UI显示错误
+  // 但在Node.js环境中（如SSR），我们只能记录到控制台
+  if (typeof window !== 'undefined' && (window as any).showError) {
+    (window as any).showError(displayTitle, displayMessage, JSON.stringify({
+      operation: operationName,
+      error: errorMessage,
+      timestamp: new Date().toISOString()
+    }), true, 'medium');
+  } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    // 尝试通过全局事件发送错误
+    const event = new CustomEvent('showAppError', {
+      detail: {
+        title: displayTitle,
+        message: displayMessage,
+        details: JSON.stringify({
+          operation: operationName,
+          error: errorMessage,
+          timestamp: new Date().toISOString()
+        }),
+        showRetry: true,
+        priority: 'medium'
+      }
+    });
+    window.dispatchEvent(event);
+  } else {
+    console.error(`${displayTitle}: ${displayMessage}`, {
+      operation: operationName,
+      error: errorMessage,
+      timestamp: new Date().toISOString()
+    });
+  }
+  
   throw new Error(`网络错误: ${errorMessage}`);
 }
 
-// 模拟错误上报函数
-function reportError(error: AppError): void {
-  // 避免重复上报
-  if (error.reported) return;
-  
-  // 标记为已上报
-  (error as any).reported = true;
-  
-  // 在生产环境中，这里会将错误上报到错误监控服务
-  // 例如 Sentry、LogRocket 等
-  if (import.meta.env?.MODE === 'production') {
-    console.log(`[ERROR REPORTING] Sending error to monitoring service: ${error.id}`);
-    // 实际实现中，这里会调用具体的错误上报API
-    // sendToErrorService(error);
-  } else {
-    console.log(`[ERROR REPORTING] Error captured (dev mode): ${error.id}`, error);
-  }
-}
+// 移除reportError函数（已简化错误处理机制）
+// function reportError(error: AppError): void {
+//   // 移除错误上报功能，只记录到控制台
+//   console.log('Error reporting disabled, logged to console:', error);
+// }
 
 // 获取错误优先级的用户友好描述
 export function getPriorityDescription(priority: ErrorPriority): string {
@@ -248,7 +258,8 @@ export function getPriorityClass(priority: ErrorPriority): string {
 }
 
 // 导出全局错误状态
-export const globalErrors = errors;
+// 移除全局错误状态导出（已简化错误处理机制）
+// export const globalErrors = errors;
 
 // 测试错误处理功能的函数
 export function testErrorHandling(): void {

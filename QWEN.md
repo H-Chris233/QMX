@@ -188,6 +188,26 @@ All validation logic is centralized in the backend, with the frontend only perfo
 - **Implementation**: Uses simple `throw new Error()` statements instead of `handleValidationError` calls
 - **Future Direction**: Continue minimizing frontend validation to reduce complexity and improve performance
 
+## Error Handling Architecture
+
+### Current Implementation
+1. **Simplified Error Handling** - All errors displayed through modal dialogs, without global error state management
+2. **Priority Differentiation** - Three error types with different priorities:
+   - Validation errors: Low priority
+   - Network errors: Medium priority
+   - API errors: High priority
+3. **Modal Display** - All errors shown using ErrorModal component with priority indicators
+4. **Cross-environment Compatibility** - UI display in browser environments, console logging in Node.js environments
+
+### Future Usage Patterns
+1. **Consistent Priority Usage** - Maintain consistent priority levels across all error types for unified user experience
+2. **Context-aware Error Display** - Show error modals with appropriate context based on current user workflow
+3. **Non-intrusive Error Presentation** - Use toast notifications for low-priority errors to minimize workflow disruption
+4. **Persistent Error Tracking** - Log errors to localStorage for debugging while maintaining simplified architecture
+5. **Error Boundary Integration** - Implement Vue error boundaries to catch unhandled errors gracefully
+6. **Accessibility Compliance** - Ensure all error modals meet WCAG accessibility standards for screen readers
+7. **Performance Optimization** - Debounce frequent error displays to prevent UI freezing from error spam
+
 ## License
 No license declared.
 

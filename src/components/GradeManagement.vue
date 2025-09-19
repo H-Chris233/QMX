@@ -390,9 +390,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
-import DatePicker from './DatePicker.vue';
-import { ApiService } from '../api/ApiService';
 import type { Student } from '../types/api';
+import { ApiService } from '../api/ApiService';
+import { handleValidationError } from '../utils/errorHandler';
+import DatePicker from './DatePicker.vue';
 
 
 // TypeScript类型定义
@@ -888,6 +889,7 @@ interface StudentData {
     };
 
     // 输入验证函数
+    // 简化的成绩验证函数 - 只做最基本的类型检查
     const validateScoreInput = (score: any, _studentData?: StudentData | null): { isValid: boolean; errors: string[] } => {
       const errors: string[] = [];
       
@@ -900,15 +902,6 @@ interface StudentData {
       if (isNaN(numScore) || !isFinite(numScore)) {
         errors.push('成绩必须是有效数字');
         return { isValid: false, errors };
-      }
-      
-      if (numScore < 0) {
-        errors.push('成绩不能为负数');
-      }
-      
-      const maxScore = getMaxScore();
-      if (numScore > maxScore) {
-        errors.push(`成绩不能超过 ${maxScore}`);
       }
       
       return {
@@ -954,31 +947,31 @@ interface StudentData {
         !currentGrade.value.course ||
         currentGrade.value.score === null || currentGrade.value.score === undefined
       ) {
-        showError('输入错误', '请填写必要信息：学员、课程类型和分数');
+        handleValidationError('missing_fields', '请填写必要信息：学员、课程类型和分数');
         return;
       }
 
       // 验证分数范围
       const maxScore = getMaxScoreForCourse(currentGrade.value.course);
       if (maxScore && currentGrade.value.score > maxScore) {
-        showError('输入错误', `${currentGrade.value.course}课程的分数不能超过${maxScore}`);
+        handleValidationError('score_range', `${currentGrade.value.course}课程的分数不能超过${maxScore}`);
         return;
       }
 
       if (currentGrade.value.score < 0) {
-        showError('输入错误', '分数不能为负数');
+        handleValidationError('negative_score', '分数不能为负数');
         return;
       }
 
       // 获取学员姓名 - 改进学员ID转换
       const studentId = Number(currentGrade.value.studentId);
       if (isNaN(studentId) || studentId <= 0) {
-        showError('输入错误', '学员ID无效');
+        handleValidationError('invalid_student_id', '学员ID无效');
         return;
       }
       
       const student = students.value.find(
-        (s) => s.uid === studentId,
+        (s: any) => s.uid === studentId,
       );
       if (student) {
         currentGrade.value.studentName = student.name;
@@ -1052,7 +1045,7 @@ interface StudentData {
         return;
       }
 
-      const studentName = students.value.find(s => s.uid === Number(selectedStudent.value))?.name || '未知学员';
+      const studentName = students.value.find((s: any) => s.uid === Number(selectedStudent.value))?.name || '未知学员';
       showConfirm({
         title: '删除成绩',
         message: `确定要删除${studentName}的第${scoreIndex + 1}次成绩 ${score} 吗？`,
@@ -1110,7 +1103,7 @@ interface StudentData {
       
       const validation = validateScoreInput(newScore, selectedStudentData.value);
       if (!validation.isValid) {
-        showError('输入错误', validation.errors.join('；'));
+        handleValidationError('score_input', validation.errors.join('；'));
         return;
       }
       
@@ -1127,7 +1120,7 @@ interface StudentData {
       
       try {
         const studentUid = Number(selectedStudent.value);
-        const studentName = students.value.find(s => s.uid === studentUid)?.name || '未知学员';
+        const studentName = students.value.find((s: any) => s.uid === studentUid)?.name || '未知学员';
         
         await ApiService.updateStudentScore(studentUid, scoreIndex, newScore);
         
@@ -1237,7 +1230,7 @@ interface StudentData {
         }
 
         const scores = await ApiService.getStudentScores(studentUid);
-        const student = students.value.find(s => s.uid === studentUid);
+                 const student = students.value.find((s: any) => s.uid === studentUid);
         
         if (!student) {
           throw new Error('找不到对应的学员信息');
@@ -1294,7 +1287,7 @@ interface StudentData {
       // 验证成绩输入
       const validation = validateScoreInput(quickScore.value, selectedStudentData.value);
       if (!validation.isValid) {
-        showError('输入错误', validation.errors.join('；'));
+        handleValidationError('quick_score_validation', validation.errors.join('；'));
         return;
       }
 
@@ -1303,7 +1296,7 @@ interface StudentData {
 
       loading.value = true;
       try {
-        const studentName = students.value.find(s => s.uid == studentUid)?.name || '未知学员';
+        const studentName = students.value.find((s: any) => s.uid == studentUid)?.name || '未知学员';
         await ApiService.addScore(studentUid, score);
         
         if (import.meta.env?.MODE !== 'production') console.log(`成功为学员 ${studentUid} 添加成绩 ${score}`);
