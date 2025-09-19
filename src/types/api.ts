@@ -103,6 +103,8 @@ export interface StudentSearchOptions {
   name_contains?: string | null;
   min_age?: number | null;
   max_age?: number | null;
+  min_score?: number | null;
+  max_score?: number | null;
   class_type?: string | null;
   subject?: string | null;
   has_membership?: boolean | null;

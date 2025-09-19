@@ -1142,6 +1142,8 @@ fn search_students(
     name_contains: Option<String>,
     min_age: Option<u8>,
     max_age: Option<u8>,
+    min_score: Option<f64>,
+    max_score: Option<f64>,
     class_type: Option<String>,
     subject: Option<String>,
     has_membership: Option<bool>,
@@ -1158,6 +1160,11 @@ fn search_students(
         // 验证年龄范围
         validate_age_range(min, max)?;
         query = query.age_range(min, max);
+    }
+    if let (Some(min), Some(max)) = (min_score, max_score) {
+        // 验证成绩范围
+        validate_score_range(min, max)?;
+        query = query.score_range(min, max);
     }
     if let Some(class_str) = class_type {
         validate_class_type(&class_str)?;

@@ -76,18 +76,6 @@
       </div>
     </main>
 
-    <!-- 错误弹窗 -->
-    <ErrorModal
-      :show="errorModal.show"
-      :title="errorModal.title"
-      :message="errorModal.message"
-      :details="errorModal.details"
-      :show-retry="errorModal.showRetry"
-      :priority="errorModal.priority || 'medium'"
-      @close="hideError"
-      @retry="retryWithError"
-    />
-
     <!-- 确认弹窗 -->
     <ConfirmModal
       :show="confirmModal.show"
@@ -111,19 +99,12 @@ import FinancialStatistics from './components/FinancialStatistics.vue';
 import GradeManagement from './components/GradeManagement.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
-import ErrorModal from './components/ErrorModal.vue';
+
 import ConfirmModal from './components/ConfirmModal.vue';
-import { globalErrors, removeError, type AppError } from './utils/errorHandler';
+
 
 // 定义类型接口
-interface ErrorModalState {
-  show: boolean;
-  title: string;
-  message: string;
-  details: string;
-  showRetry: boolean;
-  priority?: string;
-}
+
 
 interface ConfirmModalState {
   show: boolean;
@@ -167,37 +148,38 @@ const activeTab: Ref<string> = ref('dashboard');
 const sidebarRef = ref<HTMLElement | null>(null);
 const toggleButtonRef = ref<HTMLElement | null>(null);
 
+// 移除错误弹窗状态（已简化错误处理机制）
 // 错误弹窗状态
-const errorModal: Ref<ErrorModalState> = ref({
-  show: false,
-  title: '错误',
-  message: '',
-  details: '',
-  showRetry: false,
-});
+// const errorModal: Ref<ErrorModalState> = ref({
+//   show: false,
+//   title: '错误',
+//   message: '',
+//   details: '',
+//   showRetry: false,
+// });
 
 // 当前显示的错误
-const currentError = ref<AppError | null>(null);
+// const currentError = ref<AppError | null>(null);
 
-// 监听全局错误状态
-watch(globalErrors, (errors) => {
-  if (errors.length > 0 && !errorModal.value.show) {
-    // 显示最新的错误
-    const latestError = errors[errors.length - 1];
-    if (latestError) {
-      currentError.value = latestError;
-      
-      errorModal.value = {
-        show: true,
-        title: latestError.title,
-        message: latestError.message,
-        details: latestError.details || '',
-        showRetry: latestError.retryable && !!latestError.retryCallback,
-        priority: latestError.priority as string,
-      };
-    }
-  }
-}, { deep: true });
+// 移除全局错误状态监听（已简化错误处理机制）
+// watch(globalErrors, (errors) => {
+//   if (errors.length > 0 && !errorModal.value.show) {
+//     // 显示最新的错误
+//     const latestError = errors[errors.length - 1];
+//     if (latestError) {
+//       currentError.value = latestError;
+//       
+//       errorModal.value = {
+//         show: true,
+//         title: latestError.title,
+//         message: latestError.message,
+//         details: latestError.details || '',
+//         showRetry: latestError.retryable && !!latestError.retryCallback,
+//         priority: latestError.priority as string,
+//       };
+//     }
+//   }
+// }, { deep: true });
 
 // 确认弹窗状态
 const confirmModal: Ref<ConfirmModalState> = ref({
@@ -250,48 +232,55 @@ const handleSidebarItemClick = (id: string): void => {
 
 
 // 错误处理方法
-const showError = (title: string, message: string, details: string = '', showRetry: boolean = false): void => {
+const showError = (title: string, message: string, details: string = '', priority: 'low' | 'medium' | 'high' = 'medium'): void => {
       try {
         if (!title || typeof title !== 'string') title = '系统错误';
         if (!message || typeof message !== 'string' || message.trim() === '') message = '发生了未知错误';
 
-        errorModal.value.show = true;
-        errorModal.value.title = title.substring(0, 100);
-        errorModal.value.message = message.substring(0, 500);
-        errorModal.value.details = details ? String(details).substring(0, 2000) : '';
-        errorModal.value.showRetry = Boolean(showRetry);
+        // 根据优先级调整显示方式
+        const priorityText = priority === 'high' ? ' (高优先级)' : 
+                             priority === 'low' ? ' (低优先级)' : ' (中优先级)';
+        const fullTitle = `${title}${priorityText}`;
+
+        // 直接使用alert显示错误（简化错误处理机制）
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(`${fullTitle}: ${message}${details ? '\n\n详情: ' + details : ''}`);
+        } else {
+          console.error(`${fullTitle}: ${message}`, details);
+        }
       } catch (error) {
-        if (import.meta.env?.MODE !== 'production') console.error('显示错误弹窗失败:', error);
+        if (import.meta.env?.MODE !== 'production') console.error('显示错误失败:', error);
       }
     };
 
-const hideError = (): void => {
-  errorModal.value.show = false;
-  // 从全局错误列表中移除当前错误
-  if (currentError.value) {
-    removeError(currentError.value.id);
-    currentError.value = null;
-  }
-};
+// 移除与错误弹窗相关的方法（已简化错误处理机制）
+// const hideError = (): void => {
+//   errorModal.value.show = false;
+//   // 从全局错误列表中移除当前错误
+//   if (currentError.value) {
+//     removeError(currentError.value.id);
+//     currentError.value = null;
+//   }
+// };
 
-const retryWithError = async (): Promise<void> => {
-  errorModal.value.show = false;
-  
-  if (currentError.value?.retryCallback) {
-    try {
-      await currentError.value.retryCallback();
-    } catch (error) {
-      // 重试失败，重新显示错误
-      errorModal.value.show = true;
-    }
-  }
-  
-  // 从全局错误列表中移除当前错误
-  if (currentError.value) {
-    removeError(currentError.value.id);
-    currentError.value = null;
-  }
-};
+// const retryWithError = async (): Promise<void> => {
+//   errorModal.value.show = false;
+//   
+//   if (currentError.value?.retryCallback) {
+//     try {
+//       await currentError.value.retryCallback();
+//     } catch (error) {
+//       // 重试失败，重新显示错误
+//       errorModal.value.show = true;
+//     }
+//   }
+//   
+//   // 从全局错误列表中移除当前错误
+//   if (currentError.value) {
+//     removeError(currentError.value.id);
+//     currentError.value = null;
+//   }
+// };
 
 // 确认弹窗方法
 const showConfirm = (options: ConfirmOptions): void => {
@@ -501,8 +490,8 @@ const triggerRefresh = (componentType: string): void => {
     // 提供全局错误处理方法和刷新机制给子组件使用
     provide('errorHandler', {
       showError,
-      hideError,
-      retryWithError,
+      hideError: () => {}, // 移除的函数占位符
+      retryWithError: () => Promise.resolve(), // 移除的函数占位符
       showSuccess,
       showConfirm,
     });
