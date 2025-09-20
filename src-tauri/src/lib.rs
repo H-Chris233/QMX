@@ -159,7 +159,7 @@ fn open_main_window(app: tauri::AppHandle) {
 #[tauri::command]
 fn add_student(
     name: String,
-    age: u8,
+    age: Option<u8>,
     class_type: String,
     phone: String,
     note: String,
@@ -169,7 +169,9 @@ fn add_student(
 
     // v2 API - 增强输入验证（完整的后端验证）
     validate_student_name(&name)?;
-    validate_age(age)?;
+    if let Some(age_val) = age {
+        validate_age(age_val)?;
+    }
     validate_phone_number(&phone)?;
     validate_note(&note)?;
     validate_class_type(&class_type)?;
@@ -181,12 +183,17 @@ fn add_student(
 
     // v2 API - 使用构建器模式创建学生
     let manager = get_manager()?;
-    let builder = StudentBuilder::new(name.trim(), age)
+    let mut builder = StudentBuilder::new(name.trim())
         .phone(phone.trim())
         .class(class)
         .subject(subject_enum)
         .note(note.trim());
-
+    
+    // 如果提供了年龄，则设置年龄
+    if let Some(age_value) = age {
+        builder = builder.age(age_value);
+    }
+    
     let uid = manager.create_student(builder).map_err(|e| {
         log::error!("v2 API创建学生失败: {}", e);
         format!("创建学生失败: {}", e)
@@ -372,7 +379,7 @@ fn get_student_scores(student_uid: u64) -> Result<StudentScoresResponse, String>
 fn update_student_info(
     student_uid: u64,
     name: Option<String>,
-    age: Option<u8>,
+    age: Option<Option<u8>>,
     class_type: Option<String>,
     phone: Option<String>,
     note: Option<String>,
@@ -390,7 +397,7 @@ fn update_student_info(
     if let Some(name_str) = &name {
         validate_student_name(name_str)?;
     }
-    if let Some(age_val) = age {
+    if let Some(Some(age_val)) = age {
         validate_age(age_val)?;
     }
     if let Some(phone_str) = &phone {
@@ -1482,7 +1489,7 @@ pub fn run() {
 pub struct StudentResponse {
     pub uid: u64,
     pub name: String,
-    pub age: u8,
+    pub age: Option<u8>,
     pub class: String,
     pub phone: String,
     pub note: String,
@@ -1546,7 +1553,7 @@ pub struct FinancialStatsResponse {
 #[derive(Serialize, Deserialize)]
 pub struct StudentUpdateBatch {
     pub name: Option<String>,
-    pub age: Option<u8>,
+    pub age: Option<Option<u8>>,
     pub class_type: Option<String>,
     pub subject: Option<String>,
     pub note: Option<String>,

@@ -244,7 +244,7 @@
           <div class="form-group">
             <label>年龄</label>
             <input
-              v-model.number="currentStudent.age"
+              v-model="currentStudent.age"
               type="number"
               placeholder="请输入年龄"
               min="3"
@@ -423,7 +423,7 @@ interface Student extends ApiStudent {
 interface CurrentStudent {
   uid: number | null;
   name: string;
-  age: number; // 统一为数字类型
+  age: number | null; // 改为可空数字类型
   phone: string;
   classType: string;
   note: string;
@@ -485,7 +485,7 @@ const showMembershipModal: Ref<boolean> = ref(false);
 const currentStudent: Ref<CurrentStudent> = ref({
   uid: null,
   name: '',
-  age: 0, // 改为数字类型
+  age: null, // 改为null
   phone: '',
   classType: '',
   note: '',
@@ -771,7 +771,7 @@ const editStudent = (student: Student): void => {
         currentStudent.value = {
           uid: student.uid,
           name: student.name || '',
-          age: student.age || 0,
+          age: student.age || null, // 改为null
           phone: student.phone || '',
           classType: student.class || 'Others',
           note: student.note || '',
@@ -881,9 +881,11 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
           errors.push('姓名包含不安全字符');
         }
         // 年龄验证 - 只做基本类型检查
-      const age = typeof student.age === 'number' ? student.age : Number(student.age);
-      if (isNaN(age) || age < 3 || age > 120) {
-        errors.push('年龄必须是3-120之间的数字');
+      if (student.age !== null && student.age !== undefined) {
+        const age = typeof student.age === 'number' ? student.age : Number(student.age);
+        if (isNaN(age) || age < 3 || age > 120) {
+          errors.push('年龄必须是3-120之间的数字');
+        }
       }
       
       // 电话验证 - 只做基本检查
@@ -969,7 +971,7 @@ const saveStudent = async (): Promise<void> => {
         const sanitizedStudent = {
           ...currentStudent.value,
           name: currentStudent.value.name.trim().substring(0, 50),
-          age: Math.max(3, Math.min(120, Number(currentStudent.value.age) || 0)),
+          age: currentStudent.value.age !== null ? Math.max(3, Math.min(120, Number(currentStudent.value.age) || 0)) : null,
           classType: ['TenTry', 'Month', 'Year', 'Others'].includes(currentStudent.value.classType) 
             ? currentStudent.value.classType : 'Others',
           phone: currentStudent.value.phone.trim().replace(/[^\d\-\+\s\(\)]/g, '').substring(0, 20),
@@ -982,7 +984,7 @@ const saveStudent = async (): Promise<void> => {
           // 添加新学员
           const result = await ApiService.addStudent(
             sanitizedStudent.name,
-            sanitizedStudent.age,
+            sanitizedStudent.age !== null ? sanitizedStudent.age : undefined,
             sanitizedStudent.classType,
             sanitizedStudent.phone,
             sanitizedStudent.note,
@@ -1050,7 +1052,7 @@ const saveStudent = async (): Promise<void> => {
           
           await ApiService.updateStudentInfo(sanitizedStudent.uid, {
             name: sanitizedStudent.name,
-            age: Number(currentStudent.value.age),
+            age: sanitizedStudent.age !== null ? Number(sanitizedStudent.age) : null,
             classType: sanitizedStudent.classType,
             phone: sanitizedStudent.phone,
             note: sanitizedStudent.note,
@@ -1204,7 +1206,7 @@ const closeModals = (): void => {
         currentStudent.value = {
           uid: null,
           name: '',
-          age: 0,
+          age: null, // 改为null
           phone: '',
           classType: '',
           note: '',

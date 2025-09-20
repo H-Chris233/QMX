@@ -7,15 +7,19 @@ export function isStudent(obj: unknown): obj is Student {
   return (
     typeof student.uid === 'number' &&
     typeof student.name === 'string' &&
-    typeof student.age === 'number' &&
+    (typeof student.age === 'number' || student.age === null) &&
     typeof student.class === 'string' &&
     typeof student.phone === 'string' &&
     Array.isArray(student.rings) &&
     student.rings.every(ring => typeof ring === 'number') &&
-    typeof student.note === 'string' &&
+    (typeof student.note === 'string' || student.note === null) &&
     typeof student.cash === 'string' &&
     typeof student.subject === 'string' &&
-    (student.lesson_left === undefined || typeof student.lesson_left === 'number')
+    (typeof student.lesson_left === 'number' || student.lesson_left === null) &&
+    (typeof student.membership_start_date === 'string' || student.membership_start_date === null) &&
+    (typeof student.membership_end_date === 'string' || student.membership_end_date === null) &&
+    typeof student.is_membership_active === 'boolean' &&
+    (typeof student.membership_days_remaining === 'number' || student.membership_days_remaining === null)
   );
 }
 
@@ -76,32 +80,37 @@ export function validateStudent(obj: unknown): ValidationResult<Student> {
   const student = obj as Record<string, unknown>;
   
   if (typeof student.uid !== 'number') errors.push('uid必须是数字');
-  if (typeof student.name !== 'string' || !student.name.trim()) errors.push('姓名必须是非空字符串');
-  if (typeof student.age !== 'number' || student.age < 0 || student.age > 150) errors.push('年龄必须是0-150之间的数字');
+  if (typeof student.name !== 'string') errors.push('姓名必须是字符串');
+  if (typeof student.age !== 'number' && student.age !== null) errors.push('年龄必须是数字或null');
   if (typeof student.class !== 'string') errors.push('班级必须是字符串');
   if (typeof student.phone !== 'string') errors.push('电话必须是字符串');
   if (!Array.isArray(student.rings)) errors.push('成绩必须是数组');
-  if (typeof student.note !== 'string') errors.push('备注必须是字符串');
+  if (typeof student.note !== 'string' && student.note !== null) errors.push('备注必须是字符串或null');
   if (typeof student.cash !== 'string') errors.push('现金必须是字符串');
   if (typeof student.subject !== 'string') errors.push('科目必须是字符串');
+  if (typeof student.lesson_left !== 'number' && student.lesson_left !== null) errors.push('剩余课程数必须是数字或null');
+  if (typeof student.membership_start_date !== 'string' && student.membership_start_date !== null) errors.push('会员开始日期必须是字符串或null');
+  if (typeof student.membership_end_date !== 'string' && student.membership_end_date !== null) errors.push('会员结束日期必须是字符串或null');
+  if (typeof student.is_membership_active !== 'boolean') errors.push('会员激活状态必须是布尔值');
+  if (typeof student.membership_days_remaining !== 'number' && student.membership_days_remaining !== null) errors.push('会员剩余天数必须是数字或null');
   
   if (errors.length === 0) {
     // 创建一个新的Student对象，确保所有必需字段都存在
     const validStudent: Student = {
       uid: student.uid as number,
       name: student.name as string,
-      age: student.age as number,
+      age: student.age as number | null,
       class: student.class as string,
       phone: student.phone as string,
       rings: student.rings as number[],
-      note: student.note as string,
+      note: student.note as string | null,
       cash: student.cash as string,
       subject: student.subject as string,
-      lesson_left: typeof student.lesson_left === 'number' ? student.lesson_left : undefined,
-      membership_start_date: typeof student.membership_start_date === 'string' ? student.membership_start_date : null,
-      membership_end_date: typeof student.membership_end_date === 'string' ? student.membership_end_date : null,
-      is_membership_active: typeof student.is_membership_active === 'boolean' ? student.is_membership_active : false,
-      membership_days_remaining: typeof student.membership_days_remaining === 'number' ? student.membership_days_remaining : null,
+      lesson_left: student.lesson_left as number | null,
+      membership_start_date: student.membership_start_date as string | null,
+      membership_end_date: student.membership_end_date as string | null,
+      is_membership_active: student.is_membership_active as boolean,
+      membership_days_remaining: student.membership_days_remaining as number | null,
     };
     
     return { isValid: true, data: validStudent, errors: [] };
@@ -125,17 +134,24 @@ export function validateTransaction(obj: unknown): ValidationResult<Transaction>
   }
   if (typeof transaction.amount !== 'number') errors.push('金额必须是数字');
   if (typeof transaction.description !== 'string') errors.push('描述必须是字符串');
+  if (typeof transaction.note !== 'string' && transaction.note !== null) errors.push('备注必须是字符串或null');
   if (typeof transaction.is_installment !== 'boolean') errors.push('is_installment必须是布尔值');
   
   if (transaction.is_installment) {
-    if (typeof transaction.installment_plan_id !== 'number') {
-      errors.push('分期计划ID必须是数字');
+    if (typeof transaction.installment_plan_id !== 'number' && transaction.installment_plan_id !== null) {
+      errors.push('分期计划ID必须是数字或null');
     }
-    if (typeof transaction.installment_current !== 'number') {
-      errors.push('当前分期必须是数字');
+    if (typeof transaction.installment_current !== 'number' && transaction.installment_current !== null) {
+      errors.push('当前分期必须是数字或null');
     }
-    if (typeof transaction.installment_total !== 'number') {
-      errors.push('总分期数必须是数字');
+    if (typeof transaction.installment_total !== 'number' && transaction.installment_total !== null) {
+      errors.push('总分期数必须是数字或null');
+    }
+    if (typeof transaction.installment_due_date !== 'string' && transaction.installment_due_date !== null) {
+      errors.push('分期付款到期日期必须是字符串或null');
+    }
+    if (!isInstallmentStatus(transaction.installment_status) && transaction.installment_status !== null) {
+      errors.push('分期付款状态必须是有效的状态或null');
     }
   }
   
@@ -146,12 +162,12 @@ export function validateTransaction(obj: unknown): ValidationResult<Transaction>
       student_id: transaction.student_id as number | null,
       amount: transaction.amount as number,
       description: transaction.description as string,
-      note: typeof transaction.note === 'string' ? transaction.note : null,
+      note: transaction.note as string | null,
       is_installment: transaction.is_installment as boolean,
-      installment_plan_id: typeof transaction.installment_plan_id === 'number' ? transaction.installment_plan_id : null,
-      installment_current: typeof transaction.installment_current === 'number' ? transaction.installment_current : null,
-      installment_total: typeof transaction.installment_total === 'number' ? transaction.installment_total : null,
-      installment_due_date: typeof transaction.installment_due_date === 'string' ? transaction.installment_due_date : null,
+      installment_plan_id: transaction.installment_plan_id as number | null,
+      installment_current: transaction.installment_current as number | null,
+      installment_total: transaction.installment_total as number | null,
+      installment_due_date: transaction.installment_due_date as string | null,
       installment_status: isInstallmentStatus(transaction.installment_status) ? transaction.installment_status as InstallmentStatus : null,
     };
     
