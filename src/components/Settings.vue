@@ -68,7 +68,7 @@
         <div class="card-content">
           <div class="about-info">
             <h4>启明星管理系统</h4>
-            <p class="version">版本: 0.12.0</p>
+            <p class="version">版本: 0.12.1</p>
             <p class="tech-stack">基于 Tauri + Vue 3 构建</p>
           </div>
         </div>
