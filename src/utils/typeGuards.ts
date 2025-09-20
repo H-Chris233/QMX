@@ -86,7 +86,25 @@ export function validateStudent(obj: unknown): ValidationResult<Student> {
   if (typeof student.subject !== 'string') errors.push('科目必须是字符串');
   
   if (errors.length === 0) {
-    return { isValid: true, data: student as unknown as Student, errors: [] };
+    // 创建一个新的Student对象，确保所有必需字段都存在
+    const validStudent: Student = {
+      uid: student.uid as number,
+      name: student.name as string,
+      age: student.age as number,
+      class: student.class as string,
+      phone: student.phone as string,
+      rings: student.rings as number[],
+      note: student.note as string,
+      cash: student.cash as string,
+      subject: student.subject as string,
+      lesson_left: typeof student.lesson_left === 'number' ? student.lesson_left : undefined,
+      membership_start_date: typeof student.membership_start_date === 'string' ? student.membership_start_date : null,
+      membership_end_date: typeof student.membership_end_date === 'string' ? student.membership_end_date : null,
+      is_membership_active: typeof student.is_membership_active === 'boolean' ? student.is_membership_active : false,
+      membership_days_remaining: typeof student.membership_days_remaining === 'number' ? student.membership_days_remaining : null,
+    };
+    
+    return { isValid: true, data: validStudent, errors: [] };
   }
   
   return { isValid: false, errors };
@@ -122,7 +140,22 @@ export function validateTransaction(obj: unknown): ValidationResult<Transaction>
   }
   
   if (errors.length === 0) {
-    return { isValid: true, data: transaction as unknown as Transaction, errors: [] };
+    // 创建一个新的Transaction对象，确保所有必需字段都存在
+    const validTransaction: Transaction = {
+      uid: transaction.uid as number,
+      student_id: transaction.student_id as number | null,
+      amount: transaction.amount as number,
+      description: transaction.description as string,
+      note: typeof transaction.note === 'string' ? transaction.note : null,
+      is_installment: transaction.is_installment as boolean,
+      installment_plan_id: typeof transaction.installment_plan_id === 'number' ? transaction.installment_plan_id : null,
+      installment_current: typeof transaction.installment_current === 'number' ? transaction.installment_current : null,
+      installment_total: typeof transaction.installment_total === 'number' ? transaction.installment_total : null,
+      installment_due_date: typeof transaction.installment_due_date === 'string' ? transaction.installment_due_date : null,
+      installment_status: isInstallmentStatus(transaction.installment_status) ? transaction.installment_status as InstallmentStatus : null,
+    };
+    
+    return { isValid: true, data: validTransaction, errors: [] };
   }
   
   return { isValid: false, errors };
