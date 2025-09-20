@@ -9,6 +9,8 @@ use qmx_backend_lib::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::WindowBuilder;
 
 // 引入验证模块
