@@ -92,7 +92,7 @@ fn convert_student_to_response(student: &qmx_backend_lib::student::Student) -> S
     StudentResponse {
         uid: student.uid(),
         name: student.name().to_string(),
-        age: student.age().unwrap_or(0),
+        age: student.age(),
         class: format!("{:?}", student.class()),
         phone: student.phone().to_string(),
         note: student.note().to_string(),
@@ -210,7 +210,7 @@ fn add_student(
     Ok(StudentResponse {
         uid: student.uid(),
         name: student.name().to_string(),
-        age: student.age().unwrap_or(0),
+        age: student.age(),
         class: format!("{:?}", student.class()),
         phone: student.phone().to_string(),
         note: student.note().to_string(),
@@ -1205,7 +1205,7 @@ fn search_students(
         student_responses.push(StudentResponse {
             uid: student.uid(),
             name: student.name().to_string(),
-            age: student.age().unwrap_or(0),
+            age: student.age(),
             class: format!("{:?}", student.class()),
             phone: student.phone().to_string(),
             note: student.note().to_string(),
@@ -1422,7 +1422,7 @@ fn get_membership_expiring_soon(days: i64) -> Result<Vec<StudentResponse>, Strin
                 expiring_students.push(StudentResponse {
                     uid: student.uid(),
                     name: student.name().to_string(),
-                    age: student.age().unwrap_or(0),
+                    age: student.age(),
                     class: format!("{:?}", student.class()),
                     phone: student.phone().to_string(),
                     note: student.note().to_string(),
