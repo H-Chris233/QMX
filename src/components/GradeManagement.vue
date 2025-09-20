@@ -6,9 +6,6 @@
     <div class="section-header">
       <h2>成绩管理</h2>
       <div class="header-actions">
-        <button class="add-btn" @click="showAddGrade = true">
-          ➕ 添加成绩
-        </button>
         <button class="refresh-btn" @click="loadData" :disabled="loading">
           {{ loading ? '加载中...' : '🔄 刷新' }}
         </button>
@@ -85,36 +82,6 @@
       </div>
     </div>
 
-    <!-- 筛选和搜索 -->
-    <div class="filter-section" v-if="selectedStudentData">
-      <div class="filter-group">
-        <label>课程</label>
-        <select v-model="selectedCourse" @change="filterGrades">
-          <option value="">全部课程</option>
-          <option v-for="course in courses" :key="course" :value="course">
-            {{ course }}
-          </option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>考试类型</label>
-        <select v-model="selectedExamType" @change="filterGrades">
-          <option value="">全部类型</option>
-          <option value="期末考试">期末考试</option>
-          <option value="平时测验">平时测验</option>
-          <option value="作业">作业</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>学员</label>
-        <input
-          v-model="studentSearch"
-          type="text"
-          placeholder="搜索学员姓名"
-          @input="filterGrades"
-        />
-      </div>
-    </div>
 
     <!-- 学员成绩详情 -->
     <div v-if="selectedStudentData" class="student-detail">
@@ -228,59 +195,6 @@
       </div>
     </div>
 
-    <!-- 成绩表格 -->
-    <div class="grades-table" v-if="filteredGrades.length > 0">
-      <table>
-        <thead>
-          <tr>
-            <th>学员姓名</th>
-            <th>课程</th>
-            <th>考试类型</th>
-            <th>分数</th>
-            <th>等级</th>
-            <th>考试日期</th>
-            <th>备注</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="grade in filteredGrades" :key="grade.id">
-            <td>{{ grade.studentName }}</td>
-            <td>{{ grade.course }}</td>
-            <td>{{ grade.examType }}</td>
-            <td>
-              <div class="score-display">
-                <span :class="['score', getScoreClass(grade.score)]">{{
-                  grade.score
-                }}</span>
-                <div class="score-bar">
-                  <div
-                    class="score-fill"
-                    :style="{
-                      width: grade.score + '%',
-                      backgroundColor: getScoreColor(grade.score),
-                    }"
-                  ></div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span :class="['grade-level', getScoreClass(grade.score)]">
-                {{ getGradeLevel(grade.score) }}
-              </span>
-            </td>
-            <td>{{ grade.date }}</td>
-            <td class="notes">{{ grade.notes || '-' }}</td>
-            <td class="actions">
-              <button class="edit-btn" @click="editGrade(grade)">✏️</button>
-              <button class="delete-btn" @click="deleteGrade(grade.id)">
-                🗑️
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
 
     <!-- 成绩分布图表 -->
     <div class="grade-distribution">
@@ -308,82 +222,6 @@
       </div>
     </div>
 
-    <!-- 添加/编辑成绩模态框 -->
-    <div
-      v-if="showAddGrade || showEditGrade"
-      class="modal-overlay"
-      @click="closeModals"
-    >
-      <div class="modal" @click.stop>
-        <div class="modal-header">
-          <h3>{{ showAddGrade ? '添加成绩' : '编辑成绩' }}</h3>
-          <button class="close-btn" @click="closeModals">✖️</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label>学员姓名</label>
-            <select v-model="currentGrade.studentId">
-              <option value="">请选择学员</option>
-              <option
-                v-for="student in students"
-                :key="student.uid"
-                :value="student.uid"
-              >
-                {{ student.name }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>课程类型</label>
-            <select v-model="currentGrade.course">
-              <option value="">请选择课程类型</option>
-              <option value="射击">射击</option>
-              <option value="射箭">射箭</option>
-              <option value="其他">其他</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>考试类型</label>
-            <select v-model="currentGrade.examType">
-              <option value="">请选择类型</option>
-              <option value="期末考试">期末考试</option>
-              <option value="平时测验">平时测验</option>
-              <option value="作业">作业</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>分数 {{ getScoreRangeText(currentGrade.course) }}</label>
-            <input
-              v-model.number="currentGrade.score"
-              type="number"
-              min="0"
-              :max="getMaxScoreForCourse(currentGrade.course)"
-              :placeholder="getScorePlaceholderText(currentGrade.course)"
-            />
-          </div>
-          <div class="form-group">
-            <DatePicker
-              v-model="currentGrade.date"
-              label="考试日期"
-              placeholder="选择考试日期"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label>备注</label>
-            <textarea
-              v-model="currentGrade.notes"
-              rows="3"
-              placeholder="可选备注信息"
-            ></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="cancel-btn" @click="closeModals">取消</button>
-          <button class="save-btn" @click="saveGrade">保存</button>
-        </div>
-      </div>
-    </div>
 
   </div>
 </template>
@@ -396,17 +234,6 @@ import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
 
 
-// TypeScript类型定义
-interface Grade {
-  id: number;
-  studentName: string;
-  course: string;
-  examType: string;
-  score: number;
-  date: string;
-  studentId: number;
-  notes?: string;
-}
 
 
 
@@ -418,7 +245,6 @@ interface ErrorHandler {
 
 // 使用script setup提高类型安全
     const loading = ref(false);
-    const grades = ref<Grade[]>([]);
     const students = ref<Student[]>([]);
 
     const selectedStudent = ref('');
@@ -426,30 +252,6 @@ interface ErrorHandler {
     const quickScore = ref('');
     const studentSelect = ref<HTMLElement | null>(null);
     const abortController = ref<AbortController | null>(null);
-    const selectedCourse = ref('');
-    const selectedExamType = ref('');
-    const studentSearch = ref('');
-    const showAddGrade = ref(false);
-    const showEditGrade = ref(false);
-    const currentGrade = ref<{
-      id: number | null;
-      studentId: string;
-      studentName: string;
-      course: string;
-      examType: string;
-      score: number | null;
-      date: string;
-      notes: string;
-    }>({
-      id: null,
-      studentId: '',
-      studentName: '',
-      course: '',
-      examType: '',
-      score: null,
-      date: '',
-      notes: '',
-    });
 
     // 注入错误处理函数
     const errorHandler = inject<ErrorHandler>('errorHandler');
@@ -483,8 +285,6 @@ interface ErrorHandler {
       console.warn('⚠️ errorHandler 未正确注入到 GradeManagement 组件');
     }
 
-    // 课程列表
-    const courses = ['射击', '射箭', '其他'];
 
     // 计算属性
     const recentScores = computed(() => {
@@ -527,41 +327,14 @@ interface ErrorHandler {
       return min === Infinity ? 0 : min;
     });
 
-    const filteredGrades = computed(() => {
-      let filtered = grades.value;
-
-      // 如果选中了学员，只显示该学员的成绩
-      if (selectedStudentData.value) {
-        filtered = filtered.filter((g) => g.studentName === selectedStudentData.value!.name);
-      }
-
-      if (selectedCourse.value) {
-        filtered = filtered.filter((g) => g.course === selectedCourse.value);
-      }
-
-      if (selectedExamType.value) {
-        filtered = filtered.filter(
-          (g) => g.examType === selectedExamType.value,
-        );
-      }
-
-      if (studentSearch.value) {
-        const q = studentSearch.value.toLowerCase();
-        filtered = filtered.filter((g) =>
-          g.studentName.toLowerCase().includes(q),
-        );
-      }
-
-      return filtered;
-    });
 
     const totalCount = computed(() => {
       // 如果选中了学员，返回 API 数据的数量
       if (selectedStudentData.value) {
         return selectedStudentData.value.rings.length;
       }
-      // 否则返回所有成绩的数量
-      return filteredGrades.value.length;
+      // 否则返回0
+      return 0;
     });
     
     const passedCount = computed(() => {
@@ -574,8 +347,8 @@ interface ErrorHandler {
           return score >= 60;
         }).length;
       }
-      // 否则计算所有成绩的及格数
-      return filteredGrades.value.filter((g) => g.score >= 60).length;
+      // 否则返回0
+      return 0;
     });
     
     const excellentCount = computed(() => {
@@ -588,8 +361,8 @@ interface ErrorHandler {
           return score >= 90;
         }).length;
       }
-      // 否则计算所有成绩的优秀数
-      return filteredGrades.value.filter((g) => g.score >= 90).length;
+      // 否则返回0
+      return 0;
     });
 
     const averageScore = computed(() => {
@@ -597,10 +370,8 @@ interface ErrorHandler {
       if (selectedStudentData.value) {
         return averageScoreApi.value.toFixed(1);
       }
-      // 否则显示模拟数据的平均分
-      if (totalCount.value === 0) return 0;
-      const sum = filteredGrades.value.reduce((acc, g) => acc + g.score, 0);
-      return Math.round(sum / totalCount.value);
+      // 否则返回0
+      return 0;
     });
 
     const highestScore = computed(() => {
@@ -608,9 +379,8 @@ interface ErrorHandler {
       if (selectedStudentData.value) {
         return maxScoreApi.value.toFixed(1);
       }
-      // 否则显示模拟数据的最高分
-      if (totalCount.value === 0) return 0;
-      return Math.max(...filteredGrades.value.map((g) => g.score));
+      // 否则返回0
+      return 0;
     });
 
     const highestScorer = computed(() => {
@@ -618,12 +388,8 @@ interface ErrorHandler {
       if (selectedStudentData.value) {
         return selectedStudentData.value.name;
       }
-      // 否则显示模拟数据的最高分获得者
-      if (totalCount.value === 0) return '';
-      const highestGrade = filteredGrades.value.reduce((max, g) =>
-        g.score > max.score ? g : max,
-      );
-      return highestGrade.studentName;
+      // 否则返回空字符串
+      return '';
     });
 
     const passRate = computed(() => {
@@ -638,9 +404,8 @@ interface ErrorHandler {
         }).length;
         return Math.round((passedApiCount / selectedStudentData.value.rings.length) * 100);
       }
-      // 否则计算模拟数据的及格率
-      if (totalCount.value === 0) return 0;
-      return Math.round((passedCount.value / totalCount.value) * 100);
+      // 否则返回0
+      return 0;
     });
 
     const excellentRate = computed(() => {
@@ -655,9 +420,8 @@ interface ErrorHandler {
         }).length;
         return Math.round((excellentApiCount / selectedStudentData.value.rings.length) * 100);
       }
-      // 否则计算模拟数据的优秀率
-      if (totalCount.value === 0) return 0;
-      return Math.round((excellentCount.value / totalCount.value) * 100);
+      // 否则返回0
+      return 0;
     });
 
     const scoreRanges = computed(() => {
@@ -703,7 +467,7 @@ interface ErrorHandler {
         return ranges.map((r) => ({ ...r, maxCount }));
       }
       
-      // 否则使用模拟数据的分布
+      // 否则返回空的分布数据
       const ranges = [
         { label: '90-100', min: 90, max: 100, count: 0, color: '#4caf50' },
         { label: '80-89', min: 80, max: 89, count: 0, color: '#8bc34a' },
@@ -712,14 +476,7 @@ interface ErrorHandler {
         { label: '0-59', min: 0, max: 59, count: 0, color: '#f44336' },
       ];
 
-      filteredGrades.value.forEach((grade) => {
-        const range = ranges.find(
-          (r) => grade.score >= r.min && grade.score <= r.max,
-        );
-        if (range) range.count++;
-      });
-
-      const maxCount = Math.max(...ranges.map((r) => r.count), 1);
+      const maxCount = 1;
       return ranges.map((r) => ({ ...r, maxCount }));
     });
 
@@ -836,46 +593,6 @@ interface ErrorHandler {
       }
     };
 
-    // 根据课程类型获取分数上限
-    const getMaxScoreForCourse = (course: string): number => {
-      switch (course) {
-        case '射击':
-          return 645;
-        case '射箭':
-          return 600;
-        case '其他':
-        default:
-          return 1000; // 设置一个较大的上限值
-      }
-    };
-
-    // 根据课程类型获取分数范围文本
-    const getScoreRangeText = (course: string): string => {
-      switch (course) {
-        case '射击':
-          return '(0-645)';
-        case '射箭':
-          return '(0-600)';
-        case '其他':
-          return '(无限制)';
-        default:
-          return '';
-      }
-    };
-
-    // 根据课程类型获取占位符文本
-    const getScorePlaceholderText = (course: string): string => {
-      switch (course) {
-        case '射击':
-          return '请输入射击成绩 (0-645)';
-        case '射箭':
-          return '请输入射箭成绩 (0-600)';
-        case '其他':
-          return '请输入成绩';
-        default:
-          return '请选择课程类型后输入成绩';
-      }
-    };
 
     // 输入验证函数
     // 简化的成绩验证函数 - 只做最基本的类型检查
@@ -899,126 +616,7 @@ interface ErrorHandler {
       };
     };
 
-    const filterGrades = (): void => {
-      // 筛选逻辑已通过computed属性实现
-    };
 
-    const editGrade = (grade: Grade): void => {
-      currentGrade.value = {
-        id: grade.id,
-        studentId: String(grade.studentId),
-        studentName: grade.studentName || '',
-        course: grade.course || '',
-        examType: grade.examType || '',
-        score: grade.score ?? 0,
-        date: grade.date || '',
-        notes: grade.notes || '',
-      };
-      showEditGrade.value = true;
-    };
-
-    const deleteGrade = (id: number): void => {
-      showConfirm({
-        title: '删除成绩记录',
-        message: '确定要删除这条成绩记录吗？',
-        confirmText: '删除',
-        cancelText: '取消',
-        confirmType: 'danger',
-        onConfirm: () => {
-          grades.value = grades.value.filter((g) => g.id !== id);
-        }
-      });
-    };
-
-    const saveGrade = (): void => {
-      if (
-        !currentGrade.value.studentId ||
-        !currentGrade.value.course ||
-        currentGrade.value.score === null || currentGrade.value.score === undefined
-      ) {
-        handleValidationError('missing_fields', '请填写必要信息：学员、课程类型和分数');
-        return;
-      }
-
-      // 验证分数范围
-      const maxScore = getMaxScoreForCourse(currentGrade.value.course);
-      if (maxScore && currentGrade.value.score > maxScore) {
-        handleValidationError('score_range', `${currentGrade.value.course}课程的分数不能超过${maxScore}`);
-        return;
-      }
-
-      if (currentGrade.value.score < 0) {
-        handleValidationError('negative_score', '分数不能为负数');
-        return;
-      }
-
-      // 获取学员姓名 - 改进学员ID转换
-      const studentId = Number(currentGrade.value.studentId);
-      if (isNaN(studentId) || studentId <= 0) {
-        handleValidationError('invalid_student_id', '学员ID无效');
-        return;
-      }
-      
-      const student = students.value.find(
-        (s: any) => s.uid === studentId,
-      );
-      if (student) {
-        currentGrade.value.studentName = student.name;
-      }
-
-      if (showAddGrade.value) {
-        // 添加新成绩
-        const newGrade: Grade = {
-          id: Date.now(),
-          studentId: currentGrade.value.studentId ? Number(currentGrade.value.studentId) : 0,
-          studentName: currentGrade.value.studentName,
-          course: currentGrade.value.course,
-          examType: currentGrade.value.examType,
-          score: currentGrade.value.score,
-          date: currentGrade.value.date ? currentGrade.value.date : new Date().toISOString().split('T')[0] as string,
-          notes: currentGrade.value.notes,
-        };
-        grades.value.push(newGrade);
-      } else {
-        // 编辑现有成绩
-        const index = grades.value.findIndex(
-          (g) => g.id === currentGrade.value.id,
-        );
-        if (index === -1) {
-          return;
-        }
-        if (index !== -1) {
-          const fallback = grades.value[index]!;
-          grades.value[index] = {
-            id: (currentGrade.value.id ?? fallback.id) as number,
-            studentId: currentGrade.value.studentId ? Number(currentGrade.value.studentId) : (fallback.studentId ? Number(fallback.studentId) : 0),
-            studentName: currentGrade.value.studentName || fallback.studentName,
-            course: currentGrade.value.course || fallback.course,
-            examType: currentGrade.value.examType || fallback.examType,
-            score: currentGrade.value.score ?? fallback.score,
-            date: currentGrade.value.date || fallback.date || new Date().toISOString().split('T')[0],
-            notes: currentGrade.value.notes ?? fallback.notes,
-          } as Grade;
-        }
-      }
-
-      closeModals();
-    };
-
-    const closeModals = (): void => {
-      showAddGrade.value = false;
-      showEditGrade.value = false;
-      currentGrade.value = {
-        id: null,
-        studentId: '',
-        studentName: '',
-        course: '',
-        examType: '',
-        score: null,
-        date: '',
-        notes: '',
-      };
-    };
 
 
 

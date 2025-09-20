@@ -5,9 +5,10 @@
     role="dialog"
     aria-modal="true"
     :aria-label="title || '确认操作'"
-    @click="closeOnOverlayClick ? cancelAction() : null"
+    @mousedown="handleOverlayMouseDown"
+    @mouseup="handleOverlayMouseUp"
   >
-    <div class="confirm-modal" tabindex="-1" @click.stop>
+    <div class="confirm-modal" tabindex="-1" @click.stop @mousedown.stop @mouseup.stop>
       <div class="confirm-header">
         <div class="confirm-icon" aria-hidden="true">❓</div>
         <h3>{{ title }}</h3>
@@ -71,6 +72,21 @@ const confirmAction = (): void => {
 
 const cancelAction = (): void => {
   emit('cancel');
+};
+
+// 模态框背景事件处理 - 防止拖拽误关闭
+let overlayMouseDownTarget: EventTarget | null = null;
+
+const handleOverlayMouseDown = (event: MouseEvent): void => {
+  overlayMouseDownTarget = event.target;
+};
+
+const handleOverlayMouseUp = (event: MouseEvent): void => {
+  // 只有当mousedown和mouseup都在背景区域时才关闭模态框
+  if (overlayMouseDownTarget === event.target && event.target === event.currentTarget && props.closeOnOverlayClick) {
+    cancelAction();
+  }
+  overlayMouseDownTarget = null;
 };
 
 // 修复内存泄漏：使用ref跟踪监听器状态

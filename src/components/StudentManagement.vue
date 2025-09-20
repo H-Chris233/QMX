@@ -194,9 +194,10 @@
     <div
       v-if="showAddModal || showEditModal"
       class="modal-overlay"
-      @click="closeModals"
+      @mousedown="handleOverlayMouseDown"
+      @mouseup="handleOverlayMouseUp"
     >
-      <div class="modal" @click.stop>
+      <div class="modal" @click.stop @mousedown.stop @mouseup.stop>
         <div class="modal-header">
           <h3>{{ showAddModal ? '添加学员' : '编辑学员' }}</h3>
           <button class="close-btn" @click="closeModals">✖️</button>
@@ -242,11 +243,11 @@
             />
           </div>
           <div class="form-group">
-            <label>年龄</label>
+            <label>年龄 <span class="optional-label">(可选)</span></label>
             <input
               v-model="currentStudent.age"
               type="number"
-              placeholder="请输入年龄"
+              placeholder="请输入年龄（可选）"
               min="3"
               max="120"
             />
@@ -329,9 +330,10 @@
     <div
       v-if="showMembershipModal"
       class="modal-overlay"
-      @click="closeMembershipModal"
+      @mousedown="handleMembershipOverlayMouseDown"
+      @mouseup="handleMembershipOverlayMouseUp"
     >
-      <div class="modal membership-modal" @click.stop>
+      <div class="modal membership-modal" @click.stop @mousedown.stop @mouseup.stop>
         <div class="modal-header">
           <h3>会员管理 - {{ membershipStudent?.name }}</h3>
           <button class="close-btn" @click="closeMembershipModal">✖️</button>
@@ -880,8 +882,8 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
         if (/('|(\\x27)|(\\x2D\\x2D)|(\;)|(\|)|(\*)|(\%))/.test(trimmedName)) {
           errors.push('姓名包含不安全字符');
         }
-        // 年龄验证 - 只做基本类型检查
-      if (student.age !== null && student.age !== undefined) {
+        // 年龄验证 - 可选字段，只在有值时验证
+      if (student.age !== null && student.age !== undefined && student.age !== '') {
         const age = typeof student.age === 'number' ? student.age : Number(student.age);
         if (isNaN(age) || age < 3 || age > 120) {
           errors.push('年龄必须是3-120之间的数字');
@@ -1499,6 +1501,36 @@ const onCustomMembershipToggle = (): void => {
       }
     };
 
+// 模态框背景事件处理 - 防止拖拽误关闭
+let overlayMouseDownTarget: EventTarget | null = null;
+
+const handleOverlayMouseDown = (event: MouseEvent): void => {
+  overlayMouseDownTarget = event.target;
+};
+
+const handleOverlayMouseUp = (event: MouseEvent): void => {
+  // 只有当mousedown和mouseup都在背景区域时才关闭模态框
+  if (overlayMouseDownTarget === event.target && event.target === event.currentTarget) {
+    closeModals();
+  }
+  overlayMouseDownTarget = null;
+};
+
+// 会员管理模态框背景事件处理
+let membershipOverlayMouseDownTarget: EventTarget | null = null;
+
+const handleMembershipOverlayMouseDown = (event: MouseEvent): void => {
+  membershipOverlayMouseDownTarget = event.target;
+};
+
+const handleMembershipOverlayMouseUp = (event: MouseEvent): void => {
+  // 只有当mousedown和mouseup都在背景区域时才关闭模态框
+  if (membershipOverlayMouseDownTarget === event.target && event.target === event.currentTarget) {
+    closeMembershipModal();
+  }
+  membershipOverlayMouseDownTarget = null;
+};
+
 
 </script>
 
@@ -1996,6 +2028,12 @@ const onCustomMembershipToggle = (): void => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.optional-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: normal;
 }
 
 .preview-icon {

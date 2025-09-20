@@ -2,9 +2,10 @@
   <div
     v-if="show"
     class="error-modal-overlay"
-    @click="closeOnOverlayClick ? closeModal() : null"
+    @mousedown="handleOverlayMouseDown"
+    @mouseup="handleOverlayMouseUp"
   >
-    <div class="error-modal" @click.stop>
+    <div class="error-modal" @click.stop @mousedown.stop @mouseup.stop>
       <div class="error-header">
         <div class="error-icon" :class="priorityClass">❌</div>
         <h3>{{ title }}</h3>
@@ -95,6 +96,21 @@ const closeModal = (): void => {
 
 const retry = (): void => {
   emit('retry');
+};
+
+// 模态框背景事件处理 - 防止拖拽误关闭
+let overlayMouseDownTarget: EventTarget | null = null;
+
+const handleOverlayMouseDown = (event: MouseEvent): void => {
+  overlayMouseDownTarget = event.target;
+};
+
+const handleOverlayMouseUp = (event: MouseEvent): void => {
+  // 只有当mousedown和mouseup都在背景区域时才关闭模态框
+  if (overlayMouseDownTarget === event.target && event.target === event.currentTarget && props.closeOnOverlayClick) {
+    closeModal();
+  }
+  overlayMouseDownTarget = null;
 };
 
 // 修复内存泄漏：使用ref跟踪监听器状态
