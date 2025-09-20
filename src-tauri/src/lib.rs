@@ -92,7 +92,7 @@ fn convert_student_to_response(student: &qmx_backend_lib::student::Student) -> S
     StudentResponse {
         uid: student.uid(),
         name: student.name().to_string(),
-        age: student.age(),
+        age: student.age().unwrap_or(0),
         class: format!("{:?}", student.class()),
         phone: student.phone().to_string(),
         note: student.note().to_string(),
@@ -183,12 +183,17 @@ fn add_student(
 
     // v2 API - 使用构建器模式创建学生
     let manager = get_manager()?;
-    let builder = StudentBuilder::new(name.trim(), age)
+    let mut builder = StudentBuilder::new(name.trim())
         .phone(phone.trim())
         .class(class)
         .subject(subject_enum)
         .note(note.trim());
-
+    
+    // 如果提供了年龄，则设置年龄
+    if let Some(age_value) = age {
+        builder = builder.age(age_value);
+    }
+    
     let uid = manager.create_student(builder).map_err(|e| {
         log::error!("v2 API创建学生失败: {}", e);
         format!("创建学生失败: {}", e)
@@ -205,7 +210,7 @@ fn add_student(
     Ok(StudentResponse {
         uid: student.uid(),
         name: student.name().to_string(),
-        age: student.age(),
+        age: student.age().unwrap_or(0),
         class: format!("{:?}", student.class()),
         phone: student.phone().to_string(),
         note: student.note().to_string(),
@@ -1200,7 +1205,7 @@ fn search_students(
         student_responses.push(StudentResponse {
             uid: student.uid(),
             name: student.name().to_string(),
-            age: student.age(),
+            age: student.age().unwrap_or(0),
             class: format!("{:?}", student.class()),
             phone: student.phone().to_string(),
             note: student.note().to_string(),
@@ -1417,7 +1422,7 @@ fn get_membership_expiring_soon(days: i64) -> Result<Vec<StudentResponse>, Strin
                 expiring_students.push(StudentResponse {
                     uid: student.uid(),
                     name: student.name().to_string(),
-                    age: student.age(),
+                    age: student.age().unwrap_or(0),
                     class: format!("{:?}", student.class()),
                     phone: student.phone().to_string(),
                     note: student.note().to_string(),
@@ -1484,7 +1489,7 @@ pub fn run() {
 pub struct StudentResponse {
     pub uid: u64,
     pub name: String,
-    pub age: u8,
+    pub age: Option<u8>,
     pub class: String,
     pub phone: String,
     pub note: String,
