@@ -101,7 +101,7 @@ export class ApiService {
   // 学员管理
   static async addStudent(
     name: string,
-    age: number,
+    age: number | undefined,
     classType: string,
     phone: string,
     note: string,

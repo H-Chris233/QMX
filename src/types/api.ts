@@ -1,7 +1,7 @@
 export interface Student {
   uid: number;
   name: string;
-  age: number;
+  age: number | null;
   class: string;
   phone: string;
   rings: number[];
@@ -42,7 +42,7 @@ export type InstallmentStatus = 'Pending' | 'Paid' | 'Overdue' | 'Cancelled';
 
 export interface StudentUpdateData {
   name?: string;
-  age?: number;
+  age?: number | null;
   classType?: string;
   phone?: string;
   note?: string;
@@ -121,7 +121,7 @@ export interface CashSearchOptions {
 
 export interface StudentUpdateBatch {
   name?: string;
-  age?: number;
+  age?: number | null;
   class_type?: string;
   subject?: string;
   note?: string;
