@@ -24,10 +24,10 @@ export function transformStudentData(rawData: unknown): Student {
     rings: Array.isArray(data.rings) && data.rings.every(r => typeof r === 'number') 
       ? data.rings as number[] 
       : [],
-    note: typeof data.note === 'string' ? data.note : '',
+    note: typeof data.note === 'string' ? data.note : null,
     cash: typeof data.cash === 'string' ? data.cash : '',
     subject: typeof data.subject === 'string' ? data.subject : 'Others',
-    lesson_left: typeof data.lesson_left === 'number' ? data.lesson_left : undefined,
+    lesson_left: typeof data.lesson_left === 'number' ? data.lesson_left : null,
     membership_start_date: typeof data.membership_start_date === 'string' ? data.membership_start_date : null,
     membership_end_date: typeof data.membership_end_date === 'string' ? data.membership_end_date : null,
     is_membership_active: typeof data.is_membership_active === 'boolean' ? data.is_membership_active : false,
@@ -122,12 +122,16 @@ export function validateStudentData(student: unknown): boolean {
   return (
     typeof s.uid === 'number' &&
     typeof s.name === 'string' &&
-    typeof s.age === 'number' &&
+    (typeof s.age === 'number' || s.age === null) &&
     typeof s.class === 'string' &&
     typeof s.phone === 'string' &&
     typeof s.subject === 'string' &&
-    (s.lesson_left === undefined ||
-      typeof s.lesson_left === 'number')
+    (typeof s.note === 'string' || s.note === null) &&
+    (typeof s.lesson_left === 'number' || s.lesson_left === null) &&
+    (typeof s.membership_start_date === 'string' || s.membership_start_date === null) &&
+    (typeof s.membership_end_date === 'string' || s.membership_end_date === null) &&
+    typeof s.is_membership_active === 'boolean' &&
+    (typeof s.membership_days_remaining === 'number' || s.membership_days_remaining === null)
   );
 }
 
@@ -214,7 +218,7 @@ export function getInstallmentStatusLabel(status: string | null): string {
     case 'Cancelled':
       return '已取消';
     default:
-      return status;
+      return '未知';
   }
 }
 

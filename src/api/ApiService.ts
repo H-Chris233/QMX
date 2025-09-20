@@ -111,7 +111,7 @@ export class ApiService {
     if (!name || typeof name !== 'string') throw new Error('学员姓名无效');
     
     return handleApiOperation(async () => {
-      const rawData = await invokeWithEnhancements<unknown>('add_student' as TauriCommand, {
+      const rawData = await invokeWithEnhancements<unknown>('add_student', {
         name: name.trim(),
         age,
         classType,
@@ -131,7 +131,7 @@ export class ApiService {
 
   static async getAllStudents(): Promise<Student[]> {
     return handleApiOperation(async () => {
-      const rawDataArray = await invokeWithEnhancements<unknown[]>('get_all_students' as TauriCommand, {}, {
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('get_all_students', {}, {
         timeout: API_CONFIG.LONG_OPERATION_TIMEOUT // 获取所有学员可能需要更长时间
       });
       
@@ -155,7 +155,7 @@ export class ApiService {
     if (typeof score !== 'number' || !isFinite(score)) throw new Error('成绩必须是有效数字');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('add_score' as TauriCommand, {
+      await invokeWithEnhancements<null>('add_score', {
         studentUid,
         score,
       });
@@ -171,7 +171,7 @@ export class ApiService {
     if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
-      const response = await invokeWithEnhancements<StudentScoresResponse>('get_student_scores' as TauriCommand, {
+      const response = await invokeWithEnhancements<StudentScoresResponse>('get_student_scores', {
         studentUid,
       });
       
@@ -210,7 +210,7 @@ export class ApiService {
     if (typeof scoreIndex !== 'number' || !Number.isInteger(scoreIndex) || scoreIndex < 0) throw new Error('成绩索引无效');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('delete_student_score' as TauriCommand, {
+      await invokeWithEnhancements<null>('delete_student_score', {
         studentUid,
         scoreIndex,
       });
@@ -229,7 +229,7 @@ export class ApiService {
     if (typeof newScore !== 'number' || !isFinite(newScore)) throw new Error('成绩必须是有效数字');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('update_student_score' as TauriCommand, {
+      await invokeWithEnhancements<null>('update_student_score', {
         studentUid,
         scoreIndex,
         newScore,
@@ -250,7 +250,7 @@ export class ApiService {
     if (!updates || typeof updates !== 'object') throw new Error('更新数据无效');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('update_student_info' as TauriCommand, {
+      await invokeWithEnhancements<null>('update_student_info', {
         studentUid,
         name: updates.name?.trim(),
         age: updates.age,
@@ -274,7 +274,7 @@ export class ApiService {
     if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('delete_student' as TauriCommand, {
+      await invokeWithEnhancements<null>('delete_student', {
         studentUid,
       }, {
         retries: false // 删除操作不重试，避免重复删除
@@ -305,7 +305,7 @@ export class ApiService {
     }
 
     return handleApiOperation(async () => {
-      const rawData = await invokeWithEnhancements<any>('add_cash_transaction' as TauriCommand, {
+      const rawData = await invokeWithEnhancements<any>('add_cash_transaction', {
         studentUid: studentUid === null ? null : Number(studentUid),
         amount,
         note: note || '',
@@ -359,7 +359,7 @@ export class ApiService {
     }
 
     return handleApiOperation(async () => {
-      const rawData = await invokeWithEnhancements<any>('add_cash_transaction' as TauriCommand, {
+      const rawData = await invokeWithEnhancements<any>('add_cash_transaction', {
         studentUid: studentUid === null ? null : Number(studentUid),
         amount: totalAmount,
         note: note || '',
@@ -539,7 +539,7 @@ export class ApiService {
     if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('set_student_membership' as TauriCommand, {
+      await invokeWithEnhancements<null>('set_student_membership', {
         studentUid,
         startDate: startDate || null,
         endDate: endDate || null,
@@ -556,7 +556,7 @@ export class ApiService {
     if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('clear_student_membership' as TauriCommand, {
+      await invokeWithEnhancements<null>('clear_student_membership', {
         studentUid,
       });
       
@@ -579,7 +579,7 @@ export class ApiService {
     }
     
     return handleApiOperation(async () => {
-      await invokeWithEnhancements<null>('set_membership_by_type' as TauriCommand, {
+      await invokeWithEnhancements<null>('set_membership_by_type', {
         studentUid,
         membershipType,
         startFromToday,
@@ -606,7 +606,7 @@ export class ApiService {
     if (typeof studentUid !== 'number' || !Number.isInteger(studentUid) || studentUid <= 0) throw new Error('学员ID无效');
     
     return handleApiOperation(async () => {
-      const rawData = await invokeWithEnhancements<unknown>('get_student_stats' as TauriCommand, {
+      const rawData = await invokeWithEnhancements<unknown>('get_student_stats', {
         studentUid,
       });
       
@@ -644,7 +644,7 @@ export class ApiService {
   // 获取特定周期的财务统计
   static async getFinancialStats(period: 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear' | { start: string; end: string } = 'ThisMonth') {
     return handleApiOperation(async () => {
-      return await invokeWithEnhancements<any>('get_financial_stats' as TauriCommand, {
+      return await invokeWithEnhancements<any>('get_financial_stats', {
         period,
       });
     }, '获取财务统计', {
@@ -690,7 +690,7 @@ export class ApiService {
     }
     
     return handleApiOperation(async () => {
-      const rawDataArray = await invokeWithEnhancements<unknown[]>('search_students' as TauriCommand, {
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('search_students', {
         nameContains: options.name_contains,
         minAge: options.min_age,
         maxAge: options.max_age,
@@ -743,7 +743,7 @@ export class ApiService {
     }
     
     return handleApiOperation(async () => {
-      const rawDataArray = await invokeWithEnhancements<unknown[]>('search_cash' as TauriCommand, {
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('search_cash', {
         studentId: options.student_id,
         minAmount: options.min_amount,
         maxAmount: options.max_amount,
@@ -767,7 +767,7 @@ export class ApiService {
     if (days <= 0) throw new Error('天数必须大于0');
     
     return handleApiOperation(async () => {
-      const rawDataArray = await invokeWithEnhancements<unknown[]>('get_membership_expiring_soon' as TauriCommand, {
+      const rawDataArray = await invokeWithEnhancements<unknown[]>('get_membership_expiring_soon', {
         days,
       });
       
