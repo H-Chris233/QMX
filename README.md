@@ -83,7 +83,7 @@ pnpm preview
 ## 配置与约定
 - 固定开发端口：1420（vite.config.ts、tauri.conf.json）
 - 窗口默认尺寸：1500x1000，标题“启明星管理软件”
-- 本地依赖：qmx_backend_lib 通过 Cargo.toml 指向 ../../qmx_backend_lib
+- 本地依赖：qmx_backend_lib 通过 Cargo.toml 指向https://github.com/H-Chris233/qmx_backend_lib
 
 ## 许可证
 暂未声明。
