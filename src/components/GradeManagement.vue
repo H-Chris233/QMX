@@ -231,7 +231,6 @@ import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import type { Student } from '../types/api';
 import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
-import DatePicker from './DatePicker.vue';
 
 
 
@@ -507,43 +506,6 @@ interface ErrorHandler {
       return 'fail';
     };
 
-    const getScoreColor = (score: number): string => {
-      const colors: Record<'excellent' | 'good' | 'average' | 'pass' | 'fail', string> = {
-        excellent: '#4caf50',
-        good: '#8bc34a',
-        average: '#ffc107',
-        pass: '#ff9800',
-        fail: '#f44336',
-      };
-      return colors[getScoreClass(score)];
-    };
-
-    const getGradeLevel = (score: number): 'A' | 'B' | 'C' | 'D' | 'F' => {
-      // 如果选中了学员，根据运动项目设置不同的等级
-      if (selectedStudentData.value) {
-        const subject = selectedStudentData.value.subject;
-        if (subject === 'Shooting') {
-          if (score >= 500) return 'A';
-          if (score >= 400) return 'B';
-          if (score >= 300) return 'C';
-          if (score >= 200) return 'D';
-          return 'F';
-        } else if (subject === 'Archery') {
-          if (score >= 450) return 'A';
-          if (score >= 350) return 'B';
-          if (score >= 250) return 'C';
-          if (score >= 150) return 'D';
-          return 'F';
-        }
-      }
-      
-      // 默认的学术成绩等级
-      if (score >= 90) return 'A';
-      if (score >= 80) return 'B';
-      if (score >= 70) return 'C';
-      if (score >= 60) return 'D';
-      return 'F';
-    };
 
     // 格式化方法
     const getStudentAge = (): string => {

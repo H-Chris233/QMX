@@ -883,7 +883,7 @@ const validateStudentInput = (student: CurrentStudent): { isValid: boolean; erro
           errors.push('姓名包含不安全字符');
         }
         // 年龄验证 - 可选字段，只在有值时验证
-      if (student.age !== null && student.age !== undefined && student.age !== '') {
+      if (student.age !== null && student.age !== undefined) {
         const age = typeof student.age === 'number' ? student.age : Number(student.age);
         if (isNaN(age) || age < 3 || age > 120) {
           errors.push('年龄必须是3-120之间的数字');
