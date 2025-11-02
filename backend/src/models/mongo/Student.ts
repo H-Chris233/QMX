@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import logger from '@/utils/logger';
 
 // 学生接口定义
 export interface IStudentDoc extends Document {
@@ -11,8 +12,16 @@ export interface IStudentDoc extends Document {
   rings: number[];
   membership_start_date: Date | null;
   membership_end_date: Date | null;
+  note?: string;
   created_at: Date;
   updated_at: Date;
+  
+  // 方法
+  getAverageScore(): number;
+  hasMembership(): boolean;
+  getMembershipDaysRemaining(): number | null;
+  updateScore(newScore: number): void;
+  addMembershipDays(days: number): void;
 }
 
 // 学生Schema
@@ -65,10 +74,11 @@ const StudentSchema = new Schema<IStudentDoc>({
     default: null,
     comment: '会员开始日期'
   },
-  membership_end_date: {
-    type: Date,
+  note: {
+    type: String,
+    trim: true,
     default: null,
-    comment: '会员结束日期'
+    comment: '备注信息'
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
@@ -109,7 +119,55 @@ StudentSchema.methods.getAverageScore = function(): number {
     return 0;
   }
   const sum = this.rings.reduce((total: number, score: number) => total + score, 0);
-  return Number((sum / this.rings.length).toFixed(1));
+  return Number((sum / this.rings.length).toFixed(2));
+};
+
+// 实例方法：更新成绩
+StudentSchema.methods.updateScore = function(newScore: number): void {
+  if (!this.rings) {
+    this.rings = [];
+  }
+  this.rings.push(newScore);
+  // 只保留最近20次成绩
+  if (this.rings.length > 20) {
+    this.rings = this.rings.slice(-20);
+  }
+};
+
+// 实例方法：添加会员天数
+StudentSchema.methods.addMembershipDays = function(days: number): void {
+  const now = new Date();
+  if (!this.membership_end_date || this.membership_end_date < now) {
+    this.membership_start_date = now;
+    this.membership_end_date = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  } else {
+    this.membership_end_date = new Date(this.membership_end_date.getTime() + days * 24 * 60 * 60 * 1000);
+  }
+};
+
+// 静态方法：根据手机号查找
+StudentSchema.statics.findByPhone = function(phone: string) {
+  return this.findOne({ phone: phone?.trim() || null });
+};
+
+// 静态方法：查找有会员的学生
+StudentSchema.statics.findWithMembership = function() {
+  return this.find({
+    membership_end_date: { $exists: true, $ne: null }
+  });
+};
+
+// 静态方法：查找即将到期的会员
+StudentSchema.statics.findExpiringSoon = function(days: number = 30) {
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + days);
+  
+  return this.find({
+    membership_end_date: {
+      $gte: new Date(),
+      $lte: targetDate
+    }
+  }).sort({ membership_end_date: 1 });
 };
 
 // 虚拟字段：会员状态
@@ -143,4 +201,23 @@ StudentSchema.set('toObject', {
   }
 });
 
-export default mongoose.model<IStudentDoc>('Student', StudentSchema);
+// 中间件：数据清理
+StudentSchema.pre('save', function(next) {
+  if (this.isModified('phone') && this.phone) {
+    this.phone = this.phone.trim();
+  }
+  if (this.isModified('name')) {
+    this.name = this.name.trim();
+  }
+  if (this.isModified('class')) {
+    this.class = this.class.trim();
+  }
+  if (this.isModified('subject')) {
+    this.subject = this.subject.trim();
+  }
+  next();
+});
+
+// 导出模型
+const Student = mongoose.models.Student || mongoose.model<IStudentDoc>('Student', StudentSchema);
+export default Student;

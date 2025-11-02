@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import logger from '@/utils/logger';
 
 // 交易记录接口定义
 export interface ICashDoc extends Document {
@@ -8,6 +9,13 @@ export interface ICashDoc extends Document {
   note: string | null;
   created_at: Date;
   updated_at: Date;
+  
+  // 方法
+  getAmount(): number;
+  isIncome(): boolean;
+  isExpense(): boolean;
+  getFormattedAmount(): string;
+  getTransactionDescription(): string;
 }
 
 // 交易记录Schema
@@ -106,4 +114,81 @@ CashSchema.set('toObject', {
   }
 });
 
-export default mongoose.model<ICashDoc>('Cash', CashSchema);
+// 实例方法：获取交易描述
+CashSchema.methods.getTransactionDescription = function(): string {
+  const amount = Math.abs(this.cash);
+  const prefix = this.cash >= 0 ? '收入' : '支出';
+  return `${prefix} ¥${(amount / 100).toFixed(2)}`;
+};
+
+// 静态方法：按学生统计收入
+CashSchema.statics.getStudentIncomeStats = async function(studentId?: number) {
+  const matchCondition: any = { cash: { $gt: 0 } };
+  if (studentId) {
+    matchCondition.student_id = studentId;
+  }
+  
+  return this.aggregate([
+    { $match: matchCondition },
+    {
+      $group: {
+        _id: '$student_id',
+        totalIncome: { $sum: '$cash' },
+        transactionCount: { $sum: 1 },
+        avgAmount: { $avg: '$cash' }
+      }
+    },
+    { $sort: { totalIncome: -1 } }
+  ]);
+};
+
+// 静态方法：获取财务统计
+CashSchema.statics.getFinancialStats = async function(period: string = 'month') {
+  const now = new Date();
+  let dateFrom: Date;
+  
+  switch (period) {
+    case 'week':
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'month':
+      dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case 'quarter':
+      const quarter = Math.floor(now.getMonth() / 3);
+      dateFrom = new Date(now.getFullYear(), quarter * 3, 1);
+      break;
+    case 'year':
+      dateFrom = new Date(now.getFullYear(), 0, 1);
+      break;
+    default:
+      dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  
+  return this.aggregate([
+    { $match: { created_at: { $gte: dateFrom } } },
+    {
+      $group: {
+        _id: null,
+        totalIncome: { $sum: { $cond: [{ $gt: ['$cash', 0] }, '$cash', 0] } },
+        totalExpense: { $sum: { $cond: [{ $lt: ['$cash', 0] }, { $abs: '$cash' }, 0] } },
+        transactionCount: { $sum: 1 }
+      }
+    }
+  ]);
+};
+
+// 中间件：数据验证
+CashSchema.pre('save', function(next) {
+  if (this.cash === 0) {
+    return next(new Error('交易金额不能为0'));
+  }
+  if (this.isModified('note') && this.note) {
+    this.note = this.note.trim();
+  }
+  next();
+});
+
+// 导出模型
+const Cash = mongoose.models.Cash || mongoose.model<ICashDoc>('Cash', CashSchema);
+export default Cash;

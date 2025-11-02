@@ -5,6 +5,7 @@ import cashRoutes from '@/routes/cashRoutes';
 import installmentRoutes from '@/routes/installmentRoutes';
 import statsRoutes from '@/routes/statsRoutes';
 import membershipRoutes from '@/routes/membershipRoutes';
+import adapterRoutes from '@/routes/adapterRoutes';
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ router.get('/', (req, res) => {
       installments: '/installments',
       membership: '/membership',
       dashboard: '/dashboard',
+      adapter: '/adapter', // 数据库适配器路由
     },
     documentation: '/docs',
     health: '/health',
@@ -34,5 +36,6 @@ router.use('/transactions', cashRoutes);
 router.use('/installments', installmentRoutes);
 router.use('/membership', membershipRoutes);
 router.use('/dashboard', statsRoutes);
+router.use('/adapter', adapterRoutes); // 数据库适配器路由
 
 export default router;

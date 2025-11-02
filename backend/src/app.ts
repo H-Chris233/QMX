@@ -60,6 +60,47 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 数据库健康检查端点
+app.get('/api/v1/health/db', async (req, res) => {
+  try {
+    const { isUsingMongoDB } = await import('@/config/database');
+    
+    if (isUsingMongoDB()) {
+      const { checkMongoHealth } = await import('@/models/mongo');
+      const health = await checkMongoHealth();
+      
+      res.json({
+        success: true,
+        data: {
+          database_type: 'mongodb',
+          connection_status: health.status,
+          details: health.details,
+          timestamp: new Date()
+        }
+      });
+    } else {
+      // SQL数据库健康检查
+      const { sequelize } = await import('@/config/database');
+      await sequelize.authenticate();
+      
+      res.json({
+        success: true,
+        data: {
+          database_type: 'sql',
+          connection_status: 'healthy',
+          details: { dialect: sequelize.getDialect() },
+          timestamp: new Date()
+        }
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown database error'
+    });
+  }
+});
+
 // API路由
 import routes from '@/routes';
 

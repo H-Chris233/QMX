@@ -22,6 +22,19 @@ export const config = {
     sqlitePath: process.env.SQLITE_PATH || './data/qmx.db',
   },
 
+  // MongoDB 云数据库配置
+  mongodb: {
+    uri: process.env.MONGODB_URI || process.env.MONGODB_URL || process.env.mongodburl || process.env.mongodb_uri,
+    enabled: process.env.MONGODB_ENABLED === 'true' || !!(process.env.MONGODB_URI || process.env.MONGODB_URL || process.env.mongodburl || process.env.mongodb_uri),
+    options: {
+      maxPoolSize: parseInt(process.env.MONGO_POOL_SIZE || '10', 10),
+      serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_TIMEOUT || '5000', 10),
+      socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT || '45000', 10),
+      retryWrites: process.env.MONGO_RETRY_WRITES !== 'false',
+      w: process.env.MONGO_WRITE_CONCERN || 'majority',
+    },
+  },
+
   // 安全配置
   security: {
     jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
@@ -61,4 +74,30 @@ export function validateConfig(): void {
   if (config.server.nodeEnv === 'production' && config.security.jwtSecret === 'your-super-secret-jwt-key-change-this-in-production') {
     throw new Error('JWT_SECRET must be changed in production environment');
   }
+
+  // 如果启用了MongoDB，验证MongoDB配置
+  if (config.mongodb.enabled && !config.mongodb.uri) {
+    throw new Error('MongoDB is enabled but MONGODB_URI is not provided');
+  }
+}
+
+// 获取数据库类型
+export function getDatabaseType(): 'sqlite' | 'postgresql' | 'mongodb' {
+  if (config.mongodb.enabled) {
+    return 'mongodb';
+  }
+  return config.database.type as 'sqlite' | 'postgresql';
+}
+
+// 获取数据库连接字符串
+export function getDatabaseUrl(): string {
+  if (config.mongodb.enabled && config.mongodb.uri) {
+    return config.mongodb.uri;
+  }
+  
+  if (config.database.type === 'postgresql') {
+    return `postgresql://${config.database.username}:${config.database.password}@${config.database.host}:${config.database.port}/${config.database.name}`;
+  }
+  
+  return config.database.sqlitePath;
 }
