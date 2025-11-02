@@ -1,5 +1,6 @@
 "import { Request, Response } from 'express';
-import { Student, IApiResponse } from '@/models/mongo';
+import { Student } from '@/models/mongo';
+import { IApiResponse } from '@/types';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 

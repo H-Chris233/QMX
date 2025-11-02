@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import { Cash, CashClass, ICashDoc } from '@/models/CashMongo';
+import { CashClass, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
-import { InstallmentPlan, Installment } from '@/models/InstallmentMongo';
+import { Installment } from '@/models/InstallmentMongo';
+import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
@@ -740,4 +741,4 @@ export class CashController {
 
 // 导出控制器实例
 const cashController = new CashController();
-export default cashController;"
+export default cashController;

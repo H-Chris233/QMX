@@ -1,7 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 import { ClassType, SubjectType } from '@/types';
 
-// Student MongoDB 接口
 export interface IStudentDoc extends Document {
   uid: number;
   age: number | null;
@@ -17,7 +16,6 @@ export interface IStudentDoc extends Document {
   createdAt: Date;
   updatedAt: Date;
 
-  // 实例方法
   hasMembership(): boolean;
   getMembershipDaysRemaining(): number | null;
   getAverageScore(): number;
@@ -28,7 +26,6 @@ export interface IStudentDoc extends Document {
   updateScore(index: number, newScore: number): void;
 }
 
-// MongoDB Schema 定义
 const studentSchema = new Schema<IStudentDoc>({
   uid: {
     type: Number,
@@ -55,7 +52,7 @@ const studentSchema = new Schema<IStudentDoc>({
     default: '未填写',
     validate: {
       validator: function(v: string) {
-        return /^1[3-9]\d{9}$|^未填写$/.test(v);
+        return /^1[3-9]\\d{9}$|^未填写$/.test(v);
       },
       message: '手机号格式不正确'
     },
@@ -105,17 +102,15 @@ const studentSchema = new Schema<IStudentDoc>({
     default: null
   }
 }, {
-  timestamps: true, // 自动添加 createdAt, updatedAt
+  timestamps: true,
   collection: 'students',
   versionKey: false
 });
 
-// 复合索引
 studentSchema.index({ membershipStartDate: 1, membershipEndDate: 1 });
 studentSchema.index({ name: 1, phone: 1 });
 studentSchema.index({ class: 1, subject: 1 });
 
-// 实例方法实现
 studentSchema.methods.hasMembership = function(): boolean {
   if (!this.membershipStartDate || !this.membershipEndDate) {
     return false;
@@ -177,7 +172,6 @@ studentSchema.methods.updateScore = function(index: number, newScore: number): v
   }
 };
 
-// 虚拟字段
 studentSchema.virtual('isMembershipActive').get(function() {
   return this.hasMembership();
 });
@@ -186,7 +180,6 @@ studentSchema.virtual('membershipDaysRemaining').get(function() {
   return this.getMembershipDaysRemaining();
 });
 
-// JSON 序列化时转换字段名
 studentSchema.methods.toJSON = function() {
   const obj = this.toObject();
   return {
@@ -197,7 +190,6 @@ studentSchema.methods.toJSON = function() {
     phone: obj.phone,
     rings: obj.rings,
     note: obj.note,
-    cash: obj.cash || '',
     subject: obj.subject,
     lesson_left: obj.lessonLeft,
     membership_start_date: obj.membershipStartDate ? obj.membershipStartDate.toISOString().split('T')[0] : null,
@@ -207,45 +199,40 @@ studentSchema.methods.toJSON = function() {
   };
 };
 
-// 创建并导出模型
-export const StudentModel = model<IStudentDoc>('Student', studentSchema);
+const studentModel = model<IStudentDoc>('Student', studentSchema);
 
-// 导出函数组件式接口
 export class Student {
   static async findByUid(uid: number): Promise<IStudentDoc | null> {
-    return await StudentModel.findOne({ uid }).exec();
+    return await studentModel.findOne({ uid }).exec();
   }
 
   static async findAll(): Promise<IStudentDoc[]> {
-    return await StudentModel.find().sort({ createdAt: -1 }).exec();
+    return await studentModel.find().sort({ createdAt: -1 }).exec();
   }
 
   static async create(data: Partial<IStudentDoc>): Promise<IStudentDoc> {
-    // 获取下一个UID
-    const lastStudent = await StudentModel.findOne().sort({ uid: -1 }).exec();
+    const lastStudent = await studentModel.findOne().sort({ uid: -1 }).exec();
     const nextUid = lastStudent ? lastStudent.uid + 1 : 1;
-
-    return await StudentModel.create({ ...data, uid: nextUid });
+    return await studentModel.create({ ...data, uid: nextUid });
   }
 
   static async updateByUid(uid: number, data: Partial<IStudentDoc>): Promise<IStudentDoc | null> {
-    return await StudentModel.findOneAndUpdate({ uid }, data, { new: true, runValidators: true }).exec();
+    return await studentModel.findOneAndUpdate({ uid }, data, { new: true, runValidators: true }).exec();
   }
 
   static async deleteByUid(uid: number): Promise<boolean> {
-    const result = await StudentModel.deleteOne({ uid }).exec();
+    const result = await studentModel.deleteOne({ uid }).exec();
     return result.deletedCount > 0;
   }
 
   static async search(criteria: any): Promise<IStudentDoc[]> {
-    return await StudentModel.find(criteria).sort({ createdAt: -1 }).exec();
+    return await studentModel.find(criteria).sort({ createdAt: -1 }).exec();
   }
 
   static async count(criteria: any = {}): Promise<number> {
-    return await StudentModel.countDocuments(criteria).exec();
+    return await studentModel.countDocuments(criteria).exec();
   }
 }
 
-// 导出类型和模型
+export { studentModel };
 export default Student;
-export { StudentModel, IStudentDoc };

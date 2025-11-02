@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Student } from '@/models/mongo';
-import { Cash } from '@/models/CashMongo';
+import { CashClass } from '@/models/CashMongo';
 import { InstallmentPlan, Installment } from '@/models/InstallmentMongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
@@ -323,7 +323,7 @@ export class InstallmentController {
     if (status === 'Paid' && installment.status !== 'Paid') {
       const plan = await InstallmentPlan.findByUid(installment.plan_id);
       if (plan) {
-        await Cash.create({
+        await CashClass.create({
           student_id: plan.student_id,
           cash: installment.installment_amount,
           note: `分期付款: 第${installment.current_installment}/${installment.total_installments}期`,
