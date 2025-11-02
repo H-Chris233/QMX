@@ -209,7 +209,7 @@ export class CashController {
         total_amount: Math.round(Number(total_amount) * 100), // 转换为分
         total_installments: Number(total_installments),
         frequency,
-        custom_days: frequency === 'Custom' ? Number(custom_days) : undefined,
+        custom_days: frequency === 'Custom' && custom_days ? Number(custom_days) : undefined,
         start_date: new Date(start_date),
         note,
         status: 'Active',

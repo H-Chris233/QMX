@@ -211,7 +211,7 @@ export class InstallmentController {
         total_amount: Math.round(Number(total_amount) * 100),
         total_installments: Number(total_installments),
         frequency,
-        custom_days: frequency === 'Custom' ? Number(custom_days) : undefined,
+        custom_days: frequency === 'Custom' && custom_days ? Number(custom_days) : undefined,
         start_date: new Date(start_date),
         note,
         status: 'Active',

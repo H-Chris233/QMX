@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { isUsingMongoDB } from '@/config/database';
 import { Student as SqlStudent, Cash as SqlCash, Installment as SqlInstallment } from '@/models';
-import { Student as MongoStudent, Cash as MongoCash, Installment as MongoInstallment } from '@/models';
+import { Student, CashClass as MongoCash, Installment } from '@/models';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
@@ -27,32 +27,39 @@ export class AdapterController {
     const StudentModel = this.getStudentModel();
     
     if (isUsingMongoDB()) {
-      // MongoDB 查询
-      const { page = 1, limit = 20, search, class: className, subject } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
+      // MongoDB 查询 - 使用封装的类方法
+      const { page = 1, limit = 20, search, class: className, subject } = req.query as {
+        page?: string;
+        limit?: string;
+        search?: string;
+        class?: string;
+        subject?: string;
+      };
       
-      // 构建查询条件
-      const query: any = {};
+      const allStudents = await Student.findAll();
+      let filteredStudents = allStudents;
+      
       if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } }
-        ];
+        filteredStudents = filteredStudents.filter(student => 
+          student.name.toLowerCase().includes(search.toLowerCase()) ||
+          student.phone.toLowerCase().includes(search.toLowerCase())
+        );
       }
       if (className) {
-        query.class = className;
+        filteredStudents = filteredStudents.filter(student => 
+          student.class === className
+        );
       }
       if (subject) {
-        query.subject = subject;
+        filteredStudents = filteredStudents.filter(student => 
+          student.subject === subject
+        );
       }
       
-      const students = await StudentModel
-        .find(query)
-        .skip(skip)
-        .limit(Number(limit))
-        .sort({ created_at: -1 });
-      
-      const total = await StudentModel.countDocuments(query);
+      // 分页处理
+      const skip = (Number(page) - 1) * Number(limit);
+      const total = filteredStudents.length;
+      const students = filteredStudents.slice(skip, skip + Number(limit));
       
       const response = {
         success: true,
@@ -62,17 +69,17 @@ export class AdapterController {
           phone: student.phone,
           class: student.class,
           subject: student.subject,
-          lesson_left: student.lesson_left,
+          lesson_left: student.lessonLeft,
           rings: student.rings || [],
-          membership_start_date: student.membership_start_date,
-          membership_end_date: student.membership_end_date,
+          membership_start_date: student.membershipStartDate ? student.membershipStartDate.toISOString().split('T')[0] : null,
+          membership_end_date: student.membershipEndDate ? student.membershipEndDate.toISOString().split('T')[0] : null,
           note: student.note,
-          membership_status: student.membership_status,
+          membership_status: student.hasMembership(),
           average_score: student.getAverageScore(),
           has_membership: student.hasMembership(),
           days_remaining: student.getMembershipDaysRemaining(),
-          created_at: student.created_at,
-          updated_at: student.updated_at
+          created_at: student.createdAt,
+          updated_at: student.updatedAt
         })),
         pagination: {
           page: Number(page),
@@ -100,22 +107,15 @@ export class AdapterController {
     if (isUsingMongoDB()) {
       const { name, phone, class: className, subject, lesson_left = 0, rings = [], note } = req.body;
       
-      // 生成唯一UID
-      const lastStudent = await StudentModel.findOne().sort({ uid: -1 });
-      const uid = lastStudent ? lastStudent.uid + 1 : 1;
-      
-      const student = new StudentModel({
-        uid,
+      const student = await Student.create({
         name: name.trim(),
         phone: phone?.trim() || null,
         class: className.trim(),
         subject: subject.trim(),
-        lesson_left: Number(lesson_left),
+        lessonLeft: Number(lesson_left),
         rings: rings.filter((score: number) => score >= 0 && score <= 10),
         note: note?.trim() || null
       });
-      
-      await student.save();
       
       const response = {
         success: true,
@@ -125,17 +125,17 @@ export class AdapterController {
           phone: student.phone,
           class: student.class,
           subject: student.subject,
-          lesson_left: student.lesson_left,
+          lesson_left: student.lessonLeft,
           rings: student.rings || [],
-          membership_start_date: student.membership_start_date,
-          membership_end_date: student.membership_end_date,
+          membership_start_date: student.membershipStartDate ? student.membershipStartDate.toISOString().split('T')[0] : null,
+          membership_end_date: student.membershipEndDate ? student.membershipEndDate.toISOString().split('T')[0] : null,
           note: student.note,
-          created_at: student.created_at
+          created_at: student.createdAt
         },
         message: '学生添加成功'
       };
       
-      logger.info(`MongoDB添加学生成功，UID: ${uid}, 姓名: ${name}`);
+      logger.info(`MongoDB添加学生成功，UID: ${student.uid}, 姓名: ${name}`);
       res.status(201).json(response);
     } else {
       res.status(500).json({
@@ -151,51 +151,41 @@ export class AdapterController {
     
     if (isUsingMongoDB()) {
       const { page = 1, limit = 20, student_id, min_amount, max_amount, is_income } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
       
       // 构建查询条件
-      const query: any = {};
+      let transactions = await CashClass.findAll();
       if (student_id) {
-        query.student_id = Number(student_id);
+        transactions = transactions.filter(t => t.student_id === Number(student_id));
       }
       if (min_amount || max_amount) {
-        query.cash = {};
-        if (min_amount) {
-          query.cash.$gte = Math.round(Number(min_amount) * 100);
-        }
-        if (max_amount) {
-          query.cash.$lte = Math.round(Number(max_amount) * 100);
-        }
+        transactions = transactions.filter(t => {
+          const amount = Math.abs(t.cash) / 100;
+          return (!min_amount || amount >= Number(min_amount)) && 
+                 (!max_amount || amount <= Number(max_amount));
+        });
       }
       if (is_income !== undefined) {
-        query.cash = query.cash || {};
-        if (is_income === 'true') {
-          query.cash.$gt = 0;
-        } else {
-          query.cash.$lt = 0;
-        }
+        const incomeFlag = is_income === 'true';
+        transactions = transactions.filter(t => (t.cash > 0) === incomeFlag);
       }
       
-      const transactions = await CashModel
-        .find(query)
-        .skip(skip)
-        .limit(Number(limit))
-        .sort({ created_at: -1 });
-      
-      const total = await CashModel.countDocuments(query);
+      // 分页处理
+      const skip = (Number(page) - 1) * Number(limit);
+      const total = transactions.length;
+      const pagedTransactions = transactions.slice(skip, skip + Number(limit));
       
       const response = {
         success: true,
-        data: transactions.map(transaction => ({
+        data: pagedTransactions.map(transaction => ({
           uid: transaction.uid,
           student_id: transaction.student_id,
-          amount: transaction.cash / 100,
+          amount: Math.abs(transaction.cash) / 100,
           note: transaction.note,
           is_income: transaction.cash > 0,
           is_expense: transaction.cash < 0,
           formatted_amount: transaction.getFormattedAmount(),
-          description: transaction.getTransactionDescription(),
-          installment_plan: transaction.installment_plan,
+          description: transaction.getTransactionDescription ? transaction.getTransactionDescription() : (transaction.cash > 0 ? '收入' : '支出'),
+          installment_plan: undefined, // 暂不支持分期计划
           created_at: transaction.created_at,
           updated_at: transaction.updated_at
         })),

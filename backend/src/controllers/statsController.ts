@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Student } from '@/models/mongo';
-import { Cash, CashClass } from '@/models/CashMongo';
+import { CashClass } from '@/models/CashMongo';
 import { Installment } from '@/models/InstallmentMongo';
 import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
 import { catchAsync } from '@/middleware/errorHandler';
@@ -515,7 +515,8 @@ export class StatsController {
           break;
 
         case 'students':
-          value = allStudents.length; // 这里简化处理，实际应该按时间过滤
+          const allStudentsCount = await Student.count(); // 获取所有学员数量
+          value = allStudentsCount;
           break;
 
         case 'installments':
