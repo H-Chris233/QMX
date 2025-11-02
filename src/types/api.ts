@@ -276,35 +276,57 @@ export interface StudentScoresResponse {
 }
 
 /**
- * Tauri命令类型
- * 定义了所有可用的Tauri命令
+ * API响应接口
  */
-export type TauriCommand = 
-  | 'add_student'
-  | 'get_all_students'
-  | 'add_score'
-  | 'get_student_scores'
-  | 'delete_student_score'
-  | 'update_student_score'
-  | 'update_student_info'
-  | 'delete_student'
-  | 'add_cash_transaction'
-  | 'get_all_transactions'
-  | 'delete_cash_transaction'
-  | 'update_installment_status'
-  | 'generate_next_installment'
-  | 'cancel_installment_plan'
-  | 'get_installments_by_plan'
-  | 'get_dashboard_stats'
-  | 'open_main_window'
-  | 'set_student_membership'
-  | 'clear_student_membership'
-  | 'set_membership_by_type'
-  // v2 API commands
-  | 'get_student_stats'
-  | 'get_financial_stats'
-  | 'search_students'
-  | 'get_student_cash'
-  | 'search_cash'
-  | 'update_multiple_students'
-  | 'get_membership_expiring_soon';
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+/**
+ * 分页响应接口
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
+/**
+ * API端点类型
+ * 定义了所有可用的API端点
+ */
+export type ApiEndpoint = 
+  | '/students'
+  | '/students/search'
+  | '/students/:id'
+  | '/students/:id/scores'
+  | '/students/:id/scores/:scoreIndex'
+  | '/students/:id/scores/batch'
+  | '/transactions'
+  | '/transactions/search'
+  | '/transactions/:id'
+  | '/transactions/installment'
+  | '/installments/statuses'
+  | '/installments/upcoming'
+  | '/installments/:transactionUid/status'
+  | '/installments/:planId/next'
+  | '/installments/:planId/cancel'
+  | '/installments/:planId'
+  | '/dashboard/stats'
+  | '/dashboard/financial-stats'
+  | '/dashboard/global-student-stats'
+  | '/dashboard/global-financial-stats'
+  | '/dashboard/membership-expiring'
+  | '/dashboard/students/:id/stats'
+  | '/membership/stats'
+  | '/membership/batch'
+  | '/membership/students/:id/membership'
+  | '/membership/students/:id/membership/type'
+  | '/membership/students/:id/membership/renew';
