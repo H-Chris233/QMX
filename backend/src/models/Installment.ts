@@ -1,194 +1,124 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '@/config/database';
-import { 
-  IInstallment, 
-  IInstallmentCreationAttributes,
-  InstallmentStatus,
-  PaymentFrequency 
-} from '@/types';
+import mongoose, { Schema, Document } from 'mongoose';
 
-// 分期付款详情模型
-export class Installment 
-  extends Model<IInstallment, IInstallmentCreationAttributes> 
-  implements IInstallment {
-  
-  public uid!: number;
-  public plan_id!: number;
-  public total_amount!: number;
-  public total_installments!: number;
-  public current_installment!: number;
-  public frequency!: PaymentFrequency;
-  public custom_days!: number | null;
-  public due_date!: Date;
-  public status!: InstallmentStatus;
-  public createdAt!: Date;
-
-  // 时间戳
-  public readonly updatedAt!: Date;
-
-  // 实例方法
-  public getInstallmentAmount(): number {
-    return Number((this.total_amount / this.total_installments).toFixed(2));
-  }
-
-  public getFrequencyText(): string {
-    switch (this.frequency) {
-      case PaymentFrequency.WEEKLY:
-        return '每周';
-      case PaymentFrequency.MONTHLY:
-        return '每月';
-      case PaymentFrequency.QUARTERLY:
-        return '每季度';
-      case PaymentFrequency.CUSTOM:
-        return `每${this.custom_days || 0}天`;
-      default:
-        return '未知';
-    }
-  }
-
-  public getStatusText(): string {
-    switch (this.status) {
-      case InstallmentStatus.PENDING:
-        return '待支付';
-      case InstallmentStatus.PAID:
-        return '已支付';
-      case InstallmentStatus.OVERDUE:
-        return '已逾期';
-      case InstallmentStatus.CANCELLED:
-        return '已取消';
-      default:
-        return '未知';
-    }
-  }
-
-  public isOverdue(): boolean {
-    return this.status === InstallmentStatus.PENDING && new Date() > this.due_date;
-  }
-
-  public getDaysOverdue(): number {
-    if (!this.isOverdue()) {
-      return 0;
-    }
-    const now = new Date();
-    const diffTime = now.getTime() - this.due_date.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }
-
-  public getProgress(): number {
-    return Number(((this.current_installment / this.total_installments) * 100).toFixed(1));
-  }
+export enum InstallmentStatus {
+  PENDING = 'pending',
+  PAID = 'paid',
+  OVERDUE = 'overdue',
+  CANCELLED = 'cancelled'
 }
 
-// 初始化模型
-Installment.init({
+export enum PaymentFrequency {
+  MONTHLY = 'monthly',
+  QUARTERLY = 'quarterly',
+  YEARLY = 'yearly',
+  CUSTOM = 'custom'
+}
+
+export interface IInstallmentDoc extends Document {
+  uid: number;
+  plan_id: number;
+  student_id: number;
+  total_amount: number;
+  installment_number: number;
+  total_installments: number;
+  amount: number;
+  frequency: PaymentFrequency;
+  custom_days?: number[];
+  due_date: Date;
+  status: InstallmentStatus;
+  cash_uid?: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+const InstallmentSchema = new Schema<IInstallmentDoc>({
   uid: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
+    type: Number,
+    required: true,
+    unique: true,
+    index: true,
+    comment: '分期唯一ID'
   },
   plan_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'installment_plans',
-      key: 'plan_id',
-    },
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE',
-    field: 'plan_id',
+    type: Number,
+    required: true,
+    index: true,
+    comment: '分期计划ID'
+  },
+  student_id: {
+    type: Number,
+    required: true,
+    index: true,
+    comment: '关联学生ID'
   },
   total_amount: {
-    type: DataTypes.BIGINT,
-    allowNull: false,
-    validate: {
-      min: {
-        args: [0],
-        msg: '总金额不能为负数',
-      },
-    },
-    field: 'total_amount',
+    type: Schema.Types.Long,
+    required: true,
+    comment: '总金额（分为单位）'
+  },
+  installment_number: {
+    type: Number,
+    required: true,
+    min: 1,
+    comment: '当前期号'
   },
   total_installments: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    validate: {
-      min: {
-        args: [1],
-        msg: '总期数至少为1',
-      },
-    },
-    field: 'total_installments',
+    type: Number,
+    required: true,
+    min: 1,
+    comment: '总期数'
   },
-  current_installment: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: false,
-    validate: {
-      min: {
-        args: [1],
-        msg: '当前期数至少为1',
-      },
-    },
-    field: 'current_installment',
+  amount: {
+    type: Schema.Types.Long,
+    required: true,
+    comment: '当期金额（分为单位）'
   },
   frequency: {
-    type: DataTypes.ENUM(...Object.values(PaymentFrequency)),
-    allowNull: false,
+    type: String,
+    enum: Object.values(PaymentFrequency),
+    default: PaymentFrequency.MONTHLY,
+    comment: '付款频率'
   },
   custom_days: {
-    type: DataTypes.INTEGER.UNSIGNED,
-    allowNull: true,
-    validate: {
-      min: 1,
-      max: 365,
-    },
-    field: 'custom_days',
+    type: [Number],
+    default: undefined,
+    comment: '自定义间隔天数'
   },
   due_date: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    field: 'due_date',
+    type: Date,
+    required: true,
+    comment: '应付款日期'
   },
   status: {
-    type: DataTypes.ENUM(...Object.values(InstallmentStatus)),
-    allowNull: false,
-    defaultValue: InstallmentStatus.PENDING,
+    type: String,
+    enum: Object.values(InstallmentStatus),
+    default: InstallmentStatus.PENDING,
+    comment: '分期状态'
   },
-  createdAt: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'createdAt',
-  },
-  updatedAt: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'updatedAt',
-  },
+  cash_uid: {
+    type: Number,
+    default: undefined,
+    index: true,
+    comment: '关联的交易记录ID'
+  }
 }, {
-  sequelize,
-  tableName: 'installments',
-  modelName: 'Installment',
-  timestamps: true,
-  paranoid: false,
-  indexes: [
-    {
-      unique: true,
-      fields: ['uid'],
-    },
-    {
-      fields: ['plan_id'],
-    },
-    {
-      fields: ['status'],
-    },
-    {
-      fields: ['due_date'],
-    },
-    {
-      fields: ['plan_id', 'current_installment'],
-    },
-  ],
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+  collection: 'installments',
+  versionKey: false
 });
 
-export default Installment;
+InstallmentSchema.index({ plan_id: 1 });
+InstallmentSchema.index({ student_id: 1 });
+InstallmentSchema.index({ status: 1 });
+InstallmentSchema.index({ due_date: 1 });
+InstallmentSchema.index({ plan_id: 1, installment_number: 1 });
+
+InstallmentSchema.set('toJSON', {
+  transform: function(doc, ret) {
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
+
+export default mongoose.model<IInstallmentDoc>('Installment', InstallmentSchema);

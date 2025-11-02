@@ -38,7 +38,7 @@ export class ScoreController {
 
     const responseData = {
       student_uid: student.uid,
-      rings: student.rings,
+      scores: student.scores,
       message: `成功为学员 ${student.name} 添加成绩 ${score}`,
     };
 
@@ -69,8 +69,8 @@ export class ScoreController {
     const responseData = {
       student_uid: student.uid,
       student_name: student.name,
-      rings: student.rings,
-      total_scores: student.rings.length,
+      scores: student.scores,
+      total_scores: student.scores.length,
       average_score: student.getAverageScore(),
       max_score: student.getMaxScore(),
       min_score: student.getMinScore(),
@@ -81,7 +81,7 @@ export class ScoreController {
       data: responseData,
     };
 
-    logger.info(`获取学员成绩成功，学员UID: ${student.uid}, 成绩数量: ${student.rings.length}`);
+    logger.info(`获取学员成绩成功，学员UID: ${student.uid}, 成绩数量: ${student.scores.length}`);
     res.json(response);
   });
 
@@ -103,7 +103,7 @@ export class ScoreController {
     const index = Number(scoreIndex);
 
     // 检查成绩索引是否有效
-    if (index < 0 || index >= student.rings.length) {
+    if (index < 0 || index >= student.scores.length) {
       res.status(400).json({
         success: false,
         error: '成绩索引无效',
@@ -120,7 +120,7 @@ export class ScoreController {
       return;
     }
 
-    const oldScore = student.rings[index];
+    const oldScore = student.scores[index];
     student.updateScore(index, Number(newScore));
     await student.save();
 
@@ -129,7 +129,7 @@ export class ScoreController {
       score_index: index,
       old_score: oldScore,
       new_score: Number(newScore),
-      updated_rings: student.rings,
+      updated_scores: student.scores,
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -159,7 +159,7 @@ export class ScoreController {
     const index = Number(scoreIndex);
 
     // 检查成绩索引是否有效
-    if (index < 0 || index >= student.rings.length) {
+    if (index < 0 || index >= student.scores.length) {
       res.status(400).json({
         success: false,
         error: '成绩索引无效',
@@ -167,7 +167,7 @@ export class ScoreController {
       return;
     }
 
-    const deletedScore = student.rings[index];
+    const deletedScore = student.scores[index];
     student.removeScore(index);
     await student.save();
 
@@ -175,7 +175,7 @@ export class ScoreController {
       student_uid: student.uid,
       score_index: index,
       deleted_score: deletedScore,
-      remaining_rings: student.rings,
+      remaining_scores: student.scores,
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -224,7 +224,7 @@ export class ScoreController {
     }
 
     // 批量添加成绩
-    const originalRings = [...student.rings];
+    const originalRings = [...student.scores];
     scores.forEach(score => student.addScore(Number(score)));
     await student.save();
 
@@ -233,8 +233,8 @@ export class ScoreController {
       added_scores: scores,
       total_added: scores.length,
       original_total: originalRings.length,
-      new_total: student.rings.length,
-      all_rings: student.rings,
+      new_total: student.scores.length,
+      all_scores: student.scores,
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -261,15 +261,15 @@ export class ScoreController {
       return;
     }
 
-    const clearedCount = student.rings.length;
-    student.rings = [];
-    student.changed('rings', true);
+    const clearedCount = student.scores.length;
+    student.scores = [];
+    student.changed('scores', true);
     await student.save();
 
     const responseData = {
       student_uid: student.uid,
       cleared_count: clearedCount,
-      current_rings: student.rings,
+      current_scores: student.scores,
     };
 
     const response: IApiResponse<typeof responseData> = {

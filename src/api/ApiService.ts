@@ -314,10 +314,10 @@ export class ApiService {
 
   static async getStudentScores(studentUid: number): Promise<number[]> {
     return handleApiOperation(async () => {
-      const responseData = await apiCall<{ rings: number[] }>('GET', `/students/${studentUid}/scores`);
+      const responseData = await apiCall<{ scores: number[] }>('GET', `/students/${studentUid}/scores`);
       
-      console.log(`✅ 获取学员 ${studentUid} 的 ${responseData.rings.length} 条成绩记录`);
-      return responseData.rings;
+      console.log(`✅ 获取学员 ${studentUid} 的 ${responseData.scores.length} 条成绩记录`);
+      return responseData.scores;
     }, '获取学员成绩', {
       context: { studentUid }
     });

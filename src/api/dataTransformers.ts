@@ -21,8 +21,8 @@ export function transformStudentData(rawData: unknown): Student {
     age: typeof data.age === 'number' ? data.age : 0,
     class: typeof data.class === 'string' ? data.class : '',
     phone: typeof data.phone === 'string' ? data.phone : '',
-    rings: Array.isArray(data.rings) && data.rings.every(r => typeof r === 'number') 
-      ? data.rings as number[] 
+    scores: Array.isArray(data.scores) && data.scores.every(r => typeof r === 'number')
+      ? data.scores as number[]
       : [],
     note: typeof data.note === 'string' ? data.note : null,
     cash: typeof data.cash === 'string' ? data.cash : '',

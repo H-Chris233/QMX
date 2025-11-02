@@ -1,50 +1,47 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '@/config/database';
+import mongoose, { Schema, Document } from 'mongoose';
 
-// 系统配置模型
-interface ISystemConfig {
+export interface ISystemConfigDoc extends Document {
   key: string;
   value: string;
-  description?: string;
-  created_at?: Date;
-  updated_at?: Date;
+  description: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
-interface ISystemConfigCreationAttributes extends Optional<ISystemConfig, 'created_at' | 'updated_at'> {}
-
-export class SystemConfig 
-  extends Model<ISystemConfig, ISystemConfigCreationAttributes> 
-  implements ISystemConfig {
-  
-  public key!: string;
-  public value!: string;
-  public description?: string;
-
-  // 时间戳
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
-}
-
-// 初始化模型
-SystemConfig.init({
+const SystemConfigSchema = new Schema<ISystemConfigDoc>({
   key: {
-    type: DataTypes.STRING(100),
-    primaryKey: true,
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    index: true,
+    comment: '配置键名'
   },
   value: {
-    type: DataTypes.TEXT,
-    allowNull: false,
+    type: String,
+    required: true,
+    trim: true,
+    comment: '配置值'
   },
   description: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-  },
+    type: String,
+    default: null,
+    trim: true,
+    comment: '配置描述'
+  }
 }, {
-  sequelize,
-  tableName: 'system_configs',
-  modelName: 'SystemConfig',
-  timestamps: true,
-  paranoid: false,
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+  collection: 'system_configs',
+  versionKey: false
 });
 
+SystemConfigSchema.set('toJSON', {
+  transform: function(doc, ret) {
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
+
+const SystemConfig = mongoose.models.SystemConfig || mongoose.model<ISystemConfigDoc>('SystemConfig', SystemConfigSchema);
 export default SystemConfig;

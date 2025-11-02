@@ -13,7 +13,7 @@ export interface Student {
   /** 联系电话 */
   phone: string;
   /** 成绩数组 */
-  rings: number[];
+  scores: number[];
   /** 备注信息 */
   note: string | null;
   /** 现金信息 - 兼容旧字段 */
@@ -272,7 +272,7 @@ export interface StudentUpdateBatch {
  */
 export interface StudentScoresResponse {
   /** 成绩数组 */
-  rings: number[];
+  scores: number[];
 }
 
 

@@ -1,93 +1,81 @@
-import { sequelize } from '@/config/database';
-import Student from './Student';
-import Cash from './Cash';
-import InstallmentPlan from './InstallmentPlan';
-import Installment from './Installment';
-import SystemConfig from './SystemConfig';
+import { default as Student } from './Student';
+import { default as Cash } from './Cash';
+import { default as Installment } from './Installment';
+import { default as SystemConfig } from './SystemConfig';
+import mongoose from 'mongoose';
 
-// 设置模型关联
-export function setupAssociations(): void {
-  // 学生与交易记录的关联
-  Student.hasMany(Cash, {
-    foreignKey: 'student_id',
-    sourceKey: 'uid',
-    as: 'cashTransactions',
-  });
+export { Student, Cash, Installment, SystemConfig };
 
-  Cash.belongsTo(Student, {
-    foreignKey: 'student_id',
-    targetKey: 'uid',
-    as: 'student',
-  });
+export type {
+  IStudentDoc,
+  ICashDoc,
+  IInstallmentDoc,
+  ISystemConfigDoc
+} from './Student';
 
-  // 分期付款计划与分期详情的关联
-  InstallmentPlan.hasMany(Installment, {
-    foreignKey: 'plan_id',
-    sourceKey: 'plan_id',
-    as: 'installments',
-  });
+export { InstallmentStatus, PaymentFrequency } from './Installment';
 
-  Installment.belongsTo(InstallmentPlan, {
-    foreignKey: 'plan_id',
-    targetKey: 'plan_id',
-    as: 'plan',
-  });
-
-  // 学生与分期付款的间接关联（通过交易记录）
-  // 这个关联会在后续的交易与分期付款关联中建立
-}
-
-// 初始化关联
-setupAssociations();
-
-// 数据库同步函数
-export async function syncDatabase(): Promise<void> {
+export async function initMongoModels(): Promise<void> {
   try {
-    // 按依赖顺序同步表结构
-    await SystemConfig.sync({ alter: true });
-    await Student.sync({ alter: true });
-    await InstallmentPlan.sync({ alter: true });
-    await Cash.sync({ alter: true });
-    await Installment.sync({ alter: true });
+    await Student.createIndexes();
+    await Cash.createIndexes();
+    await Installment.createIndexes();
+    await SystemConfig.createIndexes();
 
-    console.log('✅ 数据库表结构同步完成');
+    console.log('✅ MongoDB模型初始化完成');
   } catch (error) {
-    console.error('❌ 数据库表结构同步失败:', error);
+    console.error('❌ MongoDB模型初始化失败:', error);
     throw error;
   }
 }
 
-// 导出所有模型
-export {
-  sequelize,
-  Student,
-  Cash,
-  InstallmentPlan,
-  Installment,
-  SystemConfig,
-};
+export async function checkMongoHealth(): Promise<{ status: string; details: any }> {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const statusMap = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+    const status = statusMap[dbState] || 'unknown';
 
-// 导出类型和枚举
-export type {
-  IStudent,
-  IStudentCreationAttributes,
-  ICash,
-  ICashCreationAttributes,
-  IInstallmentPlan,
-  IInstallment,
-  IInstallmentCreationAttributes,
-  IApiResponse,
-  IPaginatedResponse,
-  IDashboardStats,
-  IStudentStats,
-  IFinancialStats,
-  IStudentSearchOptions,
-  ICashSearchOptions,
-} from '@/types';
+    if (status !== 'connected') {
+      return { status: 'unhealthy', details: { connectionStatus: status } };
+    }
 
-export {
-  ClassType,
-  SubjectType,
-  PaymentFrequency,
-  InstallmentStatus,
-} from '@/types';
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    const requiredCollections = ['students', 'cash_transactions', 'installments', 'system_configs'];
+    const missingCollections = requiredCollections.filter(name =>
+      !collections.some(col => col.name === name)
+    );
+
+    if (missingCollections.length > 0) {
+      return {
+        status: 'partial',
+        details: {
+          connectionStatus: status,
+          missingCollections,
+          existingCollections: collections.map(col => col.name)
+        }
+      };
+    }
+
+    const stats = {
+      students: await Student.countDocuments(),
+      cashTransactions: await Cash.countDocuments(),
+      installments: await Installment.countDocuments(),
+      systemConfigs: await SystemConfig.countDocuments(),
+    };
+
+    return {
+      status: 'healthy',
+      details: {
+        connectionStatus: status,
+        collections: collections.map(col => col.name),
+        stats
+      }
+    };
+
+  } catch (error) {
+    return {
+      status: 'error',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' }
+    };
+  }
+}
