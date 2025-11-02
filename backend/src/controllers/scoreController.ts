@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { Student } from '@/models';
+import { Student } from '@/models/mongo';
 import { catchAsync } from '@/middleware/errorHandler';
-import { validate, validateParams, commonValidations } from '@/middleware/validation';
 import { IApiResponse } from '@/types';
 import logger from '@/utils/logger';
 import Joi from 'joi';
@@ -13,7 +12,7 @@ export class ScoreController {
     const { id } = req.params;
     const { score } = req.body;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -34,11 +33,11 @@ export class ScoreController {
 
     // 添加成绩
     student.addScore(Number(score));
-    await student.save();
+    const updatedStudent = await Student.updateByUid(Number(id), { rings: student.rings });
 
     const responseData = {
-      student_uid: student.uid,
-      scores: student.scores,
+      student_uid: updatedStudent?.uid || student.uid,
+      scores: updatedStudent?.rings || student.rings,
       message: `成功为学员 ${student.name} 添加成绩 ${score}`,
     };
 
@@ -56,7 +55,7 @@ export class ScoreController {
   public getStudentScores = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -69,8 +68,8 @@ export class ScoreController {
     const responseData = {
       student_uid: student.uid,
       student_name: student.name,
-      scores: student.scores,
-      total_scores: student.scores.length,
+      scores: student.rings,
+      total_scores: student.rings.length,
       average_score: student.getAverageScore(),
       max_score: student.getMaxScore(),
       min_score: student.getMinScore(),
@@ -81,7 +80,7 @@ export class ScoreController {
       data: responseData,
     };
 
-    logger.info(`获取学员成绩成功，学员UID: ${student.uid}, 成绩数量: ${student.scores.length}`);
+    logger.info(`获取学员成绩成功，学员UID: ${student.uid}, 成绩数量: ${student.rings.length}`);
     res.json(response);
   });
 
@@ -90,7 +89,7 @@ export class ScoreController {
     const { id, scoreIndex } = req.params;
     const { newScore } = req.body;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -103,7 +102,7 @@ export class ScoreController {
     const index = Number(scoreIndex);
 
     // 检查成绩索引是否有效
-    if (index < 0 || index >= student.scores.length) {
+    if (index < 0 || index >= student.rings.length) {
       res.status(400).json({
         success: false,
         error: '成绩索引无效',
@@ -120,16 +119,16 @@ export class ScoreController {
       return;
     }
 
-    const oldScore = student.scores[index];
+    const oldScore = student.rings[index];
     student.updateScore(index, Number(newScore));
-    await student.save();
+    const updatedStudent = await Student.updateByUid(Number(id), { rings: student.rings });
 
     const responseData = {
-      student_uid: student.uid,
+      student_uid: updatedStudent?.uid || student.uid,
       score_index: index,
       old_score: oldScore,
       new_score: Number(newScore),
-      updated_scores: student.scores,
+      updated_scores: updatedStudent?.rings || student.rings,
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -146,7 +145,7 @@ export class ScoreController {
   public deleteStudentScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id, scoreIndex } = req.params;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -159,7 +158,7 @@ export class ScoreController {
     const index = Number(scoreIndex);
 
     // 检查成绩索引是否有效
-    if (index < 0 || index >= student.scores.length) {
+    if (index < 0 || index >= student.rings.length) {
       res.status(400).json({
         success: false,
         error: '成绩索引无效',
@@ -167,15 +166,15 @@ export class ScoreController {
       return;
     }
 
-    const deletedScore = student.scores[index];
+    const deletedScore = student.rings[index];
     student.removeScore(index);
-    await student.save();
+    const updatedStudent = await Student.updateByUid(Number(id), { rings: student.rings });
 
     const responseData = {
-      student_uid: student.uid,
+      student_uid: updatedStudent?.uid || student.uid,
       score_index: index,
       deleted_score: deletedScore,
-      remaining_scores: student.scores,
+      remaining_scores: updatedStudent?.rings || student.rings,
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -193,7 +192,7 @@ export class ScoreController {
     const { id } = req.params;
     const { scores } = req.body;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -224,17 +223,17 @@ export class ScoreController {
     }
 
     // 批量添加成绩
-    const originalRings = [...student.scores];
+    const originalRings = [...student.rings];
     scores.forEach(score => student.addScore(Number(score)));
-    await student.save();
+    const updatedStudent = await Student.updateByUid(Number(id), { rings: student.rings });
 
     const responseData = {
-      student_uid: student.uid,
+      student_uid: updatedStudent?.uid || student.uid,
       added_scores: scores,
       total_added: scores.length,
       original_total: originalRings.length,
-      new_total: student.scores.length,
-      all_scores: student.scores,
+      new_total: updatedStudent?.rings.length || student.rings.length,
+      all_scores: updatedStudent?.rings || student.rings,
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -251,7 +250,7 @@ export class ScoreController {
   public clearAllScores = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -261,15 +260,14 @@ export class ScoreController {
       return;
     }
 
-    const clearedCount = student.scores.length;
-    student.scores = [];
-    student.changed('scores', true);
-    await student.save();
+    const clearedCount = student.rings.length;
+    student.rings = [];
+    const updatedStudent = await Student.updateByUid(Number(id), { rings: [] });
 
     const responseData = {
-      student_uid: student.uid,
+      student_uid: updatedStudent?.uid || student.uid,
       cleared_count: clearedCount,
-      current_scores: student.scores,
+      current_scores: updatedStudent?.rings || [],
     };
 
     const response: IApiResponse<typeof responseData> = {

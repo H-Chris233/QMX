@@ -1,5 +1,5 @@
 <template>
-  <div :class="['main-app', theme]">
+  <div :class="['main-app', appStore.theme]">
     <!-- 顶部导航栏（同时承载移动端侧边栏触发按钮） -->
     <nav class="navbar">
       <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
@@ -13,8 +13,8 @@
         <div
           v-for="item in menuItems"
           :key="item.id"
-          :class="['nav-menu-item', { active: activeTab === item.id }]"
-          @click="activeTab = item.id"
+          :class="['nav-menu-item', { active: appStore.activeTab === item.id }]"
+          @click="appStore.setActiveTab(item.id)"
         >
           <span class="nav-menu-icon">{{ item.icon }}</span>
           <span class="nav-menu-text">{{ item.label }}</span>
@@ -31,7 +31,7 @@
           <li
             v-for="item in menuItems"
             :key="item.id"
-            :class="{ active: activeTab === item.id }"
+            :class="{ active: appStore.activeTab === item.id }"
             @click="handleSidebarItemClick(item.id)"
           >
             <span class="sidebar-icon">{{ item.icon }}</span>
@@ -51,95 +51,69 @@
     <!-- 主内容区域 -->
     <main class="main-content">
       <!-- 学员管理 -->
-      <div v-if="activeTab === 'students'" class="tab-content">
+      <div v-if="appStore.activeTab === 'students'" class="tab-content">
         <StudentManagement />
       </div>
 
       <!-- 收支统计 -->
-      <div v-if="activeTab === 'finance'" class="tab-content">
+      <div v-if="appStore.activeTab === 'finance'" class="tab-content">
         <FinancialStatistics />
       </div>
 
       <!-- 成绩管理 -->
-      <div v-if="activeTab === 'grades'" class="tab-content">
+      <div v-if="appStore.activeTab === 'grades'" class="tab-content">
         <GradeManagement />
       </div>
 
       <!-- 仪表盘 -->
-      <div v-if="activeTab === 'dashboard'" class="tab-content">
+      <div v-if="appStore.activeTab === 'dashboard'" class="tab-content">
         <Dashboard />
       </div>
 
       <!-- 设置 -->
-      <div v-if="activeTab === 'settings'" class="tab-content">
+      <div v-if="appStore.activeTab === 'settings'" class="tab-content">
         <Settings />
       </div>
     </main>
 
     <!-- 错误弹窗 -->
     <ErrorModal
-      :show="errorModal.show"
-      :title="errorModal.title"
-      :message="errorModal.message"
-      :details="errorModal.details"
-      :show-retry="errorModal.showRetry"
-      :priority="errorModal.priority || 'medium'"
-      @close="hideError"
+      :show="appStore.errorModal.show"
+      :title="appStore.errorModal.title"
+      :message="appStore.errorModal.message"
+      :details="appStore.errorModal.details"
+      :show-retry="appStore.errorModal.showRetry"
+      :priority="appStore.errorModal.priority || 'medium'"
+      @close="appStore.hideError"
       @retry="retryWithError"
     />
 
     <!-- 确认弹窗 -->
     <ConfirmModal
-      :show="confirmModal.show"
-      :title="confirmModal.title"
-      :message="confirmModal.message"
-      :details="confirmModal.details"
-      :confirm-text="confirmModal.confirmText"
-      :cancel-text="confirmModal.cancelText"
-      :confirm-type="confirmModal.confirmType"
-      @confirm="handleConfirm"
-      @cancel="handleCancel"
+      :show="appStore.confirmModal.show"
+      :title="appStore.confirmModal.title"
+      :message="appStore.confirmModal.message"
+      :details="appStore.confirmModal.details"
+      :confirm-text="appStore.confirmModal.confirmText"
+      :cancel-text="appStore.confirmModal.cancelText"
+      :confirm-type="appStore.confirmModal.confirmType"
+      @confirm="appStore.handleConfirm"
+      @cancel="appStore.handleCancel"
     />
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, provide, watch, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, provide } from 'vue';
+import { appStore } from './store/appStore';
 import ErrorModal from './components/ErrorModal.vue';
-import { type AppError } from './utils/errorHandler';
 import StudentManagement from './components/StudentManagement.vue';
 import FinancialStatistics from './components/FinancialStatistics.vue';
 import GradeManagement from './components/GradeManagement.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
-
 import ConfirmModal from './components/ConfirmModal.vue';
-
-
-// 定义类型接口
-
-
-interface ErrorModalState {
-  show: boolean;
-  title: string;
-  message: string;
-  details: string;
-  showRetry: boolean;
-  priority?: string;
-}
-
-interface ConfirmModalState {
-  show: boolean;
-  title: string;
-  message: string;
-  details: string;
-  confirmText: string;
-  cancelText: string;
-  confirmType: string;
-  onConfirm: (() => void) | null;
-  onCancel: (() => void) | null;
-}
 
 interface MenuItem {
   id: string;
@@ -147,98 +121,19 @@ interface MenuItem {
   icon: string;
 }
 
-interface RefreshTriggers {
-  students: number;
-  transactions: number;
-  dashboard: number;
-  grades: number;
-}
-
-interface ConfirmOptions {
-  title?: string;
-  message: string;
-  details?: string;
-  confirmText?: string;
-  cancelText?: string;
-  confirmType?: string;
-  onConfirm?: (() => void) | null;
-  onCancel?: (() => void) | null;
-}
-const theme: Ref<string> = ref('dark');
-const activeTab: Ref<string> = ref('dashboard');
-
-// DOM元素引用 - 优化性能，避免重复查询
-const sidebarRef = ref<HTMLElement | null>(null);
-const toggleButtonRef = ref<HTMLElement | null>(null);
-
-// 错误弹窗状态
-const errorModal: Ref<ErrorModalState> = ref({
-  show: false,
-  title: '错误',
-  message: '',
-  details: '',
-  showRetry: false,
-});
-
-// 当前显示的错误
-const currentError = ref<AppError | null>(null);
-
-// 移除错误弹窗状态（已简化错误处理机制）
-// 错误弹窗状态
-// const errorModal: Ref<ErrorModalState> = ref({
-//   show: false,
-//   title: '错误',
-//   message: '',
-//   details: '',
-//   showRetry: false,
-// });
-
-// 当前显示的错误
-// const currentError = ref<AppError | null>(null);
-
-// 移除全局错误状态监听（已简化错误处理机制）
-// watch(globalErrors, (errors) => {
-//   if (errors.length > 0 && !errorModal.value.show) {
-//     // 显示最新的错误
-//     const latestError = errors[errors.length - 1];
-//     if (latestError) {
-//       currentError.value = latestError;
-//       
-//       errorModal.value = {
-//         show: true,
-//         title: latestError.title,
-//         message: latestError.message,
-//         details: latestError.details || '',
-//         showRetry: latestError.retryable && !!latestError.retryCallback,
-//         priority: latestError.priority as string,
-//       };
-//     }
-//   }
-// }, { deep: true });
-
-// 确认弹窗状态
-const confirmModal: Ref<ConfirmModalState> = ref({
-  show: false,
-  title: '确认操作',
-  message: '',
-  details: '',
-  confirmText: '确定',
-  cancelText: '取消',
-  confirmType: 'primary',
-  onConfirm: null,
-  onCancel: null,
-});
-
 const menuItems: MenuItem[] = [
   { id: 'dashboard', label: '仪表盘', icon: '📊' },
   { id: 'students', label: '学员管理', icon: '👥' },
   { id: 'finance', label: '收支统计', icon: '💰' },
   { id: 'grades', label: '成绩管理', icon: '📝' },
-  { id: 'settings', label: '设置', icon: '⚙️' }, // 新增「设置」菜单项
+  { id: 'settings', label: '设置', icon: '⚙️' },
 ];
 
-// 新增：侧边栏展开状态 + 交互方法
-const isSidebarOpen: Ref<boolean> = ref(false);
+// DOM元素引用
+const sidebarRef = ref<HTMLElement | null>(null);
+const toggleButtonRef = ref<HTMLElement | null>(null);
+const isSidebarOpen = ref(false);
+
 const toggleSidebar = (): void => {
   const newState = !isSidebarOpen.value;
   isSidebarOpen.value = newState;
@@ -259,347 +154,114 @@ const toggleSidebar = (): void => {
   
   if (import.meta.env?.MODE !== 'production') console.log('侧边栏状态：' + newState);
 };
+
 const handleSidebarItemClick = (id: string): void => {
-  activeTab.value = id; // 切换激活Tab
+  appStore.setActiveTab(id); // 切换激活Tab
   toggleSidebar(); // 点击菜单项后自动收起侧边栏
 };
 
-
-
-// 错误处理方法
-const showError = (title: string, message: string, details: string = '', showRetry: boolean = false, priority: 'low' | 'medium' | 'high' = 'medium'): void => {
-      try {
-        if (!title || typeof title !== 'string') title = '系统错误';
-        if (!message || typeof message !== 'string' || message.trim() === '') message = '发生了未知错误';
-
-        errorModal.value.show = true;
-        errorModal.value.title = title.substring(0, 100);
-        errorModal.value.message = message.substring(0, 500);
-        errorModal.value.details = details ? String(details).substring(0, 2000) : '';
-        errorModal.value.showRetry = Boolean(showRetry);
-        errorModal.value.priority = priority;
-      } catch (error) {
-        if (import.meta.env?.MODE !== 'production') console.error('显示错误弹窗失败:', error);
-      }
-    };
-
-const hideError = (): void => {
-  errorModal.value.show = false;
-  // 移除对已删除函数的调用
-  if (currentError.value) {
-    currentError.value = null;
-  }
-};
-
+// 重试错误（保留但简化）
 const retryWithError = async (): Promise<void> => {
-  errorModal.value.show = false;
-  
-  if (currentError.value?.retryCallback) {
-    try {
-      await currentError.value.retryCallback();
-    } catch (error) {
-      // 重试失败，重新显示错误
-      errorModal.value.show = true;
-    }
-  }
-  
-  // 移除对已删除函数的调用
-  if (currentError.value) {
-    currentError.value = null;
-  }
-};
-
-// 移除与错误弹窗相关的方法（已简化错误处理机制）
-// const hideError = (): void => {
-//   errorModal.value.show = false;
-//   // 从全局错误列表中移除当前错误
-//   if (currentError.value) {
-//     removeError(currentError.value.id);
-//     currentError.value = null;
-//   }
-// };
-
-// const retryWithError = async (): Promise<void> => {
-//   errorModal.value.show = false;
-//   
-//   if (currentError.value?.retryCallback) {
-//     try {
-//       await currentError.value.retryCallback();
-//     } catch (error) {
-//       // 重试失败，重新显示错误
-//       errorModal.value.show = true;
-//     }
-//   }
-//   
-//   // 从全局错误列表中移除当前错误
-//   if (currentError.value) {
-//     removeError(currentError.value.id);
-//     currentError.value = null;
-//   }
-// };
-
-// 确认弹窗方法
-const showConfirm = (options: ConfirmOptions): void => {
-      const {
-        title = '确认操作',
-        message,
-        details = '',
-        confirmText = '确定',
-        cancelText = '取消',
-        confirmType = 'primary',
-        onConfirm = null,
-        onCancel = null,
-      } = options;
-
-      const safeMessage = (typeof message === 'string' && message.trim() !== '') ? message : '请确认是否继续该操作';
-
-      confirmModal.value.show = true;
-      confirmModal.value.title = title;
-      confirmModal.value.message = safeMessage;
-      confirmModal.value.details = details;
-      confirmModal.value.confirmText = confirmText;
-      confirmModal.value.cancelText = cancelText;
-      confirmModal.value.confirmType = confirmType;
-      confirmModal.value.onConfirm = onConfirm;
-      confirmModal.value.onCancel = onCancel;
-    };
-
-const handleConfirm = (): void => {
-  confirmModal.value.show = false;
-  try {
-    if (confirmModal.value.onConfirm) confirmModal.value.onConfirm();
-  } catch (e) {
-    showError('操作失败', '确认操作执行出错');
-  }
-};
-
-const handleCancel = (): void => {
-  confirmModal.value.show = false;
-  try {
-    if (confirmModal.value.onCancel) confirmModal.value.onCancel();
-  } catch (e) {
-    if (import.meta.env?.MODE !== 'production') console.warn('取消回调执行异常', e);
-  }
-};
-
-// 成功消息处理（简单的控制台日志，可以后续扩展为Toast通知）
-const showSuccess = (title: string, message: string): void => {
-  if (import.meta.env?.MODE !== 'production') {
-    console.log(`✅ ${title}: ${message}`);
-  }
+  appStore.hideError();
+  // 这里可以实现特定的重试逻辑
 };
 
 // 事件监听器清理函数
 let cleanupFunctions: (() => void)[] = [];
 
-    onMounted(() => {
-      try {
-        // 恢复页面状态
-        let savedActiveTab: string | null = null;
-        try { savedActiveTab = localStorage.getItem('qmx_active_tab'); } catch {}
-        if (savedActiveTab && ['dashboard', 'students', 'finance', 'grades', 'settings'].includes(savedActiveTab)) {
-          activeTab.value = savedActiveTab;
-          if (import.meta.env?.MODE !== 'production') console.log('🔄 恢复到之前的页面:', savedActiveTab);
-        }
-        
-        // 检查并显示上次操作结果
-        let lastOperation: string | null = null;
-        let lastOperationTime: string | null = null;
-        try {
-          lastOperation = localStorage.getItem('qmx_last_operation');
-          lastOperationTime = localStorage.getItem('qmx_last_operation_time');
-        } catch {}
-        
-        if (lastOperation && lastOperationTime) {
-          const timeDiff = Date.now() - parseInt(lastOperationTime);
-          // 如果操作是在5秒内完成的，显示成功消息
-          if (timeDiff < 5000) {
-            if (import.meta.env?.MODE !== 'production') console.log('✅ 页面刷新完成，上次操作:', lastOperation);
-            showSuccess('操作成功', lastOperation);
-          }
-          
-          // 清除操作记录
-          try {
-            localStorage.removeItem('qmx_last_operation');
-            localStorage.removeItem('qmx_last_operation_time');
-          } catch {}
-        }
-        
-        // 安全的主题初始化
-        let savedTheme: string | null = null;
-        try { savedTheme = localStorage.getItem('theme'); } catch {}
-        if (savedTheme && ['dark', 'light'].includes(savedTheme)) {
-          theme.value = savedTheme;
-        } else {
-          // 安全的媒体查询检查
-          const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
-          theme.value = mediaQuery?.matches ? 'dark' : 'light';
-        }
-        document.documentElement.className = `${theme.value}-theme`;
-        document.documentElement.setAttribute('data-theme', theme.value);
-        
-        // 优化的外部点击处理：使用缓存的DOM引用，避免重复查询
-        const handleOutsideClick = (e: Event): void => {
-          if (window.innerWidth <= 768 && isSidebarOpen.value) {
-            const target = e.target as Node;
-            
-            // 使用缓存的DOM引用，大幅提升性能
-            const sidebar = sidebarRef.value;
-            const toggleButton = toggleButtonRef.value;
-            
-            // 安全的DOM事件检查，避免null引用
-            if (target && sidebar && toggleButton && 
-                !sidebar.contains(target) && 
-                !toggleButton.contains(target)) {
-              isSidebarOpen.value = false;
-            }
-          }
-        };
+onMounted(() => {
+  // 优化的外部点击处理
+  const handleOutsideClick = (e: Event): void => {
+    if (window.innerWidth <= 768 && isSidebarOpen.value) {
+      const target = e.target as Node;
+      
+      const sidebar = sidebarRef.value;
+      const toggleButton = toggleButtonRef.value;
+      
+      if (target && sidebar && toggleButton && 
+          !sidebar.contains(target) && 
+          !toggleButton.contains(target)) {
+        isSidebarOpen.value = false;
+      }
+    }
+  };
 
-        // 防抖处理，避免频繁触发
-        let debounceTimer: number | null = null;
-        const debouncedHandleClick = (e: Event): void => {
-          if (debounceTimer) window.clearTimeout(debounceTimer);
-          debounceTimer = window.setTimeout(() => handleOutsideClick(e), 10);
-        };
+  // 防抖处理
+  let debounceTimer: number | null = null;
+  const debouncedHandleClick = (e: Event): void => {
+    if (debounceTimer) window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(() => handleOutsideClick(e), 10);
+  };
 
-        document.addEventListener('click', debouncedHandleClick);
-        
-        // 使用具名函数以便正确清理
-        const handleKeydown = (e: KeyboardEvent): void => {
-          if (e.key === 'Escape' && isSidebarOpen.value) {
-            isSidebarOpen.value = false;
-          }
-        };
-        document.addEventListener('keydown', handleKeydown);
-        
-        // 一次性添加所有清理函数
-        cleanupFunctions.push(
-          () => document.removeEventListener('click', debouncedHandleClick),
-          () => {
-            if (debounceTimer) window.clearTimeout(debounceTimer as number);
-          },
-          () => document.removeEventListener('keydown', handleKeydown)
-        );
-
-        // 添加窗口大小变化监听器，自动关闭侧边栏
-        let resizeRaf = 0;
-        const handleResize = (): void => {
-          if (resizeRaf) cancelAnimationFrame(resizeRaf);
-          resizeRaf = requestAnimationFrame(() => {
-            if (window.innerWidth > 768 && isSidebarOpen.value) {
-              isSidebarOpen.value = false;
-            }
-          });
-        };
-        cleanupFunctions.push(() => { if (resizeRaf) cancelAnimationFrame(resizeRaf); });
-
-        window.addEventListener('resize', handleResize);
-        cleanupFunctions.push(() => {
-          window.removeEventListener('resize', handleResize);
-        });
-
-      } catch (error) {
-        if (import.meta.env?.MODE !== 'production') console.error('主题初始化失败:', error);
-        theme.value = 'dark';
-        document.documentElement.className = 'dark-theme';
+  document.addEventListener('click', debouncedHandleClick);
+  
+  const handleKeydown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && isSidebarOpen.value) {
+      isSidebarOpen.value = false;
+    }
+  };
+  document.addEventListener('keydown', handleKeydown);
+  
+  // 添加窗口大小变化监听器
+  let resizeRaf = 0;
+  const handleResize = (): void => {
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => {
+      if (window.innerWidth > 768 && isSidebarOpen.value) {
+        isSidebarOpen.value = false;
       }
     });
+  };
 
-    onUnmounted(() => {
-      // 清理所有事件监听器
-      cleanupFunctions.forEach((cleanup: () => void) => {
-        try {
-          cleanup();
-        } catch (error) {
-          if (import.meta.env?.MODE !== 'production') console.warn('清理事件监听器失败:', error);
-        }
-      });
-      cleanupFunctions = [];
-    });
-
-// 全局数据刷新事件系统
-const refreshTriggers: Ref<RefreshTriggers> = ref({
-  students: 0,
-  transactions: 0,
-  dashboard: 0,
-  grades: 0,
+  window.addEventListener('resize', handleResize);
+  
+  // 一次性添加所有清理函数
+  cleanupFunctions.push(
+    () => document.removeEventListener('click', debouncedHandleClick),
+    () => {
+      if (debounceTimer) window.clearTimeout(debounceTimer as number);
+    },
+    () => document.removeEventListener('keydown', handleKeydown),
+    () => { if (resizeRaf) cancelAnimationFrame(resizeRaf); },
+    () => window.removeEventListener('resize', handleResize)
+  );
 });
 
-const triggerRefresh = (componentType: string): void => {
-      try {
-        if (componentType === 'all') {
-          // 刷新所有组件
-          refreshTriggers.value.students++;
-          refreshTriggers.value.transactions++;
-          refreshTriggers.value.dashboard++;
-          refreshTriggers.value.grades++;
-        } else if (componentType in refreshTriggers.value) {
-          (refreshTriggers.value as any)[componentType]++;
-        }
-        if (import.meta.env?.MODE !== 'production') console.log(`触发 ${componentType} 组件刷新`);
-      } catch (error) {
-        if (import.meta.env?.MODE !== 'production') console.error('触发刷新失败:', error);
-      }
-    };
+onUnmounted(() => {
+  // 清理所有事件监听器
+  cleanupFunctions.forEach((cleanup: () => void) => {
+    try {
+      cleanup();
+    } catch (error) {
+      if (import.meta.env?.MODE !== 'production') console.warn('清理事件监听器失败:', error);
+    }
+  });
+  cleanupFunctions = [];
+});
 
-    // 提供全局错误处理方法和刷新机制给子组件使用
+// 提供全局错误处理方法和刷新机制给子组件使用
 provide('errorHandler', {
-  showError,
-  hideError,
+  showError: appStore.showError,
+  hideError: appStore.hideError,
   retryWithError,
-  showSuccess,
-  showConfirm,
+  showSuccess: appStore.showSuccess,
+  showConfirm: appStore.showConfirm,
+});
+
+// 提供刷新系统
+provide('refreshSystem', {
+  refreshTriggers: appStore.refreshTriggers,
+  triggerRefresh: appStore.triggerRefresh,
 });
 
 // 添加全局错误显示方法
-(window as any).showError = showError;
+(window as any).showError = appStore.showError;
 
 // 监听全局错误事件
 window.addEventListener('showAppError', (event: any) => {
   const detail = event.detail;
-  showError(detail.title, detail.message, detail.details, detail.showRetry, detail.priority);
+  appStore.showError(detail.title, detail.message, detail.details, detail.showRetry, detail.priority);
 });
-
-    provide('refreshSystem', {
-      refreshTriggers,
-      triggerRefresh,
-    });
-
-// 监听标签页切换，自动刷新对应组件并保存状态
-watch(activeTab, (newTab: string, oldTab: string) => {
-      if (newTab !== oldTab) {
-        if (import.meta.env?.MODE !== 'production') console.log(`切换到 ${newTab} 标签页，触发刷新`);
-        
-        try {
-          try { localStorage.setItem('qmx_active_tab', newTab); } catch {}
-          if (import.meta.env?.MODE !== 'production') console.log('💾 已保存当前页面状态:', newTab);
-        } catch (error) {
-          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
-        }
-        
-        // 根据切换的标签页触发对应的刷新
-        switch (newTab) {
-          case 'dashboard':
-            triggerRefresh('dashboard');
-            break;
-          case 'students':
-            triggerRefresh('students');
-            break;
-          case 'finance':
-            triggerRefresh('transactions');
-            break;
-          case 'grades':
-            triggerRefresh('grades');
-            break;
-          case 'settings':
-            triggerRefresh('all');
-            break;
-        }
-      }
-    });
-
-
 </script>
 
 <style>

@@ -202,120 +202,8 @@
           <button class="close-btn" @click="closeModals">✖️</button>
         </div>
         <div class="modal-body">
-          <!-- 科目选择切换按钮 -->
-          <div class="subject-toggle">
-            <button
-              :class="[
-                'subject-btn',
-                { active: currentStudent.subject === 'Shooting' },
-              ]"
-              @click="currentStudent.subject = 'Shooting'"
-            >
-              射击
-            </button>
-            <button
-              :class="[
-                'subject-btn',
-                { active: currentStudent.subject === 'Archery' },
-              ]"
-              @click="currentStudent.subject = 'Archery'"
-            >
-              射箭
-            </button>
-            <button
-              :class="[
-                'subject-btn',
-                { active: currentStudent.subject === 'Others' },
-              ]"
-              @click="currentStudent.subject = 'Others'"
-            >
-              其他
-            </button>
-          </div>
-
-          <div class="form-group">
-            <label>姓名</label>
-            <input
-              v-model="currentStudent.name"
-              type="text"
-              placeholder="请输入学员姓名"
-            />
-          </div>
-          <div class="form-group">
-            <label>年龄</label>
-            <input
-              v-model="currentStudent.age"
-              type="number"
-              placeholder="请输入年龄"
-              min="3"
-              max="120"
-            />
-          </div>
-          <div class="form-group">
-            <label>电话</label>
-            <input
-              v-model="currentStudent.phone"
-              type="tel"
-              placeholder="请输入电话号码"
-            />
-          </div>
-          <div class="form-group">
-            <label>课程类型</label>
-            <select v-model="currentStudent.classType">
-              <option value="">请选择课程</option>
-              <option value="TenTry">体验课 (10次)</option>
-              <option value="Month">月卡 (自动设置30天会员)</option>
-              <option value="Year">年卡 (自动设置365天会员)</option>
-              <option value="Others">其他</option>
-            </select>
-            <div v-if="currentStudent.classType === 'Month' || currentStudent.classType === 'Year'" class="membership-hint">
-              <span class="hint-icon">💡</span>
-              <span class="hint-text">
-                选择{{ currentStudent.classType === 'Month' ? '月卡' : '年卡' }}将自动为学员设置对应的会员权限
-              </span>
-            </div>
-          </div>
-          
-          <!-- 自定义会员开始时间 -->
-          <div v-if="currentStudent.classType === 'Month' || currentStudent.classType === 'Year'" class="form-group membership-custom">
-            <div class="custom-membership-toggle">
-              <label class="checkbox-label">
-                <input 
-                  type="checkbox" 
-                  v-model="currentStudent.enableCustomMembership"
-                  @change="onCustomMembershipToggle"
-                />
-                <span class="checkmark"></span>
-                自定义会员开始时间
-              </label>
-            </div>
-            
-            <div v-if="currentStudent.enableCustomMembership" class="custom-membership-date">
-              <DatePicker
-                v-model="currentStudent.customMembershipStart"
-                label="会员开始时间"
-                :min-date="getTodayDate()"
-                placeholder="选择会员开始日期"
-                required
-              />
-              <div class="membership-preview" v-if="currentStudent.customMembershipStart">
-                <span class="preview-icon">📅</span>
-                <span class="preview-text">
-                  会员将从 {{ formatDateForDisplay(currentStudent.customMembershipStart) }} 开始，
-                  {{ currentStudent.classType === 'Month' ? '30天后' : '365天后' }}到期
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>备注</label>
-            <textarea
-              v-model="currentStudent.note"
-              rows="3"
-              placeholder="请输入备注信息"
-            ></textarea>
-          </div>
-        </div>
+        <StudentForm v-model="currentStudent" />
+      </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals" :disabled="loading">取消</button>
           <button class="save-btn" @click="saveStudent" :disabled="loading">
@@ -412,6 +300,7 @@ import { ApiService } from '../api/ApiService';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
+import StudentForm from './StudentForm.vue';
 
 // 定义类型接口
 import type { Student as ApiStudent } from '../types/api';
@@ -1477,27 +1366,7 @@ const saveCustomMembership = async (): Promise<void> => {
       }
     });
 
-// 格式化日期用于显示
-const formatDateForDisplay = (dateString: string): string => {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toLocaleDateString('zh-CN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    };
 
-// 自定义会员时间切换处理
-const onCustomMembershipToggle = (): void => {
-      if (!currentStudent.value.enableCustomMembership) {
-        // 如果关闭自定义时间，清空自定义开始时间
-        currentStudent.value.customMembershipStart = '';
-      } else {
-        // 如果开启自定义时间，默认设置为今天
-        currentStudent.value.customMembershipStart = getTodayDate();
-      }
-    };
 
 
 </script>

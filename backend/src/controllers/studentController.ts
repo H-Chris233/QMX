@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Student } from '@/models';
+import { Student, IStudentDoc } from '@/models/mongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
@@ -7,9 +7,7 @@ import logger from '@/utils/logger';
 export class StudentController {
   // 获取所有学员
   public getAllStudents = catchAsync(async (req: Request, res: Response) => {
-    const students = await Student.findAll({
-      order: [['createdAt', 'DESC']],
-    });
+    const students = await Student.findAll();
 
     res.json({
       success: true,
@@ -21,7 +19,7 @@ export class StudentController {
   public addStudent = catchAsync(async (req: Request, res: Response) => {
     const studentData = req.body;
     const student = await Student.create(studentData);
-    
+
     logger.info(`添加学员成功，UID: ${student.uid}, 姓名: ${student.name}`);
     res.status(201).json({
       success: true,
@@ -33,8 +31,8 @@ export class StudentController {
   // 更新学员
   public updateStudent = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    const student = await Student.findByPk(id);
-    
+    const student = await Student.findByUid(Number(id));
+
     if (!student) {
       res.status(404).json({
         success: false,
@@ -42,13 +40,13 @@ export class StudentController {
       });
       return;
     }
-    
-    await student.update(req.body);
-    
+
+    const updatedStudent = await Student.updateByUid(Number(id), req.body);
+
     logger.info(`更新学员成功，UID: ${student.uid}`);
     res.json({
       success: true,
-      data: student,
+      data: updatedStudent,
       message: '学员更新成功',
     });
   });
@@ -56,8 +54,8 @@ export class StudentController {
   // 删除学员
   public deleteStudent = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    const student = await Student.findByPk(id);
-    
+    const student = await Student.findByUid(Number(id));
+
     if (!student) {
       res.status(404).json({
         success: false,
@@ -65,21 +63,28 @@ export class StudentController {
       });
       return;
     }
-    
-    await student.destroy();
-    
-    logger.info(`删除学员成功，UID: ${student.uid}`);
-    res.json({
-      success: true,
-      message: '学员删除成功',
-    });
+
+    const deleted = await Student.deleteByUid(Number(id));
+
+    if (deleted) {
+      logger.info(`删除学员成功，UID: ${student.uid}`);
+      res.json({
+        success: true,
+        message: '学员删除成功',
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: '删除学员失败',
+      });
+    }
   });
 
   // 获取单个学员
   public getStudentById = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    const student = await Student.findByPk(id);
-    
+    const student = await Student.findByUid(Number(id));
+
     if (!student) {
       res.status(404).json({
         success: false,
@@ -87,7 +92,7 @@ export class StudentController {
       });
       return;
     }
-    
+
     res.json({
       success: true,
       data: student,
@@ -113,7 +118,8 @@ export class StudentController {
     // 姓名包含搜索
     if (name_contains) {
       whereCondition.name = {
-        [require('sequelize').Op.iLike]: `%${name_contains}%`
+        $regex: name_contains,
+        $options: 'i'
       };
     }
 
@@ -121,22 +127,20 @@ export class StudentController {
     if (min_age !== undefined && min_age !== null) {
       whereCondition.age = {
         ...whereCondition.age,
-        [require('sequelize').Op.gte]: Number(min_age)
+        $gte: Number(min_age)
       };
     }
     if (max_age !== undefined && max_age !== null) {
       whereCondition.age = {
         ...whereCondition.age,
-        [require('sequelize').Op.lte]: Number(max_age)
+        $lte: Number(max_age)
       };
     }
 
     // 成绩范围搜索 - 这里需要查询成绩字段
     if (min_score !== undefined && min_score !== null || max_score !== undefined && max_score !== null) {
-      // 由于成绩是数组格式，需要使用子查询或特殊处理
-      const students = await Student.findAll({
-        attributes: ['uid', 'name', 'age', 'class', 'phone', 'rings', 'subject', 'membership_start_date', 'membership_end_date'],
-      });
+      // 由于成绩是数组格式，需要使用MongoDB的聚合查询或特殊处理
+      const students = await Student.findAll();
 
       let filteredStudents = students;
 
@@ -189,13 +193,13 @@ export class StudentController {
         const now = new Date();
         if (has_membership === 'true') {
           filteredStudents = filteredStudents.filter(student =>
-            student.membership_start_date && student.membership_end_date &&
-            student.membership_start_date <= now && student.membership_end_date >= now
+            student.membershipStartDate && student.membershipEndDate &&
+            student.membershipStartDate <= now && student.membershipEndDate >= now
           );
         } else {
           filteredStudents = filteredStudents.filter(student =>
-            !student.membership_start_date || !student.membership_end_date ||
-            student.membership_start_date > now || student.membership_end_date < now
+            !student.membershipStartDate || !student.membershipEndDate ||
+            student.membershipStartDate > now || student.membershipEndDate < now
           );
         }
       }
@@ -221,27 +225,19 @@ export class StudentController {
     if (has_membership !== undefined && has_membership !== null) {
       const now = new Date();
       if (has_membership === 'true') {
-        whereCondition.membership_start_date = {
-          [require('sequelize').Op.lte]: now
-        };
-        whereCondition.membership_end_date = {
-          [require('sequelize').Op.gte]: now
-        };
+        whereCondition.membershipStartDate = { $lte: now };
+        whereCondition.membershipEndDate = { $gte: now };
       } else {
-        whereCondition[require('sequelize').Op.or] = [
-          { membership_start_date: null },
-          { membership_end_date: null },
-          { membership_start_date: { [require('sequelize').Op.gt]: now } },
-          { membership_end_date: { [require('sequelize').Op.lt]: now } }
+        whereCondition.$or = [
+          { membershipStartDate: null },
+          { membershipEndDate: null },
+          { membershipStartDate: { $gt: now } },
+          { membershipEndDate: { $lt: now } }
         ];
       }
     }
 
-    const students = await Student.findAll({
-      where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
-      attributes: ['uid', 'name', 'age', 'class', 'phone', 'rings', 'subject', 'membership_start_date', 'membership_end_date'],
-      order: [['createdAt', 'DESC']],
-    });
+    const students = await Student.search(whereCondition);
 
     res.json({
       success: true,
@@ -254,7 +250,7 @@ export class StudentController {
   // 批量操作学员
   public batchUpdateStudents = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { studentIds, updates } = req.body;
-    
+
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       res.status(400).json({
         success: false,
@@ -263,28 +259,28 @@ export class StudentController {
       return;
     }
 
-    const result = await Student.update(updates, {
-      where: {
-        uid: {
-          [require('sequelize').Op.in]: studentIds
-        }
+    let updatedCount = 0;
+    for (const studentId of studentIds) {
+      const result = await Student.updateByUid(Number(studentId), updates);
+      if (result) {
+        updatedCount++;
       }
-    });
+    }
 
-    logger.info(`批量更新学员成功，影响行数: ${result[0]}`);
+    logger.info(`批量更新学员成功，影响数量: ${updatedCount}`);
     res.json({
       success: true,
       data: {
-        updated_count: result[0],
+        updated_count: updatedCount,
       },
-      message: `成功更新${result[0]}个学员`,
+      message: `成功更新${updatedCount}个学员`,
     });
   });
 
   // 批量删除学员
   public batchDeleteStudents = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { studentIds } = req.body;
-    
+
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       res.status(400).json({
         success: false,
@@ -293,21 +289,21 @@ export class StudentController {
       return;
     }
 
-    const deleted_count = await Student.destroy({
-      where: {
-        uid: {
-          [require('sequelize').Op.in]: studentIds
-        }
+    let deletedCount = 0;
+    for (const studentId of studentIds) {
+      const deleted = await Student.deleteByUid(Number(studentId));
+      if (deleted) {
+        deletedCount++;
       }
-    });
+    }
 
-    logger.info(`批量删除学员成功，删除数量: ${deleted_count}`);
+    logger.info(`批量删除学员成功，删除数量: ${deletedCount}`);
     res.json({
       success: true,
       data: {
-        deleted_count,
+        deleted_count: deletedCount,
       },
-      message: `成功删除${deleted_count}个学员`,
+      message: `成功删除${deletedCount}个学员`,
     });
   });
 
@@ -315,7 +311,7 @@ export class StudentController {
   public updateStudentScores = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { rings } = req.body;
-    
+
     if (!Array.isArray(rings)) {
       res.status(400).json({
         success: false,
@@ -324,8 +320,8 @@ export class StudentController {
       return;
     }
 
-    const student = await Student.findByPk(id);
-    
+    const student = await Student.findByUid(Number(id));
+
     if (!student) {
       res.status(404).json({
         success: false,
@@ -333,13 +329,13 @@ export class StudentController {
       });
       return;
     }
-    
-    await student.update({ rings });
-    
+
+    const updatedStudent = await Student.updateByUid(Number(id), { rings });
+
     logger.info(`更新学员成绩成功，UID: ${student.uid}, 成绩: ${rings}`);
     res.json({
       success: true,
-      data: student,
+      data: updatedStudent,
       message: '学员成绩更新成功',
     });
   });
@@ -347,26 +343,15 @@ export class StudentController {
   // 获取即将到期的会员
   public getExpiringMemberships = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { days = 30 } = req.query;
-    
+
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + Number(days));
-    
-    const expiringStudents = await Student.findAll({
-      where: {
-        [require('sequelize').Op.and]: [
-          {
-            membership_end_date: {
-              [require('sequelize').Op.gte]: new Date()
-            }
-          },
-          {
-            membership_end_date: {
-              [require('sequelize').Op.lte]: futureDate
-            }
-          }
-        ]
-      },
-      order: [['membership_end_date', 'ASC']],
+
+    const expiringStudents = await Student.search({
+      membershipEndDate: {
+        $gte: new Date(),
+        $lte: futureDate
+      }
     });
 
     res.json({
@@ -379,61 +364,46 @@ export class StudentController {
   // 学员统计信息
   public getStudentStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const total_students = await Student.count();
-    
+
     const now = new Date();
-    const active_students = await Student.count({
-      where: {
-        [require('sequelize').Op.and]: [
-          {
-            membership_start_date: {
-              [require('sequelize').Op.lte]: now
-            }
-          },
-          {
-            membership_end_date: {
-              [require('sequelize').Op.gte]: now
-            }
-          }
-        ]
-      }
+    const active_students = await Student.search({
+      membershipStartDate: { $lte: now },
+      membershipEndDate: { $gte: now }
     });
 
-    const expired_memberships = await Student.count({
-      where: {
-        membership_end_date: {
-          [require('sequelize').Op.lt]: now
-        }
-      }
+    const expired_memberships_count = total_students - active_students.length;
+
+    // 按班级统计 - 简化版本
+    const allStudents = await Student.findAll();
+    const classStats = new Map<string, number>();
+    const subjectStats = new Map<string, number>();
+
+    allStudents.forEach(student => {
+      const className = student.class || 'Others';
+      const subjectName = student.subject || 'Others';
+
+      classStats.set(className, (classStats.get(className) || 0) + 1);
+      subjectStats.set(subjectName, (subjectStats.get(subjectName) || 0) + 1);
     });
 
-    // 按班级统计
-    const classStats = await Student.findAll({
-      attributes: [
-        'class',
-        [require('sequelize').fn('COUNT', require('sequelize').col('uid')), 'count']
-      ],
-      group: ['class'],
-      raw: true
-    });
+    const class_statistics = Array.from(classStats.entries()).map(([name, count]) => ({
+      class: name,
+      count
+    }));
 
-    // 按科目统计
-    const subjectStats = await Student.findAll({
-      attributes: [
-        'subject',
-        [require('sequelize').fn('COUNT', require('sequelize').col('uid')), 'count']
-      ],
-      group: ['subject'],
-      raw: true
-    });
+    const subject_statistics = Array.from(subjectStats.entries()).map(([name, count]) => ({
+      subject: name,
+      count
+    }));
 
     res.json({
       success: true,
       data: {
         total_students,
-        active_students,
-        expired_memberships,
-        class_statistics: classStats,
-        subject_statistics: subjectStats,
+        active_students: active_students.length,
+        expired_memberships: expired_memberships_count,
+        class_statistics,
+        subject_statistics,
       },
     });
   });

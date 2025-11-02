@@ -266,127 +266,11 @@
           </button>
         </div>
         <div class="modal-body">
-          <div class="payment-mode-toggle">
-            <button
-              :class="['mode-btn', { active: !isInstallmentMode }]"
-              @click="isInstallmentMode = false"
-            >
-              普通付款
-            </button>
-            <button
-              :class="['mode-btn', { active: isInstallmentMode }]"
-              @click="isInstallmentMode = true"
-            >
-              分期付款
-            </button>
-          </div>
-
-          <div class="form-group">
-            <label for="transaction-type">类型</label>
-            <select
-              id="transaction-type"
-              v-model="currentTransaction.type"
-              :disabled="isInstallmentMode"
-            >
-              <option value="income">收入</option>
-              <option value="expense">支出</option>
-            </select>
-            <span v-if="isInstallmentMode" class="form-note"
-              >分期付款仅支持收入类型</span
-            >
-          </div>
-
-          <div class="form-group">
-            <label for="transaction-amount">金额</label>
-            <input
-              id="transaction-amount"
-              v-model.number="currentTransaction.amount"
-              type="number"
-              placeholder="填入金额"
-              min="0"
-              step="1"
-              oninput="validity.valid||(value='');"
-              class="no-spinners"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="student-id">学员 (可选)</label>
-            <select id="student-id" v-model="currentTransaction.student_id">
-              <option :value="null">其他交易</option>
-              <option
-                v-for="student in students"
-                :key="student.uid"
-                :value="student.uid"
-              >
-                {{ student.name }} (ID: {{ student.uid }})
-              </option>
-            </select>
-          </div>
-
-          <!-- 分期付款特定字段 -->
-          <div v-if="isInstallmentMode" class="installment-fields">
-            <div class="form-group">
-              <label for="installment-total">总期数</label>
-              <input
-                id="installment-total"
-                v-model.number="currentTransaction.installment_total"
-                type="number"
-                placeholder="例如: 12"
-                min="2"
-                step="1"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="installment-frequency">付款频率</label>
-              <select
-                id="installment-frequency"
-                v-model="currentTransaction.installment_frequency"
-              >
-                <option value="Weekly">每周</option>
-                <option value="Monthly" selected>每月</option>
-                <option value="Quarterly">每季度</option>
-                <option value="Custom">自定义</option>
-              </select>
-            </div>
-
-            <div
-              v-if="currentTransaction.installment_frequency === 'Custom'"
-              class="form-group"
-            >
-              <label for="custom-frequency-days">自定义天数</label>
-              <input
-                id="custom-frequency-days"
-                v-model.number="currentTransaction.custom_frequency_days"
-                type="number"
-                placeholder="天数"
-                min="1"
-                step="1"
-              />
-            </div>
-
-            <div class="form-group">
-              <DatePicker
-                :model-value="currentTransaction.installment_due_date || ''"
-                @update:model-value="(value) => currentTransaction.installment_due_date = value"
-                label="首次到期日"
-                placeholder="选择到期日期"
-                :min-date="getTodayDate() || ''"
-                :required="true"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="transaction-note">备注</label>
-            <textarea
-              id="transaction-note"
-              v-model="currentTransaction.note"
-              placeholder="请输入交易备注信息"
-              rows="3"
-            ></textarea>
-          </div>
+          <TransactionForm 
+            v-model="currentTransaction"
+            v-model:isInstallmentMode="isInstallmentMode"
+            :students="students" 
+          />
         </div>
         <div class="modal-footer">
           <button class="cancel-btn" @click="closeModals">取消</button>
@@ -456,6 +340,7 @@ import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
+import TransactionForm from './TransactionForm.vue';
 import type { Student, InstallmentStatus } from '../types/api';
 
 // 前端Transaction类型（基于API Transaction但添加了前端特有字段）
