@@ -1,5 +1,5 @@
 /**
- * 学员信息接口
+ * 学生信息接口 - 统一命名语义
  */
 export interface Student {
   /** 学员唯一标识符 */
@@ -16,7 +16,7 @@ export interface Student {
   rings: number[];
   /** 备注信息 */
   note: string | null;
-  /** 现金信息 */
+  /** 现金信息 - 兼容旧字段 */
   cash: string;
   /** 科目类型 */
   subject: string;
@@ -88,7 +88,7 @@ export interface DashboardStats {
 export type InstallmentStatus = 'Pending' | 'Paid' | 'Overdue' | 'Cancelled';
 
 /**
- * 学员信息更新数据接口
+ * 学生信息更新数据接口 - 统一命名语义
  */
 export interface StudentUpdateData {
   /** 学员姓名 */
@@ -275,15 +275,6 @@ export interface StudentScoresResponse {
   rings: number[];
 }
 
-/**
- * API响应接口
- */
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
 
 /**
  * 分页响应接口

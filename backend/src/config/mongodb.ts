@@ -9,7 +9,7 @@ export interface MongoConfig {
 
 // 获取MongoDB配置
 export function getMongoConfig(): MongoConfig {
-  const uri = process.env.MONGODB_URI || process.env.MONGODB_URL || 
+  const uri = process.env.MONGODB_URI || process.env.MONGODB_URL ||
     process.env.mongodburl || process.env.mongodb_uri;
 
   if (!uri) {
@@ -41,14 +41,14 @@ class MongoConnectionManager {
       }
 
       const { uri, options } = getMongoConfig();
-      
+
       logger.info(`🔄 正在连接MongoDB: ${uri.replace(/\/\/[^@]+@/, '//***:***@')}`);
-      
+
       await mongoose.connect(uri, options);
-      
+
       this.isConnected = true;
       logger.info('✅ MongoDB连接成功！');
-      
+
       // 监听连接事件
       mongoose.connection.on('error', (error) => {
         logger.error('MongoDB连接错误:', error);
@@ -82,7 +82,7 @@ class MongoConnectionManager {
       await mongoose.disconnect();
       this.isConnected = false;
       logger.info('MongoDB连接已断开');
-      
+
     } catch (error) {
       logger.error('❌ MongoDB断开连接失败:', error);
       throw error;
@@ -97,6 +97,36 @@ class MongoConnectionManager {
     const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
     return states[mongoose.connection.readyState] || 'unknown';
   }
+
+  // 健康检查方法
+  async checkHealth(): Promise<{ status: string; details: any }> {
+    try {
+      if (!this.isConnected) {
+        return { status: 'disconnected', details: { state: this.getConnectionState() } };
+      }
+
+      // 执行简单的ping操作
+      await mongoose.connection.db.admin().ping();
+
+      return {
+        status: 'healthy',
+        details: {
+          state: this.getConnectionState(),
+          host: mongoose.connection.host,
+          port: mongoose.connection.port,
+          name: mongoose.connection.name
+        }
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        details: {
+          state: this.getConnectionState(),
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      };
+    }
+  }
 }
 
 // 导出单例实例
@@ -108,4 +138,5 @@ export default {
   disconnect: () => mongoManager.disconnect(),
   getStatus: () => mongoManager.getConnectionStatus(),
   getState: () => mongoManager.getConnectionState(),
+  checkHealth: () => mongoManager.checkHealth(),
 };

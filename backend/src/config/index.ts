@@ -11,21 +11,9 @@ export const config = {
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:1420',
   },
 
-  // 数据库配置
-  database: {
-    type: process.env.DB_TYPE || 'sqlite',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    name: process.env.DB_NAME || 'qmx_db',
-    username: process.env.DB_USER || 'qmx_user',
-    password: process.env.DB_PASSWORD || 'qmx_password',
-    sqlitePath: process.env.SQLITE_PATH || './data/qmx.db',
-  },
-
-  // MongoDB 云数据库配置
+  // MongoDB 配置 - 唯一数据库
   mongodb: {
     uri: process.env.MONGODB_URI || process.env.MONGODB_URL || process.env.mongodburl || process.env.mongodb_uri,
-    enabled: process.env.MONGODB_ENABLED === 'true' || !!(process.env.MONGODB_URI || process.env.MONGODB_URL || process.env.mongodburl || process.env.mongodb_uri),
     options: {
       maxPoolSize: parseInt(process.env.MONGO_POOL_SIZE || '10', 10),
       serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_TIMEOUT || '5000', 10),
@@ -63,41 +51,35 @@ export const config = {
 
 // 验证必需的环境变量
 export function validateConfig(): void {
-  const requiredVars = ['JWT_SECRET'];
-  
-  const missingVars = requiredVars.filter(varName => !process.env[varName]);
-  
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  // 只检查MongoDB连接必需的环境变量
+  if (!config.mongodb.uri) {
+    throw new Error('MONGODB_URI is required for QMX to work. Setting examples:');
+    console.error('');
+    console.error('  # MongoDB Atlas (recommended):');
+    console.error('  MONGODB_URI=mongodb+srv://username:password@cluster_name.mongodb.net/qmx');
+    console.error('');
+    console.error('  # Local MongoDB:');
+    console.error('  MONGODB_URI=mongodb://localhost:27017/qmx');
+    console.error('');
+    console.error('  # MongoDB Compass (local):');
+    console.error('  MONGODB_URI=mongodb://admin:password@localhost:27017/qmx?authSource=admin');
+    console.error('');
   }
-  
+
   if (config.server.nodeEnv === 'production' && config.security.jwtSecret === 'your-super-secret-jwt-key-change-this-in-production') {
     throw new Error('JWT_SECRET must be changed in production environment');
   }
-
-  // 如果启用了MongoDB，验证MongoDB配置
-  if (config.mongodb.enabled && !config.mongodb.uri) {
-    throw new Error('MongoDB is enabled but MONGODB_URI is not provided');
-  }
 }
 
-// 获取数据库类型
-export function getDatabaseType(): 'sqlite' | 'postgresql' | 'mongodb' {
-  if (config.mongodb.enabled) {
-    return 'mongodb';
-  }
-  return config.database.type as 'sqlite' | 'postgresql';
+// 获取数据库类型 - 只返回MongoDB
+export function getDatabaseType(): 'mongodb' {
+  return 'mongodb';
 }
 
-// 获取数据库连接字符串
-export function getDatabaseUrl(): string {
-  if (config.mongodb.enabled && config.mongodb.uri) {
-    return config.mongodb.uri;
+// 获取MongoDB URI
+export function getMongoDBUri(): string {
+  if (!config.mongodb.uri) {
+    throw new Error('MONGODB_URI is not configured');
   }
-  
-  if (config.database.type === 'postgresql') {
-    return `postgresql://${config.database.username}:${config.database.password}@${config.database.host}:${config.database.port}/${config.database.name}`;
-  }
-  
-  return config.database.sqlitePath;
+  return config.mongodb.uri;
 }
