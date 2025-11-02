@@ -1,4 +1,4 @@
-"import { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { Cash, CashClass, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
 import { InstallmentPlan, Installment } from '@/models/InstallmentMongo';

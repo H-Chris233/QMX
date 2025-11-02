@@ -3,7 +3,6 @@ import express from 'express';
 import installmentController from '@/controllers/installmentController';
 import { validate, validateParams, validateQuery, commonValidations } from '@/middleware/validation';
 import { apiRateLimitMiddleware } from '@/middleware/rateLimiter';
-import { InstallmentStatus } from '@/types';
 
 const router = express.Router();
 
@@ -11,89 +10,110 @@ const router = express.Router();
 router.use(apiRateLimitMiddleware);
 
 // 验证规则
+const createInstallmentPlanSchema = Joi.object({
+  student_id: Joi.number().integer().min(1).optional().allow(null),
+  total_amount: Joi.number().positive().required().messages({
+    'number.positive': '总金额必须大于0',
+    'any.required': '总金额不能为空',
+  }),
+  note: Joi.string().max(1000).default('').messages({
+    'string.max': '备注长度不能超过1000字符',
+  }),
+  total_installments: Joi.number().integer().min(1).required().messages({
+    'number.min': '总期数至少为1',
+    'any.required': '总期数不能为空',
+  }),
+  frequency: Joi.string().valid('Weekly', 'Monthly', 'Quarterly', 'Custom').required().messages({
+    'any.only': '无效的付款频率',
+    'any.required': '付款频率不能为空',
+  }),
+  custom_days: Joi.number().integer().min(1).when('frequency', {
+    is: 'Custom',
+    then: Joi.required().messages({ 'any.required': '自定义频率必须指定天数' }),
+    otherwise: Joi.optional(),
+  }),
+  start_date: Joi.date().iso().required().messages({
+    'date.format': '开始日期格式不正确',
+    'any.required': '开始日期不能为空',
+  }),
+});
+
 const updateInstallmentStatusSchema = Joi.object({
-  status: Joi.string().valid(...Object.values(InstallmentStatus)).required().messages({
+  status: Joi.string().valid('Pending', 'Paid', 'Overdue', 'Cancelled').required().messages({
     'any.only': '无效的分期付款状态',
     'any.required': '分期付款状态不能为空',
   }),
-});
-
-const generateNextInstallmentSchema = Joi.object({
-  dueDate: Joi.date().iso().required().messages({
-    'date.format': '到期日期格式不正确',
-    'any.required': '到期日期不能为空',
+  amount: Joi.number().positive().optional().messages({
+    'number.positive': '支付金额必须大于0',
   }),
 });
 
-const upcomingInstallmentsSchema = Joi.object({
-  days: Joi.number().integer().min(1).max(365).default(7).messages({
-    'number.base': '天数必须是数字',
-    'number.integer': '天数必须是整数',
-    'number.min': '天数至少为1',
-    'number.max': '天数不能超过365',
-  }),
+const queryInstallmentSchema = Joi.object({
+  page: commonValidations.page,
+  limit: commonValidations.limit,
+  sort_by: Joi.string().valid('created_at', 'start_date', 'total_amount', 'status').default('created_at'),
+  sort_order: commonValidations.sortOrder,
+  student_id: commonValidations.id.optional(),
+  status: Joi.string().valid('Active', 'Completed', 'Cancelled').optional(),
 });
 
 // 路由定义
 /**
- * @route GET /api/v1/installments/statuses
- * @desc 获取分期付款状态列表
+ * @route GET /api/v1/installments
+ * @desc 获取所有分期计划
  * @access Public
  */
-router.get('/statuses', installmentController.getInstallmentStatuses);
-
-/**
- * @route GET /api/v1/installments/upcoming
- * @desc 获取即将到期的分期
- * @access Public
- */
-router.get('/upcoming', 
-  validateQuery(upcomingInstallmentsSchema),
-  installmentController.getUpcomingInstallments
+router.get('/',
+  validateQuery(queryInstallmentSchema),
+  installmentController.getAllInstallmentPlans
 );
 
 /**
- * @route PUT /api/v1/installments/:transactionUid/status
+ * @route GET /api/v1/installments/overdue
+ * @desc 获取逾期分期列表
+ * @access Public
+ */
+router.get('/overdue', installmentController.getOverdueInstallments);
+
+/**
+ * @route GET /api/v1/installments/:id
+ * @desc 获取单个分期计划详情
+ * @access Public
+ */
+router.get('/:id',
+  validateParams(Joi.object({ id: commonValidations.id })),
+  installmentController.getInstallmentPlanById
+);
+
+/**
+ * @route POST /api/v1/installments
+ * @desc 创建分期计划
+ * @access Public
+ */
+router.post('/',
+  validate(createInstallmentPlanSchema),
+  installmentController.createInstallmentPlan
+);
+
+/**
+ * @route PUT /api/v1/installments/:id/payment
  * @desc 更新分期付款状态
  * @access Public
  */
-router.put('/:transactionUid/status', 
-  validateParams(Joi.object({ 
-    transactionUid: commonValidations.id,
-  })),
+router.put('/:id/payment',
+  validateParams(Joi.object({ id: commonValidations.id })),
   validate(updateInstallmentStatusSchema),
-  installmentController.updateInstallmentStatus
+  installmentController.updateInstallmentPayment
 );
 
 /**
- * @route POST /api/v1/installments/:planId/next
- * @desc 生成下一期分期
+ * @route DELETE /api/v1/installments/:id
+ * @desc 删除分期计划
  * @access Public
  */
-router.post('/:planId/next', 
-  validateParams(Joi.object({ planId: commonValidations.id })),
-  validate(generateNextInstallmentSchema),
-  installmentController.generateNextInstallment
-);
-
-/**
- * @route DELETE /api/v1/installments/:planId/cancel
- * @desc 取消分期计划
- * @access Public
- */
-router.delete('/:planId/cancel', 
-  validateParams(Joi.object({ planId: commonValidations.id })),
-  installmentController.cancelInstallmentPlan
-);
-
-/**
- * @route GET /api/v1/installments/:planId
- * @desc 获取分期计划详情
- * @access Public
- */
-router.get('/:planId', 
-  validateParams(Joi.object({ planId: commonValidations.id })),
-  installmentController.getInstallmentsByPlan
+router.delete('/:id',
+  validateParams(Joi.object({ id: commonValidations.id })),
+  installmentController.deleteInstallmentPlan
 );
 
 export default router;
