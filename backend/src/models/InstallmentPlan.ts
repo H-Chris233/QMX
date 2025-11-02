@@ -86,6 +86,17 @@ InstallmentPlan.init({
     },
     field: 'custom_days',
   },
+  student_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'students',
+      key: 'uid',
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
+    field: 'student_id',
+  },
   createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -108,6 +119,9 @@ InstallmentPlan.init({
     {
       unique: true,
       fields: ['plan_id'],
+    },
+    {
+      fields: ['student_id'], // 添加学员ID索引
     },
   ],
 });

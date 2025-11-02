@@ -94,23 +94,155 @@ export class StudentController {
     });
   });
 
-  // 搜索学员
+  // 搜索学员 - 修复前后端不匹配问题
   public searchStudents = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { keyword } = req.query;
-    let students = [];
-    
-    if (keyword) {
-      students = await Student.findAll({
-        where: {
-          name: {
-            [require('sequelize').Op.iLike]: `%${keyword}%`
-          }
-        }
-      });
-    } else {
-      students = await Student.findAll();
+    const {
+      name_contains,
+      min_age,
+      max_age,
+      min_score,
+      max_score,
+      class_type,
+      subject,
+      has_membership,
+    } = req.query;
+
+    // 构建查询条件
+    const whereCondition: any = {};
+
+    // 姓名包含搜索
+    if (name_contains) {
+      whereCondition.name = {
+        [require('sequelize').Op.iLike]: `%${name_contains}%`
+      };
     }
-    
+
+    // 年龄范围搜索
+    if (min_age !== undefined && min_age !== null) {
+      whereCondition.age = {
+        ...whereCondition.age,
+        [require('sequelize').Op.gte]: Number(min_age)
+      };
+    }
+    if (max_age !== undefined && max_age !== null) {
+      whereCondition.age = {
+        ...whereCondition.age,
+        [require('sequelize').Op.lte]: Number(max_age)
+      };
+    }
+
+    // 成绩范围搜索 - 这里需要查询成绩字段
+    if (min_score !== undefined && min_score !== null || max_score !== undefined && max_score !== null) {
+      // 由于成绩是数组格式，需要使用子查询或特殊处理
+      const students = await Student.findAll({
+        attributes: ['uid', 'name', 'age', 'class', 'phone', 'rings', 'subject', 'membership_start_date', 'membership_end_date'],
+      });
+
+      let filteredStudents = students;
+
+      // 筛选成绩范围
+      if (min_score !== undefined && min_score !== null) {
+        filteredStudents = filteredStudents.filter(student => {
+          if (!student.rings || student.rings.length === 0) return false;
+          return student.rings.some(score => score >= Number(min_score));
+        });
+      }
+      if (max_score !== undefined && max_score !== null) {
+        filteredStudents = filteredStudents.filter(student => {
+          if (!student.rings || student.rings.length === 0) return true;
+          return student.rings.some(score => score <= Number(max_score));
+        });
+      }
+
+      // 应用其他筛选条件
+      if (name_contains) {
+        filteredStudents = filteredStudents.filter(student =>
+          student.name.toLowerCase().includes(String(name_contains).toLowerCase())
+        );
+      }
+
+      if (min_age !== undefined && min_age !== null) {
+        filteredStudents = filteredStudents.filter(student =>
+          student.age && student.age >= Number(min_age)
+        );
+      }
+
+      if (max_age !== undefined && max_age !== null) {
+        filteredStudents = filteredStudents.filter(student =>
+          student.age && student.age <= Number(max_age)
+        );
+      }
+
+      if (class_type) {
+        filteredStudents = filteredStudents.filter(student =>
+          student.class === class_type
+        );
+      }
+
+      if (subject) {
+        filteredStudents = filteredStudents.filter(student =>
+          student.subject === subject
+        );
+      }
+
+      if (has_membership !== undefined && has_membership !== null) {
+        const now = new Date();
+        if (has_membership === 'true') {
+          filteredStudents = filteredStudents.filter(student =>
+            student.membership_start_date && student.membership_end_date &&
+            student.membership_start_date <= now && student.membership_end_date >= now
+          );
+        } else {
+          filteredStudents = filteredStudents.filter(student =>
+            !student.membership_start_date || !student.membership_end_date ||
+            student.membership_start_date > now || student.membership_end_date < now
+          );
+        }
+      }
+
+      res.json({
+        success: true,
+        data: filteredStudents,
+      });
+      return;
+    }
+
+    // 班级类型搜索
+    if (class_type) {
+      whereCondition.class = class_type;
+    }
+
+    // 科目搜索
+    if (subject) {
+      whereCondition.subject = subject;
+    }
+
+    // 会员状态搜索
+    if (has_membership !== undefined && has_membership !== null) {
+      const now = new Date();
+      if (has_membership === 'true') {
+        whereCondition.membership_start_date = {
+          [require('sequelize').Op.lte]: now
+        };
+        whereCondition.membership_end_date = {
+          [require('sequelize').Op.gte]: now
+        };
+      } else {
+        whereCondition[require('sequelize').Op.or] = [
+          { membership_start_date: null },
+          { membership_end_date: null },
+          { membership_start_date: { [require('sequelize').Op.gt]: now } },
+          { membership_end_date: { [require('sequelize').Op.lt]: now } }
+        ];
+      }
+    }
+
+    const students = await Student.findAll({
+      where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
+      attributes: ['uid', 'name', 'age', 'class', 'phone', 'rings', 'subject', 'membership_start_date', 'membership_end_date'],
+      order: [['createdAt', 'DESC']],
+    });
+
     res.json({
       success: true,
       data: students,

@@ -72,7 +72,8 @@ export interface IInstallmentPlan {
   total_amount: number;
   total_installments: number;
   frequency: PaymentFrequency;
-  custom_days?: number | null; // 自定义天数
+  custom_days?: number | null;
+  student_id?: number | null; // 添加学员ID关联
   createdAt: Date;
   updatedAt?: Date;
 }

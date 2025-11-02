@@ -204,10 +204,11 @@ export class CashController {
         }
       } else {
         installmentPlan = await InstallmentPlan.create({
-          total_amount: Math.round(Number(total_amount) * 100), // 转换为分
+          total_amount: Math.round(Number(total_amount) * 100),
           total_installments: Number(total_installments),
           frequency,
           custom_days: frequency === PaymentFrequency.CUSTOM ? req.body.custom_days : null,
+          student_id: student_id ? Number(student_id) : null, // 添加学员ID关联
         });
       }
 
@@ -661,13 +662,9 @@ export class CashController {
     // 如果是已支付，创建对应的交易记录
     if (status === InstallmentStatus.PAID) {
       await Cash.create({
-        student_id: null, // 这里需要根据业务逻辑设置
-        cash: installment.getInstallmentAmount() * 100, // 转换为分
-        note: JSON.stringify({
-          installment_id: installment.plan_id,
-          installment_number: installment.current_installment,
-          type: 'installment_payment'
-        }),
+        student_id: installment.installment_plan?.student_id || null,
+        cash: installment.getInstallmentAmount() * 100,
+        note: `分期付款第${installment.current_installment}期支付`,
       });
     }
 
