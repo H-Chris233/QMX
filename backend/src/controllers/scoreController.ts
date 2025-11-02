@@ -9,25 +9,27 @@ import Joi from 'joi';
 // 成绩控制器
 export class ScoreController {
   // 为学员添加成绩
-  public addScore = catchAsync(async (req: Request, res: Response) => {
+  public addScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { score } = req.body;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 验证成绩范围
     if (typeof score !== 'number' || score < 0 || score > 10) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '成绩必须在0-10之间',
       });
+      return;
     }
 
     // 添加成绩
@@ -51,16 +53,17 @@ export class ScoreController {
   });
 
   // 获取学员成绩列表
-  public getStudentScores = catchAsync(async (req: Request, res: Response) => {
+  public getStudentScores = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     const responseData = {
@@ -83,35 +86,38 @@ export class ScoreController {
   });
 
   // 更新学员成绩
-  public updateStudentScore = catchAsync(async (req: Request, res: Response) => {
+  public updateStudentScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id, scoreIndex } = req.params;
     const { newScore } = req.body;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     const index = Number(scoreIndex);
 
     // 检查成绩索引是否有效
     if (index < 0 || index >= student.rings.length) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '成绩索引无效',
       });
+      return;
     }
 
     // 验证新成绩范围
     if (typeof newScore !== 'number' || newScore < 0 || newScore > 10) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '成绩必须在0-10之间',
       });
+      return;
     }
 
     const oldScore = student.rings[index];
@@ -137,26 +143,28 @@ export class ScoreController {
   });
 
   // 删除学员成绩
-  public deleteStudentScore = catchAsync(async (req: Request, res: Response) => {
+  public deleteStudentScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id, scoreIndex } = req.params;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     const index = Number(scoreIndex);
 
     // 检查成绩索引是否有效
     if (index < 0 || index >= student.rings.length) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '成绩索引无效',
       });
+      return;
     }
 
     const deletedScore = student.rings[index];
@@ -181,34 +189,37 @@ export class ScoreController {
   });
 
   // 批量添加成绩
-  public batchAddScores = catchAsync(async (req: Request, res: Response) => {
+  public batchAddScores = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { scores } = req.body;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 验证成绩数组
     if (!Array.isArray(scores) || scores.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '成绩数组不能为空',
       });
+      return;
     }
 
     // 验证每个成绩
     for (const score of scores) {
       if (typeof score !== 'number' || score < 0 || score > 10) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: '所有成绩都必须在0-10之间',
         });
+        return;
       }
     }
 
@@ -237,16 +248,17 @@ export class ScoreController {
   });
 
   // 清空学员所有成绩
-  public clearAllScores = catchAsync(async (req: Request, res: Response) => {
+  public clearAllScores = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     const clearedCount = student.rings.length;

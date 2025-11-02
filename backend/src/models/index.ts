@@ -67,7 +67,7 @@ export {
   SystemConfig,
 };
 
-// 导出类型
+// 导出类型和枚举
 export type {
   IStudent,
   IStudentCreationAttributes,
@@ -78,6 +78,14 @@ export type {
   IInstallmentCreationAttributes,
   IApiResponse,
   IPaginatedResponse,
+  IDashboardStats,
+  IStudentStats,
+  IFinancialStats,
+  IStudentSearchOptions,
+  ICashSearchOptions,
+} from '@/types';
+
+export {
   ClassType,
   SubjectType,
   PaymentFrequency,

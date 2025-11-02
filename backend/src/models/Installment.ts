@@ -21,9 +21,9 @@ export class Installment
   public custom_days!: number | null;
   public due_date!: Date;
   public status!: InstallmentStatus;
+  public createdAt!: Date;
 
   // 时间戳
-  public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
   // 实例方法
@@ -153,17 +153,17 @@ Installment.init({
     allowNull: false,
     defaultValue: InstallmentStatus.PENDING,
   },
-  created_at: {
+  createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW,
-    field: 'created_at',
+    field: 'createdAt',
   },
-  updated_at: {
+  updatedAt: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW,
-    field: 'updated_at',
+    field: 'updatedAt',
   },
 }, {
   sequelize,

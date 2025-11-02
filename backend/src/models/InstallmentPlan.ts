@@ -6,7 +6,7 @@ import {
 } from '@/types';
 
 // 分期付款计划创建属性类型
-export type IInstallmentPlanCreationAttributes = Optional<IInstallmentPlan, 'plan_id' | 'created_at' | 'updated_at'>;
+export type IInstallmentPlanCreationAttributes = Optional<IInstallmentPlan, 'plan_id' | 'createdAt' | 'updatedAt'>;
 
 // 分期付款计划模型
 export class InstallmentPlan 
@@ -18,9 +18,9 @@ export class InstallmentPlan
   public total_installments!: number;
   public frequency!: PaymentFrequency;
   public custom_days!: number | null;
+  public createdAt!: Date;
 
   // 时间戳
-  public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
   // 实例方法
@@ -85,6 +85,18 @@ InstallmentPlan.init({
       max: 365,
     },
     field: 'custom_days',
+  },
+  createdAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+    field: 'createdAt',
+  },
+  updatedAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+    field: 'updatedAt',
   },
 }, {
   sequelize,

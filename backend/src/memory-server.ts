@@ -161,15 +161,16 @@ app.get('/api/v1/students/search', (req, res) => {
   });
 });
 
-app.get('/api/v1/students/:id', (req, res) => {
+app.get('/api/v1/students/:id', (req, res): void => {
   const { id } = req.params;
   const student = students.find(s => s.uid === Number(id));
   
   if (!student) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '学员不存在',
     });
+    return;
   }
 
   res.json({
@@ -178,7 +179,7 @@ app.get('/api/v1/students/:id', (req, res) => {
   });
 });
 
-app.post('/api/v1/students', (req, res) => {
+app.post('/api/v1/students', (req, res): void => {
   const { name, age, class: classType, phone, note, subject } = req.body;
   
   const newStudent = {
@@ -210,15 +211,16 @@ app.post('/api/v1/students', (req, res) => {
   });
 });
 
-app.put('/api/v1/students/:id', (req, res) => {
+app.put('/api/v1/students/:id', (req, res): void => {
   const { id } = req.params;
   const studentIndex = students.findIndex(s => s.uid === Number(id));
   
   if (studentIndex === -1) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '学员不存在',
     });
+    return;
   }
 
   const updates = req.body;
@@ -233,15 +235,16 @@ app.put('/api/v1/students/:id', (req, res) => {
   });
 });
 
-app.delete('/api/v1/students/:id', (req, res) => {
+app.delete('/api/v1/students/:id', (req, res): void => {
   const { id } = req.params;
   const studentIndex = students.findIndex(s => s.uid === Number(id));
   
   if (studentIndex === -1) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '学员不存在',
     });
+    return;
   }
 
   const deletedStudent = students.splice(studentIndex, 1)[0];
@@ -255,16 +258,17 @@ app.delete('/api/v1/students/:id', (req, res) => {
 });
 
 // 成绩管理接口
-app.post('/api/v1/students/:id/scores', (req, res) => {
+app.post('/api/v1/students/:id/scores', (req, res): void => {
   const { id } = req.params;
   const { score } = req.body;
   
   const studentIndex = students.findIndex(s => s.uid === Number(id));
   if (studentIndex === -1) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '学员不存在',
     });
+    return;
   }
 
   students[studentIndex].rings.push(Number(score));
@@ -281,15 +285,16 @@ app.post('/api/v1/students/:id/scores', (req, res) => {
   });
 });
 
-app.get('/api/v1/students/:id/scores', (req, res) => {
+app.get('/api/v1/students/:id/scores', (req, res): void => {
   const { id } = req.params;
   const student = students.find(s => s.uid === Number(id));
   
   if (!student) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '学员不存在',
     });
+    return;
   }
 
   res.json({
@@ -300,7 +305,7 @@ app.get('/api/v1/students/:id/scores', (req, res) => {
       rings: student.rings,
       total_scores: student.rings.length,
       average_score: student.rings.length > 0 ? 
-        Number((student.rings.reduce((sum, score) => sum + score, 0) / student.rings.length).toFixed(1)) : 0,
+        Number((student.rings.reduce((sum: number, score: number) => sum + score, 0) / student.rings.length).toFixed(1)) : 0,
       max_score: student.rings.length > 0 ? Math.max(...student.rings) : 0,
       min_score: student.rings.length > 0 ? Math.min(...student.rings) : 0,
     },
@@ -329,7 +334,7 @@ app.get('/api/v1/transactions', (req, res) => {
   });
 });
 
-app.post('/api/v1/transactions', (req, res) => {
+app.post('/api/v1/transactions', (req, res): void => {
   const { student_id, amount, note, is_installment = false } = req.body;
   
   const newTransaction = {
@@ -358,10 +363,11 @@ app.delete('/api/v1/transactions/:id', (req, res) => {
   const transactionIndex = transactions.findIndex(t => t.uid === Number(id));
   
   if (transactionIndex === -1) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '交易记录不存在',
     });
+    return;
   }
 
   transactions.splice(transactionIndex, 1);
@@ -417,16 +423,17 @@ app.get('/api/v1/dashboard/stats', (req, res) => {
 });
 
 // 会员管理接口
-app.post('/api/v1/membership/students/:id/membership', (req, res) => {
+app.post('/api/v1/membership/students/:id/membership', (req, res): void => {
   const { id } = req.params;
   const { startDate, endDate } = req.body;
   
   const studentIndex = students.findIndex(s => s.uid === Number(id));
   if (studentIndex === -1) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       error: '学员不存在',
     });
+    return;
   }
 
   students[studentIndex].membership_start_date = startDate;

@@ -14,7 +14,7 @@ import logger from '@/utils/logger';
 // 分期付款控制器
 export class InstallmentController {
   // 获取分期付款状态列表
-  public getInstallmentStatuses = catchAsync(async (req: Request, res: Response) => {
+  public getInstallmentStatuses = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const statuses = Object.values(InstallmentStatus).map(status => ({
       value: status,
       label: this.getStatusText(status),
@@ -30,26 +30,28 @@ export class InstallmentController {
   });
 
   // 更新分期付款状态
-  public updateInstallmentStatus = catchAsync(async (req: Request, res: Response) => {
+  public updateInstallmentStatus = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { transactionUid } = req.params;
     const { status } = req.body;
 
     // 验证状态值
     if (!Object.values(InstallmentStatus).includes(status)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '无效的分期付款状态',
       });
+      return;
     }
 
     // 查找分期付款记录
     const installment = await Installment.findByPk(Number(transactionUid));
 
     if (!installment) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '分期付款记录不存在',
       });
+      return;
     }
 
     const oldStatus = installment.status;
@@ -77,7 +79,7 @@ export class InstallmentController {
   });
 
   // 生成下一期分期
-  public generateNextInstallment = catchAsync(async (req: Request, res: Response) => {
+  public generateNextInstallment = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { planId } = req.params;
     const { dueDate } = req.body;
 
@@ -85,10 +87,11 @@ export class InstallmentController {
     const plan = await InstallmentPlan.findByPk(Number(planId));
 
     if (!plan) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '分期计划不存在',
       });
+      return;
     }
 
     // 查找最后一期分期
@@ -98,18 +101,20 @@ export class InstallmentController {
     });
 
     if (!lastInstallment) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '找不到已有的分期记录',
       });
+      return;
     }
 
     // 检查是否已经是最后一期
     if (lastInstallment.current_installment >= plan.total_installments) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '已经是最后一期，无法生成新分期',
       });
+      return;
     }
 
     // 生成下一期
@@ -148,17 +153,18 @@ export class InstallmentController {
   });
 
   // 取消分期计划
-  public cancelInstallmentPlan = catchAsync(async (req: Request, res: Response) => {
+  public cancelInstallmentPlan = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { planId } = req.params;
 
     // 查找分期计划
     const plan = await InstallmentPlan.findByPk(Number(planId));
 
     if (!plan) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '分期计划不存在',
       });
+      return;
     }
 
     // 取消所有未支付的分期
@@ -189,17 +195,18 @@ export class InstallmentController {
   });
 
   // 获取分期计划详情
-  public getInstallmentsByPlan = catchAsync(async (req: Request, res: Response) => {
+  public getInstallmentsByPlan = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { planId } = req.params;
 
     // 查找分期计划
     const plan = await InstallmentPlan.findByPk(Number(planId));
 
     if (!plan) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '分期计划不存在',
       });
+      return;
     }
 
     // 查找所有分期
@@ -259,7 +266,7 @@ export class InstallmentController {
   });
 
   // 获取即将到期的分期
-  public getUpcomingInstallments = catchAsync(async (req: Request, res: Response) => {
+  public getUpcomingInstallments = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { days = 7 } = req.query;
 
     const targetDate = new Date();

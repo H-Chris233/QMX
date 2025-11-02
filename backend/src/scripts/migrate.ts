@@ -126,7 +126,6 @@ export async function migrateFromLegacyData(): Promise<void> {
       for (const [uid, studentData] of studentEntries) {
         try {
           await Student.upsert({
-            uid: parseInt(uid),
             name: studentData.name,
             age: studentData.age || null,
             class: convertClassType(studentData.class),
@@ -160,11 +159,9 @@ export async function migrateFromLegacyData(): Promise<void> {
           
           // 创建现金记录
           await Cash.upsert({
-            uid: parseInt(uid),
             student_id: cashData.student_id || null,
             cash: amountInCents,
             note: cashData.note || null,
-            created_at: new Date(cashData.created_at),
           });
 
           // 如果有分期付款数据，创建分期记录
@@ -182,7 +179,6 @@ export async function migrateFromLegacyData(): Promise<void> {
 
             // 创建分期详情
             await Installment.upsert({
-              uid: parseInt(uid), // 使用相同的UID
               plan_id: installment.plan_id,
               total_amount: Math.round(installment.total_amount * 100),
               total_installments: installment.total_installments,
@@ -191,7 +187,6 @@ export async function migrateFromLegacyData(): Promise<void> {
               custom_days: installment.frequency === 'Custom' ? 30 : null,
               due_date: new Date(installment.due_date),
               status: convertInstallmentStatus(installment.status),
-              created_at: new Date(cashData.created_at),
             });
           }
         } catch (error) {
@@ -233,7 +228,6 @@ export async function createSampleData(): Promise<void> {
     // 创建示例学生
     const sampleStudents = [
       {
-        uid: 1,
         name: '张三',
         age: 18,
         class: ClassType.MONTH,
@@ -246,7 +240,6 @@ export async function createSampleData(): Promise<void> {
         membership_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30天后
       },
       {
-        uid: 2,
         name: '李四',
         age: 20,
         class: ClassType.TEN_TRY,
@@ -259,7 +252,6 @@ export async function createSampleData(): Promise<void> {
         membership_end_date: null,
       },
       {
-        uid: 3,
         name: '王五',
         age: 16,
         class: ClassType.YEAR,
@@ -280,25 +272,21 @@ export async function createSampleData(): Promise<void> {
     // 创建示例交易记录
     const sampleTransactions = [
       {
-        uid: 1,
         student_id: 1,
         cash: 150000, // 1500.00元
         note: '月卡费用',
       },
       {
-        uid: 2,
         student_id: 2,
         cash: 50000, // 500.00元
         note: '体验课费用',
       },
       {
-        uid: 3,
         student_id: 3,
         cash: 365000, // 3650.00元
         note: '年卡费用',
       },
       {
-        uid: 4,
         student_id: null,
         cash: -10000, // -100.00元
         note: '器材采购',

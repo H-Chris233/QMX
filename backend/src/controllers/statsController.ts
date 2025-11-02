@@ -17,7 +17,7 @@ import logger from '@/utils/logger';
 // 统计控制器
 export class StatsController {
   // 获取仪表板统计数据
-  public getDashboardStats = catchAsync(async (req: Request, res: Response) => {
+  public getDashboardStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     // 获取总学员数
     const totalStudents = await Student.count();
 
@@ -85,7 +85,7 @@ export class StatsController {
   });
 
   // 获取特定学员的统计信息
-  public getStudentStats = catchAsync(async (req: Request, res: Response) => {
+  public getStudentStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const student = await Student.findByPk(Number(id), {
@@ -93,21 +93,22 @@ export class StatsController {
         {
           model: Cash,
           as: 'cashTransactions',
-          attributes: ['cash', 'created_at'],
+          attributes: ['cash', 'createdAt'],
         },
       ],
     });
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 计算支付统计
-    const payments = student.cashTransactions?.filter(t => t.cash > 0) || [];
-    const totalPayments = payments.reduce((sum, p) => sum + p.cash, 0) / 100; // 转换为元
+    const payments = (student as any).cashTransactions?.filter((t: any) => t.cash > 0) || [];
+    const totalPayments = payments.reduce((sum: number, p: any) => sum + p.cash, 0) / 100; // 转换为元
     const paymentCount = payments.length;
 
     // 计算成绩统计
@@ -145,7 +146,7 @@ export class StatsController {
   });
 
   // 获取财务统计
-  public getFinancialStats = catchAsync(async (req: Request, res: Response) => {
+  public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { period = 'ThisMonth' } = req.query;
 
     // 计算时间范围
@@ -177,7 +178,7 @@ export class StatsController {
     // 获取时间范围内的交易
     const transactions = await Cash.findAll({
       where: {
-        created_at: {
+        createdAt: {
           [Op.between]: [startDate, endDate],
         },
       },
@@ -204,7 +205,7 @@ export class StatsController {
           model: Installment,
           as: 'installments',
           where: {
-            created_at: {
+            createdAt: {
               [Op.between]: [startDate, endDate],
             },
           },
@@ -218,8 +219,9 @@ export class StatsController {
     let installmentPending = 0;
 
     installmentPlans.forEach(plan => {
-      if (plan.installments && plan.installments.length > 0) {
-        plan.installments.forEach(installment => {
+      const installments = (plan as any).installments;
+      if (installments && installments.length > 0) {
+        installments.forEach((installment: any) => {
           const amount = installment.getInstallmentAmount() / 100; // 转换为元
           installmentTotal += amount;
 
@@ -253,7 +255,7 @@ export class StatsController {
   });
 
   // 获取全局学员统计
-  public getGlobalStudentStats = catchAsync(async (req: Request, res: Response) => {
+  public getGlobalStudentStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const dashboardStats = await this.calculateDashboardStats();
 
     const responseData = {
@@ -272,7 +274,7 @@ export class StatsController {
   });
 
   // 获取全局财务统计
-  public getGlobalFinancialStats = catchAsync(async (req: Request, res: Response) => {
+  public getGlobalFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const dashboardStats = await this.calculateDashboardStats();
 
     const revenue = dashboardStats.total_revenue;
@@ -298,7 +300,7 @@ export class StatsController {
   });
 
   // 获取即将到期的会员
-  public getMembershipExpiringSoon = catchAsync(async (req: Request, res: Response) => {
+  public getMembershipExpiringSoon = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { days = 30 } = req.query;
 
     const targetDate = new Date();

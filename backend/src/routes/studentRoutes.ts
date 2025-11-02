@@ -79,7 +79,7 @@ router.get('/:id',
  */
 router.post('/', 
   validate(createStudentSchema),
-  studentController.createStudent
+  studentController.addStudent
 );
 
 /**

@@ -10,17 +10,18 @@ import logger from '@/utils/logger';
 // 会员管理控制器
 export class MembershipController {
   // 设置学员会员信息
-  public setStudentMembership = catchAsync(async (req: Request, res: Response) => {
+  public setStudentMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { startDate, endDate } = req.body;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 验证日期
@@ -28,10 +29,11 @@ export class MembershipController {
     const end = endDate ? new Date(endDate) : null;
 
     if (start && end && start > end) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '会员开始日期不能晚于结束日期',
       });
+      return;
     }
 
     // 更新会员信息
@@ -61,16 +63,17 @@ export class MembershipController {
   });
 
   // 清除学员会员信息
-  public clearStudentMembership = catchAsync(async (req: Request, res: Response) => {
+  public clearStudentMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 清除会员信息
@@ -100,25 +103,27 @@ export class MembershipController {
   });
 
   // 按类型设置会员（月卡/年卡）
-  public setMembershipByType = catchAsync(async (req: Request, res: Response) => {
+  public setMembershipByType = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { membershipType, startFromToday = true } = req.body;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 验证会员类型
     if (!['month', 'year'].includes(membershipType)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '会员类型无效，只支持 month 或 year',
       });
+      return;
     }
 
     // 计算会员期限
@@ -169,25 +174,27 @@ export class MembershipController {
   });
 
   // 续费会员
-  public renewMembership = catchAsync(async (req: Request, res: Response) => {
+  public renewMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { membershipType, extendFromCurrent = true } = req.body;
 
     const student = await Student.findByPk(Number(id));
 
     if (!student) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '学员不存在',
       });
+      return;
     }
 
     // 验证会员类型
     if (!['month', 'year'].includes(membershipType)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '会员类型无效，只支持 month 或 year',
       });
+      return;
     }
 
     // 计算续费开始日期
@@ -247,22 +254,24 @@ export class MembershipController {
   });
 
   // 批量设置会员
-  public batchSetMembership = catchAsync(async (req: Request, res: Response) => {
+  public batchSetMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { studentIds, membershipType, startFromToday = true } = req.body;
 
     // 验证输入
     if (!Array.isArray(studentIds) || studentIds.length === 0) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '学员ID列表不能为空',
       });
+      return;
     }
 
     if (!['month', 'year'].includes(membershipType)) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: '会员类型无效，只支持 month 或 year',
       });
+      return;
     }
 
     // 查找学员
@@ -273,10 +282,11 @@ export class MembershipController {
     });
 
     if (students.length === 0) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: '未找到任何有效的学员',
       });
+      return;
     }
 
     // 批量处理
@@ -347,7 +357,7 @@ export class MembershipController {
   });
 
   // 获取会员统计信息
-  public getMembershipStats = catchAsync(async (req: Request, res: Response) => {
+  public getMembershipStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const now = new Date();
 
     // 总会员数

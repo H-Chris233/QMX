@@ -2,8 +2,10 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '@/config/database';
 import { 
   ICash, 
-  ICashCreationAttributes 
-} from '@/types';
+  ICashCreationAttributes,
+  Installment,
+  InstallmentPlan
+} from '@/models';
 
 // 交易记录模型
 export class Cash 
@@ -14,11 +16,15 @@ export class Cash
   public student_id!: number | null;
   public cash!: number;
   public note!: string | null;
-  public created_at!: Date;
+  public createdAt!: Date;
 
   // 时间戳
-  public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
+
+  // 关联属性
+  public student?: any;
+  public installment?: any;
+  public installment_plan?: any;
 
   // 实例方法
   public getAmount(): number {
@@ -40,8 +46,11 @@ export class Cash
   }
 
   public hasInstallment(): boolean {
-    // 这个方法会在关联分期付款后实现
-    return false; // 暂时返回false，后续关联分期付款表
+    return this.installment !== undefined && this.installment !== null;
+  }
+
+  public getInstallmentPlan(): any {
+    return this.installment_plan;
   }
 }
 
@@ -74,17 +83,17 @@ Cash.init({
     allowNull: true,
     defaultValue: null,
   },
-  created_at: {
+  createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW,
-    field: 'created_at',
+    field: 'createdAt',
   },
-  updated_at: {
+  updatedAt: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW,
-    field: 'updated_at',
+    field: 'updatedAt',
   },
 }, {
   sequelize,
@@ -92,6 +101,29 @@ Cash.init({
   modelName: 'Cash',
   timestamps: true,
   paranoid: false,
+  hooks: {
+    afterFind: (instances: any) => {
+      // 为分期付款关联的现金记录设置关联
+      const processInstance = (instance: any) => {
+        if (instance && instance.note && typeof instance.note === 'string') {
+          try {
+            const noteData = JSON.parse(instance.note);
+            if (noteData.installment_id) {
+              instance.installment = { plan_id: noteData.installment_id };
+            }
+          } catch (e) {
+            // 不是JSON格式的note，忽略
+          }
+        }
+      };
+
+      if (Array.isArray(instances)) {
+        instances.forEach(processInstance);
+      } else if (instances) {
+        processInstance(instances);
+      }
+    }
+  },
   indexes: [
     {
       unique: true,
@@ -104,12 +136,32 @@ Cash.init({
       fields: ['cash'],
     },
     {
-      fields: ['created_at'],
+      fields: ['createdAt'],
     },
     {
-      fields: ['student_id', 'created_at'],
+      fields: ['student_id', 'createdAt'],
     },
   ],
+}) as any;
+
+// 注意：由于原有设计将分期信息嵌入在note字段中，我们通过虚拟关联实现
+Object.defineProperty(Cash.prototype, 'installment_plan', {
+  get: function(this: any) {
+    if (this.note && typeof this.note === 'string') {
+      try {
+        const noteData = JSON.parse(this.note);
+        if (noteData.installment_id) {
+          return {
+            plan_id: noteData.installment_id,
+            installment_number: noteData.installment_number
+          };
+        }
+      } catch (e) {
+        // 解析失败，返回undefined
+      }
+    }
+    return undefined;
+  }
 });
 
 export default Cash;
