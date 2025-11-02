@@ -301,6 +301,7 @@ import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { handleValidationError } from '../utils/errorHandler';
 import DatePicker from './DatePicker.vue';
 import StudentForm from './StudentForm.vue';
+import type { Student } from '../types/api';
 
 // 定义类型接口
 import type { Student as ApiStudent } from '../types/api';

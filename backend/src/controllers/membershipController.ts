@@ -1,9 +1,5 @@
-import { Request, Response } from 'express';
-import { Op } from 'sequelize';
-import { 
-  Student,
-  IApiResponse
-} from '@/models';
+"import { Request, Response } from 'express';
+import { Student, IApiResponse } from '@/models/mongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
@@ -14,7 +10,7 @@ export class MembershipController {
     const { id } = req.params;
     const { startDate, endDate } = req.body;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -37,19 +33,19 @@ export class MembershipController {
     }
 
     // 更新会员信息
-    await student.update({
-      membership_start_date: start,
-      membership_end_date: end,
+    const updatedStudent = await Student.updateByUid(Number(id), {
+      membershipStartDate: start,
+      membershipEndDate: end,
     });
 
     const responseData = {
       uid: student.uid,
       name: student.name,
-      membership_start_date: student.membership_start_date,
-      membership_end_date: student.membership_end_date,
-      is_membership_active: student.hasMembership(),
-      membership_days_remaining: student.getMembershipDaysRemaining(),
-      updated_at: student.updatedAt,
+      membership_start_date: updatedStudent?.membershipStartDate || start,
+      membership_end_date: updatedStudent?.membershipEndDate || end,
+      is_membership_active: updatedStudent?.hasMembership() || false,
+      membership_days_remaining: updatedStudent?.getMembershipDaysRemaining() || null,
+      updated_at: updatedStudent?.updatedAt || new Date(),
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -66,7 +62,7 @@ export class MembershipController {
   public clearStudentMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -77,9 +73,9 @@ export class MembershipController {
     }
 
     // 清除会员信息
-    await student.update({
-      membership_start_date: null,
-      membership_end_date: null,
+    const updatedStudent = await Student.updateByUid(Number(id), {
+      membershipStartDate: null,
+      membershipEndDate: null,
     });
 
     const responseData = {
@@ -89,7 +85,7 @@ export class MembershipController {
       membership_end_date: null,
       is_membership_active: false,
       membership_days_remaining: null,
-      cleared_at: student.updatedAt,
+      cleared_at: updatedStudent?.updatedAt || new Date(),
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -107,7 +103,7 @@ export class MembershipController {
     const { id } = req.params;
     const { membershipType, startFromToday = true } = req.body;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -144,9 +140,9 @@ export class MembershipController {
     }
 
     // 更新会员信息
-    await student.update({
-      membership_start_date: startDate,
-      membership_end_date: endDate,
+    const updatedStudent = await Student.updateByUid(Number(id), {
+      membershipStartDate: startDate,
+      membershipEndDate: endDate,
     });
 
     const typeText = membershipType === 'month' ? '月卡' : '年卡';
@@ -155,12 +151,12 @@ export class MembershipController {
       name: student.name,
       membership_type: membershipType,
       membership_type_text: typeText,
-      membership_start_date: student.membership_start_date,
-      membership_end_date: student.membership_end_date,
-      is_membership_active: student.hasMembership(),
-      membership_days_remaining: student.getMembershipDaysRemaining(),
+      membership_start_date: updatedStudent?.membershipStartDate || startDate,
+      membership_end_date: updatedStudent?.membershipEndDate || endDate,
+      is_membership_active: updatedStudent?.hasMembership() || false,
+      membership_days_remaining: updatedStudent?.getMembershipDaysRemaining() || 0,
       duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
-      updated_at: student.updatedAt,
+      updated_at: updatedStudent?.updatedAt || new Date(),
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -178,7 +174,7 @@ export class MembershipController {
     const { id } = req.params;
     const { membershipType, extendFromCurrent = true } = req.body;
 
-    const student = await Student.findByPk(Number(id));
+    const student = await Student.findByUid(Number(id));
 
     if (!student) {
       res.status(404).json({
@@ -199,9 +195,9 @@ export class MembershipController {
 
     // 计算续费开始日期
     let startDate: Date;
-    if (extendFromCurrent && student.membership_end_date) {
+    if (extendFromCurrent && student.membershipEndDate) {
       // 从当前结束日期的下一天开始
-      startDate = new Date(student.membership_end_date);
+      startDate = new Date(student.membershipEndDate);
       startDate.setDate(startDate.getDate() + 1);
     } else {
       // 从今天开始
@@ -222,9 +218,9 @@ export class MembershipController {
     }
 
     // 更新会员信息
-    await student.update({
-      membership_start_date: student.membership_start_date || startDate, // 如果是首次开通，使用开始日期
-      membership_end_date: endDate,
+    const updatedStudent = await Student.updateByUid(Number(id), {
+      membershipStartDate: student.membershipStartDate || startDate, // 如果是首次开通，使用开始日期
+      membershipEndDate: endDate,
     });
 
     const typeText = membershipType === 'month' ? '月卡' : '年卡';
@@ -233,14 +229,14 @@ export class MembershipController {
       name: student.name,
       membership_type: membershipType,
       membership_type_text: typeText,
-      membership_start_date: student.membership_start_date,
-      membership_end_date: student.membership_end_date,
-      is_membership_active: student.hasMembership(),
-      membership_days_remaining: student.getMembershipDaysRemaining(),
+      membership_start_date: updatedStudent?.membershipStartDate,
+      membership_end_date: updatedStudent?.membershipEndDate,
+      is_membership_active: updatedStudent?.hasMembership() || false,
+      membership_days_remaining: updatedStudent?.getMembershipDaysRemaining() || 0,
       renewal_start_date: startDate,
       renewal_end_date: endDate,
       duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
-      renewed_at: student.updatedAt,
+      renewed_at: updatedStudent?.updatedAt || new Date(),
     };
 
     const response: IApiResponse<typeof responseData> = {
@@ -249,7 +245,7 @@ export class MembershipController {
       message: `学员 ${student.name} ${typeText}续费成功`,
     };
 
-    logger.info(`学员会员续费成功，UID: ${student.uid}, 类型: ${typeText}, 新有效期: ${student.membership_start_date?.toISOString().split('T')[0]} - ${endDate.toISOString().split('T')[0]}`);
+    logger.info(`学员会员续费成功，UID: ${student.uid}, 类型: ${typeText}, 新有效期: ${updatedStudent?.membershipStartDate?.toISOString().split('T')[0]} - ${endDate.toISOString().split('T')[0]}`);
     res.json(response);
   });
 
@@ -275,11 +271,13 @@ export class MembershipController {
     }
 
     // 查找学员
-    const students = await Student.findAll({
-      where: {
-        uid: studentIds.map((id: any) => Number(id)),
-      },
-    });
+    const students = [];
+    for (const id of studentIds) {
+      const student = await Student.findByUid(Number(id));
+      if (student) {
+        students.push(student);
+      }
+    }
 
     if (students.length === 0) {
       res.status(404).json({
@@ -310,18 +308,18 @@ export class MembershipController {
         }
 
         // 更新会员信息
-        await student.update({
-          membership_start_date: startDate,
-          membership_end_date: endDate,
+        const updatedStudent = await Student.updateByUid(student.uid, {
+          membershipStartDate: startDate,
+          membershipEndDate: endDate,
         });
 
         results.push({
           uid: student.uid,
           name: student.name,
           success: true,
-          membership_start_date: student.membership_start_date,
-          membership_end_date: student.membership_end_date,
-          is_membership_active: student.hasMembership(),
+          membership_start_date: updatedStudent?.membershipStartDate,
+          membership_end_date: updatedStudent?.membershipEndDate,
+          is_membership_active: updatedStudent?.hasMembership() || false,
         });
 
       } catch (error) {
@@ -362,18 +360,14 @@ export class MembershipController {
 
     // 总会员数
     const totalMembers = await Student.count({
-      where: {
-        membership_start_date: { [Op.not]: null },
-        membership_end_date: { [Op.not]: null },
-      },
+      membershipStartDate: { $exists: true, $ne: null },
+      membershipEndDate: { $exists: true, $ne: null },
     });
 
     // 有效会员数
     const activeMembers = await Student.count({
-      where: {
-        membership_start_date: { [Op.lte]: now },
-        membership_end_date: { [Op.gte]: now },
-      },
+      membershipStartDate: { $lte: now },
+      membershipEndDate: { $gte: now },
     });
 
     // 即将到期的会员（30天内）
@@ -381,20 +375,17 @@ export class MembershipController {
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
 
     const expiringSoon = await Student.count({
-      where: {
-        membership_end_date: {
-          [Op.between]: [now, thirtyDaysLater],
-        },
-        membership_start_date: { [Op.not]: null },
+      membershipEndDate: {
+        $gte: now,
+        $lte: thirtyDaysLater,
       },
+      membershipStartDate: { $exists: true, $ne: null },
     });
 
     // 已过期的会员
     const expiredMembers = await Student.count({
-      where: {
-        membership_end_date: { [Op.lt]: now },
-        membership_start_date: { [Op.not]: null },
-      },
+      membershipEndDate: { $lt: now },
+      membershipStartDate: { $exists: true, $ne: null },
     });
 
     const responseData = {
@@ -416,4 +407,4 @@ export class MembershipController {
   });
 }
 
-export default new MembershipController();
+export default new MembershipController();"

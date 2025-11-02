@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+"import { Request, Response } from 'express';
 import { Cash, CashClass, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
+import { InstallmentPlan, Installment } from '@/models/InstallmentMongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
@@ -158,7 +159,7 @@ export class CashController {
     res.status(201).json(response);
   });
 
-  // 添加分期付款交易 - 简化版本
+  // 添加分期付款交易 - 完整版本
   public addInstallmentTransaction = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const {
       student_id,
@@ -166,8 +167,8 @@ export class CashController {
       note = '',
       total_installments,
       frequency,
-      due_date,
-      current_installment = 1,
+      custom_days,
+      start_date,
     } = req.body;
 
     // 验证学员是否存在
@@ -192,39 +193,123 @@ export class CashController {
       return;
     }
 
-    // 创建交易记录（暂时简化，不创建分期计划表）
-    const transaction = await CashClass.create({
-      student_id: student_id ? Number(student_id) : null,
-      cash: Math.round(Number(total_amount) * 100),
-      note: `分期付款: ${note} - 第${current_installment}/${total_installments}期`,
-    });
+    if (frequency === 'Custom' && (!custom_days || custom_days < 1)) {
+      res.status(400).json({
+        success: false,
+        error: '自定义频率必须指定天数且大于0',
+      });
+      return;
+    }
 
-    const responseData = {
-      uid: transaction.uid,
-      student_id: transaction.student_id,
-      amount: transaction.getAmount(),
-      description: this.getTransactionDescription(transaction),
-      note: transaction.note,
-      is_income: transaction.isIncome(),
-      is_expense: !transaction.isIncome(),
-      formatted_amount: transaction.getFormattedAmount(),
-      installment_info: {
+    try {
+      // 创建分期计划
+      const installmentPlan = await InstallmentPlan.create({
+        student_id: student_id ? Number(student_id) : null,
+        total_amount: Math.round(Number(total_amount) * 100), // 转换为分
         total_installments: Number(total_installments),
-        current_installment: Number(current_installment),
         frequency,
-        due_date: new Date(due_date),
-      },
-      created_at: transaction.created_at,
-    };
+        custom_days: frequency === 'Custom' ? Number(custom_days) : undefined,
+        start_date: new Date(start_date),
+        note,
+        status: 'Active',
+      });
 
-    const response: IApiResponse<typeof responseData> = {
-      success: true,
-      data: responseData,
-      message: '分期付款添加成功',
-    };
+      // 计算每期金额
+      const installmentAmount = installmentPlan.getInstallmentAmount();
 
-    logger.info(`添加分期付款成功，交易ID: ${transaction.uid}, 期数: ${current_installment}/${total_installments}`);
-    res.status(201).json(response);
+      // 生成所有分期
+      const installments = [];
+      let currentDate = new Date(start_date);
+
+      for (let i = 1; i <= Number(total_installments); i++) {
+        const dueDate = new Date(currentDate);
+
+        // 根据频率计算下次付款日期
+        switch (frequency) {
+          case 'Weekly':
+            currentDate.setDate(currentDate.getDate() + 7);
+            break;
+          case 'Monthly':
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case 'Quarterly':
+            currentDate.setMonth(currentDate.getMonth() + 3);
+            break;
+          case 'Custom':
+            currentDate.setDate(currentDate.getDate() + Number(custom_days));
+            break;
+        }
+
+        const installment = await Installment.create({
+          plan_id: installmentPlan.uid,
+          current_installment: i,
+          total_installments: Number(total_installments),
+          installment_amount: installmentAmount,
+          due_date: dueDate,
+          status: i === 1 ? 'Paid' : 'Pending', // 第一期立即支付
+          paid_amount: i === 1 ? installmentAmount : undefined,
+          paid_at: i === 1 ? new Date() : undefined,
+        });
+
+        installments.push(installment);
+      }
+
+      // 创建交易记录（首期付款）
+      const transaction = await CashClass.create({
+        student_id: student_id ? Number(student_id) : null,
+        cash: Math.round(Number(total_amount) * 100 / Number(total_installments)), // 首期金额
+        note: `分期付款: ${note} - 第1/${total_installments}期`,
+      });
+
+      const responseData = {
+        transaction: {
+          uid: transaction.uid,
+          student_id: transaction.student_id,
+          amount: transaction.getAmount(),
+          description: this.getTransactionDescription(transaction),
+          note: transaction.note,
+          is_income: transaction.isIncome(),
+          formatted_amount: transaction.getFormattedAmount(),
+          created_at: transaction.created_at,
+        },
+        plan: {
+          uid: installmentPlan.uid,
+          student_id: installmentPlan.student_id,
+          total_amount: installmentPlan.total_amount / 100,
+          total_installments: installmentPlan.total_installments,
+          frequency: installmentPlan.frequency,
+          custom_days: installmentPlan.custom_days,
+          start_date: installmentPlan.start_date,
+          status: installmentPlan.status,
+        },
+        installments: installments.map(inst => ({
+          uid: inst.uid,
+          current_installment: inst.current_installment,
+          total_installments: inst.total_installments,
+          installment_amount: inst.installment_amount / 100,
+          due_date: inst.due_date,
+          status: inst.status,
+          paid_amount: (inst.paid_amount || 0) / 100,
+          paid_at: inst.paid_at,
+        })),
+      };
+
+      const response: IApiResponse<typeof responseData> = {
+        success: true,
+        data: responseData,
+        message: '分期付款创建成功',
+      };
+
+      logger.info(`创建分期付款成功，交易ID: ${transaction.uid}, 计划ID: ${installmentPlan.uid}, 期数: ${total_installments}`);
+      res.status(201).json(response);
+
+    } catch (error) {
+      logger.error('创建分期付款失败:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : '创建分期付款失败',
+      });
+    }
   });
 
   // 删除交易记录
@@ -478,55 +563,79 @@ export class CashController {
     res.json(response);
   });
 
-  // 获取分期付款列表 - 简化版本
+  // 获取分期付款列表 - 完整版本
   public getInstallments = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    // 简化实现：返回有分期备注的交易记录
     const {
       student_id,
       page = 1,
       limit = 20,
       sort_by = 'created_at',
       sort_order = 'DESC',
+      status,
     } = req.query as any;
 
-    const whereCondition: any = {
-      note: { $regex: '分期付款', $options: 'i' }
-    };
+    const whereCondition: any = {};
 
     if (student_id) {
       whereCondition.student_id = Number(student_id);
+    }
+
+    if (status) {
+      whereCondition.status = status;
     }
 
     const sortField = sort_by === 'created_at' ? 'created_at' : sort_by;
     const sortOrder = sort_order === 'DESC' ? -1 : 1;
     const sort = { [sortField]: sortOrder };
 
-    // 获取分页数据
-    const result = await CashClass.findWithPagination(
+    // 获取分期计划数据
+    const result = await InstallmentPlan.findWithPagination(
       whereCondition,
       Number(page),
       Number(limit),
       sort
     );
 
-    const responseData = result.data.map(transaction => ({
-      uid: transaction.uid,
-      plan_id: null, // 暂时为null
-      total_amount: transaction.getAmount(),
-      total_installments: 1, // 暂时为1
-      current_installment: 1,
-      frequency: 'Monthly',
-      custom_days: null,
-      due_date: transaction.created_at,
-      status: 'Paid',
-      status_text: '已支付',
-      frequency_text: '月付',
-      installment_amount: transaction.getAmount(),
-      progress: 100,
-      is_overdue: false,
-      days_overdue: 0,
-      installment_plan: null,
-    }));
+    const responseData = [];
+
+    for (const plan of result.data) {
+      // 获取该计划的所有分期
+      const installments = await Installment.findByPlanId(plan.uid);
+
+      const paidCount = installments.filter(i => i.status === 'Paid').length;
+      const pendingCount = installments.filter(i => i.status === 'Pending').length;
+      const overdueCount = installments.filter(i => i.isOverdue()).length;
+
+      responseData.push({
+        uid: plan.uid,
+        student_id: plan.student_id,
+        total_amount: plan.total_amount / 100,
+        total_installments: plan.total_installments,
+        frequency: plan.frequency,
+        custom_days: plan.custom_days,
+        start_date: plan.start_date,
+        status: plan.status,
+        status_text: this.getStatusText(plan.status),
+        frequency_text: this.getFrequencyText(plan.frequency, plan.custom_days),
+        installment_amount: plan.getInstallmentAmount() / 100,
+        progress: Math.round((paidCount / plan.total_installments) * 100),
+        paid_count: paidCount,
+        pending_count: pendingCount,
+        overdue_count: overdueCount,
+        installments: installments.map(inst => ({
+          uid: inst.uid,
+          current_installment: inst.current_installment,
+          installment_amount: inst.installment_amount / 100,
+          due_date: inst.due_date,
+          status: inst.status,
+          status_text: this.getStatusText(inst.status),
+          paid_amount: (inst.paid_amount || 0) / 100,
+          paid_at: inst.paid_at,
+          days_overdue: inst.getDaysOverdue(),
+          is_overdue: inst.isOverdue(),
+        })),
+      });
+    }
 
     const paginationResponse: IPaginatedResponse<any> = {
       data: responseData,
@@ -547,7 +656,7 @@ export class CashController {
     res.json(response);
   });
 
-  // 更新分期付款状态 - 简化版本
+  // 更新分期付款状态
   public updateInstallmentStatus = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { status } = req.body;
@@ -561,9 +670,9 @@ export class CashController {
       return;
     }
 
-    const transaction = await CashClass.findByUid(Number(id));
+    const installment = await Installment.findByUid(Number(id));
 
-    if (!transaction) {
+    if (!installment) {
       res.status(404).json({
         success: false,
         error: '分期记录不存在',
@@ -571,15 +680,29 @@ export class CashController {
       return;
     }
 
-    // 更新交易备注来反映状态变化
-    const updatedNote = `${transaction.note} - 状态更新为: ${status}`;
-    const updatedTransaction = await CashClass.updateByUid(Number(id), { note: updatedNote });
+    // 如果是支付，创建交易记录
+    if (status === 'Paid' && installment.status !== 'Paid') {
+      const plan = await InstallmentPlan.findByUid(installment.plan_id);
+      if (plan) {
+        await CashClass.create({
+          student_id: plan.student_id,
+          cash: installment.installment_amount,
+          note: `分期付款: 第${installment.current_installment}/${installment.total_installments}期`,
+        });
+      }
+    }
 
-    if (updatedTransaction) {
-      logger.info(`更新分期付款状态成功，ID: ${transaction.uid}, 状态: ${status}`);
+    const updatedInstallment = await Installment.updateByUid(Number(id), {
+      status,
+      paid_at: status === 'Paid' ? new Date() : installment.paid_at,
+      paid_amount: status === 'Paid' ? installment.installment_amount : installment.paid_amount,
+    });
+
+    if (updatedInstallment) {
+      logger.info(`更新分期付款状态成功，ID: ${installment.uid}, 状态: ${status}`);
       res.json({
         success: true,
-        data: updatedTransaction,
+        data: updatedInstallment,
         message: '分期付款状态更新成功',
       });
     } else {
@@ -589,8 +712,32 @@ export class CashController {
       });
     }
   });
+
+  // 私有辅助方法：获取状态文本
+  private getStatusText(status: string): string {
+    const statusMap: { [key: string]: string } = {
+      'Pending': '待支付',
+      'Paid': '已支付',
+      'Overdue': '已逾期',
+      'Cancelled': '已取消',
+      'Active': '进行中',
+      'Completed': '已完成',
+    };
+    return statusMap[status] || status;
+  }
+
+  // 私有辅助方法：获取频率文本
+  private getFrequencyText(frequency: string, customDays?: number): string {
+    const frequencyMap: { [key: string]: string } = {
+      'Weekly': '周付',
+      'Monthly': '月付',
+      'Quarterly': '季付',
+      'Custom': customDays ? `${customDays}天一次` : '自定义',
+    };
+    return frequencyMap[frequency] || frequency;
+  }
 }
 
 // 导出控制器实例
 const cashController = new CashController();
-export default cashController;
+export default cashController;"

@@ -25,7 +25,7 @@ export interface AppError {
   stack?: string | undefined;
 }
 
-// 全局错误状态
+// 全局错误状态（现简化为仅提供错误处理函数）
 const errors = ref<AppError[]>([]);
 
 // 错误工厂函数
@@ -66,23 +66,18 @@ export function createError(
   };
 }
 
-// 添加错误到全局状态
+// 添加错误到全局状态（已简化）
 export function addError(error: AppError): void {
-  // 移除全局错误状态管理，只记录到控制台
+  // 简化错误处理，移除全局状态管理，只记录到控制台
   console.log('Error recorded (global error state removed):', error);
 }
-
-// 移除removeError函数（已简化错误处理机制）
-// export function removeError(errorId: string): void {
-//   errors.value = errors.value.filter(error => error.id !== errorId);
-// }
 
 // 清除所有错误
 export function clearAllErrors(): void {
   errors.value = [];
 }
 
-// API错误处理包装器
+// API错误处理包装器（简化版本）
 export async function handleApiOperation<T>(
   operation: () => Promise<T>,
   operationName: string,
@@ -103,7 +98,6 @@ export async function handleApiOperation<T>(
     const displayTitle = `${operationName}失败 (高优先级)`;
     
     // 在浏览器环境中，我们希望通过UI显示错误
-    // 但在Node.js环境中（如SSR），我们只能记录到控制台
     if (typeof window !== 'undefined' && (window as any).showError) {
       (window as any).showError(displayTitle, displayMessage, JSON.stringify({
         operation: operationName,
@@ -153,7 +147,6 @@ export function handleValidationError(
   const displayTitle = '验证错误 (低优先级)';
   
   // 在浏览器环境中，我们希望通过UI显示错误
-  // 但在Node.js环境中（如SSR），我们只能记录到控制台
   if (typeof window !== 'undefined' && (window as any).showError) {
     (window as any).showError(displayTitle, displayMessage, JSON.stringify({ field, value }), false, 'low');
   } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
@@ -185,7 +178,6 @@ export function handleNetworkError(
   const displayTitle = '网络错误 (中优先级)';
   
   // 在浏览器环境中，我们希望通过UI显示错误
-  // 但在Node.js环境中（如SSR），我们只能记录到控制台
   if (typeof window !== 'undefined' && (window as any).showError) {
     (window as any).showError(displayTitle, displayMessage, JSON.stringify({
       operation: operationName,
@@ -219,12 +211,6 @@ export function handleNetworkError(
   throw new Error(`网络错误: ${errorMessage}`);
 }
 
-// 移除reportError函数（已简化错误处理机制）
-// function reportError(error: AppError): void {
-//   // 移除错误上报功能，只记录到控制台
-//   console.log('Error reporting disabled, logged to console:', error);
-// }
-
 // 获取错误优先级的用户友好描述
 export function getPriorityDescription(priority: ErrorPriority): string {
   switch (priority) {
@@ -257,9 +243,8 @@ export function getPriorityClass(priority: ErrorPriority): string {
   }
 }
 
-// 导出全局错误状态
-// 移除全局错误状态导出（已简化错误处理机制）
-// export const globalErrors = errors;
+// 导出全局错误状态（已简化为仅提供错误处理函数）
+export const globalErrors = errors;
 
 // 测试错误处理功能的函数
 export function testErrorHandling(): void {
