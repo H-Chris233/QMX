@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { isUsingMongoDB } from '@/config/database';
 import { Student as SqlStudent, Cash as SqlCash, Installment as SqlInstallment } from '@/models';
-import { Student as MongoStudent, Cash as MongoCash, Installment as MongoInstallment } from '@/models/mongo';
+import { Student as MongoStudent, Cash as MongoCash, Installment as MongoInstallment } from '@/models';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
@@ -276,7 +276,7 @@ export class AdapterController {
     const dbType = isUsingMongoDB() ? 'mongodb' : 'sql';
     
     if (isUsingMongoDB()) {
-      const { checkMongoHealth } = await import('@/models/mongo');
+      const { checkMongoHealth } = await import('@/models');
       const health = await checkMongoHealth();
       
       const response = {

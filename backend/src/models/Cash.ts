@@ -24,7 +24,7 @@ const CashSchema = new Schema<ICashDoc>({
     comment: '关联学生ID'
   },
   cash: {
-    type: Schema.Types.Long,
+    type: Number,
     required: true,
     comment: '金额（分为单位，正数表示收入，负数表示支出）'
   },
@@ -45,9 +45,10 @@ CashSchema.index({ student_id: 1, created_at: 1 });
 
 CashSchema.set('toJSON', {
   transform: function(doc, ret) {
-    delete ret._id;
-    delete ret.__v;
-    return ret;
+    const transformed: any = { ...ret };
+    delete transformed._id;
+    delete transformed.__v;
+    return transformed;
   }
 });
 

@@ -199,40 +199,40 @@ studentSchema.methods.toJSON = function() {
   };
 };
 
-const studentModel = model<IStudentDoc>('Student', studentSchema);
+const StudentMongo = model<IStudentDoc>('Student', studentSchema);
 
 export class Student {
   static async findByUid(uid: number): Promise<IStudentDoc | null> {
-    return await studentModel.findOne({ uid }).exec();
+    return await StudentMongo.findOne({ uid }).exec();
   }
 
   static async findAll(): Promise<IStudentDoc[]> {
-    return await studentModel.find().sort({ createdAt: -1 }).exec();
+    return await StudentMongo.find().sort({ createdAt: -1 }).exec();
   }
 
   static async create(data: Partial<IStudentDoc>): Promise<IStudentDoc> {
-    const lastStudent = await studentModel.findOne().sort({ uid: -1 }).exec();
+    const lastStudent = await StudentMongo.findOne().sort({ uid: -1 }).exec();
     const nextUid = lastStudent ? lastStudent.uid + 1 : 1;
-    return await studentModel.create({ ...data, uid: nextUid });
+    return await StudentMongo.create({ ...data, uid: nextUid });
   }
 
   static async updateByUid(uid: number, data: Partial<IStudentDoc>): Promise<IStudentDoc | null> {
-    return await studentModel.findOneAndUpdate({ uid }, data, { new: true, runValidators: true }).exec();
+    return await StudentMongo.findOneAndUpdate({ uid }, data, { new: true, runValidators: true }).exec();
   }
 
   static async deleteByUid(uid: number): Promise<boolean> {
-    const result = await studentModel.deleteOne({ uid }).exec();
+    const result = await StudentMongo.deleteOne({ uid }).exec();
     return result.deletedCount > 0;
   }
 
   static async search(criteria: any): Promise<IStudentDoc[]> {
-    return await studentModel.find(criteria).sort({ createdAt: -1 }).exec();
+    return await StudentMongo.find(criteria).sort({ createdAt: -1 }).exec();
   }
 
   static async count(criteria: any = {}): Promise<number> {
-    return await studentModel.countDocuments(criteria).exec();
+    return await StudentMongo.countDocuments(criteria).exec();
   }
 }
 
-export { studentModel };
-export default Student;
+export { StudentMongo as studentModel, Student };
+export { IStudentDoc };

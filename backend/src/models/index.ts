@@ -1,19 +1,25 @@
-import { default as Student } from './Student';
-import { default as Cash } from './Cash';
-import { default as Installment } from './Installment';
-import { default as SystemConfig } from './SystemConfig';
+import { Student, IStudentDoc } from './mongo';
+import { CashClass as Cash, ICashDoc } from './CashMongo';
+import { Installment } from './InstallmentMongo';
+import { InstallmentPlan as SystemConfig } from './InstallmentPlanMongo';
 import mongoose from 'mongoose';
 
 export { Student, Cash, Installment, SystemConfig };
 
 export type {
   IStudentDoc,
+} from './mongo';
+export type {
   ICashDoc,
+} from './CashMongo';
+export type {
   IInstallmentDoc,
-  ISystemConfigDoc
-} from './Student';
+} from './InstallmentMongo';
+export type {
+  IInstallmentPlanDoc as ISystemConfigDoc,
+} from './InstallmentPlanMongo';
 
-export { InstallmentStatus, PaymentFrequency } from './Installment';
+export { ClassType, SubjectType } from '@/types';
 
 export async function initMongoModels(): Promise<void> {
   try {
@@ -39,6 +45,9 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
       return { status: 'unhealthy', details: { connectionStatus: status } };
     }
 
+    if (!mongoose.connection.db) {
+      return { status: 'unhealthy', details: { connectionStatus: 'disconnected' } };
+    }
     const collections = await mongoose.connection.db.listCollections().toArray();
     const requiredCollections = ['students', 'cash_transactions', 'installments', 'system_configs'];
     const missingCollections = requiredCollections.filter(name =>

@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { Student } from '@/models/mongo';
 import { CashClass } from '@/models/CashMongo';
-import { InstallmentPlan, Installment } from '@/models/InstallmentMongo';
+import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
+import { Installment } from '@/models/InstallmentMongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 

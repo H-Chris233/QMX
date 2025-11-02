@@ -1,4 +1,4 @@
-"import { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { Student } from '@/models/mongo';
 import { IApiResponse } from '@/types';
 import { catchAsync } from '@/middleware/errorHandler';
@@ -408,4 +408,4 @@ export class MembershipController {
   });
 }
 
-export default new MembershipController();"
+export default new MembershipController();

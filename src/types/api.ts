@@ -321,3 +321,25 @@ export type ApiEndpoint =
   | '/membership/students/:id/membership'
   | '/membership/students/:id/membership/type'
   | '/membership/students/:id/membership/renew';
+
+/** 当前学生接口 - 用于表单数据 */
+export interface CurrentStudent {
+  /** 学员唯一标识符 - null表示新增 */
+  uid: number | null;
+  /** 学员姓名 */
+  name: string;
+  /** 学员年龄 */
+  age: number | null;
+  /** 联系电话 */
+  phone: string;
+  /** 班级类型 */
+  classType: string;
+  /** 备注信息 */
+  note: string;
+  /** 科目类型 */
+  subject: string;
+  /** 自定义会员开始时间 */
+  customMembershipStart: string;
+  /** 是否启用自定义会员时间 */
+  enableCustomMembership: boolean;
+}

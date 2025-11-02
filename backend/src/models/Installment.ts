@@ -52,7 +52,7 @@ const InstallmentSchema = new Schema<IInstallmentDoc>({
     comment: '关联学生ID'
   },
   total_amount: {
-    type: Schema.Types.Long,
+    type: Number,
     required: true,
     comment: '总金额（分为单位）'
   },
@@ -69,7 +69,7 @@ const InstallmentSchema = new Schema<IInstallmentDoc>({
     comment: '总期数'
   },
   amount: {
-    type: Schema.Types.Long,
+    type: Number,
     required: true,
     comment: '当期金额（分为单位）'
   },
@@ -115,9 +115,10 @@ InstallmentSchema.index({ plan_id: 1, installment_number: 1 });
 
 InstallmentSchema.set('toJSON', {
   transform: function(doc, ret) {
-    delete ret._id;
-    delete ret.__v;
-    return ret;
+    const transformed: any = { ...ret };
+    delete transformed._id;
+    delete transformed.__v;
+    return transformed;
   }
 });
 

@@ -21,7 +21,6 @@ export function getMongoConfig(): MongoConfig {
     serverSelectionTimeoutMS: 5000, // 服务器选择超时
     socketTimeoutMS: 45000, // Socket超时
     bufferCommands: false, // 禁用mongoose缓冲
-    bufferMaxEntries: 0, // 禁用mongoose缓冲
     retryWrites: true, // 启用重试写入
     w: 'majority', // 写入确认
   };
@@ -106,7 +105,11 @@ class MongoConnectionManager {
       }
 
       // 执行简单的ping操作
-      await mongoose.connection.db.admin().ping();
+      if (mongoose.connection.db) {
+        await mongoose.connection.db.admin().ping();
+      } else {
+        throw new Error('MongoDB连接尚未建立');
+      }
 
       return {
         status: 'healthy',
