@@ -345,7 +345,7 @@ export class CashController {
     }
   });
 
-  // 搜索现金记录
+  // 搜索现金记录 - 使用聚合查询优化
   public searchCash = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const {
       student_id,
@@ -359,65 +359,78 @@ export class CashController {
       sort_order = 'DESC',
     } = req.query as any;
 
-    // 构建查询条件
-    const whereCondition: any = {};
+    // 构建聚合管道
+    const pipeline: any[] = [];
+
+    // 匹配条件
+    const matchCondition: any = {};
 
     if (student_id) {
-      whereCondition.student_id = Number(student_id);
+      matchCondition.student_id = Number(student_id);
     }
 
     if (min_amount || max_amount) {
-      whereCondition.cash = {};
+      matchCondition.cash = {};
       if (min_amount) {
-        whereCondition.cash.$gte = Math.round(Number(min_amount) * 100);
+        matchCondition.cash.$gte = Math.round(Number(min_amount) * 100);
       }
       if (max_amount) {
-        whereCondition.cash.$lte = Math.round(Number(max_amount) * 100);
+        matchCondition.cash.$lte = Math.round(Number(max_amount) * 100);
       }
     }
 
     if (date_from || date_to) {
-      whereCondition.created_at = {};
+      matchCondition.created_at = {};
       if (date_from) {
-        whereCondition.created_at.$gte = new Date(date_from);
+        matchCondition.created_at.$gte = new Date(date_from);
       }
       if (date_to) {
-        whereCondition.created_at.$lte = new Date(date_to);
+        matchCondition.created_at.$lte = new Date(date_to);
       }
     }
 
+    if (Object.keys(matchCondition).length > 0) {
+      pipeline.push({ $match: matchCondition });
+    }
+
+    // 排序
     const sortField = sort_by === 'created_at' ? 'created_at' : sort_by;
     const sortOrder = sort_order === 'DESC' ? -1 : 1;
-    const sort = { [sortField]: sortOrder };
+    pipeline.push({ $sort: { [sortField]: sortOrder } });
 
-    // 获取分页数据
-    const result = await CashClass.findWithPagination(
-      whereCondition,
-      Number(page),
-      Number(limit),
-      sort
-    );
+    // 计算总数（用于分页）
+    const countPipeline = [...pipeline, { $count: "total" }];
+    const countResult = await CashClass.aggregate(countPipeline).exec();
+    const total = countResult[0]?.total || 0;
 
-    const responseData = result.data.map(transaction => ({
+    // 分页
+    pipeline.push({ $skip: (Number(page) - 1) * Number(limit) });
+    pipeline.push({ $limit: Number(limit) });
+
+    // 执行聚合查询
+    const result = await CashClass.aggregate(pipeline).exec();
+
+    // 格式化结果
+    const responseData = result.map((transaction: any) => ({
       uid: transaction.uid,
       student_id: transaction.student_id,
       student_name: null, // 暂时为null
-      amount: transaction.getAmount(),
-      description: this.getTransactionDescription(transaction),
+      amount: Math.abs(transaction.cash) / 100,
+      description: this.getTransactionDescriptionFromRaw(transaction),
       note: transaction.note,
-      is_income: transaction.isIncome(),
-      is_expense: !transaction.isIncome(),
-      formatted_amount: transaction.getFormattedAmount(),
+      is_income: transaction.cash > 0,
+      is_expense: transaction.cash < 0,
+      formatted_amount: `${transaction.cash >= 0 ? '+' : '-'}¥${(Math.abs(transaction.cash) / 100).toFixed(2)}`,
       created_at: transaction.created_at,
     }));
 
     const paginationResponse: IPaginatedResponse<any> = {
       data: responseData,
       pagination: {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        total_pages: Math.ceil(result.total / result.limit),
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        total_pages: Math.ceil(total / Number(limit)),
       },
     };
 
@@ -426,7 +439,7 @@ export class CashController {
       data: paginationResponse,
     };
 
-    logger.info(`搜索现金记录完成，找到 ${result.total} 条记录`);
+    logger.info(`搜索现金记录完成，找到 ${total} 条记录`);
     res.json(response);
   });
 
@@ -483,6 +496,13 @@ export class CashController {
   private getTransactionDescription(transaction: ICashDoc): string {
     const amount = transaction.getAmount();
     const prefix = transaction.isIncome() ? '收入' : '支出';
+    return `${prefix} ¥${amount.toFixed(2)}`;
+  }
+
+  // 私有辅助方法：从原始数据获取交易描述
+  private getTransactionDescriptionFromRaw(transaction: any): string {
+    const amount = Math.abs(transaction.cash) / 100;
+    const prefix = transaction.cash > 0 ? '收入' : '支出';
     return `${prefix} ¥${amount.toFixed(2)}`;
   }
 

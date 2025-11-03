@@ -232,6 +232,11 @@ export class Student {
   static async count(criteria: any = {}): Promise<number> {
     return await StudentMongo.countDocuments(criteria).exec();
   }
+  
+  // 添加聚合查询支持
+  static aggregate(pipeline: any[]) {
+    return StudentMongo.aggregate(pipeline);
+  }
 }
 
 export { StudentMongo as studentModel, Student };

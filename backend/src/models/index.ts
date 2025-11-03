@@ -49,7 +49,7 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
       return { status: 'unhealthy', details: { connectionStatus: 'disconnected' } };
     }
     const collections = await mongoose.connection.db.listCollections().toArray();
-    const requiredCollections = ['students', 'cash_transactions', 'installments', 'system_configs'];
+    const requiredCollections = ['students', 'cash_transactions', 'installments', 'installment_plans'];
     const missingCollections = requiredCollections.filter(name =>
       !collections.some(col => col.name === name)
     );
@@ -69,7 +69,7 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
       students: await Student.countDocuments(),
       cashTransactions: await Cash.countDocuments(),
       installments: await Installment.countDocuments(),
-      systemConfigs: await SystemConfig.countDocuments(),
+      installmentPlans: await SystemConfig.countDocuments(),
     };
 
     return {

@@ -99,7 +99,7 @@ export class StudentController {
     });
   });
 
-  // 搜索学员 - 修复前后端不匹配问题
+  // 搜索学员 - 使用MongoDB聚合查询优化
   public searchStudents = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const {
       name_contains,
@@ -110,138 +110,156 @@ export class StudentController {
       class_type,
       subject,
       has_membership,
+      page = 1,
+      limit = 20
     } = req.query;
 
     // 构建查询条件
-    const whereCondition: any = {};
+    const conditions: any = [];
 
     // 姓名包含搜索
     if (name_contains) {
-      whereCondition.name = {
-        $regex: name_contains,
-        $options: 'i'
-      };
+      conditions.push({ $regexMatch: { input: "$name", regex: name_contains as string, options: "i" } });
     }
 
     // 年龄范围搜索
     if (min_age !== undefined && min_age !== null) {
-      whereCondition.age = {
-        ...whereCondition.age,
-        $gte: Number(min_age)
-      };
+      conditions.push({ $gte: ["$age", Number(min_age)] });
     }
     if (max_age !== undefined && max_age !== null) {
-      whereCondition.age = {
-        ...whereCondition.age,
-        $lte: Number(max_age)
-      };
-    }
-
-    // 成绩范围搜索 - 这里需要查询成绩字段
-    if (min_score !== undefined && min_score !== null || max_score !== undefined && max_score !== null) {
-      // 由于成绩是数组格式，需要使用MongoDB的聚合查询或特殊处理
-      const students = await Student.findAll();
-
-      let filteredStudents = students;
-
-      // 筛选成绩范围
-      if (min_score !== undefined && min_score !== null) {
-        filteredStudents = filteredStudents.filter(student => {
-          if (!student.rings || student.rings.length === 0) return false;
-          return student.rings.some(score => score >= Number(min_score));
-        });
-      }
-      if (max_score !== undefined && max_score !== null) {
-        filteredStudents = filteredStudents.filter(student => {
-          if (!student.rings || student.rings.length === 0) return true;
-          return student.rings.some(score => score <= Number(max_score));
-        });
-      }
-
-      // 应用其他筛选条件
-      if (name_contains) {
-        filteredStudents = filteredStudents.filter(student =>
-          student.name.toLowerCase().includes(String(name_contains).toLowerCase())
-        );
-      }
-
-      if (min_age !== undefined && min_age !== null) {
-        filteredStudents = filteredStudents.filter(student =>
-          student.age && student.age >= Number(min_age)
-        );
-      }
-
-      if (max_age !== undefined && max_age !== null) {
-        filteredStudents = filteredStudents.filter(student =>
-          student.age && student.age <= Number(max_age)
-        );
-      }
-
-      if (class_type) {
-        filteredStudents = filteredStudents.filter(student =>
-          student.class === class_type
-        );
-      }
-
-      if (subject) {
-        filteredStudents = filteredStudents.filter(student =>
-          student.subject === subject
-        );
-      }
-
-      if (has_membership !== undefined && has_membership !== null) {
-        const now = new Date();
-        if (has_membership === 'true') {
-          filteredStudents = filteredStudents.filter(student =>
-            student.membershipStartDate && student.membershipEndDate &&
-            student.membershipStartDate <= now && student.membershipEndDate >= now
-          );
-        } else {
-          filteredStudents = filteredStudents.filter(student =>
-            !student.membershipStartDate || !student.membershipEndDate ||
-            student.membershipStartDate > now || student.membershipEndDate < now
-          );
-        }
-      }
-
-      res.json({
-        success: true,
-        data: filteredStudents,
-      });
-      return;
+      conditions.push({ $lte: ["$age", Number(max_age)] });
     }
 
     // 班级类型搜索
     if (class_type) {
-      whereCondition.class = class_type;
+      conditions.push({ $eq: ["$class", class_type] });
     }
 
     // 科目搜索
     if (subject) {
-      whereCondition.subject = subject;
+      conditions.push({ $eq: ["$subject", subject] });
     }
 
     // 会员状态搜索
     if (has_membership !== undefined && has_membership !== null) {
       const now = new Date();
       if (has_membership === 'true') {
-        whereCondition.membershipStartDate = { $lte: now };
-        whereCondition.membershipEndDate = { $gte: now };
+        conditions.push(
+          { $lte: ["$membershipStartDate", now] },
+          { $gte: ["$membershipEndDate", now] }
+        );
       } else {
-        whereCondition.$or = [
-          { membershipStartDate: null },
-          { membershipEndDate: null },
-          { membershipStartDate: { $gt: now } },
-          { membershipEndDate: { $lt: now } }
-        ];
+        conditions.push({
+          $or: [
+            { $eq: ["$membershipStartDate", null] },
+            { $eq: ["$membershipEndDate", null] },
+            { $gt: ["$membershipStartDate", now] },
+            { $lt: ["$membershipEndDate", now] }
+          ]
+        });
       }
     }
 
-    const students = await Student.search(whereCondition);
+    // 构建聚合管道
+    let pipeline: any[] = [];
+
+    // 如果需要成绩范围搜索，则使用聚合管道
+    if (min_score !== undefined && min_score !== null || max_score !== undefined && max_score !== null) {
+      // 使用聚合管道计算平均分并按分数范围过滤
+      pipeline = [
+        // 添加计算平均成绩的字段
+        {
+          $addFields: {
+            avgScore: {
+              $cond: {
+                if: { $gt: [{ $size: { $ifNull: ["$rings", []] } }, 0] },
+                then: { $avg: "$rings" },
+                else: 0
+              }
+            }
+          }
+        },
+        // 添加匹配条件
+        {
+          $match: {
+            $expr: {
+              $and: [
+                ...(conditions.length > 0 ? [{$and: conditions}] : []), // 其他条件
+                ...(min_score !== undefined && min_score !== null ? [{ $gte: ["$avgScore", Number(min_score)] }] : []),
+                ...(max_score !== undefined && max_score !== null ? [{ $lte: ["$avgScore", Number(max_score)] }] : [])
+              ]
+            }
+          }
+        },
+        // 按创建时间排序
+        { $sort: { createdAt: -1 } },
+        // 分页
+        { $skip: (Number(page) - 1) * Number(limit) },
+        { $limit: Number(limit) }
+      ];
+    } else {
+      // 没有成绩范围搜索时的简单查询
+      const whereCondition: any = {};
+      
+      if (name_contains) {
+        whereCondition.name = { $regex: name_contains as string, $options: 'i' };
+      }
+      if (min_age !== undefined && min_age !== null) {
+        whereCondition.age = { $gte: Number(min_age) };
+      }
+      if (max_age !== undefined && max_age !== null) {
+        whereCondition.age = { ...whereCondition.age, $lte: Number(max_age) };
+      }
+      if (class_type) {
+        whereCondition.class = class_type;
+      }
+      if (subject) {
+        whereCondition.subject = subject;
+      }
+      if (has_membership !== undefined && has_membership !== null) {
+        const now = new Date();
+        if (has_membership === 'true') {
+          whereCondition.membershipStartDate = { $lte: now };
+          whereCondition.membershipEndDate = { $gte: now };
+        } else {
+          whereCondition.$or = [
+            { membershipStartDate: null },
+            { membershipEndDate: null },
+            { membershipStartDate: { $gt: now } },
+            { membershipEndDate: { $lt: now } }
+          ];
+        }
+      }
+
+      pipeline = [
+        { $match: whereCondition },
+        { $sort: { createdAt: -1 } },
+        { $skip: (Number(page) - 1) * Number(limit) },
+        { $limit: Number(limit) }
+      ];
+    }
+
+    // 执行聚合查询
+    const students = await Student.aggregate(pipeline).exec();
+
+    // 获取总数用于分页信息
+    const countPipeline = [
+      ...pipeline.slice(0, pipeline.findIndex(p => p.$skip || p.$limit) === -1 ? pipeline.length : pipeline.findIndex(p => p.$skip || p.$limit)),
+      { $count: "count" }
+    ];
+    
+    const countResult = await Student.aggregate(countPipeline).exec();
+    const total = countResult[0]?.count || 0;
 
     res.json({
       success: true,
       data: students,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        total_pages: Math.ceil(total / Number(limit))
+      }
     });
   });
 
