@@ -3,7 +3,7 @@ import adapterController from '@/controllers/adapterController';
 
 const router = express.Router();
 
-// 数据库适配器路由 - 统一的多数据库支持接口
+// MongoDB专用路由
 
 // 学生相关接口
 router.get('/students', adapterController.getStudents);
@@ -25,11 +25,9 @@ router.get('/info', (req, res) => {
     success: true,
     data: {
       adapter_version: '1.0.0',
-      supported_databases: ['mongodb', 'sqlite', 'postgresql'],
+      supported_databases: ['mongodb'],
       features: {
         mongodb: 'Full support with Mongoose models',
-        sqlite: 'Limited support (existing controllers)',
-        postgresql: 'Limited support (existing controllers)'
       },
       endpoints: {
         students: {

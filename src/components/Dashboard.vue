@@ -208,7 +208,7 @@ const loadExpiringMemberships = async (): Promise<Student[]> => {
         student && student.uid && student.name
       ) as Student[];
 
-      if (import.meta.env?.MODE !== 'production') console.log(`找到 ${validExpiring.length} 个即将过期的会员`);
+      if (import.meta.env?.MODE !== 'production') console.log('找到 ' + validExpiring.length + ' 个即将过期的会员');
       return validExpiring;
     };
 

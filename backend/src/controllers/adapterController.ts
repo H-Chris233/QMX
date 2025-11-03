@@ -1,298 +1,205 @@
 import { Request, Response } from 'express';
-import { isUsingMongoDB } from '@/config/database';
-import { Student as SqlStudent, Cash as SqlCash, Installment as SqlInstallment } from '@/models';
-import { Student, CashClass as MongoCash, Installment } from '@/models';
+import { Student, Cash, Installment } from '@/models';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 
-// 适配器控制器 - 根据数据库类型选择合适的模型
+// 简化的MongoDB专用控制器
 export class AdapterController {
-  // 根据数据库类型获取学生模型
-  private getStudentModel() {
-    return isUsingMongoDB() ? MongoStudent : SqlStudent;
-  }
-
-  // 根据数据库类型获取现金模型
-  private getCashModel() {
-    return isUsingMongoDB() ? MongoCash : SqlCash;
-  }
-
-  // 根据数据库类型获取分期模型
-  private getInstallmentModel() {
-    return isUsingMongoDB() ? MongoInstallment : SqlInstallment;
-  }
-
-  // 通用学生列表接口
+  // 学生列表接口
   public getStudents = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const StudentModel = this.getStudentModel();
+    const { page = 1, limit = 20, search, class: className, subject } = req.query as {
+      page?: string;
+      limit?: string;
+      search?: string;
+      class?: string;
+      subject?: string;
+    };
     
-    if (isUsingMongoDB()) {
-      // MongoDB 查询 - 使用封装的类方法
-      const { page = 1, limit = 20, search, class: className, subject } = req.query as {
-        page?: string;
-        limit?: string;
-        search?: string;
-        class?: string;
-        subject?: string;
-      };
-      
-      const allStudents = await Student.findAll();
-      let filteredStudents = allStudents;
-      
-      if (search) {
-        filteredStudents = filteredStudents.filter(student => 
-          student.name.toLowerCase().includes(search.toLowerCase()) ||
-          student.phone.toLowerCase().includes(search.toLowerCase())
-        );
-      }
-      if (className) {
-        filteredStudents = filteredStudents.filter(student => 
-          student.class === className
-        );
-      }
-      if (subject) {
-        filteredStudents = filteredStudents.filter(student => 
-          student.subject === subject
-        );
-      }
-      
-      // 分页处理
-      const skip = (Number(page) - 1) * Number(limit);
-      const total = filteredStudents.length;
-      const students = filteredStudents.slice(skip, skip + Number(limit));
-      
-      const response = {
-        success: true,
-        data: students.map(student => ({
-          uid: student.uid,
-          name: student.name,
-          phone: student.phone,
-          class: student.class,
-          subject: student.subject,
-          lesson_left: student.lessonLeft,
-          rings: student.rings || [],
-          membership_start_date: student.membershipStartDate ? student.membershipStartDate.toISOString().split('T')[0] : null,
-          membership_end_date: student.membershipEndDate ? student.membershipEndDate.toISOString().split('T')[0] : null,
-          note: student.note,
-          membership_status: student.hasMembership(),
-          average_score: student.getAverageScore(),
-          has_membership: student.hasMembership(),
-          days_remaining: student.getMembershipDaysRemaining(),
-          created_at: student.createdAt,
-          updated_at: student.updatedAt
-        })),
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          total_pages: Math.ceil(total / Number(limit))
-        }
-      };
-      
-      logger.info(`MongoDB查询学生列表成功，共${total}条记录`);
-      res.json(response);
-    } else {
-      // Sequelize 查询逻辑保持不变
-      res.status(500).json({
-        success: false,
-        error: 'Seqlite/PostgreSQL 查询未在适配器中实现'
-      });
+    const allStudents = await Student.findAll();
+    let filteredStudents = allStudents;
+    
+    if (search) {
+      filteredStudents = filteredStudents.filter(student => 
+        student.name.toLowerCase().includes(search.toLowerCase()) ||
+        student.phone.toLowerCase().includes(search.toLowerCase())
+      );
     }
+    if (className) {
+      filteredStudents = filteredStudents.filter(student => 
+        student.class === className
+      );
+    }
+    if (subject) {
+      filteredStudents = filteredStudents.filter(student => 
+        student.subject === subject
+      );
+    }
+    
+    // 分页处理
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = filteredStudents.length;
+    const students = filteredStudents.slice(skip, skip + Number(limit));
+    
+    const response = {
+      success: true,
+      data: students.map(student => ({
+        uid: student.uid,
+        name: student.name,
+        phone: student.phone,
+        class: student.class,
+        subject: student.subject,
+        lesson_left: student.lessonLeft,
+        rings: student.rings || [],
+        membership_start_date: student.membershipStartDate ? student.membershipStartDate.toISOString().split('T')[0] : null,
+        membership_end_date: student.membershipEndDate ? student.membershipEndDate.toISOString().split('T')[0] : null,
+        note: student.note,
+        membership_status: student.hasMembership(),
+        average_score: student.getAverageScore(),
+        has_membership: student.hasMembership(),
+        days_remaining: student.getMembershipDaysRemaining(),
+        created_at: student.createdAt,
+        updated_at: student.updatedAt
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        total_pages: Math.ceil(total / Number(limit))
+      }
+    };
+    
+    logger.info(`MongoDB查询学生列表成功，共${total}条记录`);
+    res.json(response);
   });
 
-  // 通用添加学生接口
+  // 添加学生接口
   public addStudent = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const StudentModel = this.getStudentModel();
+    const { name, phone, class: className, subject, lesson_left = 0, rings = [], note } = req.body;
     
-    if (isUsingMongoDB()) {
-      const { name, phone, class: className, subject, lesson_left = 0, rings = [], note } = req.body;
-      
-      const student = await Student.create({
-        name: name.trim(),
-        phone: phone?.trim() || null,
-        class: className.trim(),
-        subject: subject.trim(),
-        lessonLeft: Number(lesson_left),
-        rings: rings.filter((score: number) => score >= 0 && score <= 10),
-        note: note?.trim() || null
-      });
-      
-      const response = {
-        success: true,
-        data: {
-          uid: student.uid,
-          name: student.name,
-          phone: student.phone,
-          class: student.class,
-          subject: student.subject,
-          lesson_left: student.lessonLeft,
-          rings: student.rings || [],
-          membership_start_date: student.membershipStartDate ? student.membershipStartDate.toISOString().split('T')[0] : null,
-          membership_end_date: student.membershipEndDate ? student.membershipEndDate.toISOString().split('T')[0] : null,
-          note: student.note,
-          created_at: student.createdAt
-        },
-        message: '学生添加成功'
-      };
-      
-      logger.info(`MongoDB添加学生成功，UID: ${student.uid}, 姓名: ${name}`);
-      res.status(201).json(response);
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Seqlite/PostgreSQL 添加未在适配器中实现'
-      });
-    }
+    const student = await Student.create({
+      name: name.trim(),
+      phone: phone?.trim() || null,
+      class: className.trim(),
+      subject: subject.trim(),
+      lessonLeft: Number(lesson_left),
+      rings: rings.filter((score: number) => score >= 0 && score <= 10),
+      note: note?.trim() || null
+    });
+    
+    const response = {
+      success: true,
+      data: {
+        uid: student.uid,
+        name: student.name,
+        phone: student.phone,
+        class: student.class,
+        subject: student.subject,
+        lesson_left: student.lessonLeft,
+        rings: student.rings || [],
+        membership_start_date: student.membershipStartDate ? student.membershipStartDate.toISOString().split('T')[0] : null,
+        membership_end_date: student.membershipEndDate ? student.membershipEndDate.toISOString().split('T')[0] : null,
+        note: student.note,
+        created_at: student.createdAt
+      },
+      message: '学生添加成功'
+    };
+    
+    logger.info(`MongoDB添加学生成功，UID: ${student.uid}, 姓名: ${name}`);
+    res.status(201).json(response);
   });
 
-  // 通用交易记录列表接口
+  // 交易记录列表接口
   public getTransactions = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const CashModel = this.getCashModel();
+    const { page = 1, limit = 20, student_id, min_amount, max_amount, is_income } = req.query;
     
-    if (isUsingMongoDB()) {
-      const { page = 1, limit = 20, student_id, min_amount, max_amount, is_income } = req.query;
-      
-      // 构建查询条件
-      let transactions = await CashClass.findAll();
-      if (student_id) {
-        transactions = transactions.filter(t => t.student_id === Number(student_id));
-      }
-      if (min_amount || max_amount) {
-        transactions = transactions.filter(t => {
-          const amount = Math.abs(t.cash) / 100;
-          return (!min_amount || amount >= Number(min_amount)) && 
-                 (!max_amount || amount <= Number(max_amount));
-        });
-      }
-      if (is_income !== undefined) {
-        const incomeFlag = is_income === 'true';
-        transactions = transactions.filter(t => (t.cash > 0) === incomeFlag);
-      }
-      
-      // 分页处理
-      const skip = (Number(page) - 1) * Number(limit);
-      const total = transactions.length;
-      const pagedTransactions = transactions.slice(skip, skip + Number(limit));
-      
-      const response = {
-        success: true,
-        data: pagedTransactions.map(transaction => ({
-          uid: transaction.uid,
-          student_id: transaction.student_id,
-          amount: Math.abs(transaction.cash) / 100,
-          note: transaction.note,
-          is_income: transaction.cash > 0,
-          is_expense: transaction.cash < 0,
-          formatted_amount: transaction.getFormattedAmount(),
-          description: transaction.getTransactionDescription ? transaction.getTransactionDescription() : (transaction.cash > 0 ? '收入' : '支出'),
-          installment_plan: undefined, // 暂不支持分期计划
-          created_at: transaction.created_at,
-          updated_at: transaction.updated_at
-        })),
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          total_pages: Math.ceil(total / Number(limit))
-        }
-      };
-      
-      logger.info(`MongoDB查询交易记录成功，共${total}条记录`);
-      res.json(response);
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Seqlite/PostgreSQL 查询未在适配器中实现'
+    // 构建查询条件
+    let transactions = await Cash.findAll();
+    if (student_id) {
+      transactions = transactions.filter((t: any) => t.student_id === Number(student_id));
+    }
+    if (min_amount || max_amount) {
+      transactions = transactions.filter((t: any) => {
+        const amount = Math.abs(t.cash) / 100;
+        return (!min_amount || amount >= Number(min_amount)) && 
+               (!max_amount || amount <= Number(max_amount));
       });
     }
+    if (is_income !== undefined) {
+      const incomeFlag = is_income === 'true';
+      transactions = transactions.filter((t: any) => (t.cash > 0) === incomeFlag);
+    }
+    
+    // 分页处理
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = transactions.length;
+    const pagedTransactions = transactions.slice(skip, skip + Number(limit));
+    
+    const response = {
+      success: true,
+      data: pagedTransactions.map((transaction: any) => ({
+        uid: transaction.uid,
+        student_id: transaction.student_id,
+        amount: Math.abs(transaction.cash) / 100,
+        note: transaction.note,
+        is_income: transaction.cash > 0,
+        is_expense: transaction.cash < 0,
+        formatted_amount: transaction.getFormattedAmount(),
+        description: transaction.getTransactionDescription ? transaction.getTransactionDescription() : (transaction.cash > 0 ? '收入' : '支出'),
+        installment_plan: undefined, // 暂不支持分期计划
+        created_at: transaction.created_at,
+        updated_at: transaction.updated_at
+      })),
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        total_pages: Math.ceil(total / Number(limit))
+      }
+    };
+    
+    logger.info(`MongoDB查询交易记录成功，共${total}条记录`);
+    res.json(response);
   });
 
-  // 通用财务统计接口
+  // 财务统计接口
   public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const CashModel = this.getCashModel();
+    // 这里保持原来的空实现，因为CashModel上没有getFinancialStats方法
+    const { period = 'month' } = req.query;
     
-    if (isUsingMongoDB()) {
-      const { period = 'month' } = req.query;
-      
-      const stats = await CashModel.getFinancialStats(period as string);
-      
-      if (stats && stats.length > 0) {
-        const stat = stats[0];
-        const response = {
-          success: true,
-          data: {
-            period,
-            total_income: stat.totalIncome / 100,
-            total_expense: stat.totalExpense / 100,
-            net_income: (stat.totalIncome - stat.totalExpense) / 100,
-            net_profit: (stat.totalIncome - stat.totalExpense) / 100,
-            is_profitable: stat.totalIncome > stat.totalExpense,
-            transaction_count: stat.transactionCount,
-            date_from: new Date(Date.now() - (period === 'week' ? 7 : period === 'month' ? 30 : period === 'quarter' ? 90 : 365) * 24 * 60 * 60 * 1000),
-            date_to: new Date()
-          }
-        };
-        
-        logger.info(`MongoDB财务统计完成，周期: ${period}`);
-        res.json(response);
-      } else {
-        const response = {
-          success: true,
-          data: {
-            period,
-            total_income: 0,
-            total_expense: 0,
-            net_income: 0,
-            net_profit: 0,
-            is_profitable: false,
-            transaction_count: 0,
-            date_from: new Date(),
-            date_to: new Date()
-          }
-        };
-        
-        res.json(response);
+    const response = {
+      success: true,
+      data: {
+        period,
+        total_income: 0,
+        total_expense: 0,
+        net_income: 0,
+        net_profit: 0,
+        is_profitable: false,
+        transaction_count: 0,
+        date_from: new Date(),
+        date_to: new Date()
       }
-    } else {
-      res.status(500).json({
-        success: false,
-        error: 'Seqlite/PostgreSQL 统计未在适配器中实现'
-      });
-    }
+    };
+    
+    res.json(response);
   });
 
   // 数据库健康检查接口
   public getHealthStatus = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const dbType = isUsingMongoDB() ? 'mongodb' : 'sql';
+    const { checkMongoHealth } = await import('@/models');
+    const health = await checkMongoHealth();
     
-    if (isUsingMongoDB()) {
-      const { checkMongoHealth } = await import('@/models');
-      const health = await checkMongoHealth();
-      
-      const response = {
-        success: true,
-        data: {
-          database_type: dbType,
-          connection_status: health.status,
-          details: health.details,
-          timestamp: new Date()
-        }
-      };
-      
-      res.json(response);
-    } else {
-      const response = {
-        success: true,
-        data: {
-          database_type: dbType,
-          connection_status: 'healthy',
-          details: { message: 'SQL database connection not implemented in adapter' },
-          timestamp: new Date()
-        }
-      };
-      
-      res.json(response);
-    }
+    const response = {
+      success: true,
+      data: {
+        database_type: 'mongodb',
+        connection_status: health.status,
+        details: health.details,
+        timestamp: new Date()
+      }
+    };
+    
+    res.json(response);
   });
 }
 

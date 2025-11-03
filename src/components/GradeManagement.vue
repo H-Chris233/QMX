@@ -463,7 +463,7 @@ interface ErrorHandler {
     const refreshSystem = inject<RefreshSystem>('refreshSystem');
     
     const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
-      console.error(`${title}: ${message}`, details);
+      console.error(title + ': ' + message, details);
       // 统一错误处理：移除alert降级
     });
     
@@ -477,7 +477,7 @@ interface ErrorHandler {
     });
     
     const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
-      console.log(`✅ ${title}: ${message}`);
+      console.log('✅ ' + title + ': ' + message);
     });
     
     if (!errorHandler) {
@@ -1029,12 +1029,12 @@ interface ErrorHandler {
         const studentUid = Number(selectedStudent.value);
         await ApiService.deleteStudentScore(studentUid, scoreIndex);
         
-        if (import.meta.env?.MODE !== 'production') console.log(`成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
+        if (import.meta.env?.MODE !== 'production') console.log('成功删除学员 ' + studentUid + ' 的第 ' + scoreIndex + ' 个成绩');
         
         // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'grades');
-          localStorage.setItem('qmx_last_operation', `已删除${studentName}的第${scoreIndex + 1}次成绩${score}`);
+          localStorage.setItem('qmx_last_operation', '已删除' + studentName + '的第' + (scoreIndex + 1) + '次成绩' + score);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error: any) {
           if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
@@ -1095,18 +1095,18 @@ interface ErrorHandler {
         
         await ApiService.updateStudentScore(studentUid, scoreIndex, newScore);
         
-        console.log(`成功更新学员 ${studentUid} 的第 ${scoreIndex} 个成绩为 ${newScore}`);
+        console.log('成功更新学员 ' + studentUid + ' 的第 ' + scoreIndex + ' 个成绩为 ' + newScore);
         
         // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'grades');
-          localStorage.setItem('qmx_last_operation', `已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}`);
+          localStorage.setItem('qmx_last_operation', '已将' + studentName + '的第' + (scoreIndex + 1) + '次成绩从' + currentScore + '修改为' + newScore);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error: any) {
           if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        console.log(`✅ 已将${studentName}的第${scoreIndex + 1}次成绩从${currentScore}修改为${newScore}，刷新当前学员数据`);
+        console.log('✅ 已将' + studentName + '的第' + (scoreIndex + 1) + '次成绩从' + currentScore + '修改为' + newScore + '，刷新当前学员数据');
         
         await onStudentChange();
       } catch (error: any) {
@@ -1158,11 +1158,11 @@ interface ErrorHandler {
         });
         
         if (validStudents.length !== data.length) {
-          if (import.meta.env?.MODE !== 'production') console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
+          if (import.meta.env?.MODE !== 'production') console.warn('过滤了 ' + (data.length - validStudents.length) + ' 个无效学员记录');
         }
         
         students.value = validStudents;
-        if (import.meta.env?.MODE !== 'production') console.log(`成功加载 ${validStudents.length} 个学员记录`);
+        if (import.meta.env?.MODE !== 'production') console.log('成功加载 ' + validStudents.length + ' 个学员记录');
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           if (import.meta.env?.MODE !== 'production') console.error('加载学员数据失败:', error);
@@ -1215,7 +1215,7 @@ interface ErrorHandler {
           );
           
           if (validScores.length !== scores.length) {
-            if (import.meta.env?.MODE !== 'production') console.warn(`过滤了 ${scores.length - validScores.length} 个无效成绩`);
+            if (import.meta.env?.MODE !== 'production') console.warn('过滤了 ' + (scores.length - validScores.length) + ' 个无效成绩');
           }
         } else {
           if (import.meta.env?.MODE !== 'production') console.warn('返回的成绩数据不是数组格式，使用空数组');
@@ -1226,7 +1226,7 @@ interface ErrorHandler {
           rings: validScores,
         } as Student;
         
-        if (import.meta.env?.MODE !== 'production') console.log(`加载学员 ${student.name} 的 ${validScores.length} 条成绩记录`);
+        if (import.meta.env?.MODE !== 'production') console.log('加载学员 ' + student.name + ' 的 ' + validScores.length + ' 条成绩记录');
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           if (import.meta.env?.MODE !== 'production') console.error('加载学员成绩失败:', error);
@@ -1270,18 +1270,18 @@ interface ErrorHandler {
         const studentName = students.value.find((s: any) => s.uid == studentUid)?.name || '未知学员';
         await ApiService.addScore(studentUid, score);
         
-        if (import.meta.env?.MODE !== 'production') console.log(`成功为学员 ${studentUid} 添加成绩 ${score}`);
+        if (import.meta.env?.MODE !== 'production') console.log('成功为学员 ' + studentUid + ' 添加成绩 ' + score);
         
         // 保存当前页面状态
         try {
           localStorage.setItem('qmx_active_tab', 'grades');
-          localStorage.setItem('qmx_last_operation', `已为${studentName}添加成绩${score}`);
+          localStorage.setItem('qmx_last_operation', '已为' + studentName + '添加成绩' + score);
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error: any) {
           if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
         }
         
-        if (import.meta.env?.MODE !== 'production') console.log(`✅ 已为${studentName}添加成绩${score}，刷新当前学员数据`);
+        if (import.meta.env?.MODE !== 'production') console.log('✅ 已为' + studentName + '添加成绩' + score + '，刷新当前学员数据');
         
         await onStudentChange();
         quickScore.value = '';

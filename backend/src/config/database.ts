@@ -34,3 +34,8 @@ process.on('SIGTERM', async () => {
   await disconnectDatabase();
   process.exit(0);
 });
+
+// 检查是否使用MongoDB的函数（用于适配器兼容）
+export function isUsingMongoDB(): boolean {
+  return true;
+}

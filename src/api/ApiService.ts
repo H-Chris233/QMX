@@ -23,9 +23,9 @@ export class ApiService {
   static async addScore(studentUid: number, score: number): Promise<void> {
     return handleApiOperation(async () => {
       const requestData = { score };
-      await apiCall('POST', `/students/${studentUid}/scores`, requestData);
+      await apiCall('POST', '/students/' + studentUid + '/scores', requestData);
       
-      console.log(`✅ 成功为学员 ${studentUid} 添加成绩 ${score}`);
+      console.log('✅ 成功为学员 ' + studentUid + ' 添加成绩 ' + score);
     }, '添加成绩', {
       context: { studentUid, score }
     });
@@ -33,9 +33,9 @@ export class ApiService {
 
   static async getStudentScores(studentUid: number): Promise<number[]> {
     return handleApiOperation(async () => {
-      const responseData = await apiCall<{ scores: number[] }>('GET', `/students/${studentUid}/scores`);
+      const responseData = await apiCall<{ scores: number[] }>('GET', '/students/' + studentUid + '/scores');
       
-      console.log(`✅ 获取学员 ${studentUid} 的 ${responseData.scores.length} 条成绩记录`);
+      console.log('✅ 获取学员 ' + studentUid + ' 的 ' + responseData.scores.length + ' 条成绩记录');
       return responseData.scores;
     }, '获取学员成绩', {
       context: { studentUid }
@@ -44,9 +44,9 @@ export class ApiService {
 
   static async deleteStudentScore(studentUid: number, scoreIndex: number): Promise<void> {
     return handleApiOperation(async () => {
-      await apiCall('DELETE', `/students/${studentUid}/scores/${scoreIndex}`, undefined, { retries: false });
+      await apiCall('DELETE', '/students/' + studentUid + '/scores/' + scoreIndex, undefined, { retries: false });
       
-      console.log(`✅ 成功删除学员 ${studentUid} 的第 ${scoreIndex} 个成绩`);
+      console.log('✅ 成功删除学员 ' + studentUid + ' 的第 ' + scoreIndex + ' 个成绩');
     }, '删除学员成绩', {
       context: { studentUid, scoreIndex },
       retryable: false
@@ -56,9 +56,9 @@ export class ApiService {
   static async updateStudentScore(studentUid: number, scoreIndex: number, newScore: number): Promise<void> {
     return handleApiOperation(async () => {
       const requestData = { newScore };
-      await apiCall('PUT', `/students/${studentUid}/scores/${scoreIndex}`, requestData);
+      await apiCall('PUT', '/students/' + studentUid + '/scores/' + scoreIndex, requestData);
       
-      console.log(`✅ 成功更新学员 ${studentUid} 的第 ${scoreIndex} 个成绩为 ${newScore}`);
+      console.log('✅ 成功更新学员 ' + studentUid + ' 的第 ' + scoreIndex + ' 个成绩为 ' + newScore);
     }, '更新学员成绩', {
       context: { studentUid, scoreIndex, newScore }
     });

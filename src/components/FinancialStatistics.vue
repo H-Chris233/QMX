@@ -404,7 +404,7 @@ interface RefreshSystem {
     const forceUpdateTrigger = ref(0);
     
     const showError = errorHandler?.showError || ((title, message, details) => {
-      console.error(`${title}: ${message}`, details);
+      console.error(title + ': ' + message, details);
       // 统一错误处理：移除alert降级
     });
     
@@ -759,7 +759,7 @@ interface RefreshSystem {
           }));
 
         transactions.value = validTransactions;
-        console.log(`高级搜索完成，找到 ${validTransactions.length} 条交易记录`);
+        console.log('高级搜索完成，找到 ' + validTransactions.length + ' 条交易记录');
         
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
@@ -798,11 +798,11 @@ interface RefreshSystem {
         );
         
         if (validStudents.length !== data.length) {
-          console.warn(`过滤了 ${data.length - validStudents.length} 个无效学员记录`);
+          console.warn('过滤了 ' + (data.length - validStudents.length) + ' 个无效学员记录');
         }
         
         students.value = validStudents;
-        console.log(`成功加载 ${validStudents.length} 个学员记录`);
+        console.log('成功加载 ' + validStudents.length + ' 个学员记录');
       } catch (error) {
         console.error('加载学员数据失败:', error);
         students.value = []; // 确保有默认值
@@ -923,10 +923,10 @@ interface RefreshSystem {
         transactions.value = validTransactions;
         
         if (validTransactions.length !== cashTransactions.length) {
-          if (import.meta.env?.MODE !== 'production') console.warn(`过滤了 ${cashTransactions.length - validTransactions.length} 个无效交易记录`);
+          if (import.meta.env?.MODE !== 'production') console.warn('过滤了 ' + (cashTransactions.length - validTransactions.length) + ' 个无效交易记录');
         }
         
-        if (import.meta.env?.MODE !== 'production') console.log(`✅ 成功加载 ${validTransactions.length} 条交易记录`);
+        if (import.meta.env?.MODE !== 'production') console.log('✅ 成功加载 ' + validTransactions.length + ' 条交易记录');
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
           if (import.meta.env?.MODE !== 'production') console.error('加载交易数据失败:', error);
@@ -1033,11 +1033,11 @@ interface RefreshSystem {
         
         // 显示成功消息
         const transactionType = isInstallmentMode.value ? '分期付款' : '交易';
-        if (import.meta.env?.MODE !== 'production') console.log(`✅ ${transactionType}保存成功，刷新交易列表`);
+        if (import.meta.env?.MODE !== 'production') console.log('✅ ' + transactionType + '保存成功，刷新交易列表');
         
         try {
           localStorage.setItem('qmx_active_tab', 'finance');
-          localStorage.setItem('qmx_last_operation', `${transactionType}保存成功`);
+          localStorage.setItem('qmx_last_operation', transactionType + '保存成功');
           localStorage.setItem('qmx_last_operation_time', Date.now().toString());
         } catch (error) {
           if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
@@ -1085,7 +1085,7 @@ interface RefreshSystem {
       try {
         await ApiService.deleteCashTransaction(Number(id));
         
-        if (import.meta.env?.MODE !== 'production') console.log(`成功删除交易记录 ID: ${id}`);
+        if (import.meta.env?.MODE !== 'production') console.log('成功删除交易记录 ID: ' + id);
         
         if (import.meta.env?.MODE !== 'production') console.log('✅ 交易删除成功，刷新交易列表');
         

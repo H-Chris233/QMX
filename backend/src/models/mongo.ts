@@ -201,7 +201,7 @@ studentSchema.methods.toJSON = function() {
   };
 };
 
-const StudentMongo = model<IStudentDoc>('Student', studentSchema);
+const StudentModel = model<IStudentDoc>('Student', studentSchema);
 
 // 获取下一个UID的安全方法（使用计数器集合）
 const getNextUid = async (): Promise<number> => {
@@ -216,41 +216,46 @@ const getNextUid = async (): Promise<number> => {
 
 export class Student {
   static async findByUid(uid: number): Promise<IStudentDoc | null> {
-    return await StudentMongo.findOne({ uid }).exec();
+    return await StudentModel.findOne({ uid }).exec();
   }
 
   static async findAll(): Promise<IStudentDoc[]> {
-    return await StudentMongo.find().sort({ createdAt: -1 }).exec();
+    return await StudentModel.find().sort({ createdAt: -1 }).exec();
   }
 
   static async create(data: Partial<IStudentDoc>): Promise<IStudentDoc> {
     // 使用原子操作安全地生成下一个UID
     const nextUid = await getNextUid();
-    return await StudentMongo.create({ ...data, uid: nextUid });
+    return await StudentModel.create({ ...data, uid: nextUid });
   }
 
   static async updateByUid(uid: number, data: Partial<IStudentDoc>): Promise<IStudentDoc | null> {
-    return await StudentMongo.findOneAndUpdate({ uid }, data, { new: true, runValidators: true }).exec();
+    return await StudentModel.findOneAndUpdate({ uid }, data, { new: true, runValidators: true }).exec();
   }
 
   static async deleteByUid(uid: number): Promise<boolean> {
-    const result = await StudentMongo.deleteOne({ uid }).exec();
+    const result = await StudentModel.deleteOne({ uid }).exec();
     return result.deletedCount > 0;
   }
 
   static async search(criteria: any): Promise<IStudentDoc[]> {
-    return await StudentMongo.find(criteria).sort({ createdAt: -1 }).exec();
+    return await StudentModel.find(criteria).sort({ createdAt: -1 }).exec();
   }
 
   static async count(criteria: any = {}): Promise<number> {
-    return await StudentMongo.countDocuments(criteria).exec();
+    return await StudentModel.countDocuments(criteria).exec();
+  }
+  
+  // 添加索引创建方法
+  static async createIndexes(): Promise<void> {
+    await StudentModel.createIndexes();
   }
   
   // 添加聚合查询支持
   static aggregate(pipeline: any[]) {
-    return StudentMongo.aggregate(pipeline);
+    return StudentModel.aggregate(pipeline);
   }
 }
 
-export { StudentMongo as studentModel, Student };
+export { StudentModel as studentModel };
 export { IStudentDoc };

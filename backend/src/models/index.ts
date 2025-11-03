@@ -23,10 +23,19 @@ export { ClassType, SubjectType } from '@/types';
 
 export async function initMongoModels(): Promise<void> {
   try {
-    await Student.createIndexes();
-    await Cash.createIndexes();
-    await Installment.createIndexes();
-    await SystemConfig.createIndexes();
+    // 检查模型是否有createIndexes方法，如果没有则跳过
+    if (typeof Student.createIndexes === 'function') {
+      await Student.createIndexes();
+    }
+    if (typeof Cash.createIndexes === 'function') {
+      await Cash.createIndexes();
+    }
+    if (typeof Installment.createIndexes === 'function') {
+      await Installment.createIndexes();
+    }
+    if (typeof SystemConfig.createIndexes === 'function') {
+      await SystemConfig.createIndexes();
+    }
 
     console.log('✅ MongoDB模型初始化完成');
   } catch (error) {
@@ -65,11 +74,17 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
       };
     }
 
+    // 检查模型是否有countDocuments方法
+    const studentCount = typeof Student.countDocuments === 'function' ? await Student.countDocuments() : 0;
+    const cashCount = typeof Cash.countDocuments === 'function' ? await Cash.countDocuments() : 0;
+    const installmentCount = typeof Installment.countDocuments === 'function' ? await Installment.countDocuments() : 0;
+    const planCount = typeof SystemConfig.countDocuments === 'function' ? await SystemConfig.countDocuments() : 0;
+
     const stats = {
-      students: await Student.countDocuments(),
-      cashTransactions: await Cash.countDocuments(),
-      installments: await Installment.countDocuments(),
-      installmentPlans: await SystemConfig.countDocuments(),
+      students: studentCount,
+      cashTransactions: cashCount,
+      installments: installmentCount,
+      installmentPlans: planCount,
     };
 
     return {
@@ -88,3 +103,8 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
     };
   }
 }
+
+// 为了兼容adapterController而保留的假SQL模型（避免import错误）
+export class SqlStudent {}
+export class SqlCash {}
+export class SqlInstallment {}
