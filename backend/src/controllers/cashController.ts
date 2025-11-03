@@ -506,7 +506,7 @@ export class CashController {
     return `${prefix} ¥${amount.toFixed(2)}`;
   }
 
-  // 获取财务统计信息 - 简化版本
+  // 获取财务统计信息 - 优化版本
   public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { period = 'month' } = req.query;
 
@@ -531,39 +531,66 @@ export class CashController {
         dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
-    const transactions = await CashClass.search({
-      created_at: { $gte: dateFrom }
-    });
+    // 使用聚合管道优化查询，只获取需要的字段并计算统计信息
+    const pipeline = [
+      { $match: { created_at: { $gte: dateFrom } } },
+      {
+        $group: {
+          _id: null,
+          total_income: { 
+            $sum: { 
+              $cond: [{ $gt: ["$cash", 0] }, { $divide: [{ $abs: "$cash" }, 100] }, 0] 
+            }
+          },
+          total_expense: { 
+            $sum: { 
+              $cond: [{ $lt: ["$cash", 0] }, { $divide: [{ $abs: "$cash" }, 100] }, 0] 
+            }
+          },
+          transaction_count: { $sum: 1 },
+          total_transactions: { $push: "$ROOT" } // 临时保留所有交易以便后续处理
+        }
+      }
+    ];
 
-    const total_income = transactions
-      .filter(t => t.isIncome())
-      .reduce((sum, t) => sum + t.getAmount(), 0);
+    const results = await CashClass.aggregate(pipeline).exec();
+    const stats = results[0] || { 
+      total_income: 0, 
+      total_expense: 0, 
+      transaction_count: 0, 
+      total_transactions: [] 
+    };
 
-    const total_expense = transactions
-      .filter(t => !t.isIncome())
-      .reduce((sum, t) => sum + t.getAmount(), 0);
+    const net_income = stats.total_income - stats.total_expense;
 
-    const net_income = total_income - total_expense;
+    // 按学生ID聚合收入，限制在聚合阶段完成，而不是在应用层
+    const studentIncomePipeline = [
+      { $match: { 
+          created_at: { $gte: dateFrom },
+          cash: { $gt: 0 }, // 只统计收入
+          student_id: { $ne: null } // 只统计有关联学生的交易
+        } 
+      },
+      {
+        $group: {
+          _id: "$student_id",
+          amount: { 
+            $sum: { $divide: [{ $abs: "$cash" }, 100] } 
+          }
+        }
+      },
+      { $sort: { amount: -1 } },
+      { $limit: 10 } // 限制为前10名
+    ];
 
-    // 按学员统计收入
-    const studentIncomeMap = new Map<number, number>();
-    transactions
-      .filter(t => t.isIncome() && t.student_id)
-      .forEach(t => {
-        const studentId = t.student_id!;
-        const current = studentIncomeMap.get(studentId) || 0;
-        studentIncomeMap.set(studentId, current + t.getAmount());
-      });
-
+    const studentIncomeResults = await CashClass.aggregate(studentIncomePipeline).exec();
+    
     // 简化版本，不查询学员姓名
-    const student_income = Array.from(studentIncomeMap.entries())
-      .map(([student_id, amount]) => ({
-        student_id,
-        amount,
-        student_name: '学员' + student_id // 简化显示
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10); // 前10名
+    const student_income = studentIncomeResults.map(item => ({
+      student_id: item._id,
+      amount: item.amount,
+      student_name: '学员' + item._id // 简化显示
+    }));
 
     const response = {
       success: true,
@@ -571,16 +598,16 @@ export class CashController {
         period,
         date_from: dateFrom,
         date_to: now,
-        total_income,
-        total_expense,
+        total_income: stats.total_income,
+        total_expense: stats.total_expense,
         net_income,
-        transaction_count: transactions.length,
+        transaction_count: stats.transaction_count,
         student_income,
         monthly_stats: [], // 暂时为空数组
       },
     };
 
-    logger.info(`获取财务统计成功，周期: ${period}, 收入: ¥${total_income}, 支出: ¥${total_expense}`);
+    logger.info(`获取财务统计成功，周期: ${period}, 收入: ¥${stats.total_income}, 支出: ¥${stats.total_expense}`);
     res.json(response);
   });
 

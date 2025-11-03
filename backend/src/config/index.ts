@@ -51,7 +51,7 @@ export const config = {
 
 // 验证必需的环境变量
 export function validateConfig(): void {
-  // 只检查MongoDB连接必需的环境变量
+  // 检查MongoDB连接必需的环境变量
   if (!config.mongodb.uri) {
     throw new Error('MONGODB_URI is required for QMX to work. Setting examples:');
     console.error('');
@@ -69,11 +69,6 @@ export function validateConfig(): void {
   if (config.server.nodeEnv === 'production' && config.security.jwtSecret === 'your-super-secret-jwt-key-change-this-in-production') {
     throw new Error('JWT_SECRET must be changed in production environment');
   }
-}
-
-// 获取数据库类型 - 只返回MongoDB
-export function getDatabaseType(): 'mongodb' {
-  return 'mongodb';
 }
 
 // 获取MongoDB URI

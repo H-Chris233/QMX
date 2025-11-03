@@ -1,15 +1,8 @@
-import { getDatabaseType } from '@/config';
 import mongoManager from '@/config/mongodb';
 import logger from '@/utils/logger';
 
 // 连接数据库
 export const connectDatabase = async (): Promise<void> => {
-  const dbType = getDatabaseType();
-
-  if (dbType !== 'mongodb') {
-    throw new Error(`QMX现在只支持MongoDB，请更新配置使用mongodb`);
-  }
-
   try {
     await mongoManager.connect();
     logger.info('MongoDB 连接成功');
@@ -27,11 +20,6 @@ export const disconnectDatabase = async (): Promise<void> => {
   } catch (error) {
     logger.error('关闭MongoDB连接时出错:', error);
   }
-};
-
-// 检查是否使用 MongoDB
-export const isUsingMongoDB = (): boolean => {
-  return getDatabaseType() === 'mongodb';
 };
 
 // 优雅关闭处理

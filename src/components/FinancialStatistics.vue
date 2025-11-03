@@ -339,6 +339,7 @@
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
+import { validateTransactionData, safeMapApiTransactionToFrontend, validateSimplifiedTransaction } from '../utils/dataTransformers';
 import DatePicker from './DatePicker.vue';
 import TransactionForm from './TransactionForm.vue';
 import type { Student, InstallmentStatus } from '../types/api';
@@ -739,7 +740,7 @@ interface RefreshSystem {
 
         // 转换搜索结果为前端格式
         const validTransactions = searchResults
-          .filter(transaction => validateTransactionData(transaction))
+          .filter(transaction => validateSimplifiedTransaction(transaction))
           .map((transaction) => ({
             id: transaction.uid,
             type: (transaction.amount > 0 ? 'income' : 'expense') as 'income' | 'expense',
@@ -809,13 +810,7 @@ interface RefreshSystem {
       }
     };
 
-    // 数据验证函数
-    const validateTransactionData = (transaction: any): boolean => {
-      if (!transaction || typeof transaction !== 'object') return false;
-      if (typeof transaction.uid !== 'number' || transaction.uid <= 0) return false;
-      if (typeof transaction.amount !== 'number' || !isFinite(transaction.amount)) return false;
-      return true;
-    };
+
 
     // 增强的交易输入验证 - 防止溢出和注入攻击
     // 简化的交易验证函数 - 只做最基本的类型检查

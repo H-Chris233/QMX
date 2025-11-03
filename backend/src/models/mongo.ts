@@ -201,6 +201,22 @@ studentSchema.methods.toJSON = function() {
 
 const StudentMongo = model<IStudentDoc>('Student', studentSchema);
 
+// 获取下一个UID的安全方法（使用计数器集合）
+const getNextUid = async (): Promise<number> => {
+  const CounterModel = model('Counter', new Schema({
+    _id: { type: String, required: true },
+    sequence_value: { type: Number, required: true, default: 0 }
+  }));
+  
+  const counter = await CounterModel.findByIdAndUpdate(
+    { _id: 'studentId' },
+    { $inc: { sequence_value: 1 } },
+    { new: true, upsert: true }
+  ).exec();
+  
+  return counter.sequence_value;
+};
+
 export class Student {
   static async findByUid(uid: number): Promise<IStudentDoc | null> {
     return await StudentMongo.findOne({ uid }).exec();
@@ -211,8 +227,8 @@ export class Student {
   }
 
   static async create(data: Partial<IStudentDoc>): Promise<IStudentDoc> {
-    const lastStudent = await StudentMongo.findOne().sort({ uid: -1 }).exec();
-    const nextUid = lastStudent ? lastStudent.uid + 1 : 1;
+    // 使用原子操作安全地生成下一个UID
+    const nextUid = await getNextUid();
     return await StudentMongo.create({ ...data, uid: nextUid });
   }
 

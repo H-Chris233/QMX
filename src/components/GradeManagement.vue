@@ -393,6 +393,7 @@ import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import type { Student } from '../types/api';
 import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
+import { validateScoreInput } from '../utils/dataTransformers';
 import DatePicker from './DatePicker.vue';
 
 
@@ -878,26 +879,7 @@ interface ErrorHandler {
     };
 
     // 输入验证函数
-    // 简化的成绩验证函数 - 只做最基本的类型检查
-    const validateScoreInput = (score: any, _studentData?: Student | null): { isValid: boolean; errors: string[] } => {
-      const errors: string[] = [];
-      
-      if (score === null || score === undefined || score === '') {
-        errors.push('成绩不能为空');
-        return { isValid: false, errors };
-      }
-      
-      const numScore = Number(score);
-      if (isNaN(numScore) || !isFinite(numScore)) {
-        errors.push('成绩必须是有效数字');
-        return { isValid: false, errors };
-      }
-      
-      return {
-        isValid: errors.length === 0,
-        errors
-      };
-    };
+
 
     const filterGrades = (): void => {
       // 筛选逻辑已通过computed属性实现

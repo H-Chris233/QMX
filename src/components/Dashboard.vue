@@ -127,6 +127,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, inject, watch, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
+import { transformDashboardData, safeParseNumber } from '../utils/dataTransformers';
 import ErrorModal from './ErrorModal.vue';
 
 // 定义类型接口
@@ -192,41 +193,7 @@ const dashboardData: DashboardData = reactive({
 // 会员提醒数据
 const expiringMemberships: Ref<Student[]> = ref([]);
 
-// 增强的数据验证函数
-const validateDashboardData = (data: any): boolean => {
-  return data && 
-         typeof data === 'object' &&
-         'total_revenue' in data &&
-         'total_students' in data &&
-         'average_score' in data;
-};
 
-// 增强的安全数值转换函数
-const safeParseNumber = (value: any, defaultValue: number = 0, options: { min?: number; max?: number; decimals?: number } = {}): number => {
-      const { min = -Infinity, max = Infinity, decimals } = options;
-      
-      if (value === null || value === undefined || value === '') {
-        return defaultValue;
-      }
-      
-      let parsed = Number(value);
-      
-      // 检查是否为有效数字
-      if (isNaN(parsed) || !isFinite(parsed)) {
-        if (import.meta.env?.MODE !== 'production') console.warn('无效数值，使用默认值:', value, '->', defaultValue);
-        return defaultValue;
-      }
-      
-      // 范围限制
-      parsed = Math.max(min, Math.min(max, parsed));
-      
-      // 小数位限制
-      if (typeof decimals === 'number') {
-        parsed = Number(parsed.toFixed(decimals));
-      }
-      
-      return parsed;
-    };
 
 // 加载即将过期的会员 - 简化版，错误处理在调用方
 const loadExpiringMemberships = async (): Promise<Student[]> => {
@@ -327,33 +294,9 @@ const loadDashboardData = async (): Promise<void> => {
         
         if (import.meta.env?.MODE !== 'production') console.log('获取到的仪表板统计数据:', stats);
 
-        // 验证返回的数据
-        if (!validateDashboardData(stats)) {
-          throw new Error('返回的统计数据格式无效');
-        }
-
-        // 安全更新仪表板数据（兼容下划线/驼峰字段）
-        const totalRevenueRaw = (stats as any).total_revenue ?? (stats as any).totalRevenue ?? 0;
-        const totalStudentsRaw = (stats as any).total_students ?? (stats as any).activeStudents ?? (stats as any).totalStudents ?? 0;
-        const averageScoreRaw = (stats as any).average_score ?? (stats as any).averageGrade ?? (stats as any).average_score ?? 0;
-
-        dashboardData.totalRevenue = safeParseNumber(totalRevenueRaw, 0, {
-          min: 0,
-          max: 999999999999,
-          decimals: 2
-        });
-        
-        dashboardData.activeStudents = safeParseNumber(totalStudentsRaw, 0, {
-          min: 0,
-          max: 100000,
-          decimals: 0
-        });
-        
-        dashboardData.averageGrade = safeParseNumber(averageScoreRaw, 0, {
-          min: 0,
-          max: 1000,
-          decimals: 1
-        });
+        // 使用新的转换函数更新仪表板数据
+        const transformedData = transformDashboardData(stats);
+        Object.assign(dashboardData, transformedData);
 
         // 更新最后刷新时间
         lastUpdateTime.value = new Date();
@@ -381,6 +324,9 @@ const loadDashboardData = async (): Promise<void> => {
         abortController.value = null;
       }
     };
+
+// 从工具函数导入安全解析函数
+import { safeParseNumber } from '../utils/dataTransformers';
 
 // 增强的格式化方法
 const formatNumber = (value: number | string): string => {

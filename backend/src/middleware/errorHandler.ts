@@ -39,23 +39,19 @@ export const errorHandler = (
     userAgent: req.get('User-Agent'),
   });
 
-  // Sequelize验证错误
-  if (err.name === 'SequelizeValidationError') {
+  // Mongoose验证错误
+  if (err.name === 'ValidationError') {
     const message = '数据验证失败';
-    const details = (err as any).errors?.map((e: any) => e.message).join(', ');
+    const details = Object.values((err as any).errors)
+      .map((e: any) => e.message)
+      .join(', ');
     error = new AppError(`${message}: ${details}`, 400);
   }
 
-  // Sequelize唯一约束错误
-  if (err.name === 'SequelizeUniqueConstraintError') {
+  // Mongoose重复键错误
+  if (err.code === 11000) {
     const message = '数据已存在，请检查唯一性约束';
     error = new AppError(message, 409);
-  }
-
-  // Sequelize外键约束错误
-  if (err.name === 'SequelizeForeignKeyConstraintError') {
-    const message = '关联数据不存在或已被删除';
-    error = new AppError(message, 400);
   }
 
   // JWT错误
@@ -70,9 +66,9 @@ export const errorHandler = (
     error = new AppError(message, 401);
   }
 
-  // 请求参数验证错误
-  if (err.name === 'ValidationError') {
-    const message = '请求参数验证失败';
+  // CastError - 当查询参数类型错误时
+  if (err.name === 'CastError') {
+    const message = '请求参数类型错误';
     error = new AppError(message, 400);
   }
 
