@@ -1,7 +1,9 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
+import CounterModel from './counter';
 import { ClassType, SubjectType } from '@/types';
 
 export interface IStudentDoc extends Document {
+  _id: Types.ObjectId;
   uid: number;
   age: number | null;
   name: string;
@@ -203,11 +205,6 @@ const StudentMongo = model<IStudentDoc>('Student', studentSchema);
 
 // 获取下一个UID的安全方法（使用计数器集合）
 const getNextUid = async (): Promise<number> => {
-  const CounterModel = model('Counter', new Schema({
-    _id: { type: String, required: true },
-    sequence_value: { type: Number, required: true, default: 0 }
-  }));
-  
   const counter = await CounterModel.findByIdAndUpdate(
     { _id: 'studentId' },
     { $inc: { sequence_value: 1 } },
