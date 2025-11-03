@@ -24,17 +24,17 @@ export { ClassType, SubjectType } from '@/types';
 export async function initMongoModels(): Promise<void> {
   try {
     // 检查模型是否有createIndexes方法，如果没有则跳过
-    if (typeof Student.createIndexes === 'function') {
-      await Student.createIndexes();
+    if (typeof (Student as any).createIndexes === 'function') {
+      await (Student as any).createIndexes();
     }
-    if (typeof Cash.createIndexes === 'function') {
-      await Cash.createIndexes();
+    if (typeof (Cash as any).createIndexes === 'function') {
+      await (Cash as any).createIndexes();
     }
-    if (typeof Installment.createIndexes === 'function') {
-      await Installment.createIndexes();
+    if (typeof (Installment as any).createIndexes === 'function') {
+      await (Installment as any).createIndexes();
     }
-    if (typeof SystemConfig.createIndexes === 'function') {
-      await SystemConfig.createIndexes();
+    if (typeof (SystemConfig as any).createIndexes === 'function') {
+      await (SystemConfig as any).createIndexes();
     }
 
     console.log('✅ MongoDB模型初始化完成');
@@ -75,10 +75,10 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
     }
 
     // 检查模型是否有countDocuments方法
-    const studentCount = typeof Student.countDocuments === 'function' ? await Student.countDocuments() : 0;
-    const cashCount = typeof Cash.countDocuments === 'function' ? await Cash.countDocuments() : 0;
-    const installmentCount = typeof Installment.countDocuments === 'function' ? await Installment.countDocuments() : 0;
-    const planCount = typeof SystemConfig.countDocuments === 'function' ? await SystemConfig.countDocuments() : 0;
+    const studentCount = typeof (Student as any).countDocuments === 'function' ? await (Student as any).countDocuments() : 0;
+    const cashCount = typeof (Cash as any).countDocuments === 'function' ? await (Cash as any).countDocuments() : 0;
+    const installmentCount = typeof (Installment as any).countDocuments === 'function' ? await (Installment as any).countDocuments() : 0;
+    const planCount = typeof (SystemConfig as any).countDocuments === 'function' ? await (SystemConfig as any).countDocuments() : 0;
 
     const stats = {
       students: studentCount,

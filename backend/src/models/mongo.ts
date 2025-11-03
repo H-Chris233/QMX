@@ -209,9 +209,9 @@ const getNextUid = async (): Promise<number> => {
     { _id: 'studentId' },
     { $inc: { sequence_value: 1 } },
     { new: true, upsert: true }
-  ).exec();
+  );
   
-  return counter.sequence_value;
+  return counter!.sequence_value;
 };
 
 export class Student {
@@ -257,5 +257,5 @@ export class Student {
   }
 }
 
-export { StudentModel as studentModel };
+export { StudentModel as studentModel, Student };
 export { IStudentDoc };
