@@ -83,6 +83,38 @@ npm start
 #### 统计数据
 - `GET /dashboard/stats` - 获取仪表板统计
 
+### 错误响应格式
+
+当请求无法成功处理时，后端会返回如下结构的统一错误响应：
+
+```json
+{
+  "success": false,
+  "error": {
+    "type": "InvalidInput",
+    "message": "金额不能为0",
+    "details": {
+      "field": "amount"
+    }
+  }
+}
+```
+
+- `type`：错误类别（`InvalidInput`、`NotFound`、`State`、`Unauthorized` 等），前端可据此展示对应提示。
+- `message`：面向用户的错误信息。
+- `details` / `code`：可选的补充信息，便于定位问题。
+
+常见错误类别与 HTTP 状态码对应关系：
+
+| 错误类型 | 状态码 | 说明 |
+|----------|--------|------|
+| `InvalidInput` | 400 | 请求参数或数据校验失败 |
+| `NotFound` | 404 | 资源不存在或已删除 |
+| `State` | 409 | 当前业务状态不允许执行该操作 |
+| `Unauthorized` / `Forbidden` | 401 / 403 | 认证或权限校验未通过 |
+| `RateLimit` | 429 | 请求过于频繁，请稍后重试 |
+| `Other` | 500 | 未分类的服务端错误 |
+
 ## 项目结构
 
 ```
