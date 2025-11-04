@@ -11,9 +11,23 @@ const router = express.Router();
 router.use(apiRateLimitMiddleware);
 
 // 验证规则
+const amountMessages = {
+  'number.base': '金额必须是数字',
+  'number.precision': '金额最多保留两位小数',
+  'any.invalid': '金额不能为0',
+  'any.required': '金额不能为空',
+};
+
+const amountSchema = Joi.number().precision(2).invalid(0).required().messages(amountMessages);
+
+const optionalAmountSchema = Joi.number().precision(2).optional().allow(null).empty('').messages({
+  'number.base': '金额必须是数字',
+  'number.precision': '金额最多保留两位小数',
+});
+
 const addCashTransactionSchema = Joi.object({
   student_id: commonValidations.optionalId.allow(null),
-  amount: commonValidations.amount,
+  amount: amountSchema,
   note: commonValidations.text.default(''),
   is_installment: Joi.boolean().default(false),
 });
@@ -47,8 +61,8 @@ const addInstallmentTransactionSchema = Joi.object({
 
 const searchCashSchema = Joi.object({
   student_id: commonValidations.optionalId.allow(null),
-  min_amount: commonValidations.optionalAmount.allow(null),
-  max_amount: commonValidations.optionalAmount.allow(null),
+  min_amount: optionalAmountSchema,
+  max_amount: optionalAmountSchema,
   has_installment: Joi.boolean().optional().allow(null),
   date_from: Joi.date().iso().optional().allow(null),
   date_to: Joi.date().iso().optional().allow(null),

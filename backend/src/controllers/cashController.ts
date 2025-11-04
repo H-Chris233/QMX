@@ -4,6 +4,8 @@ import { Student } from '@/models/mongo';
 import { Installment } from '@/models/InstallmentMongo';
 import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
 import { catchAsync } from '@/middleware/errorHandler';
+import { CashBuilder } from '@/services/cashBuilder';
+import type { ICashSearchOptions } from '@/types';
 import logger from '@/utils/logger';
 
 // 类型定义
@@ -28,70 +30,9 @@ interface IPaginatedResponse<T> {
 export class CashController {
   // 获取所有交易记录
   public getAllTransactions = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const {
-      page = 1,
-      limit = 20,
-      sort_by = 'created_at',
-      sort_order = 'DESC',
-      student_id,
-      min_amount,
-      max_amount,
-      is_income,
-    } = req.query as any;
+    const result = await CashClass.search(this.buildSearchOptions(req.query));
 
-    // 构建查询条件
-    const whereCondition: any = {};
-
-    if (student_id) {
-      whereCondition.student_id = Number(student_id);
-    }
-
-    if (min_amount || max_amount) {
-      whereCondition.cash = {};
-      if (min_amount) {
-        whereCondition.cash.$gte = Math.round(Number(min_amount) * 100);
-      }
-      if (max_amount) {
-        whereCondition.cash.$lte = Math.round(Number(max_amount) * 100);
-      }
-    }
-
-    if (is_income !== undefined) {
-      whereCondition.cash = whereCondition.cash || {};
-      if (is_income === 'true') {
-        whereCondition.cash.$gt = 0;
-      } else {
-        whereCondition.cash.$lt = 0;
-      }
-    }
-
-    const sortField = sort_by === 'created_at' ? 'created_at' : sort_by;
-    const sortOrder = sort_order === 'DESC' ? -1 : 1;
-    const sort = { [sortField]: sortOrder };
-
-    // 获取分页数据
-    const result = await CashClass.findWithPagination(
-      whereCondition,
-      Number(page),
-      Number(limit),
-      sort
-    );
-
-    const responseData = result.data.map(transaction => {
-      const student = transaction.student_id ? { uid: transaction.student_id } : null;
-      return {
-        uid: transaction.uid,
-        student_id: transaction.student_id,
-        student_name: null, // 暂时为null，后续可以关联查询
-        amount: transaction.getAmount(),
-        description: this.getTransactionDescription(transaction),
-        note: transaction.note,
-        is_income: transaction.isIncome(),
-        is_expense: !transaction.isIncome(),
-        formatted_amount: transaction.getFormattedAmount(),
-        created_at: transaction.created_at,
-      };
-    });
+    const responseData = result.data.map(transaction => this.presentTransaction(transaction));
 
     const paginationResponse: IPaginatedResponse<any> = {
       data: responseData,
@@ -114,41 +55,23 @@ export class CashController {
 
   // 添加普通交易记录
   public addCashTransaction = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const {
-      student_id,
-      amount,
-      note = '',
-    } = req.body;
+    const { student_id, amount, note = '', installment } = req.body;
 
-    if (student_id !== null && student_id !== undefined) {
-      const student = await Student.findByUid(Number(student_id));
-      if (!student) {
-        res.status(400).json({
-          success: false,
-          error: '指定的学员不存在',
-        });
-        return;
-      }
+    const builder = CashBuilder.create()
+      .amount(amount)
+      .note(note);
+
+    if (student_id !== undefined) {
+      builder.studentId(student_id);
     }
 
-    // 创建交易记录（金额转换为分存储）
-    const transaction = await CashClass.create({
-      student_id: student_id ? Number(student_id) : null,
-      cash: Math.round(Number(amount) * 100), // 转换为分
-      note: note?.trim() || null,
-    });
+    if (installment) {
+      builder.installment(installment);
+    }
 
-    const responseData = {
-      uid: transaction.uid,
-      student_id: transaction.student_id,
-      amount: transaction.getAmount(),
-      description: this.getTransactionDescription(transaction),
-      note: transaction.note,
-      is_income: transaction.isIncome(),
-      is_expense: !transaction.isIncome(),
-      formatted_amount: transaction.getFormattedAmount(),
-      created_at: transaction.created_at,
-    };
+    const transaction = await builder.build();
+
+    const responseData = this.presentTransaction(transaction);
 
     const response: IApiResponse<typeof responseData> = {
       success: true,
@@ -156,7 +79,7 @@ export class CashController {
       message: '交易记录添加成功',
     };
 
-    logger.info(`添加交易记录成功，UID: ${transaction.uid}, 金额: ¥${amount}`);
+    logger.info(`添加交易记录成功，UID: ${transaction.uid}, 金额: ${transaction.getFormattedAmount()}`);
     res.status(201).json(response);
   });
 
@@ -256,23 +179,28 @@ export class CashController {
       }
 
       // 创建交易记录（首期付款）
-      const transaction = await CashClass.create({
-        student_id: student_id ? Number(student_id) : null,
-        cash: Math.round(Number(total_amount) * 100 / Number(total_installments)), // 首期金额
-        note: `分期付款: ${note} - 第1/${total_installments}期`,
-      });
+      const firstInstallment = installments[0];
+      const firstInstallmentCents = firstInstallment
+        ? firstInstallment.installment_amount
+        : Math.round(Number(total_amount) * 100 / Number(total_installments));
+      const firstInstallmentAmount = firstInstallmentCents / 100;
+
+      const transaction = await CashBuilder.create()
+        .amount(firstInstallmentAmount)
+        .studentId(student_id ?? null)
+        .note(`分期付款: ${note} - 第1/${total_installments}期`)
+        .installment({
+          plan_uid: installmentPlan.uid,
+          installment_uid: firstInstallment?.uid ?? null,
+          installment_number: firstInstallment?.current_installment ?? 1,
+          total_installments: Number(total_installments),
+          due_date: firstInstallment?.due_date ?? new Date(start_date),
+          status: firstInstallment?.status ?? 'Paid',
+        })
+        .build();
 
       const responseData = {
-        transaction: {
-          uid: transaction.uid,
-          student_id: transaction.student_id,
-          amount: transaction.getAmount(),
-          description: this.getTransactionDescription(transaction),
-          note: transaction.note,
-          is_income: transaction.isIncome(),
-          formatted_amount: transaction.getFormattedAmount(),
-          created_at: transaction.created_at,
-        },
+        transaction: this.presentTransaction(transaction),
         plan: {
           uid: installmentPlan.uid,
           student_id: installmentPlan.student_id,
@@ -345,92 +273,19 @@ export class CashController {
     }
   });
 
-  // 搜索现金记录 - 使用聚合查询优化
+  // 搜索现金记录
   public searchCash = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const {
-      student_id,
-      min_amount,
-      max_amount,
-      date_from,
-      date_to,
-      page = 1,
-      limit = 20,
-      sort_by = 'created_at',
-      sort_order = 'DESC',
-    } = req.query as any;
+    const result = await CashClass.search(this.buildSearchOptions(req.query));
 
-    // 构建聚合管道
-    const pipeline: any[] = [];
-
-    // 匹配条件
-    const matchCondition: any = {};
-
-    if (student_id) {
-      matchCondition.student_id = Number(student_id);
-    }
-
-    if (min_amount || max_amount) {
-      matchCondition.cash = {};
-      if (min_amount) {
-        matchCondition.cash.$gte = Math.round(Number(min_amount) * 100);
-      }
-      if (max_amount) {
-        matchCondition.cash.$lte = Math.round(Number(max_amount) * 100);
-      }
-    }
-
-    if (date_from || date_to) {
-      matchCondition.created_at = {};
-      if (date_from) {
-        matchCondition.created_at.$gte = new Date(date_from);
-      }
-      if (date_to) {
-        matchCondition.created_at.$lte = new Date(date_to);
-      }
-    }
-
-    if (Object.keys(matchCondition).length > 0) {
-      pipeline.push({ $match: matchCondition });
-    }
-
-    // 排序
-    const sortField = sort_by === 'created_at' ? 'created_at' : sort_by;
-    const sortOrder = sort_order === 'DESC' ? -1 : 1;
-    pipeline.push({ $sort: { [sortField]: sortOrder } });
-
-    // 计算总数（用于分页）
-    const countPipeline = [...pipeline, { $count: "total" }];
-    const countResult = await CashClass.aggregate(countPipeline).exec();
-    const total = countResult[0]?.total || 0;
-
-    // 分页
-    pipeline.push({ $skip: (Number(page) - 1) * Number(limit) });
-    pipeline.push({ $limit: Number(limit) });
-
-    // 执行聚合查询
-    const result = await CashClass.aggregate(pipeline).exec();
-
-    // 格式化结果
-    const responseData = result.map((transaction: any) => ({
-      uid: transaction.uid,
-      student_id: transaction.student_id,
-      student_name: null, // 暂时为null
-      amount: Math.abs(transaction.cash) / 100,
-      description: this.getTransactionDescriptionFromRaw(transaction),
-      note: transaction.note,
-      is_income: transaction.cash > 0,
-      is_expense: transaction.cash < 0,
-      formatted_amount: `${transaction.cash >= 0 ? '+' : '-'}¥${(Math.abs(transaction.cash) / 100).toFixed(2)}`,
-      created_at: transaction.created_at,
-    }));
+    const responseData = result.data.map(transaction => this.presentTransaction(transaction));
 
     const paginationResponse: IPaginatedResponse<any> = {
       data: responseData,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        total_pages: Math.ceil(total / Number(limit)),
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        total_pages: Math.ceil(result.total / result.limit),
       },
     };
 
@@ -439,7 +294,7 @@ export class CashController {
       data: paginationResponse,
     };
 
-    logger.info(`搜索现金记录完成，找到 ${total} 条记录`);
+    logger.info(`搜索现金记录完成，找到 ${result.total} 条记录`);
     res.json(response);
   });
 
@@ -457,15 +312,12 @@ export class CashController {
       return;
     }
 
-    // 尝试获取学员信息
     let student = null;
     if (transaction.student_id) {
       student = await Student.findByUid(transaction.student_id);
     }
 
-    const responseData = {
-      uid: transaction.uid,
-      student_id: transaction.student_id,
+    const responseData = this.presentTransaction(transaction, {
       student: student ? {
         uid: student.uid,
         name: student.name,
@@ -473,15 +325,8 @@ export class CashController {
         class: student.class,
         subject: student.subject,
       } : null,
-      amount: transaction.getAmount(),
-      description: this.getTransactionDescription(transaction),
-      note: transaction.note,
-      is_income: transaction.isIncome(),
-      is_expense: !transaction.isIncome(),
-      formatted_amount: transaction.getFormattedAmount(),
-      created_at: transaction.created_at,
-      updated_at: transaction.updated_at,
-    };
+      student_name: student ? student.name : null,
+    });
 
     const response: IApiResponse<typeof responseData> = {
       success: true,
@@ -492,17 +337,112 @@ export class CashController {
     res.json(response);
   });
 
+  private buildSearchOptions(query: Record<string, any>): ICashSearchOptions {
+    const options: ICashSearchOptions = {};
+
+    const student = query.studentId ?? query.student_id;
+    if (student !== undefined && student !== null && student !== '') {
+      options.studentId = Number(student);
+    }
+
+    const minAmount = query.minAmount ?? query.min_amount;
+    if (minAmount !== undefined && minAmount !== null && minAmount !== '') {
+      options.minAmount = Number(minAmount);
+    }
+
+    const maxAmount = query.maxAmount ?? query.max_amount;
+    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== '') {
+      options.maxAmount = Number(maxAmount);
+    }
+
+    const incomeFlag = query.isIncome ?? query.is_income;
+    if (incomeFlag !== undefined && incomeFlag !== null && incomeFlag !== '') {
+      if (incomeFlag === true || incomeFlag === 'true') {
+        options.isIncome = true;
+      } else if (incomeFlag === false || incomeFlag === 'false') {
+        options.isIncome = false;
+      }
+    }
+
+    const installmentFlag = query.hasInstallment ?? query.has_installment;
+    if (installmentFlag !== undefined && installmentFlag !== null && installmentFlag !== '') {
+      if (installmentFlag === true || installmentFlag === 'true') {
+        options.hasInstallment = true;
+      } else if (installmentFlag === false || installmentFlag === 'false') {
+        options.hasInstallment = false;
+      }
+    }
+
+    const dateFrom = query.dateFrom ?? query.date_from;
+    if (dateFrom) {
+      options.dateFrom = dateFrom;
+    }
+
+    const dateTo = query.dateTo ?? query.date_to;
+    if (dateTo) {
+      options.dateTo = dateTo;
+    }
+
+    const pageValue = query.page;
+    if (pageValue !== undefined && pageValue !== null && pageValue !== '') {
+      options.page = Number(pageValue);
+    }
+
+    const limitValue = query.limit;
+    if (limitValue !== undefined && limitValue !== null && limitValue !== '') {
+      options.limit = Number(limitValue);
+    }
+
+    const sortBy = query.sortBy ?? query.sort_by;
+    if (typeof sortBy === 'string') {
+      options.sortBy = sortBy;
+    }
+
+    const sortOrder = query.sortOrder ?? query.sort_order;
+    if (typeof sortOrder === 'string') {
+      options.sortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    }
+
+    return options;
+  }
+
+  private presentTransaction(transaction: ICashDoc, overrides: Record<string, unknown> = {}) {
+    const amount = transaction.getAmount();
+    const formattedAmount = transaction.getFormattedAmount();
+    const isIncome = transaction.isIncome();
+
+    const base = {
+      uid: transaction.uid,
+      student_id: transaction.student_id,
+      studentId: transaction.student_id,
+      student_name: null as string | null,
+      student: null as Record<string, unknown> | null,
+      cash: transaction.cash,
+      amount_in_cents: transaction.cash,
+      amountInCents: transaction.cash,
+      amount,
+      description: this.getTransactionDescription(transaction),
+      note: transaction.note,
+      is_income: isIncome,
+      isIncome,
+      is_expense: !isIncome,
+      isExpense: !isIncome,
+      formatted_amount: formattedAmount,
+      formattedAmount,
+      installment: transaction.installment ?? null,
+      created_at: transaction.created_at,
+      createdAt: transaction.created_at,
+      updated_at: transaction.updated_at,
+      updatedAt: transaction.updated_at,
+    };
+
+    return { ...base, ...overrides };
+  }
+
   // 私有辅助方法：获取交易描述
   private getTransactionDescription(transaction: ICashDoc): string {
     const amount = transaction.getAmount();
     const prefix = transaction.isIncome() ? '收入' : '支出';
-    return `${prefix} ¥${amount.toFixed(2)}`;
-  }
-
-  // 私有辅助方法：从原始数据获取交易描述
-  private getTransactionDescriptionFromRaw(transaction: any): string {
-    const amount = Math.abs(transaction.cash) / 100;
-    const prefix = transaction.cash > 0 ? '收入' : '支出';
     return `${prefix} ¥${amount.toFixed(2)}`;
   }
 

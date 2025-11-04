@@ -78,6 +78,8 @@ npm start
 - `POST /transactions` - 创建交易记录
 - `DELETE /transactions/:id` - 删除交易记录
 
+> 💡 **金额单位说明**：现金交易在数据库中以“分”为单位存储（整数），API 响应则统一转换为“元”（保留两位小数）。在服务层创建或更新现金记录时，请使用 `cashBuilder` / `cashUpdater` 进行金额校验与单位转换，避免直接操作 `cash` 字段。
+
 #### 统计数据
 - `GET /dashboard/stats` - 获取仪表板统计
 
