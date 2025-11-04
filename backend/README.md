@@ -190,6 +190,51 @@ backend/
 npm run migrate
 ```
 
+### 运行测试
+
+本项目使用 Jest 和 mongodb-memory-server 进行自动化测试，测试覆盖：
+- 学生服务：创建、更新、查询、成绩管理、会员管理
+- 现金交易：收入/支出创建、金额校验、分页搜索、删除
+- 分期付款：计划创建、期票生成、逾期检测、支付更新
+- 统计服务：仪表盘统计、学员统计、财务统计
+- API集成：学生API、交易API、分期API、统计API
+
+运行所有测试：
+
+```bash
+# 使用 npm
+npm test
+
+# 或使用 pnpm
+pnpm test
+
+# 运行带覆盖率的测试
+npm test -- --coverage
+```
+
+**环境要求**：
+- 测试使用内存数据库，无需外部依赖
+- 建议 Node.js >= 18.0.0
+- 首次运行会下载 mongodb-memory-server 二进制文件（约50MB）
+
+**测试结构**：
+```
+backend/src/__tests__/
+├── helpers/           # 测试辅助工具
+│   └── testSetup.ts  # 数据库设置、测试数据创建
+├── api/              # API集成测试
+│   ├── students.api.spec.ts
+│   ├── transactions.api.spec.ts
+│   ├── installments.api.spec.ts
+│   └── dashboard.api.spec.ts
+├── cash.spec.ts          # 现金交易测试
+├── installments.spec.ts   # 分期付款测试
+├── studentServices.spec.ts # 学生服务测试
+├── statsService.spec.ts    # 统计服务测试
+├── errorHandling.spec.ts   # 错误处理测试
+└── counter.spec.ts         # 计数器工具测试
+```
+
 ### 日志管理
 
 日志文件位于`logs/`目录：
