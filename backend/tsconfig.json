@@ -34,7 +34,8 @@
       "@/middleware/*": ["middleware/*"],
       "@/utils/*": ["utils/*"],
       "@/types/*": ["types/*"],
-      "@/config/*": ["config/*"]
+      "@/config/*": ["config/*"],
+      "@/services/*": ["services/*"]
     }
   },
   "include": [

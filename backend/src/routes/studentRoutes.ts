@@ -18,6 +18,13 @@ const createStudentSchema = Joi.object({
   phone: commonValidations.phone.default('未填写'),
   note: commonValidations.text.default(''),
   subject: Joi.string().valid(...Object.values(SubjectType)).default(SubjectType.OTHERS),
+  lesson_left: Joi.number().integer().min(0).optional().allow(null),
+  lessonLeft: Joi.number().integer().min(0).optional().allow(null),
+  membership_start_date: Joi.date().iso().optional().allow(null),
+  membershipStartDate: Joi.date().iso().optional().allow(null),
+  membership_end_date: Joi.date().iso().optional().allow(null),
+  membershipEndDate: Joi.date().iso().optional().allow(null),
+  rings: Joi.array().items(Joi.number().min(0).max(10).precision(1)).optional(),
 });
 
 const updateStudentSchema = Joi.object({
@@ -28,8 +35,12 @@ const updateStudentSchema = Joi.object({
   note: commonValidations.text.optional(),
   subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
   lesson_left: Joi.number().integer().min(0).optional().allow(null),
+  lessonLeft: Joi.number().integer().min(0).optional().allow(null),
   membership_start_date: Joi.date().iso().optional().allow(null),
+  membershipStartDate: Joi.date().iso().optional().allow(null),
   membership_end_date: Joi.date().iso().optional().allow(null),
+  membershipEndDate: Joi.date().iso().optional().allow(null),
+  rings: Joi.array().items(Joi.number().min(0).max(10).precision(1)).optional(),
 });
 
 const searchStudentsSchema = Joi.object({
@@ -41,6 +52,7 @@ const searchStudentsSchema = Joi.object({
   class_type: Joi.string().valid(...Object.values(ClassType)).optional().allow(null),
   subject: Joi.string().valid(...Object.values(SubjectType)).optional().allow(null),
   has_membership: Joi.boolean().optional().allow(null),
+  membership_active_at: Joi.date().iso().optional().allow(null),
   page: commonValidations.page,
   limit: commonValidations.limit,
   sort_by: Joi.string().valid('uid', 'name', 'age', 'created_at', 'updated_at').default('created_at'),

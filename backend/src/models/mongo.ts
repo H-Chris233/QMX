@@ -1,6 +1,44 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { getNextSequence, STUDENT_SEQUENCE_NAME } from './counter';
 import { ClassType, SubjectType } from '@/types';
+import { AppError } from '@/middleware/errorHandler';
+
+const TEN_TRY_DEFAULT_LESSON = 10;
+const PHONE_REGEX = /^1[3-9]\d{9}$/;
+const SCORE_MIN = 0;
+const SCORE_MAX = 10;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+type NullableDate = Date | null | undefined;
+
+const formatDate = (value: NullableDate, withTime = false): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const iso = value.toISOString();
+  if (withTime) {
+    return iso;
+  }
+  return iso.split('T')[0];
+};
+
+const ensureNonNegativeInteger = (value: number, field: string): number => {
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+    throw new AppError(`InvalidInput: ${field} 必须是非负整数`, 400);
+  }
+  return value;
+};
+
+const ensureValidScore = (score: number): number => {
+  if (typeof score !== 'number' || Number.isNaN(score)) {
+    throw new AppError('InvalidInput: 成绩必须是数字', 400);
+  }
+  if (score < SCORE_MIN || score > SCORE_MAX) {
+    throw new AppError(`InvalidInput: 成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`, 400);
+  }
+  return Number(score);
+};
 
 export interface IStudentDoc extends Document {
   _id: Types.ObjectId;
@@ -18,14 +56,16 @@ export interface IStudentDoc extends Document {
   createdAt: Date;
   updatedAt: Date;
 
-  hasMembership(): boolean;
-  getMembershipDaysRemaining(): number | null;
+  setLessonLeft(lessonLeft: number | null | undefined): IStudentDoc;
+  setClassWithLessonInit(classType: ClassType): IStudentDoc;
+  hasMembership(at?: Date): boolean;
+  getMembershipDaysRemaining(at?: Date): number | null;
   getAverageScore(): number;
   getMaxScore(): number;
   getMinScore(): number;
-  addScore(score: number): void;
-  removeScore(index: number): void;
-  updateScore(index: number, newScore: number): void;
+  addScore(score: number): IStudentDoc;
+  removeScore(index: number): number;
+  updateScore(index: number, newScore: number): number;
 }
 
 const studentSchema = new Schema<IStudentDoc>({
@@ -53,8 +93,8 @@ const studentSchema = new Schema<IStudentDoc>({
     required: [true, '手机号不能为空'],
     default: '未填写',
     validate: {
-      validator: function(v: string) {
-        return /^1[3-9]\\d{9}$|^未填写$/.test(v);
+      validator: function validator(v: string) {
+        return PHONE_REGEX.test(v) || v === '未填写';
       },
       message: '手机号格式不正确'
     },
@@ -83,8 +123,8 @@ const studentSchema = new Schema<IStudentDoc>({
     type: [Number],
     default: [],
     validate: {
-      validator: function(v: number[]) {
-        return v.every(score => typeof score === 'number' && !isNaN(score));
+      validator: function validator(v: number[]) {
+        return v.every(score => typeof score === 'number' && !Number.isNaN(score));
       },
       message: '成绩数组必须是有效的数字数组'
     }
@@ -113,27 +153,66 @@ studentSchema.index({ membershipStartDate: 1, membershipEndDate: 1 });
 studentSchema.index({ name: 1, phone: 1 });
 studentSchema.index({ class: 1, subject: 1 });
 
-studentSchema.methods.hasMembership = function(): boolean {
+studentSchema.pre('validate', function validateMembership(this: IStudentDoc, next) {
+  if ((this.membershipStartDate && !this.membershipEndDate) || (!this.membershipStartDate && this.membershipEndDate)) {
+    this.invalidate('membershipEndDate', '会员开始和结束日期必须同时设置或同时为空');
+  }
+
+  if (this.membershipStartDate && this.membershipEndDate && this.membershipStartDate > this.membershipEndDate) {
+    this.invalidate('membershipEndDate', '会员开始日期不能晚于结束日期');
+  }
+
+  next();
+});
+
+studentSchema.pre('save', function ensureTenTryLesson(this: IStudentDoc, next) {
+  if (this.class === ClassType.TEN_TRY && (this.lessonLeft === null || this.lessonLeft === undefined)) {
+    this.lessonLeft = TEN_TRY_DEFAULT_LESSON;
+  }
+  next();
+});
+
+studentSchema.methods.setLessonLeft = function setLessonLeft(lessonLeft: number | null | undefined): IStudentDoc {
+  if (lessonLeft === undefined || lessonLeft === null) {
+    this.lessonLeft = null;
+    return this;
+  }
+
+  this.lessonLeft = ensureNonNegativeInteger(lessonLeft, '课时数');
+  return this;
+};
+
+studentSchema.methods.setClassWithLessonInit = function setClassWithLessonInit(classType: ClassType): IStudentDoc {
+  this.class = classType;
+  if (classType === ClassType.TEN_TRY && (this.lessonLeft === null || this.lessonLeft === undefined)) {
+    this.lessonLeft = TEN_TRY_DEFAULT_LESSON;
+  }
+  return this;
+};
+
+studentSchema.methods.hasMembership = function hasMembership(at?: Date): boolean {
   if (!this.membershipStartDate || !this.membershipEndDate) {
     return false;
   }
-  const now = new Date();
-  return now >= this.membershipStartDate && now <= this.membershipEndDate;
+  const reference = at ? new Date(at) : new Date();
+  return reference >= this.membershipStartDate && reference <= this.membershipEndDate;
 };
 
-studentSchema.methods.getMembershipDaysRemaining = function(): number | null {
+studentSchema.methods.getMembershipDaysRemaining = function getMembershipDaysRemaining(at?: Date): number | null {
   if (!this.membershipEndDate) {
     return null;
   }
-  const now = new Date();
-  if (now > this.membershipEndDate) {
+
+  const reference = at ? new Date(at) : new Date();
+  const diff = this.membershipEndDate.getTime() - reference.getTime();
+
+  if (diff < 0) {
     return 0;
   }
-  const diffTime = this.membershipEndDate.getTime() - now.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.ceil(diff / MS_PER_DAY);
 };
 
-studentSchema.methods.getAverageScore = function(): number {
+studentSchema.methods.getAverageScore = function getAverageScore(): number {
   if (this.rings.length === 0) {
     return 0;
   }
@@ -141,69 +220,87 @@ studentSchema.methods.getAverageScore = function(): number {
   return Number((sum / this.rings.length).toFixed(1));
 };
 
-studentSchema.methods.getMaxScore = function(): number {
+studentSchema.methods.getMaxScore = function getMaxScore(): number {
   if (this.rings.length === 0) {
     return 0;
   }
   return Math.max(...this.rings);
 };
 
-studentSchema.methods.getMinScore = function(): number {
+studentSchema.methods.getMinScore = function getMinScore(): number {
   if (this.rings.length === 0) {
     return 0;
   }
   return Math.min(...this.rings);
 };
 
-studentSchema.methods.addScore = function(score: number): void {
-  this.rings.push(score);
+studentSchema.methods.addScore = function addScore(score: number): IStudentDoc {
+  const validScore = ensureValidScore(score);
+  this.rings.push(validScore);
   this.markModified('rings');
+  return this;
 };
 
-studentSchema.methods.removeScore = function(index: number): void {
-  if (index >= 0 && index < this.rings.length) {
-    this.rings.splice(index, 1);
-    this.markModified('rings');
+studentSchema.methods.removeScore = function removeScore(index: number): number {
+  if (index < 0 || index >= this.rings.length) {
+    throw new AppError('InvalidInput: 成绩索引超出范围', 400);
   }
+  const [removed] = this.rings.splice(index, 1);
+  this.markModified('rings');
+  return removed;
 };
 
-studentSchema.methods.updateScore = function(index: number, newScore: number): void {
-  if (index >= 0 && index < this.rings.length) {
-    this.rings[index] = newScore;
-    this.markModified('rings');
+studentSchema.methods.updateScore = function updateScore(index: number, newScore: number): number {
+  if (index < 0 || index >= this.rings.length) {
+    throw new AppError('InvalidInput: 成绩索引超出范围', 400);
   }
+  const validScore = ensureValidScore(newScore);
+  this.rings[index] = validScore;
+  this.markModified('rings');
+  return validScore;
 };
 
-studentSchema.virtual('isMembershipActive').get(function() {
+studentSchema.virtual('isMembershipActive').get(function membershipActiveGetter(this: IStudentDoc) {
   return this.hasMembership();
 });
 
-studentSchema.virtual('membershipDaysRemaining').get(function() {
+studentSchema.virtual('membershipDaysRemaining').get(function membershipDaysRemainingGetter(this: IStudentDoc) {
   return this.getMembershipDaysRemaining();
 });
 
-studentSchema.methods.toJSON = function() {
-  const obj = this.toObject();
+studentSchema.methods.toJSON = function toJSON() {
+  const obj = this.toObject({ virtuals: true });
+  const isActive = this.hasMembership();
+  const daysRemaining = this.getMembershipDaysRemaining();
+
   return {
     uid: obj.uid,
     name: obj.name,
     age: obj.age,
     class: obj.class,
+    subject: obj.subject,
     phone: obj.phone,
     rings: obj.rings,
     note: obj.note,
-    subject: obj.subject,
     lesson_left: obj.lessonLeft,
-    membership_start_date: obj.membershipStartDate ? obj.membershipStartDate.toISOString().split('T')[0] : null,
-    membership_end_date: obj.membershipEndDate ? obj.membershipEndDate.toISOString().split('T')[0] : null,
-    is_membership_active: this.hasMembership(),
-    membership_days_remaining: this.getMembershipDaysRemaining()
+    lessonLeft: obj.lessonLeft,
+    membership_start_date: formatDate(obj.membershipStartDate),
+    membershipStartDate: formatDate(obj.membershipStartDate),
+    membership_end_date: formatDate(obj.membershipEndDate),
+    membershipEndDate: formatDate(obj.membershipEndDate),
+    is_membership_active: isActive,
+    isMembershipActive: isActive,
+    membership_days_remaining: daysRemaining,
+    membershipDaysRemaining: daysRemaining,
+    created_at: formatDate(obj.createdAt, true),
+    createdAt: obj.createdAt,
+    updated_at: formatDate(obj.updatedAt, true),
+    updatedAt: obj.updatedAt,
   };
 };
 
 const StudentModel = model<IStudentDoc>('Student', studentSchema);
 
-// 获取下一个UID的安全方法（使用计数器集合）
 const getNextUid = async (): Promise<number> => {
   return getNextSequence(STUDENT_SEQUENCE_NAME);
 };
@@ -218,7 +315,6 @@ export class Student {
   }
 
   static async create(data: Partial<IStudentDoc>): Promise<IStudentDoc> {
-    // 使用原子操作安全地生成下一个UID
     const nextUid = await getNextUid();
     return await StudentModel.create({ ...data, uid: nextUid });
   }
@@ -232,20 +328,18 @@ export class Student {
     return result.deletedCount > 0;
   }
 
-  static async search(criteria: any): Promise<IStudentDoc[]> {
+  static async search(criteria: Record<string, unknown>): Promise<IStudentDoc[]> {
     return await StudentModel.find(criteria).sort({ createdAt: -1 }).exec();
   }
 
-  static async count(criteria: any = {}): Promise<number> {
+  static async count(criteria: Record<string, unknown> = {}): Promise<number> {
     return await StudentModel.countDocuments(criteria).exec();
   }
-  
-  // 添加索引创建方法
+
   static async createIndexes(): Promise<void> {
     await StudentModel.createIndexes();
   }
-  
-  // 添加聚合查询支持
+
   static aggregate(pipeline: any[]) {
     return StudentModel.aggregate(pipeline);
   }
