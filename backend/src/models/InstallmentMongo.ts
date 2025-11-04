@@ -1,5 +1,5 @@
 import mongoose, { Document, FilterQuery, Schema, UpdateQuery } from 'mongoose';
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 import { InstallmentStatus } from '@/types';
 import { getNextSequence, INSTALLMENT_SEQUENCE_NAME } from './counter';
 
@@ -188,7 +188,7 @@ const InstallmentModel = mongoose.models.Installment || mongoose.model<IInstallm
 export class Installment {
   static async create(payload: IInstallmentCreatePayload): Promise<IInstallmentDoc> {
     if (!Number.isInteger(payload.installment_amount) || payload.installment_amount <= 0) {
-      throw new AppError('InvalidInput: 分期金额必须以分为单位存储且大于0', 400);
+      throw AppError.invalidInput('分期金额必须以分为单位存储且大于0');
     }
 
     const uid = await getNextSequence(INSTALLMENT_SEQUENCE_NAME);

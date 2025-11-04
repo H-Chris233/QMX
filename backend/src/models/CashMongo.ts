@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, FilterQuery } from 'mongoose';
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 import { getNextSequence, CASH_SEQUENCE_NAME } from './counter';
 import type { ICashInstallmentSnapshot, ICashSearchOptions } from '@/types';
 
@@ -115,7 +115,7 @@ CashSchema.index({ 'installment.plan_uid': 1 });
 
 CashSchema.pre('validate', function ensureNonZeroAmount(this: ICashDoc, next) {
   if (this.cash === 0) {
-    next(new AppError('InvalidInput: 交易金额不能为0', 400));
+    next(AppError.invalidInput('交易金额不能为0'));
     return;
   }
   next();
@@ -327,11 +327,11 @@ export class CashClass {
     }
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw new AppError('InvalidInput: 金额必须是数字', 400);
+      throw AppError.invalidInput('金额必须是数字');
     }
     const normalized = Number(numeric.toFixed(2));
     if (Math.abs(numeric - normalized) > 1e-8) {
-      throw new AppError('InvalidInput: 金额最多保留两位小数', 400);
+      throw AppError.invalidInput('金额最多保留两位小数');
     }
     return Math.round(normalized * 100);
   }
@@ -339,26 +339,26 @@ export class CashClass {
   private static normalizeDate(value: Date | string): Date {
     if (value instanceof Date) {
       if (Number.isNaN(value.getTime())) {
-        throw new AppError('InvalidInput: 日期格式不正确', 400);
+        throw AppError.invalidInput('日期格式不正确');
       }
       return value;
     }
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
-      throw new AppError('InvalidInput: 日期格式不正确', 400);
+      throw AppError.invalidInput('日期格式不正确');
     }
     return parsed;
   }
 
   private static ensureValidCash(cash: number): number {
     if (!Number.isFinite(cash)) {
-      throw new AppError('InvalidInput: 金额无效', 400);
+      throw AppError.invalidInput('金额无效');
     }
     if (!Number.isInteger(cash)) {
-      throw new AppError('InvalidInput: 金额必须以分为单位存储', 400);
+      throw AppError.invalidInput('金额必须以分为单位存储');
     }
     if (cash === 0) {
-      throw new AppError('InvalidInput: 交易金额不能为0', 400);
+      throw AppError.invalidInput('交易金额不能为0');
     }
     return cash;
   }

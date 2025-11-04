@@ -1,4 +1,4 @@
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 import { Student, IStudentDoc } from '@/models/mongo';
 import { ClassType, SubjectType } from '@/types';
 import type { MembershipPayload } from '@/services/studentBuilder';
@@ -13,7 +13,7 @@ export class StudentUpdater {
   static async for(uid: number): Promise<StudentUpdater> {
     const doc = await Student.findByUid(uid);
     if (!doc) {
-      throw new AppError('NotFound: 学员不存在', 404);
+      throw AppError.notFound('学员不存在');
     }
     return new StudentUpdater(doc);
   }
@@ -29,7 +29,7 @@ export class StudentUpdater {
   name(name: string): this {
     const trimmed = name?.trim();
     if (!trimmed) {
-      throw new AppError('InvalidInput: 学员姓名不能为空', 400);
+      throw AppError.invalidInput('学员姓名不能为空');
     }
     this.student.name = trimmed;
     return this;
@@ -44,7 +44,7 @@ export class StudentUpdater {
       return this;
     }
     if (!Number.isInteger(age) || age < 0 || age > 120) {
-      throw new AppError('InvalidInput: 年龄必须在0-120之间', 400);
+      throw AppError.invalidInput('年龄必须在0-120之间');
     }
     this.student.age = age;
     return this;
@@ -57,7 +57,7 @@ export class StudentUpdater {
     }
     const normalized = phone.trim();
     if (!PHONE_REGEX.test(normalized)) {
-      throw new AppError('InvalidInput: 手机号格式不正确', 400);
+      throw AppError.invalidInput('手机号格式不正确');
     }
     this.student.phone = normalized;
     return this;
@@ -94,7 +94,7 @@ export class StudentUpdater {
 
   setRings(scores: number[]): this {
     if (!Array.isArray(scores)) {
-      throw new AppError('InvalidInput: 成绩必须是数组', 400);
+      throw AppError.invalidInput('成绩必须是数组');
     }
     const sanitized = scores.map(score => this.ensureValidScore(score));
     this.student.rings = sanitized;
@@ -123,10 +123,10 @@ export class StudentUpdater {
     const end = membership.endDate ? new Date(membership.endDate) : null;
 
     if (!start || !end) {
-      throw new AppError('InvalidInput: 会员开始和结束日期必须同时提供', 400);
+      throw AppError.invalidInput('会员开始和结束日期必须同时提供');
     }
     if (start > end) {
-      throw new AppError('InvalidInput: 会员开始日期不能晚于结束日期', 400);
+      throw AppError.invalidInput('会员开始日期不能晚于结束日期');
     }
 
     this.student.membershipStartDate = start;
@@ -140,10 +140,10 @@ export class StudentUpdater {
 
   private ensureValidScore(score: number): number {
     if (typeof score !== 'number' || Number.isNaN(score)) {
-      throw new AppError('InvalidInput: 成绩必须是数字', 400);
+      throw AppError.invalidInput('成绩必须是数字');
     }
     if (score < SCORE_MIN || score > SCORE_MAX) {
-      throw new AppError(`InvalidInput: 成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`, 400);
+      throw AppError.invalidInput(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
     }
     return Number(score);
   }

@@ -1,7 +1,7 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { getNextSequence, STUDENT_SEQUENCE_NAME } from './counter';
 import { ClassType, SubjectType } from '@/types';
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 
 const TEN_TRY_DEFAULT_LESSON = 10;
 const PHONE_REGEX = /^1[3-9]\d{9}$/;
@@ -25,17 +25,17 @@ const formatDate = (value: NullableDate, withTime = false): string | null => {
 
 const ensureNonNegativeInteger = (value: number, field: string): number => {
   if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
-    throw new AppError(`InvalidInput: ${field} 必须是非负整数`, 400);
+    throw AppError.invalidInput(`${field} 必须是非负整数`);
   }
   return value;
 };
 
 const ensureValidScore = (score: number): number => {
   if (typeof score !== 'number' || Number.isNaN(score)) {
-    throw new AppError('InvalidInput: 成绩必须是数字', 400);
+    throw AppError.invalidInput('成绩必须是数字');
   }
   if (score < SCORE_MIN || score > SCORE_MAX) {
-    throw new AppError(`InvalidInput: 成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`, 400);
+    throw AppError.invalidInput(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
   }
   return Number(score);
 };
@@ -243,7 +243,7 @@ studentSchema.methods.addScore = function addScore(score: number): IStudentDoc {
 
 studentSchema.methods.removeScore = function removeScore(index: number): number {
   if (index < 0 || index >= this.rings.length) {
-    throw new AppError('InvalidInput: 成绩索引超出范围', 400);
+    throw AppError.invalidInput('成绩索引超出范围');
   }
   const [removed] = this.rings.splice(index, 1);
   this.markModified('rings');
@@ -252,7 +252,7 @@ studentSchema.methods.removeScore = function removeScore(index: number): number 
 
 studentSchema.methods.updateScore = function updateScore(index: number, newScore: number): number {
   if (index < 0 || index >= this.rings.length) {
-    throw new AppError('InvalidInput: 成绩索引超出范围', 400);
+    throw AppError.invalidInput('成绩索引超出范围');
   }
   const validScore = ensureValidScore(newScore);
   this.rings[index] = validScore;

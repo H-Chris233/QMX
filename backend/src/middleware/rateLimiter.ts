@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { config } from '@/config';
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 
 // 创建速率限制器
 const rateLimiter = new RateLimiterMemory({
@@ -21,11 +21,11 @@ export const rateLimitMiddleware = async (
   } catch (rejRes: any) {
     const secs = Math.round(rejRes.msBeforeNext / 1000) || 1;
     res.set('Retry-After', String(secs));
-    
-    throw new AppError(
-      `请求过于频繁，请在 ${secs} 秒后重试`,
-      429
-    );
+
+    throw AppError.rateLimited(`请求过于频繁，请在 ${secs} 秒后重试`, {
+      statusCode: 429,
+      details: { retryAfterSeconds: secs },
+    });
   }
 };
 
@@ -46,10 +46,10 @@ export const apiRateLimitMiddleware = async (
   } catch (rejRes: any) {
     const secs = Math.round(rejRes.msBeforeNext / 1000) || 1;
     res.set('Retry-After', String(secs));
-    
-    throw new AppError(
-      `API请求过于频繁，请在 ${secs} 秒后重试`,
-      429
-    );
+
+    throw AppError.rateLimited(`API请求过于频繁，请在 ${secs} 秒后重试`, {
+      statusCode: 429,
+      details: { retryAfterSeconds: secs },
+    });
   }
 };

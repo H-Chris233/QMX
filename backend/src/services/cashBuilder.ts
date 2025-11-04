@@ -1,4 +1,4 @@
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 import { CashClass, ICashCreatePayload, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
 import type { ICashInstallmentSnapshot } from '@/types';
@@ -19,12 +19,12 @@ export const sanitizeInstallmentSnapshot = (info?: ICashInstallmentSnapshot | nu
   }
 
   if (info.plan_uid === undefined || info.plan_uid === null) {
-    throw new AppError('InvalidInput: 分期计划ID不能为空', 400);
+    throw AppError.invalidInput('分期计划ID不能为空');
   }
 
   const planUid = Number(info.plan_uid);
   if (!Number.isFinite(planUid) || planUid <= 0) {
-    throw new AppError('InvalidInput: 分期计划ID无效', 400);
+    throw AppError.invalidInput('分期计划ID无效');
   }
 
   const sanitized: ICashInstallmentSnapshot = {
@@ -34,7 +34,7 @@ export const sanitizeInstallmentSnapshot = (info?: ICashInstallmentSnapshot | nu
   if (info.installment_uid !== undefined) {
     sanitized.installment_uid = info.installment_uid === null ? null : Number(info.installment_uid);
     if (sanitized.installment_uid !== null && !Number.isFinite(sanitized.installment_uid)) {
-      throw new AppError('InvalidInput: 分期记录ID无效', 400);
+      throw AppError.invalidInput('分期记录ID无效');
     }
   }
 
@@ -44,7 +44,7 @@ export const sanitizeInstallmentSnapshot = (info?: ICashInstallmentSnapshot | nu
     } else {
       const installmentNumber = Number(info.installment_number);
       if (!Number.isFinite(installmentNumber) || installmentNumber <= 0) {
-        throw new AppError('InvalidInput: 分期期号无效', 400);
+        throw AppError.invalidInput('分期期号无效');
       }
       sanitized.installment_number = Math.trunc(installmentNumber);
     }
@@ -56,7 +56,7 @@ export const sanitizeInstallmentSnapshot = (info?: ICashInstallmentSnapshot | nu
     } else {
       const total = Number(info.total_installments);
       if (!Number.isFinite(total) || total <= 0) {
-        throw new AppError('InvalidInput: 分期总期数无效', 400);
+        throw AppError.invalidInput('分期总期数无效');
       }
       sanitized.total_installments = Math.trunc(total);
     }
@@ -65,7 +65,7 @@ export const sanitizeInstallmentSnapshot = (info?: ICashInstallmentSnapshot | nu
   if (info.due_date !== undefined && info.due_date !== null) {
     const due = info.due_date instanceof Date ? info.due_date : new Date(info.due_date);
     if (Number.isNaN(due.getTime())) {
-      throw new AppError('InvalidInput: 分期应付日期无效', 400);
+      throw AppError.invalidInput('分期应付日期无效');
     }
     sanitized.due_date = due;
   }
@@ -87,17 +87,17 @@ export const sanitizeInstallmentSnapshot = (info?: ICashInstallmentSnapshot | nu
 export const convertAmountToCents = (amount: number | string): number => {
   const numeric = Number(amount);
   if (!Number.isFinite(numeric)) {
-    throw new AppError('InvalidInput: 金额必须是数字', 400);
+    throw AppError.invalidInput('金额必须是数字');
   }
 
   const normalized = Number(numeric.toFixed(2));
   if (Math.abs(numeric - normalized) > PRECISION_EPSILON) {
-    throw new AppError('InvalidInput: 金额最多保留两位小数', 400);
+    throw AppError.invalidInput('金额最多保留两位小数');
   }
 
   const cents = Math.round(normalized * 100);
   if (cents === 0) {
-    throw new AppError('InvalidInput: 金额不能为0', 400);
+    throw AppError.invalidInput('金额不能为0');
   }
 
   return cents;
@@ -134,7 +134,7 @@ export class CashBuilder {
 
     const numeric = Number(studentId);
     if (!Number.isInteger(numeric) || numeric <= 0) {
-      throw new AppError('InvalidInput: 学员ID必须为正整数', 400);
+      throw AppError.invalidInput('学员ID必须为正整数');
     }
 
     this.payload.student_id = numeric;
@@ -153,13 +153,13 @@ export class CashBuilder {
 
   async build(): Promise<ICashDoc> {
     if (!this.amountSet || this.payload.cash === undefined) {
-      throw new AppError('InvalidInput: 金额不能为空', 400);
+      throw AppError.invalidInput('金额不能为空');
     }
 
     if (this.payload.student_id !== null && this.payload.student_id !== undefined) {
       const student = await Student.findByUid(this.payload.student_id);
       if (!student) {
-        throw new AppError('NotFound: 学员不存在', 404);
+        throw AppError.notFound('学员不存在');
       }
       this.payload.student_id = student.uid;
     }
