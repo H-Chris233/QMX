@@ -1,12 +1,23 @@
 import { ClassType, SubjectType } from '@/types';
 
-const SORT_FIELD_MAP: Record<string, string> = {
+const SORT_FIELD_MAP = {
   uid: 'uid',
   name: 'name',
   age: 'age',
   created_at: 'createdAt',
   updated_at: 'updatedAt',
+} as const;
+
+type SortFieldKey = keyof typeof SORT_FIELD_MAP;
+
+type SortFieldValue = (typeof SORT_FIELD_MAP)[SortFieldKey];
+
+const isSortFieldKey = (value: unknown): value is SortFieldKey => {
+  return typeof value === 'string'
+    && Object.prototype.hasOwnProperty.call(SORT_FIELD_MAP, value);
 };
+
+type MembershipFilterState = 'any' | 'withMembership' | 'withoutMembership';
 
 export interface StudentQueryBuildResult {
   pipeline: any[];
@@ -20,12 +31,12 @@ export class StudentQuery {
   private ageFilter: { min?: number; max?: number } = {};
   private classFilter?: ClassType;
   private subjectFilter?: SubjectType;
-  private hasMembershipFilter?: boolean;
+  private membershipFilter: MembershipFilterState = 'any';
   private membershipActiveDate?: Date;
   private minAverageScore?: number;
   private maxAverageScore?: number;
-  private hasScoreFilter = false;
-  private sortField: string = SORT_FIELD_MAP.created_at;
+  private scoreFilterActive = false;
+  private sortField: SortFieldValue = SORT_FIELD_MAP.created_at;
   private sortOrder: 1 | -1 = -1;
   private page = 1;
   private limit = 20;
@@ -66,10 +77,12 @@ export class StudentQuery {
   }
 
   hasMembership(hasMembership?: boolean | null): this {
-    if (hasMembership === undefined || hasMembership === null) {
-      this.hasMembershipFilter = undefined;
+    if (hasMembership === true) {
+      this.membershipFilter = 'withMembership';
+    } else if (hasMembership === false) {
+      this.membershipFilter = 'withoutMembership';
     } else {
-      this.hasMembershipFilter = hasMembership;
+      this.membershipFilter = 'any';
     }
     return this;
   }
@@ -87,15 +100,25 @@ export class StudentQuery {
   }
 
   scoreRange(min?: number | null, max?: number | null): this {
-    if (min !== undefined && min !== null) {
-      this.minAverageScore = Number(min);
-      this.hasScoreFilter = true;
+    const hasMin = min !== undefined && min !== null;
+    const hasMax = max !== undefined && max !== null;
+
+    if (!hasMin && !hasMax) {
+      this.minAverageScore = undefined;
+      this.maxAverageScore = undefined;
+      this.scoreFilterActive = false;
+      return this;
     }
-    if (max !== undefined && max !== null) {
-      this.maxAverageScore = Number(max);
-      this.hasScoreFilter = true;
-    }
-    if (this.minAverageScore !== undefined && this.maxAverageScore !== undefined && this.minAverageScore > this.maxAverageScore) {
+
+    this.minAverageScore = hasMin ? Number(min) : undefined;
+    this.maxAverageScore = hasMax ? Number(max) : undefined;
+    this.scoreFilterActive = true;
+
+    if (
+      this.minAverageScore !== undefined
+      && this.maxAverageScore !== undefined
+      && this.minAverageScore > this.maxAverageScore
+    ) {
       const tmp = this.minAverageScore;
       this.minAverageScore = this.maxAverageScore;
       this.maxAverageScore = tmp;
@@ -104,7 +127,7 @@ export class StudentQuery {
   }
 
   sort(sortField?: string, order: 'ASC' | 'DESC' = 'DESC'): this {
-    if (sortField && SORT_FIELD_MAP[sortField]) {
+    if (isSortFieldKey(sortField)) {
       this.sortField = SORT_FIELD_MAP[sortField];
     } else {
       this.sortField = SORT_FIELD_MAP.created_at;
@@ -149,10 +172,10 @@ export class StudentQuery {
       matchStage.subject = this.subjectFilter;
     }
 
-    if (this.hasMembershipFilter === true) {
+    if (this.membershipFilter === 'withMembership') {
       matchStage.membershipStartDate = { $ne: null };
       matchStage.membershipEndDate = { $ne: null };
-    } else if (this.hasMembershipFilter === false) {
+    } else if (this.membershipFilter === 'withoutMembership') {
       matchStage.$or = [
         { membershipStartDate: null },
         { membershipEndDate: null },
@@ -170,7 +193,7 @@ export class StudentQuery {
 
     const stages: any[] = [];
 
-    if (this.hasScoreFilter) {
+    if (this.scoreFilterActive) {
       stages.push({
         $addFields: {
           avgScore: {
@@ -208,7 +231,8 @@ export class StudentQuery {
 
     const corePipeline = [...stages];
 
-    const sortStage = { $sort: { [this.sortField]: this.sortOrder } };
+    const sortDefinition: Record<string, 1 | -1> = { [this.sortField]: this.sortOrder };
+    const sortStage = { $sort: sortDefinition };
     const paginationStages: any[] = [sortStage];
 
     const skip = (this.page - 1) * this.limit;
@@ -219,7 +243,7 @@ export class StudentQuery {
 
     const pipeline = [...corePipeline, ...paginationStages];
 
-    if (this.hasScoreFilter) {
+    if (this.scoreFilterActive) {
       pipeline.push({ $project: { avgScore: 0 } });
     }
 

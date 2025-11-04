@@ -8,7 +8,7 @@ import {
 } from '@/models/InstallmentPlanMongo';
 import { Student, type IStudentDoc } from '@/models/mongo';
 import { ClassType, InstallmentStatus, MembershipStatus } from '@/types';
-import type { PipelineStage } from 'mongoose';
+import type { Aggregate, PipelineStage } from 'mongoose';
 
 const FINANCIAL_PERIODS = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
 export type FinancialPeriod = typeof FINANCIAL_PERIODS[number];
@@ -88,6 +88,32 @@ export interface FinancialStatsData {
   studentIncome: StudentIncomeEntry[];
 }
 
+interface CashRevenueExpenseAggregateRow {
+  revenue?: number;
+  expense?: number;
+}
+
+interface CashIncomeSummaryAggregateRow {
+  incomeCents?: number;
+  expenseCents?: number;
+  transactionCount?: number;
+}
+
+interface CashStudentIncomeAggregateRow {
+  _id: number;
+  amountCents?: number;
+}
+
+interface StudentIncomeSummaryAggregateRow {
+  totalIncome?: number;
+  incomeCount?: number;
+}
+
+interface StudentNameProjection {
+  uid: number;
+  name: string;
+}
+
 export class StatsService {
   static normalizeFinancialPeriod(period?: string | null): FinancialPeriod {
     if (period && FINANCIAL_PERIODS.includes(period as FinancialPeriod)) {
@@ -115,10 +141,9 @@ export class StatsService {
       },
     ];
 
-    const [cashAggregate] = await CashClass.aggregate<{
-      revenue: number;
-      expense: number;
-    }>(revenueExpensePipeline);
+    const [cashAggregate] = await this.executeCashAggregate<CashRevenueExpenseAggregateRow>(
+      revenueExpensePipeline,
+    );
 
     const totalRevenueCents = Number(cashAggregate?.revenue ?? 0);
     const totalExpenseCents = Math.abs(Number(cashAggregate?.expense ?? 0));
@@ -208,10 +233,9 @@ export class StatsService {
       },
     ];
 
-    const [cashAggregate] = await CashClass.aggregate<{
-      totalIncome: number;
-      incomeCount: number;
-    }>(studentIncomePipeline);
+    const [cashAggregate] = await this.executeCashAggregate<StudentIncomeSummaryAggregateRow>(
+      studentIncomePipeline,
+    );
 
     const totalIncomeCents = Number(cashAggregate?.totalIncome ?? 0);
     const incomeCount = Number(cashAggregate?.incomeCount ?? 0);
@@ -257,6 +281,8 @@ export class StatsService {
     const minScore = scoreCount > 0 ? Math.min(...student.rings) : 0;
 
     const remainingAmountCents = Math.max(totalInstallmentCents - paidInstallmentCents, 0);
+    const totalAmountCents = totalInstallmentCents;
+    const paidAmountCents = paidInstallmentCents;
 
     return {
       studentUid,
@@ -311,11 +337,9 @@ export class StatsService {
       },
     ];
 
-    const [cashAggregate] = await CashClass.aggregate<{
-      incomeCents: number;
-      expenseCents: number;
-      transactionCount: number;
-    }>(cashPipeline);
+    const [cashAggregate] = await this.executeCashAggregate<CashIncomeSummaryAggregateRow>(
+      cashPipeline,
+    );
 
     const incomeCents = Number(cashAggregate?.incomeCents ?? 0);
     const expenseCents = Math.abs(Number(cashAggregate?.expenseCents ?? 0));
@@ -339,19 +363,19 @@ export class StatsService {
       { $limit: 10 },
     ];
 
-    const studentIncomeAggregate = await CashClass.aggregate<{
-      _id: number;
-      amountCents: number;
-    }>(studentIncomeAggregatePipeline);
+    const studentIncomeAggregate = await this.executeCashAggregate<CashStudentIncomeAggregateRow>(
+      studentIncomeAggregatePipeline,
+    );
 
     const studentIds = studentIncomeAggregate.map(entry => entry._id);
     const studentNameMap = new Map<number, string>();
 
     if (studentIds.length > 0) {
-      const studentDocs = await Student.aggregate<{ uid: number; name: string }>([
+      const studentNamePipeline: PipelineStage[] = [
         { $match: { uid: { $in: studentIds } } },
         { $project: { uid: 1, name: 1 } },
-      ]);
+      ];
+      const studentDocs = await this.executeStudentAggregate<StudentNameProjection>(studentNamePipeline);
 
       for (const doc of studentDocs) {
         studentNameMap.set(doc.uid, doc.name);
@@ -410,6 +434,18 @@ export class StatsService {
       transactionCount: Number(cashAggregate?.transactionCount ?? 0),
       studentIncome,
     };
+  }
+
+  private static async executeCashAggregate<T>(pipeline: PipelineStage[]): Promise<T[]> {
+    const aggregate = CashClass.aggregate(pipeline) as Aggregate<unknown[]>;
+    const result = await aggregate.exec();
+    return result as T[];
+  }
+
+  private static async executeStudentAggregate<T>(pipeline: PipelineStage[]): Promise<T[]> {
+    const aggregate = Student.aggregate(pipeline) as Aggregate<unknown[]>;
+    const result = await aggregate.exec();
+    return result as T[];
   }
 
   private static resolveDateRange(period: FinancialPeriod, reference = new Date()): DateRange {
