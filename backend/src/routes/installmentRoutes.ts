@@ -3,6 +3,7 @@ import express from 'express';
 import installmentController from '@/controllers/installmentController';
 import { validate, validateParams, validateQuery, commonValidations } from '@/middleware/validation';
 import { apiRateLimitMiddleware } from '@/middleware/rateLimiter';
+import { InstallmentStatus, PaymentFrequency, InstallmentPlanStatus } from '@/types';
 
 const router = express.Router();
 
@@ -23,12 +24,12 @@ const createInstallmentPlanSchema = Joi.object({
     'number.min': '总期数至少为1',
     'any.required': '总期数不能为空',
   }),
-  frequency: Joi.string().valid('Weekly', 'Monthly', 'Quarterly', 'Custom').required().messages({
+  frequency: Joi.string().valid(...Object.values(PaymentFrequency)).required().messages({
     'any.only': '无效的付款频率',
     'any.required': '付款频率不能为空',
   }),
   custom_days: Joi.number().integer().min(1).when('frequency', {
-    is: 'Custom',
+    is: PaymentFrequency.CUSTOM,
     then: Joi.required().messages({ 'any.required': '自定义频率必须指定天数' }),
     otherwise: Joi.optional(),
   }),
@@ -39,7 +40,7 @@ const createInstallmentPlanSchema = Joi.object({
 });
 
 const updateInstallmentStatusSchema = Joi.object({
-  status: Joi.string().valid('Pending', 'Paid', 'Overdue', 'Cancelled').required().messages({
+  status: Joi.string().valid(...Object.values(InstallmentStatus)).required().messages({
     'any.only': '无效的分期付款状态',
     'any.required': '分期付款状态不能为空',
   }),
@@ -54,7 +55,7 @@ const queryInstallmentSchema = Joi.object({
   sort_by: Joi.string().valid('created_at', 'start_date', 'total_amount', 'status').default('created_at'),
   sort_order: commonValidations.sortOrder,
   student_id: commonValidations.id.optional(),
-  status: Joi.string().valid('Active', 'Completed', 'Cancelled').optional(),
+  status: Joi.string().valid(...Object.values(InstallmentPlanStatus)).optional(),
 });
 
 // 路由定义

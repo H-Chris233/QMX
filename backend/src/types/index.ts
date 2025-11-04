@@ -40,6 +40,12 @@ export enum PaymentFrequency {
   CUSTOM = 'Custom',
 }
 
+export enum InstallmentPlanStatus {
+  ACTIVE = 'Active',
+  COMPLETED = 'Completed',
+  CANCELLED = 'Cancelled',
+}
+
 // 学员接口
 export interface IStudent {
   uid: number;
@@ -118,36 +124,65 @@ export interface ICashCreationAttributes {
 
 // 分期付款计划接口
 export interface IInstallmentPlan {
-  plan_id: number;
+  uid: number;
+  student_id: number | null;
+  studentId?: number | null;
   total_amount: number;
+  totalAmount?: number;
   total_installments: number;
+  totalInstallments?: number;
   frequency: PaymentFrequency;
   custom_days?: number | null;
-  student_id?: number | null; // 添加学员ID关联
-  createdAt: Date;
+  customDays?: number | null;
+  start_date: Date | string;
+  startDate?: Date | string;
+  status: InstallmentPlanStatus;
+  note?: string | null;
+  created_at: Date | string;
+  createdAt?: Date;
+  updated_at: Date | string;
   updatedAt?: Date;
 }
 
 // 分期付款创建属性
-export interface IInstallmentPlanCreationAttributes extends Omit<IInstallmentPlan, 'plan_id' | 'createdAt' | 'updatedAt'> {}
+export interface IInstallmentPlanCreationAttributes extends Omit<IInstallmentPlan, 'uid' | 'created_at' | 'createdAt' | 'updated_at' | 'updatedAt'> {}
 
 // 分期付款详情接口
 export interface IInstallment {
   uid: number;
   plan_id: number;
-  total_amount: number;
-  total_installments: number;
+  planId?: number;
+  installment_amount: number;
+  installmentAmount?: number;
   current_installment: number;
-  frequency: PaymentFrequency;
-  custom_days?: number | null;
-  due_date: Date;
+  currentInstallment?: number;
+  total_installments: number;
+  totalInstallments?: number;
+  due_date: Date | string;
+  dueDate?: Date | string;
   status: InstallmentStatus;
-  createdAt: Date;
+  paid_amount: number;
+  paidAmount?: number;
+  paid_at: Date | string | null;
+  paidAt?: Date | string | null;
+  student_id: number | null;
+  studentId?: number | null;
+  cash_uid: number | null;
+  cashUid?: number | null;
+  is_overdue?: boolean;
+  isOverdue?: boolean;
+  days_overdue?: number;
+  daysOverdue?: number;
+  remaining_amount?: number;
+  remainingAmount?: number;
+  created_at: Date | string;
+  createdAt?: Date;
+  updated_at: Date | string;
   updatedAt?: Date;
 }
 
 // 分期付款创建属性
-export interface IInstallmentCreationAttributes extends Omit<IInstallment, 'uid' | 'createdAt' | 'updatedAt'> {}
+export interface IInstallmentCreationAttributes extends Omit<IInstallment, 'uid' | 'created_at' | 'createdAt' | 'updated_at' | 'updatedAt'> {}
 
 // 统计数据接口
 export interface IDashboardStats {
