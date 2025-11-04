@@ -162,7 +162,7 @@ describe('Student services integration', () => {
     expect(results[0].uid).toBe(activeStudent.uid);
 
     const presented = presentStudent(results[0]);
-    expect(presented.is_membership_active).toBe(true);
+    expect(presented.isMembershipActive).toBe(true);
     expect(presented.membership_status).toBe('Active');
     expect(presented.membershipStatus).toBe('Active');
   });

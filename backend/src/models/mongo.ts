@@ -20,7 +20,7 @@ const formatDate = (value: NullableDate, withTime = false): string | null => {
   if (withTime) {
     return iso;
   }
-  return iso.split('T')[0];
+  return iso.split('T')[0] || null;
 };
 
 const ensureNonNegativeInteger = (value: number, field: string): number => {
@@ -172,22 +172,22 @@ studentSchema.pre('save', function ensureTenTryLesson(this: IStudentDoc, next) {
   next();
 });
 
-studentSchema.methods.setLessonLeft = function setLessonLeft(lessonLeft: number | null | undefined): IStudentDoc {
+studentSchema.methods.setLessonLeft = function setLessonLeft(this: IStudentDoc, lessonLeft: number | null | undefined): IStudentDoc {
   if (lessonLeft === undefined || lessonLeft === null) {
     this.lessonLeft = null;
-    return this;
+    return this as IStudentDoc;
   }
 
   this.lessonLeft = ensureNonNegativeInteger(lessonLeft, '课时数');
-  return this;
+  return this as IStudentDoc;
 };
 
-studentSchema.methods.setClassWithLessonInit = function setClassWithLessonInit(classType: ClassType): IStudentDoc {
+studentSchema.methods.setClassWithLessonInit = function setClassWithLessonInit(this: IStudentDoc, classType: ClassType): IStudentDoc {
   this.class = classType;
   if (classType === ClassType.TEN_TRY && (this.lessonLeft === null || this.lessonLeft === undefined)) {
     this.lessonLeft = TEN_TRY_DEFAULT_LESSON;
   }
-  return this;
+  return this as IStudentDoc;
 };
 
 studentSchema.methods.hasMembership = function hasMembership(at?: Date): boolean {
@@ -234,11 +234,11 @@ studentSchema.methods.getMinScore = function getMinScore(): number {
   return Math.min(...this.rings);
 };
 
-studentSchema.methods.addScore = function addScore(score: number): IStudentDoc {
+studentSchema.methods.addScore = function addScore(this: IStudentDoc, score: number): IStudentDoc {
   const validScore = ensureValidScore(score);
   this.rings.push(validScore);
   this.markModified('rings');
-  return this;
+  return this as IStudentDoc;
 };
 
 studentSchema.methods.removeScore = function removeScore(index: number): number {
@@ -345,5 +345,4 @@ export class Student {
   }
 }
 
-export { StudentModel as studentModel, Student };
-export { IStudentDoc };
+export { StudentModel as studentModel };
