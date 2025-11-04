@@ -8,6 +8,7 @@ import {
 } from '@/models/InstallmentPlanMongo';
 import { Student, type IStudentDoc } from '@/models/mongo';
 import { ClassType, InstallmentStatus, MembershipStatus } from '@/types';
+import type { PipelineStage } from 'mongoose';
 
 const FINANCIAL_PERIODS = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
 export type FinancialPeriod = typeof FINANCIAL_PERIODS[number];
@@ -96,10 +97,7 @@ export class StatsService {
   }
 
   static async buildDashboardStats(): Promise<DashboardStatsData> {
-    const [cashAggregate] = await CashClass.aggregate<{
-      revenue: number;
-      expense: number;
-    }>([
+    const revenueExpensePipeline: PipelineStage[] = [
       {
         $group: {
           _id: null,
@@ -115,7 +113,12 @@ export class StatsService {
           },
         },
       },
-    ]);
+    ];
+
+    const [cashAggregate] = await CashClass.aggregate<{
+      revenue: number;
+      expense: number;
+    }>(revenueExpensePipeline);
 
     const totalRevenueCents = Number(cashAggregate?.revenue ?? 0);
     const totalExpenseCents = Math.abs(Number(cashAggregate?.expense ?? 0));
@@ -182,10 +185,7 @@ export class StatsService {
       throw AppError.notFound('学员不存在');
     }
 
-    const [cashAggregate] = await CashClass.aggregate<{
-      totalIncome: number;
-      incomeCount: number;
-    }>([
+    const studentIncomePipeline: PipelineStage[] = [
       {
         $match: {
           student_id: studentUid,
@@ -206,7 +206,12 @@ export class StatsService {
           },
         },
       },
-    ]);
+    ];
+
+    const [cashAggregate] = await CashClass.aggregate<{
+      totalIncome: number;
+      incomeCount: number;
+    }>(studentIncomePipeline);
 
     const totalIncomeCents = Number(cashAggregate?.totalIncome ?? 0);
     const incomeCount = Number(cashAggregate?.incomeCount ?? 0);
@@ -280,11 +285,7 @@ export class StatsService {
     const normalizedPeriod = StatsService.normalizeFinancialPeriod(period);
     const dateRange = StatsService.resolveDateRange(normalizedPeriod);
 
-    const [cashAggregate] = await CashClass.aggregate<{
-      incomeCents: number;
-      expenseCents: number;
-      transactionCount: number;
-    }>([
+    const cashPipeline: PipelineStage[] = [
       {
         $match: {
           created_at: { $gte: dateRange.start, $lt: dateRange.end },
@@ -308,16 +309,19 @@ export class StatsService {
           },
         },
       },
-    ]);
+    ];
+
+    const [cashAggregate] = await CashClass.aggregate<{
+      incomeCents: number;
+      expenseCents: number;
+      transactionCount: number;
+    }>(cashPipeline);
 
     const incomeCents = Number(cashAggregate?.incomeCents ?? 0);
     const expenseCents = Math.abs(Number(cashAggregate?.expenseCents ?? 0));
     const netIncomeCents = incomeCents - expenseCents;
 
-    const studentIncomeAggregate = await CashClass.aggregate<{
-      _id: number;
-      amountCents: number;
-    }>([
+    const studentIncomeAggregatePipeline: PipelineStage[] = [
       {
         $match: {
           created_at: { $gte: dateRange.start, $lt: dateRange.end },
@@ -333,7 +337,12 @@ export class StatsService {
       },
       { $sort: { amountCents: -1 } },
       { $limit: 10 },
-    ]);
+    ];
+
+    const studentIncomeAggregate = await CashClass.aggregate<{
+      _id: number;
+      amountCents: number;
+    }>(studentIncomeAggregatePipeline);
 
     const studentIds = studentIncomeAggregate.map(entry => entry._id);
     const studentNameMap = new Map<number, string>();

@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ISystemConfigDoc extends Document {
   key: string;
@@ -36,12 +36,12 @@ const SystemConfigSchema = new Schema<ISystemConfigDoc>({
 });
 
 SystemConfigSchema.set('toJSON', {
-  transform: function(doc, ret) {
-    delete ret._id;
-    delete ret.__v;
-    return ret;
+  transform: (_doc, ret: Record<string, unknown>) => {
+    const { _id: _omitId, __v: _omitVersion, ...rest } = ret;
+    return rest;
   }
 });
 
-const SystemConfig = mongoose.models.SystemConfig || mongoose.model<ISystemConfigDoc>('SystemConfig', SystemConfigSchema);
+const SystemConfig: Model<ISystemConfigDoc> = (mongoose.models.SystemConfig as Model<ISystemConfigDoc> | undefined)
+  ?? mongoose.model<ISystemConfigDoc>('SystemConfig', SystemConfigSchema);
 export default SystemConfig;

@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, FilterQuery } from 'mongoose';
+import mongoose, { Schema, Document, FilterQuery, FilterOperators, Model, PipelineStage, Aggregate } from 'mongoose';
 import { AppError } from '@/utils/errors';
 import { getNextSequence, CASH_SEQUENCE_NAME } from './counter';
 import type { ICashInstallmentSnapshot, ICashSearchOptions } from '@/types';
@@ -170,7 +170,8 @@ CashSchema.methods.toJSON = function toJSON(this: ICashDoc) {
   };
 };
 
-const CashModel = mongoose.models.CashTransaction || mongoose.model<ICashDoc>('CashTransaction', CashSchema);
+const CashModel: Model<ICashDoc> = (mongoose.models.CashTransaction as Model<ICashDoc> | undefined)
+  ?? mongoose.model<ICashDoc>('CashTransaction', CashSchema);
 
 export class CashClass {
   static async create(payload: ICashCreatePayload): Promise<ICashDoc> {
@@ -201,7 +202,7 @@ export class CashClass {
     return await CashModel.find().sort({ created_at: -1 }).exec();
   }
 
-  static aggregate<T = any>(pipeline: Record<string, unknown>[]) {
+  static aggregate<T = unknown>(pipeline: PipelineStage[]): Aggregate<T[]> {
     return CashModel.aggregate<T>(pipeline);
   }
 
@@ -240,10 +241,13 @@ export class CashClass {
 
     const studentFilter = options.studentId ?? options.student_id;
     if (studentFilter !== undefined && studentFilter !== null) {
-      filter.student_id = Number(studentFilter);
+      const numericStudentId = Number(studentFilter);
+      if (Number.isFinite(numericStudentId)) {
+        filter.student_id = numericStudentId;
+      }
     }
 
-    const cashRange: Record<string, number> = {};
+    const cashRange: FilterOperators<number> = {};
     const minAmount = this.normalizeAmountFilter(options.minAmount ?? options.min_amount);
     if (minAmount !== undefined) {
       cashRange.$gte = minAmount;
@@ -253,17 +257,17 @@ export class CashClass {
       cashRange.$lte = maxAmount;
     }
     if (Object.keys(cashRange).length > 0) {
-      filter.cash = { ...(filter.cash as Record<string, number> | undefined ?? {}), ...cashRange } as any;
+      filter.cash = this.mergeFilterOperators<number>(filter.cash, cashRange);
     }
 
     const incomeFlag = options.isIncome ?? options.is_income;
     if (incomeFlag === true) {
-      filter.cash = { ...(filter.cash as Record<string, number> | undefined ?? {}), $gt: 0 } as any;
+      filter.cash = this.mergeFilterOperators<number>(filter.cash, { $gt: 0 });
     } else if (incomeFlag === false) {
-      filter.cash = { ...(filter.cash as Record<string, number> | undefined ?? {}), $lt: 0 } as any;
+      filter.cash = this.mergeFilterOperators<number>(filter.cash, { $lt: 0 });
     }
 
-    const dateRange: Record<string, Date> = {};
+    const dateRange: FilterOperators<Date> = {};
     const from = options.dateFrom ?? options.date_from;
     if (from) {
       dateRange.$gte = this.normalizeDate(from);
@@ -273,24 +277,23 @@ export class CashClass {
       dateRange.$lte = this.normalizeDate(to);
     }
     if (Object.keys(dateRange).length > 0) {
-      filter.created_at = dateRange as any;
+      filter.created_at = this.mergeFilterOperators<Date>(filter.created_at, dateRange);
     }
 
-    if (options.created_at && typeof options.created_at === 'object') {
-      filter.created_at = {
-        ...(filter.created_at as Record<string, unknown> | undefined ?? {}),
-        ...(options.created_at as Record<string, unknown>),
-      } as any;
+    if (this.isFilterOperatorObject<Date>(options.created_at)) {
+      filter.created_at = this.mergeFilterOperators<Date>(filter.created_at, options.created_at);
     }
 
     const hasInstallment = options.hasInstallment ?? options.has_installment;
     if (hasInstallment === true) {
-      filter.installment = { $ne: null } as any;
+      const notNullInstallment: FilterOperators<ICashInstallmentSnapshot | null> = { $ne: null };
+      filter.installment = notNullInstallment;
     } else if (hasInstallment === false) {
-      filter.$or = [
+      const noInstallmentFilter: FilterQuery<ICashDoc>[] = [
         { installment: { $exists: false } },
         { installment: null }
-      ] as any;
+      ];
+      filter.$or = noInstallmentFilter;
     }
 
     const page = this.normalizePositiveInteger(options.page ?? 1, 1);
@@ -304,6 +307,23 @@ export class CashClass {
     };
 
     return { filter, page, limit, sort };
+  }
+
+  private static mergeFilterOperators<T>(
+    current: T | FilterOperators<T> | undefined,
+    update: FilterOperators<T>
+  ): FilterOperators<T> {
+    if (this.isFilterOperatorObject<T>(current)) {
+      return { ...current, ...update };
+    }
+    return update;
+  }
+
+  private static isFilterOperatorObject<T>(value: unknown): value is FilterOperators<T> {
+    return typeof value === 'object'
+      && value !== null
+      && !Array.isArray(value)
+      && !(value instanceof Date);
   }
 
   private static normalizePositiveInteger(value: unknown, min = 1, max = Number.MAX_SAFE_INTEGER): number {
