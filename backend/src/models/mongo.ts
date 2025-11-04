@@ -1,5 +1,5 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import CounterModel from './counter';
+import { getNextSequence, STUDENT_SEQUENCE_NAME } from './counter';
 import { ClassType, SubjectType } from '@/types';
 
 export interface IStudentDoc extends Document {
@@ -205,13 +205,7 @@ const StudentModel = model<IStudentDoc>('Student', studentSchema);
 
 // 获取下一个UID的安全方法（使用计数器集合）
 const getNextUid = async (): Promise<number> => {
-  const counter = await CounterModel.findByIdAndUpdate(
-    { _id: 'studentId' },
-    { $inc: { sequence_value: 1 } },
-    { new: true, upsert: true }
-  );
-  
-  return counter!.sequence_value;
+  return getNextSequence(STUDENT_SEQUENCE_NAME);
 };
 
 export class Student {
