@@ -83,6 +83,36 @@ npm start
 #### 统计数据
 - `GET /dashboard/stats` - 获取仪表板统计
 
+> 💡 **统计服务说明**：`backend/src/services/statsService.ts` 会以“分”为单位聚合现金、分期等数据，控制器层统一转换为“元”（保留两位小数），并复用与 Rust 版本一致的汇总逻辑，确保金额精度与字段含义完全对齐。
+
+##### 仪表盘字段（`/dashboard/stats`）
+- `total_students`：学员总数
+- `total_revenue` / `total_expense` / `net_income`：财务汇总（元，保留两位小数）
+- `average_score` / `max_score`：全体成绩汇总（保留 1 位小数）
+- `active_courses`：去重后的班级数量（排除 `Others` 班级）
+- `active_members`：当前处于有效会员周期的学员数
+- `active_installments` / `overdue_installments`：活跃分期计划及逾期期数统计
+
+##### 学员统计字段（`/dashboard/students/:id/stats`）
+- `total_payments` / `payment_count`：该学员的收入总额及次数
+- `average_score` / `max_score` / `min_score` / `score_count`：成绩表现
+- `membership_status` / `membership_status_code`：会员可读文案及状态枚举（`None`/`Active`/`Expired`/`Upcoming`）
+- `membership_is_active` / `membership_days_remaining` / `membership_days_until_start`：临近过期、未开始等场景的提示
+- `installment_stats`：
+  - `total_amount`：计划总额
+  - `paid_amount`：已支付金额
+  - `pending_amount`：待支付金额（含逾期）
+  - `pending_count`：待支付期数
+  - `remaining_amount`：剩余金额
+
+##### 财务统计字段（`/dashboard/financial-stats`）
+- `period` / `date_from` / `date_to`：本次统计覆盖的时间范围
+- `total_income` / `total_expense` / `net_income` / `net_profit`：净收益指标（元）
+- `is_profitable`：是否盈利
+- `installment_total` / `installment_paid` / `installment_pending` / `installment_remaining`：分期金额拆分
+- `transaction_count`：交易数量
+- `student_income`：学员收入 Top 榜（含 `student_id`、`student_name`、`amount`）
+
 ### 错误响应格式
 
 当请求无法成功处理时，后端会返回如下结构的统一错误响应：

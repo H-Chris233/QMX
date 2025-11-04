@@ -3,75 +3,34 @@ import { Student } from '@/models/mongo';
 import { CashClass } from '@/models/CashMongo';
 import { Installment } from '@/models/InstallmentMongo';
 import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
+import StatsService from '@/services/statsService';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
-import { AppError } from '@/utils/errors';
+
+const formatCurrency = (cents: number): number => {
+  if (!Number.isFinite(cents)) {
+    return 0;
+  }
+  return Number((cents / 100).toFixed(2));
+};
 
 // 统计控制器 - 统一使用MongoDB数据源
 export class StatsController {
   // 获取仪表板统计数据
   public getDashboardStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    // 获取总学员数
-    const totalStudents = await Student.count();
-
-    // 获取财务统计
-    const transactions = await CashClass.findAll();
-    const totalRevenue = transactions
-      .filter(t => t.isIncome())
-      .reduce((sum, t) => sum + t.getAmount(), 0);
-
-    const totalExpense = Math.abs(
-      transactions
-        .filter(t => !t.isIncome())
-        .reduce((sum, t) => sum + t.getAmount(), 0)
-    );
-
-    // 计算成绩统计
-    const allStudents = await Student.findAll();
-    let totalScore = 0;
-    let scoreCount = 0;
-    let maxScore = 0;
-
-    allStudents.forEach(student => {
-      if (student.rings && student.rings.length > 0) {
-        student.rings.forEach((score: number) => {
-          totalScore += score;
-          scoreCount++;
-          maxScore = Math.max(maxScore, score);
-        });
-      }
-    });
-
-    const averageScore = scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
-
-    // 计算活跃课程数（有剩余课时的学员数）
-    const activeCourses = allStudents.filter(student =>
-      student.lessonLeft && student.lessonLeft > 0
-    ).length;
-
-    // 计算有效会员数
-    const now = new Date();
-    const activeMembers = allStudents.filter(student =>
-      student.membershipStartDate && student.membershipEndDate &&
-      student.membershipStartDate <= now && student.membershipEndDate >= now
-    ).length;
-
-    // 获取分期付款统计
-    const installmentPlans = await InstallmentPlan.findAll();
-    const activeInstallments = installmentPlans.filter(plan => plan.status === 'Active').length;
-    const overdueInstallments = await Installment.findOverdue();
+    const stats = await StatsService.buildDashboardStats();
 
     const responseData = {
-      total_students: totalStudents,
-      total_revenue: Number(totalRevenue.toFixed(2)),
-      total_expense: Number(totalExpense.toFixed(2)),
-      net_income: Number((totalRevenue - totalExpense).toFixed(2)),
-      average_score: averageScore,
-      max_score: maxScore,
-      active_courses: activeCourses,
-      active_members: activeMembers,
-      active_installments: activeInstallments,
-      overdue_installments: overdueInstallments.length,
+      total_students: stats.totalStudents,
+      total_revenue: formatCurrency(stats.totalRevenueCents),
+      total_expense: formatCurrency(stats.totalExpenseCents),
+      net_income: formatCurrency(stats.netIncomeCents),
+      average_score: stats.averageScore,
+      max_score: stats.maxScore,
+      active_courses: stats.activeCourses,
+      active_members: stats.activeMembers,
+      active_installments: stats.activeInstallmentPlans,
+      overdue_installments: stats.overdueInstallmentCount,
     };
 
     const response = {
@@ -85,68 +44,28 @@ export class StatsController {
 
   // 获取特定学员的统计信息
   public getStudentStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { id } = req.params;
+    const studentUid = Number(req.params.id);
 
-    const student = await Student.findByUid(Number(id));
-
-    if (!student) {
-      throw AppError.notFound('学员不存在');
-    }
-
-    // 计算支付统计
-    const transactions = await CashClass.search({ student_id: student.uid });
-    const payments = transactions.filter(t => t.isIncome());
-    const totalPayments = payments.reduce((sum, p) => sum + p.getAmount(), 0);
-    const paymentCount = payments.length;
-
-    // 计算成绩统计
-    const averageScore = student.getAverageScore();
-    const scoreCount = student.rings.length;
-
-    // 计算会员状态
-    let membershipStatus = '无会员';
-    if (student.hasMembership()) {
-      const daysRemaining = student.getMembershipDaysRemaining();
-      if (daysRemaining && daysRemaining > 30) {
-        membershipStatus = '会员有效';
-      } else if (daysRemaining && daysRemaining > 0) {
-        membershipStatus = `会员即将到期 (${daysRemaining}天)`;
-      } else {
-        membershipStatus = '会员已过期';
-      }
-    }
-
-    // 获取分期付款统计
-    const installmentPlans = await InstallmentPlan.search({ student_id: student.uid });
-    let totalInstallmentAmount = 0;
-    let paidInstallmentAmount = 0;
-    let pendingInstallmentCount = 0;
-
-    for (const plan of installmentPlans) {
-      const installments = await Installment.findByPlanId(plan.uid);
-      totalInstallmentAmount += plan.total_amount / 100;
-
-      for (const installment of installments) {
-        if (installment.status === 'Paid') {
-          paidInstallmentAmount += (installment.paid_amount || installment.installment_amount) / 100;
-        } else if (installment.status === 'Pending') {
-          pendingInstallmentCount++;
-        }
-      }
-    }
+    const stats = await StatsService.buildStudentStats(studentUid);
 
     const responseData = {
-      total_payments: Number(totalPayments.toFixed(2)),
-      payment_count: paymentCount,
-      average_score: averageScore,
-      score_count: scoreCount,
-      membership_status: membershipStatus,
-      membership_days_remaining: student.getMembershipDaysRemaining(),
+      total_payments: formatCurrency(stats.payments.totalAmountCents),
+      payment_count: stats.payments.count,
+      average_score: stats.scores.average,
+      max_score: stats.scores.max,
+      min_score: stats.scores.min,
+      score_count: stats.scores.count,
+      membership_status: stats.membership.label,
+      membership_status_code: stats.membership.status,
+      membership_is_active: stats.membership.isActive,
+      membership_days_remaining: stats.membership.daysRemaining,
+      membership_days_until_start: stats.membership.daysUntilStart,
       installment_stats: {
-        total_amount: Number(totalInstallmentAmount.toFixed(2)),
-        paid_amount: Number(paidInstallmentAmount.toFixed(2)),
-        pending_count: pendingInstallmentCount,
-        remaining_amount: Number((totalInstallmentAmount - paidInstallmentAmount).toFixed(2)),
+        total_amount: formatCurrency(stats.installments.totalAmountCents),
+        paid_amount: formatCurrency(stats.installments.paidAmountCents),
+        pending_amount: formatCurrency(stats.installments.pendingAmountCents),
+        pending_count: stats.installments.pendingCount,
+        remaining_amount: formatCurrency(stats.installments.remainingAmountCents),
       },
     };
 
@@ -155,115 +74,35 @@ export class StatsController {
       data: responseData,
     };
 
-    logger.info(`获取学员统计信息成功，UID: ${student.uid}`);
+    logger.info(`获取学员统计信息成功，UID: ${stats.studentUid}`);
     res.json(response);
   });
 
   // 获取财务统计
   public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { period = 'ThisMonth' } = req.query;
+    const rawPeriod = typeof req.query.period === 'string' ? req.query.period : undefined;
 
-    // 计算时间范围
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date = new Date(now.getFullYear(), now.getMonth() + 1, 0); // 月底
-
-    switch (period) {
-      case 'Today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        break;
-      case 'ThisWeek':
-        const dayOfWeek = now.getDay();
-        startDate = new Date(now.getTime() - (dayOfWeek * 24 * 60 * 60 * 1000));
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'ThisMonth':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case 'ThisYear':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31);
-        break;
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    // 获取时间范围内的交易
-    const transactions = await CashClass.search({
-      created_at: { $gte: startDate, $lte: endDate }
-    });
-
-    const totalIncome = transactions
-      .filter(t => t.isIncome())
-      .reduce((sum, t) => sum + t.getAmount(), 0);
-
-    const totalExpense = Math.abs(
-      transactions
-        .filter(t => !t.isIncome())
-        .reduce((sum, t) => sum + t.getAmount(), 0)
-    );
-
-    const netIncome = totalIncome - totalExpense;
-    const isProfitable = netIncome > 0;
-
-    // 获取分期付款统计
-    const installmentPlans = await InstallmentPlan.search({
-      created_at: { $gte: startDate, $lte: endDate }
-    });
-
-    let installmentTotal = 0;
-    let installmentPaid = 0;
-    let installmentPending = 0;
-
-    for (const plan of installmentPlans) {
-      const installments = await Installment.findByPlanId(plan.uid);
-      const planAmount = plan.total_amount / 100;
-      installmentTotal += planAmount;
-
-      for (const installment of installments) {
-        const amount = installment.installment_amount / 100;
-        if (installment.status === 'Paid') {
-          installmentPaid += amount;
-        } else if (installment.status === 'Pending') {
-          installmentPending += amount;
-        }
-      }
-    }
-
-    // 按学员统计收入
-    const studentIncomeMap = new Map<number, number>();
-    transactions
-      .filter(t => t.isIncome() && t.student_id)
-      .forEach(t => {
-        const studentId = t.student_id!;
-        const current = studentIncomeMap.get(studentId) || 0;
-        studentIncomeMap.set(studentId, current + t.getAmount());
-      });
-
-    const student_income = Array.from(studentIncomeMap.entries())
-      .map(([student_id, amount]) => ({
-        student_id,
-        amount,
-        student_name: '学员' + student_id // 简化显示
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
+    const stats = await StatsService.buildFinancialStats(rawPeriod);
 
     const responseData = {
-      period,
-      date_from: startDate,
-      date_to: endDate,
-      total_income: Number(totalIncome.toFixed(2)),
-      total_expense: Number(totalExpense.toFixed(2)),
-      net_income: Number(netIncome.toFixed(2)),
-      net_profit: Number(netIncome.toFixed(2)),
-      is_profitable: isProfitable,
-      installment_total: Number(installmentTotal.toFixed(2)),
-      installment_paid: Number(installmentPaid.toFixed(2)),
-      installment_pending: Number(installmentPending.toFixed(2)),
-      transaction_count: transactions.length,
-      student_income,
+      period: stats.period,
+      date_from: stats.dateRange.start,
+      date_to: stats.dateRange.end,
+      total_income: formatCurrency(stats.totals.incomeCents),
+      total_expense: formatCurrency(stats.totals.expenseCents),
+      net_income: formatCurrency(stats.totals.netIncomeCents),
+      net_profit: formatCurrency(stats.totals.netIncomeCents),
+      is_profitable: stats.totals.isProfitable,
+      installment_total: formatCurrency(stats.installments.totalCents),
+      installment_paid: formatCurrency(stats.installments.paidCents),
+      installment_pending: formatCurrency(stats.installments.pendingCents),
+      installment_remaining: formatCurrency(stats.installments.remainingCents),
+      transaction_count: stats.transactionCount,
+      student_income: stats.studentIncome.map(entry => ({
+        student_id: entry.studentId,
+        student_name: entry.studentName,
+        amount: formatCurrency(entry.amountCents),
+      })),
     };
 
     const response = {
@@ -271,7 +110,7 @@ export class StatsController {
       data: responseData,
     };
 
-    logger.info(`获取财务统计成功，周期: ${period}`);
+    logger.info(`获取财务统计成功，周期: ${stats.period}`);
     res.json(response);
   });
 

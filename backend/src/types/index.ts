@@ -189,9 +189,13 @@ export interface IDashboardStats {
   total_students: number;
   total_revenue: number;
   total_expense: number;
+  net_income: number;
   average_score: number;
   max_score: number;
   active_courses: number;
+  active_members: number;
+  active_installments: number;
+  overdue_installments: number;
 }
 
 // 学员统计数据
@@ -199,12 +203,28 @@ export interface IStudentStats {
   total_payments: number;
   payment_count: number;
   average_score?: number;
+  max_score?: number;
+  min_score?: number;
   score_count: number;
   membership_status: string;
+  membership_status_code?: MembershipStatus;
+  membership_is_active?: boolean;
+  membership_days_remaining?: number | null;
+  membership_days_until_start?: number | null;
+  installment_stats: {
+    total_amount: number;
+    paid_amount: number;
+    pending_amount?: number;
+    pending_count: number;
+    remaining_amount: number;
+  };
 }
 
 // 财务统计数据
 export interface IFinancialStats {
+  period?: string;
+  date_from?: Date | string;
+  date_to?: Date | string;
   total_income: number;
   total_expense: number;
   net_income: number;
@@ -213,6 +233,13 @@ export interface IFinancialStats {
   installment_total: number;
   installment_paid: number;
   installment_pending: number;
+  installment_remaining?: number;
+  transaction_count?: number;
+  student_income?: Array<{
+    student_id: number;
+    student_name: string;
+    amount: number;
+  }>;
 }
 
 // 搜索选项接口
