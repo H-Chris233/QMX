@@ -19,6 +19,17 @@ export type {
   IInstallmentPlanDoc as ISystemConfigDoc,
 } from './InstallmentPlanMongo';
 
+export {
+  COUNTER_SEQUENCES,
+  STUDENT_SEQUENCE_NAME,
+  CASH_SEQUENCE_NAME,
+  INSTALLMENT_SEQUENCE_NAME,
+  INSTALLMENT_PLAN_SEQUENCE_NAME,
+  getNextSequence,
+  resetSequence
+} from './counter';
+export type { SequenceName } from './counter';
+
 export { ClassType, SubjectType } from '@/types';
 
 export async function initMongoModels(): Promise<void> {
