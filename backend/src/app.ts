@@ -1,6 +1,6 @@
-import express from 'express';
+import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+import helmet, { type HelmetOptions } from 'helmet';
 import compression from 'compression';
 import { config } from '@/config';
 import { errorHandler, notFound } from '@/middleware/errorHandler';
@@ -8,10 +8,10 @@ import { rateLimitMiddleware } from '@/middleware/rateLimiter';
 import routes from '@/routes';
 import logger from '@/utils/logger';
 
-const app = express();
+const app: Application = express();
 
 // 安全头部设置
-app.use(helmet({
+const helmetOptions: HelmetOptions = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -25,7 +25,9 @@ app.use(helmet({
       frameSrc: ["'none'"],
     },
   },
-}));
+};
+
+app.use(helmet(helmetOptions));
 
 // CORS配置
 app.use(cors({
@@ -43,7 +45,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 请求日志记录
-app.use((req, res, next) => {
+app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info(`${req.method} ${req.url} - ${req.ip}`);
   next();
 });
@@ -52,7 +54,7 @@ app.use((req, res, next) => {
 app.use(rateLimitMiddleware);
 
 // 健康检查端点
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -62,7 +64,7 @@ app.get('/health', (req, res) => {
 });
 
 // 数据库健康检查端点
-app.get('/api/v1/health/db', async (req, res) => {
+app.get('/api/v1/health/db', async (req: Request, res: Response) => {
   try {
     const { mongoManager } = await import('@/config/mongodb');
     const health = await mongoManager.checkHealth();
@@ -85,7 +87,7 @@ app.get('/api/v1/health/db', async (req, res) => {
 });
 
 // API路由
-app.use('/api/v1', (req, res, next) => {
+app.use('/api/v1', (req: Request, _res: Response, next: NextFunction) => {
   logger.info(`API v1 ${req.method} ${req.url}`);
   next();
 }, routes);
