@@ -1,0 +1,49 @@
+# .github/workflows/node-ci.yml
+name: Full-Stack CI
+
+on:
+  push:
+    branches: [release]
+  pull_request:
+    branches: [release]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    # 1. 基础环境设置
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    # 2. 前端构建 (假设前端在根目录)
+    - name: Build Vue Frontend
+      run: |
+        npm ci
+        npm run build
+      env:
+        CI: true
+
+    # 3. 后端处理 (关键：指定子目录路径)
+    - name: Build Express Backend
+      working-directory: ./backend  # 你的后端子目录名
+      run: |
+        npm ci
+        npm run build  # 确保package.json有tsc构建命令
+        npm test       # 建议包含测试用例
+
+    # 4. 完整性检查（可选但推荐）
+    - name: Verify build artifacts
+      run: |
+        test -d dist && echo "Frontend built successfully"
+        test -d backend/dist && echo "Backend built successfully"
+        
