@@ -70,12 +70,20 @@ export interface DashboardStats {
   total_revenue: number;
   /** 总支出 */
   total_expense: number;
+  /** 净收入 */
+  net_income: number;
   /** 平均分 */
   average_score: number;
   /** 最高分 */
   max_score: number;
   /** 活跃课程数 */
   active_courses: number;
+  /** 活跃会员数 */
+  active_members?: number;
+  /** 活跃分期计划数 */
+  active_installments?: number;
+  /** 逾期分期数量 */
+  overdue_installments?: number;
 }
 
 /**
@@ -181,16 +189,47 @@ export interface StudentStats {
   payment_count: number;
   /** 平均分 */
   average_score?: number;
+  /** 最高分 */
+  max_score?: number;
+  /** 最低分 */
+  min_score?: number;
   /** 成绩次数 */
   score_count: number;
-  /** 会员状态 */
+  /** 会员状态文本 */
   membership_status: string;
+  /** 会员状态代码 */
+  membership_status_code?: 'None' | 'Active' | 'Expired' | 'Upcoming';
+  /** 会员是否处于激活状态 */
+  membership_is_active?: boolean;
+  /** 会员剩余天数 */
+  membership_days_remaining?: number | null;
+  /** 会员距离开始的天数 */
+  membership_days_until_start?: number | null;
+  /** 分期付款统计 */
+  installment_stats?: {
+    /** 分期总金额 */
+    total_amount: number;
+    /** 已支付金额 */
+    paid_amount: number;
+    /** 待支付金额 */
+    pending_amount?: number;
+    /** 待支付期数 */
+    pending_count: number;
+    /** 剩余金额 */
+    remaining_amount: number;
+  };
 }
 
 /**
  * 财务统计数据接口
  */
 export interface FinancialStats {
+  /** 统计周期 */
+  period?: string;
+  /** 起始日期 */
+  date_from?: string;
+  /** 截止日期 */
+  date_to?: string;
   /** 总收入 */
   total_income: number;
   /** 总支出 */
@@ -201,12 +240,22 @@ export interface FinancialStats {
   net_profit?: number;
   /** 是否盈利 */
   is_profitable?: boolean;
-  /** 总分期数 */
+  /** 分期总金额 */
   installment_total: number;
-  /** 已支付分期数 */
+  /** 已支付分期金额 */
   installment_paid: number;
-  /** 待处理分期数 */
+  /** 待支付分期金额 */
   installment_pending: number;
+  /** 剩余分期金额 */
+  installment_remaining?: number;
+  /** 交易数量 */
+  transaction_count?: number;
+  /** 学员收入榜 */
+  student_income?: Array<{
+    student_id: number;
+    student_name: string;
+    amount: number;
+  }>;
 }
 
 /**
