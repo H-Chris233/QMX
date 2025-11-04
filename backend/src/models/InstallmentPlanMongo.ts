@@ -1,5 +1,5 @@
 import mongoose, { Document, FilterQuery, Schema, UpdateQuery } from 'mongoose';
-import { AppError } from '@/middleware/errorHandler';
+import { AppError } from '@/utils/errors';
 import { PaymentFrequency } from '@/types';
 import { getNextSequence, INSTALLMENT_PLAN_SEQUENCE_NAME } from './counter';
 
@@ -186,7 +186,7 @@ const normalizeOptionalNumber = (value?: number | null): number | null => {
   }
   const numeric = Number(value);
   if (!Number.isInteger(numeric) || numeric <= 0) {
-    throw new AppError('InvalidInput: 数值必须为正整数', 400);
+    throw AppError.invalidInput('数值必须为正整数');
   }
   return numeric;
 };
@@ -194,10 +194,10 @@ const normalizeOptionalNumber = (value?: number | null): number | null => {
 export class InstallmentPlan {
   static async create(payload: IInstallmentPlanCreatePayload): Promise<IInstallmentPlanDoc> {
     if (!Number.isInteger(payload.total_amount) || payload.total_amount <= 0) {
-      throw new AppError('InvalidInput: 总金额必须以分为单位存储', 400);
+      throw AppError.invalidInput('总金额必须以分为单位存储');
     }
     if (!Number.isInteger(payload.total_installments) || payload.total_installments <= 0) {
-      throw new AppError('InvalidInput: 总期数必须为正整数', 400);
+      throw AppError.invalidInput('总期数必须为正整数');
     }
 
     const uid = await getNextSequence(INSTALLMENT_PLAN_SEQUENCE_NAME);

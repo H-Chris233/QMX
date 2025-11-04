@@ -1,7 +1,7 @@
-import { AppError } from '@/middleware/errorHandler';
 import { CashClass, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
 import type { ICashInstallmentSnapshot } from '@/types';
+import { AppError } from '@/utils/errors';
 import { convertAmountToCents, normalizeNote, sanitizeInstallmentSnapshot } from './cashBuilder';
 
 export class CashUpdater {
@@ -13,7 +13,7 @@ export class CashUpdater {
   static async for(uid: number): Promise<CashUpdater> {
     const doc = await CashClass.findByUid(uid);
     if (!doc) {
-      throw new AppError('NotFound: 交易记录不存在', 404);
+      throw AppError.notFound('交易记录不存在');
     }
     return new CashUpdater(doc);
   }
@@ -42,7 +42,7 @@ export class CashUpdater {
 
     const numeric = Number(studentId);
     if (!Number.isInteger(numeric) || numeric <= 0) {
-      throw new AppError('InvalidInput: 学员ID必须为正整数', 400);
+      throw AppError.invalidInput('学员ID必须为正整数');
     }
 
     this.pendingStudentId = numeric;
@@ -66,7 +66,7 @@ export class CashUpdater {
       } else {
         const student = await Student.findByUid(this.pendingStudentId);
         if (!student) {
-          throw new AppError('NotFound: 学员不存在', 404);
+          throw AppError.notFound('学员不存在');
         }
         this.cash.student_id = student.uid;
       }

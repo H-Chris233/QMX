@@ -5,6 +5,7 @@ import { IApiResponse } from '@/types';
 import logger from '@/utils/logger';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { presentStudent } from '@/services/studentPresenter';
+import { AppError } from '@/utils/errors';
 
 export class ScoreController {
   public addScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -14,11 +15,7 @@ export class ScoreController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);
@@ -50,11 +47,7 @@ export class ScoreController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const studentData = presentStudent(student);
@@ -86,11 +79,7 @@ export class ScoreController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);
@@ -125,11 +114,7 @@ export class ScoreController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);
@@ -163,21 +148,13 @@ export class ScoreController {
     const { scores } = req.body;
 
     if (!Array.isArray(scores) || scores.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: '成绩数组不能为空',
-      });
-      return;
+      throw AppError.invalidInput('成绩数组不能为空');
     }
 
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);
@@ -212,11 +189,7 @@ export class ScoreController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);

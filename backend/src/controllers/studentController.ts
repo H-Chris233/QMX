@@ -7,6 +7,7 @@ import { StudentUpdater } from '@/services/studentUpdater';
 import { StudentQuery } from '@/services/studentQuery';
 import { presentStudent } from '@/services/studentPresenter';
 import type { ClassType, SubjectType } from '@/types';
+import { AppError } from '@/utils/errors';
 
 const parseNumber = (value: unknown): number | null => {
   if (value === undefined || value === null) {
@@ -153,27 +154,19 @@ export class StudentController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const deleted = await Student.deleteByUid(student.uid);
 
-    if (deleted) {
-      logger.info(`删除学员成功，UID: ${student.uid}`);
-      res.json({
-        success: true,
-        message: '学员删除成功',
-      });
-      return;
+    if (!deleted) {
+      throw AppError.other('删除学员失败');
     }
 
-    res.status(500).json({
-      success: false,
-      error: '删除学员失败',
+    logger.info(`删除学员成功，UID: ${student.uid}`);
+    res.json({
+      success: true,
+      message: '学员删除成功',
     });
   });
 
@@ -182,11 +175,7 @@ export class StudentController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     res.json({
@@ -245,11 +234,7 @@ export class StudentController {
     const { studentIds, updates } = req.body as { studentIds: number[]; updates: Record<string, any> };
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: '学员ID列表不能为空',
-      });
-      return;
+      throw AppError.invalidInput('学员ID列表不能为空');
     }
 
     let updatedCount = 0;
@@ -279,11 +264,7 @@ export class StudentController {
     const { studentIds } = req.body as { studentIds: number[] };
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: '学员ID列表不能为空',
-      });
-      return;
+      throw AppError.invalidInput('学员ID列表不能为空');
     }
 
     let deletedCount = 0;
@@ -309,11 +290,7 @@ export class StudentController {
     const { rings } = req.body;
 
     if (!Array.isArray(rings)) {
-      res.status(400).json({
-        success: false,
-        error: '成绩必须是数组格式',
-      });
-      return;
+      throw AppError.invalidInput('成绩必须是数组格式');
     }
 
     const updater = await StudentUpdater.for(Number(id));
