@@ -262,129 +262,225 @@ export class StatsController {
 
   // 获取趋势分析数据
   public getTrendsData = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { period = 'month', type = 'revenue' } = req.query;
-    const now = new Date();
-    let dataPoints: any[] = [];
+    type TrendPeriod = 'week' | 'month' | 'quarter' | 'year';
+    type TrendMetric = 'revenue' | 'expense' | 'students' | 'installments';
 
-    // 根据周期生成时间点
-    const generateTimePoints = () => {
-      const points = [];
-      let iterations = 12;
+    interface TrendTimePoint {
+      label: string;
+      rangeStart: Date;
+      rangeEnd: Date;
+      referenceDate: Date;
+    }
+
+    interface TrendDataPoint {
+      period: string;
+      value: number;
+      date: Date;
+    }
+
+    const normalizePeriod = (raw: unknown): TrendPeriod => {
+      const value = typeof raw === 'string' ? raw.toLowerCase() : 'month';
+      if (value === 'week' || value === 'quarter' || value === 'year') {
+        return value;
+      }
+      return 'month';
+    };
+
+    const normalizeMetric = (raw: unknown): TrendMetric => {
+      const value = typeof raw === 'string' ? raw.toLowerCase() : 'revenue';
+      if (value === 'expense' || value === 'students' || value === 'installments') {
+        return value;
+      }
+      return 'revenue';
+    };
+
+    const startOfDay = (date: Date): Date => {
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      return start;
+    };
+
+    const endOfDay = (date: Date): Date => {
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+      return end;
+    };
+
+    const createTimePoints = (period: TrendPeriod, referenceDate: Date): TrendTimePoint[] => {
+      const points: TrendTimePoint[] = [];
+      const baseDate = startOfDay(referenceDate);
 
       switch (period) {
-        case 'week':
-          iterations = 12;
-          for (let i = iterations - 1; i >= 0; i--) {
-            const date = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+        case 'week': {
+          const iterations = 12;
+          for (let offset = iterations - 1; offset >= 0; offset--) {
+            const weekEnd = endOfDay(new Date(baseDate));
+            weekEnd.setDate(weekEnd.getDate() - offset * 7);
+
+            const weekStartSeed = new Date(weekEnd);
+            weekStartSeed.setDate(weekStartSeed.getDate() - 6);
+            const weekStart = startOfDay(weekStartSeed);
+
             points.push({
-              date,
-              label: `${date.getMonth() + 1}/${date.getDate()}`,
-              start: new Date(date.getFullYear(), date.getMonth(), date.getDate()),
-              end: new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+              label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+              rangeStart: weekStart,
+              rangeEnd: weekEnd,
+              referenceDate: new Date(weekStart),
             });
           }
           break;
-        case 'month':
-          iterations = 12;
-          for (let i = iterations - 1; i >= 0; i--) {
-            const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        }
+        case 'month': {
+          const iterations = 12;
+          for (let offset = iterations - 1; offset >= 0; offset--) {
+            const monthStart = startOfDay(new Date(baseDate));
+            monthStart.setMonth(monthStart.getMonth() - offset, 1);
+
+            const monthEndSeed = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+
             points.push({
-              date,
-              label: `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}`,
-              start: date,
-              end: new Date(date.getFullYear(), date.getMonth() + 1, 0)
+              label: `${monthStart.getFullYear()}/${(monthStart.getMonth() + 1).toString().padStart(2, '0')}`,
+              rangeStart: monthStart,
+              rangeEnd: endOfDay(monthEndSeed),
+              referenceDate: new Date(monthStart),
             });
           }
           break;
-        case 'quarter':
-          iterations = 8;
-          for (let i = iterations - 1; i >= 0; i--) {
-            const quarter = Math.floor(now.getMonth() / 3) - i;
-            const year = now.getFullYear() + Math.floor(quarter / 4);
-            const quarterInYear = ((quarter % 4) + 4) % 4;
-            const date = new Date(year, quarterInYear * 3, 1);
+        }
+        case 'quarter': {
+          const iterations = 8;
+          const currentQuarter = Math.floor(baseDate.getMonth() / 3);
+          for (let offset = iterations - 1; offset >= 0; offset--) {
+            const quarterIndex = currentQuarter - offset;
+            const yearOffset = Math.floor(quarterIndex / 4);
+            const normalizedQuarter = ((quarterIndex % 4) + 4) % 4;
+            const year = baseDate.getFullYear() + yearOffset;
+            const quarterStart = startOfDay(new Date(year, normalizedQuarter * 3, 1));
+            const quarterEndSeed = new Date(year, normalizedQuarter * 3 + 3, 0);
+
             points.push({
-              date,
-              label: `${year}Q${quarterInYear + 1}`,
-              start: date,
-              end: new Date(year, quarterInYear * 3 + 3, 0)
+              label: `${year}Q${normalizedQuarter + 1}`,
+              rangeStart: quarterStart,
+              rangeEnd: endOfDay(quarterEndSeed),
+              referenceDate: new Date(quarterStart),
             });
           }
           break;
-        case 'year':
-          iterations = 5;
-          for (let i = iterations - 1; i >= 0; i--) {
-            const year = now.getFullYear() - i;
-            const date = new Date(year, 0, 1);
+        }
+        case 'year': {
+          const iterations = 5;
+          for (let offset = iterations - 1; offset >= 0; offset--) {
+            const year = baseDate.getFullYear() - offset;
+            const yearStart = startOfDay(new Date(year, 0, 1));
+            const yearEndSeed = new Date(year, 11, 31);
+
             points.push({
-              date,
-              label: year.toString(),
-              start: date,
-              end: new Date(year, 11, 31)
+              label: `${year}`,
+              rangeStart: yearStart,
+              rangeEnd: endOfDay(yearEndSeed),
+              referenceDate: new Date(yearStart),
             });
           }
           break;
+        }
       }
+
       return points;
     };
 
-    const timePoints = generateTimePoints();
+    const trendPeriod = normalizePeriod(req.query.period);
+    const trendMetric = normalizeMetric(req.query.type);
+    const now = new Date();
+    const timePoints = createTimePoints(trendPeriod, now);
+    const dataPoints: TrendDataPoint[] = [];
 
-    // 为每个时间点获取数据
     for (const point of timePoints) {
-      let value = 0;
+      let rawValue = 0;
 
-      switch (type) {
-        case 'revenue':
-          const revenueTransactions = await CashClass.search({
-            created_at: { $gte: point.start, $lte: point.end },
-            cash: { $gt: 0 }
+      switch (trendMetric) {
+        case 'revenue': {
+          const { data: revenueTransactions } = await CashClass.search({
+            dateFrom: point.rangeStart,
+            dateTo: point.rangeEnd,
+            isIncome: true,
+            limit: 200,
+            page: 1,
           });
-          value = revenueTransactions.reduce((sum, t) => sum + t.getAmount(), 0);
+          const totalRevenue = revenueTransactions.reduce<number>((sum, transaction) => sum + transaction.getAmount(), 0);
+          rawValue = totalRevenue;
           break;
-
-        case 'expense':
-          const expenseTransactions = await CashClass.search({
-            created_at: { $gte: point.start, $lte: point.end },
-            cash: { $lt: 0 }
+        }
+        case 'expense': {
+          const { data: expenseTransactions } = await CashClass.search({
+            dateFrom: point.rangeStart,
+            dateTo: point.rangeEnd,
+            isIncome: false,
+            limit: 200,
+            page: 1,
           });
-          value = Math.abs(expenseTransactions.reduce((sum, t) => sum + t.getAmount(), 0));
+          const totalExpense = expenseTransactions.reduce<number>((sum, transaction) => sum + transaction.getAmount(), 0);
+          rawValue = totalExpense;
           break;
-
-        case 'students':
-          const allStudentsCount = await Student.count(); // 获取所有学员数量
-          value = allStudentsCount;
-          break;
-
-        case 'installments':
-          const installmentData = await InstallmentPlan.search({
-            created_at: { $gte: point.start, $lte: point.end }
+        }
+        case 'students': {
+          const count = await Student.count({
+            createdAt: { $gte: point.rangeStart, $lte: point.rangeEnd },
           });
-          value = installmentData.length;
+          rawValue = count;
           break;
+        }
+        case 'installments': {
+          const installmentPlans = await InstallmentPlan.search({
+            created_at: { $gte: point.rangeStart, $lte: point.rangeEnd },
+          });
+          rawValue = installmentPlans.length;
+          break;
+        }
       }
+
+      const isCurrencyMetric = trendMetric === 'revenue' || trendMetric === 'expense';
+      const normalizedValue = isCurrencyMetric
+        ? Number(rawValue.toFixed(2))
+        : rawValue;
 
       dataPoints.push({
         period: point.label,
-        value: Number(value.toFixed(2)),
-        date: point.date
+        value: normalizedValue,
+        date: point.referenceDate,
       });
     }
+
+    const aggregate = (values: number[], formatter: (value: number) => number): number => {
+      if (values.length === 0) {
+        return 0;
+      }
+      const sum = values.reduce((total, value) => total + value, 0);
+      return formatter(sum);
+    };
+
+    const metricsFormatter = (value: number): number => Number(value.toFixed(2));
+
+    const total = aggregate(dataPoints.map(point => point.value), metricsFormatter);
+    const average = dataPoints.length > 0
+      ? metricsFormatter(dataPoints.reduce((sum, point) => sum + point.value, 0) / dataPoints.length)
+      : 0;
+    const max = dataPoints.length > 0 ? metricsFormatter(Math.max(...dataPoints.map(point => point.value))) : 0;
+    const min = dataPoints.length > 0 ? metricsFormatter(Math.min(...dataPoints.map(point => point.value))) : 0;
 
     const response = {
       success: true,
       data: {
-        type,
-        period,
+        type: trendMetric,
+        period: trendPeriod,
         data_points: dataPoints,
-        total: dataPoints.reduce((sum, point) => sum + point.value, 0),
-        average: dataPoints.length > 0 ? dataPoints.reduce((sum, point) => sum + point.value, 0) / dataPoints.length : 0,
-        max: dataPoints.length > 0 ? Math.max(...dataPoints.map(p => p.value)) : 0,
-        min: dataPoints.length > 0 ? Math.min(...dataPoints.map(p => p.value)) : 0,
+        total,
+        average,
+        max,
+        min,
       },
     };
 
-    logger.info(`获取趋势分析数据成功，类型: ${type}, 周期: ${period}`);
+    logger.info(`获取趋势分析数据成功，类型: ${trendMetric}, 周期: ${trendPeriod}`);
     res.json(response);
   });
 

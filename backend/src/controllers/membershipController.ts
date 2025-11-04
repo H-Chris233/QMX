@@ -25,19 +25,62 @@ const calculateMembershipPeriod = (membershipType: MembershipType, startDate: Da
   return { startDate: start, endDate: end };
 };
 
+const normalizeMembershipStatus = (value: unknown): MembershipStatus => {
+  if (typeof value === 'string') {
+    if ((Object.values(MembershipStatus) as string[]).includes(value)) {
+      return value as MembershipStatus;
+    }
+  }
+  return MembershipStatus.NONE;
+};
+
 const buildMembershipResponse = (student: IStudentDoc, extra: Record<string, unknown> = {}) => {
-  const studentData = presentStudent(student);
-  const status = (studentData.membership_status as MembershipStatus) ?? MembershipStatus.NONE;
+  const presentedStudent = presentStudent(student);
+  const membershipStatus = normalizeMembershipStatus(
+    presentedStudent.membershipStatus ?? presentedStudent.membership_status,
+  );
+
+  const membershipStartDate = presentedStudent.membershipStartDate
+    ?? presentedStudent.membership_start_date
+    ?? null;
+  const membershipEndDate = presentedStudent.membershipEndDate
+    ?? presentedStudent.membership_end_date
+    ?? null;
+  const isMembershipActive = typeof presentedStudent.isMembershipActive === 'boolean'
+    ? presentedStudent.isMembershipActive
+    : student.hasMembership();
+  const membershipDaysRemaining = typeof presentedStudent.membershipDaysRemaining === 'number'
+    ? presentedStudent.membershipDaysRemaining
+    : presentedStudent.membership_days_remaining ?? student.getMembershipDaysRemaining();
+
+  const normalizedStudent = {
+    ...presentedStudent,
+    membershipStatus,
+    membership_status: membershipStatus,
+    membershipStartDate,
+    membership_start_date: membershipStartDate,
+    membershipEndDate,
+    membership_end_date: membershipEndDate,
+    isMembershipActive,
+    is_membership_active: isMembershipActive,
+    membershipDaysRemaining,
+    membership_days_remaining: membershipDaysRemaining,
+  };
+
   return {
     uid: student.uid,
     name: student.name,
-    membership_start_date: studentData.membership_start_date ?? studentData.membershipStartDate,
-    membership_end_date: studentData.membership_end_date ?? studentData.membershipEndDate,
-    is_membership_active: student.hasMembership(),
-    membership_days_remaining: student.getMembershipDaysRemaining(),
-    membership_status: status,
-    membershipStatus: status,
-    student: studentData,
+    membershipStartDate,
+    membership_start_date: membershipStartDate,
+    membershipEndDate,
+    membership_end_date: membershipEndDate,
+    isMembershipActive,
+    is_membership_active: isMembershipActive,
+    membershipDaysRemaining,
+    membership_days_remaining: membershipDaysRemaining,
+    membershipStatus,
+    membership_status: membershipStatus,
+    student: normalizedStudent,
     ...extra,
   };
 };
