@@ -7,6 +7,7 @@ import { catchAsync } from '@/middleware/errorHandler';
 import { CashBuilder, convertAmountToCents, normalizeNote } from '@/services/cashBuilder';
 import { InstallmentStatus, PaymentFrequency } from '@/types';
 import type { ICashSearchOptions } from '@/types';
+import type { PipelineStage } from 'mongoose';
 import logger from '@/utils/logger';
 import { AppError } from '@/utils/errors';
 
@@ -514,7 +515,7 @@ export class CashController {
     }
 
     // 使用聚合管道优化查询，只获取需要的字段并计算统计信息
-    const pipeline = [
+    const pipeline: PipelineStage[] = [
       { $match: { created_at: { $gte: dateFrom } } },
       {
         $group: {
@@ -546,7 +547,7 @@ export class CashController {
     const net_income = stats.total_income - stats.total_expense;
 
     // 按学生ID聚合收入，限制在聚合阶段完成，而不是在应用层
-    const studentIncomePipeline = [
+    const studentIncomePipeline: PipelineStage[] = [
       { $match: { 
           created_at: { $gte: dateFrom },
           cash: { $gt: 0 }, // 只统计收入

@@ -1,4 +1,4 @@
-import mongoose, { Document, FilterQuery, Schema, UpdateQuery } from 'mongoose';
+import mongoose, { Document, FilterQuery, Schema, UpdateQuery, Model } from 'mongoose';
 import { AppError } from '@/utils/errors';
 import { InstallmentStatus } from '@/types';
 import { getNextSequence, INSTALLMENT_SEQUENCE_NAME } from './counter';
@@ -183,7 +183,8 @@ InstallmentSchema.methods.toJSON = function toJSON(this: IInstallmentDoc) {
   };
 };
 
-const InstallmentModel = mongoose.models.Installment || mongoose.model<IInstallmentDoc>('Installment', InstallmentSchema);
+const InstallmentModel: Model<IInstallmentDoc> = (mongoose.models.Installment as Model<IInstallmentDoc> | undefined)
+  ?? mongoose.model<IInstallmentDoc>('Installment', InstallmentSchema);
 
 export class Installment {
   static async create(payload: IInstallmentCreatePayload): Promise<IInstallmentDoc> {

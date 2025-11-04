@@ -1,4 +1,4 @@
-import mongoose, { Document, FilterQuery, Schema, UpdateQuery } from 'mongoose';
+import mongoose, { Document, FilterQuery, Schema, UpdateQuery, Model } from 'mongoose';
 import { AppError } from '@/utils/errors';
 import { PaymentFrequency } from '@/types';
 import { getNextSequence, INSTALLMENT_PLAN_SEQUENCE_NAME } from './counter';
@@ -178,7 +178,8 @@ InstallmentPlanSchema.methods.toJSON = function toJSON(this: IInstallmentPlanDoc
   };
 };
 
-const InstallmentPlanModel = mongoose.models.InstallmentPlan || mongoose.model<IInstallmentPlanDoc>('InstallmentPlan', InstallmentPlanSchema);
+const InstallmentPlanModel: Model<IInstallmentPlanDoc> = (mongoose.models.InstallmentPlan as Model<IInstallmentPlanDoc> | undefined)
+  ?? mongoose.model<IInstallmentPlanDoc>('InstallmentPlan', InstallmentPlanSchema);
 
 const normalizeOptionalNumber = (value?: number | null): number | null => {
   if (value === undefined || value === null) {
