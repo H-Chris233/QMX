@@ -1,10 +1,13 @@
-import { Student, IStudentDoc } from './mongo';
-import { CashClass as Cash, ICashDoc } from './CashMongo';
-import { Installment } from './InstallmentMongo';
-import { InstallmentPlan as SystemConfig } from './InstallmentPlanMongo';
 import mongoose from 'mongoose';
+import { Student, IStudentDoc } from './mongo';
+import { CashClass, ICashDoc, Cash as CashModel } from './CashMongo';
+import { Installment, IInstallmentDoc, InstallmentModel } from './InstallmentMongo';
+import { InstallmentPlan, IInstallmentPlanDoc, InstallmentPlanModel } from './InstallmentPlanMongo';
+import SystemConfig, { ISystemConfigDoc } from './SystemConfig';
 
-export { Student, Cash, Installment, SystemConfig };
+const Cash = CashClass;
+
+export { Student, Cash, CashClass, Installment, InstallmentPlan, SystemConfig };
 
 export type {
   IStudentDoc,
@@ -16,8 +19,11 @@ export type {
   IInstallmentDoc,
 } from './InstallmentMongo';
 export type {
-  IInstallmentPlanDoc as ISystemConfigDoc,
+  IInstallmentPlanDoc,
 } from './InstallmentPlanMongo';
+export type {
+  ISystemConfigDoc,
+} from './SystemConfig';
 
 export {
   COUNTER_SEQUENCES,
@@ -34,15 +40,17 @@ export { ClassType, SubjectType } from '@/types';
 
 export async function initMongoModels(): Promise<void> {
   try {
-    // 检查模型是否有createIndexes方法，如果没有则跳过
     if (typeof (Student as any).createIndexes === 'function') {
       await (Student as any).createIndexes();
     }
-    if (typeof (Cash as any).createIndexes === 'function') {
-      await (Cash as any).createIndexes();
+    if (typeof (CashModel as any).createIndexes === 'function') {
+      await (CashModel as any).createIndexes();
     }
     if (typeof (Installment as any).createIndexes === 'function') {
       await (Installment as any).createIndexes();
+    }
+    if (typeof (InstallmentPlan as any).createIndexes === 'function') {
+      await (InstallmentPlan as any).createIndexes();
     }
     if (typeof (SystemConfig as any).createIndexes === 'function') {
       await (SystemConfig as any).createIndexes();
@@ -85,11 +93,10 @@ export async function checkMongoHealth(): Promise<{ status: string; details: any
       };
     }
 
-    // 检查模型是否有countDocuments方法
-    const studentCount = typeof (Student as any).countDocuments === 'function' ? await (Student as any).countDocuments() : 0;
-    const cashCount = typeof (Cash as any).countDocuments === 'function' ? await (Cash as any).countDocuments() : 0;
-    const installmentCount = typeof (Installment as any).countDocuments === 'function' ? await (Installment as any).countDocuments() : 0;
-    const planCount = typeof (SystemConfig as any).countDocuments === 'function' ? await (SystemConfig as any).countDocuments() : 0;
+    const studentCount = await Student.count();
+    const cashCount = typeof CashModel.countDocuments === 'function' ? await CashModel.countDocuments() : 0;
+    const installmentCount = typeof InstallmentModel.countDocuments === 'function' ? await InstallmentModel.countDocuments() : 0;
+    const planCount = typeof InstallmentPlanModel.countDocuments === 'function' ? await InstallmentPlanModel.countDocuments() : 0;
 
     const stats = {
       students: studentCount,

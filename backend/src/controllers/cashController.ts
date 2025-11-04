@@ -2,9 +2,10 @@ import { Request, Response } from 'express';
 import { CashClass, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
 import { Installment } from '@/models/InstallmentMongo';
-import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
-import { catchAsync } from '@/middleware/errorHandler';
-import { CashBuilder } from '@/services/cashBuilder';
+import { InstallmentPlan, InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
+import { AppError, catchAsync } from '@/middleware/errorHandler';
+import { CashBuilder, convertAmountToCents, normalizeNote } from '@/services/cashBuilder';
+import { InstallmentStatus, PaymentFrequency } from '@/types';
 import type { ICashSearchOptions } from '@/types';
 import logger from '@/utils/logger';
 
@@ -108,8 +109,8 @@ export class CashController {
     }
 
     // 验证输入
-    const validFrequencies = ['Weekly', 'Monthly', 'Quarterly', 'Custom'];
-    if (!validFrequencies.includes(frequency)) {
+    const normalizedFrequency = this.normalizeFrequency(frequency);
+    if (!normalizedFrequency) {
       res.status(400).json({
         success: false,
         error: '无效的付款频率',
@@ -117,7 +118,20 @@ export class CashController {
       return;
     }
 
-    if (frequency === 'Custom' && (!custom_days || custom_days < 1)) {
+    const totalInstallmentsInt = Number(total_installments);
+    if (!Number.isInteger(totalInstallmentsInt) || totalInstallmentsInt <= 0) {
+      res.status(400).json({
+        success: false,
+        error: '总期数必须为正整数',
+      });
+      return;
+    }
+
+    const customDaysValue = normalizedFrequency === PaymentFrequency.CUSTOM
+      ? this.normalizePositiveInteger(custom_days)
+      : null;
+
+    if (normalizedFrequency === PaymentFrequency.CUSTOM && customDaysValue === null) {
       res.status(400).json({
         success: false,
         error: '自定义频率必须指定天数且大于0',
@@ -125,100 +139,107 @@ export class CashController {
       return;
     }
 
+    const startDateValue = new Date(start_date);
+    if (Number.isNaN(startDateValue.getTime())) {
+      res.status(400).json({
+        success: false,
+        error: '开始日期格式不正确',
+      });
+      return;
+    }
+
     try {
-      // 创建分期计划
+      const totalAmountCents = convertAmountToCents(total_amount);
+      const sanitizedNote = normalizeNote(note);
+
       const installmentPlan = await InstallmentPlan.create({
-        student_id: student_id ? Number(student_id) : null,
-        total_amount: Math.round(Number(total_amount) * 100), // 转换为分
-        total_installments: Number(total_installments),
-        frequency,
-        custom_days: frequency === 'Custom' && custom_days ? Number(custom_days) : undefined,
-        start_date: new Date(start_date),
-        note,
-        status: 'Active',
+        student_id: student_id !== undefined ? Number(student_id) : null,
+        total_amount: totalAmountCents,
+        total_installments: totalInstallmentsInt,
+        frequency: normalizedFrequency,
+        custom_days: customDaysValue ?? undefined,
+        start_date: startDateValue,
+        note: sanitizedNote,
+        status: InstallmentPlanStatus.ACTIVE,
       });
 
-      // 计算每期金额
-      const installmentAmount = installmentPlan.getInstallmentAmount();
-
-      // 生成所有分期
       const installments = [];
-      let currentDate = new Date(start_date);
+      let dueDateCursor = new Date(startDateValue);
 
-      for (let i = 1; i <= Number(total_installments); i++) {
-        const dueDate = new Date(currentDate);
-
-        // 根据频率计算下次付款日期
-        switch (frequency) {
-          case 'Weekly':
-            currentDate.setDate(currentDate.getDate() + 7);
-            break;
-          case 'Monthly':
-            currentDate.setMonth(currentDate.getMonth() + 1);
-            break;
-          case 'Quarterly':
-            currentDate.setMonth(currentDate.getMonth() + 3);
-            break;
-          case 'Custom':
-            currentDate.setDate(currentDate.getDate() + Number(custom_days));
-            break;
-        }
+      for (let i = 1; i <= totalInstallmentsInt; i++) {
+        const dueDate = new Date(dueDateCursor);
+        const amountForInstallment = installmentPlan.getInstallmentAmount(i);
 
         const installment = await Installment.create({
           plan_id: installmentPlan.uid,
           current_installment: i,
-          total_installments: Number(total_installments),
-          installment_amount: installmentAmount,
+          total_installments: totalInstallmentsInt,
+          installment_amount: amountForInstallment,
           due_date: dueDate,
-          status: i === 1 ? 'Paid' : 'Pending', // 第一期立即支付
-          paid_amount: i === 1 ? installmentAmount : undefined,
+          status: i === 1 ? InstallmentStatus.PAID : InstallmentStatus.PENDING,
+          paid_amount: i === 1 ? amountForInstallment : undefined,
           paid_at: i === 1 ? new Date() : undefined,
+          student_id: installmentPlan.student_id ?? null,
         });
 
         installments.push(installment);
+        dueDateCursor = this.calculateNextDueDate(dueDateCursor, normalizedFrequency, customDaysValue);
       }
 
-      // 创建交易记录（首期付款）
       const firstInstallment = installments[0];
-      const firstInstallmentCents = firstInstallment
-        ? firstInstallment.installment_amount
-        : Math.round(Number(total_amount) * 100 / Number(total_installments));
-      const firstInstallmentAmount = firstInstallmentCents / 100;
+      const firstInstallmentAmount = firstInstallment
+        ? this.formatAmount(firstInstallment.installment_amount)
+        : this.formatAmount(Math.round(totalAmountCents / totalInstallmentsInt));
 
       const transaction = await CashBuilder.create()
         .amount(firstInstallmentAmount)
         .studentId(student_id ?? null)
-        .note(`分期付款: ${note} - 第1/${total_installments}期`)
+        .note(this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt))
         .installment({
           plan_uid: installmentPlan.uid,
           installment_uid: firstInstallment?.uid ?? null,
           installment_number: firstInstallment?.current_installment ?? 1,
-          total_installments: Number(total_installments),
-          due_date: firstInstallment?.due_date ?? new Date(start_date),
-          status: firstInstallment?.status ?? 'Paid',
+          total_installments: totalInstallmentsInt,
+          due_date: firstInstallment?.due_date ?? startDateValue,
+          status: InstallmentStatus.PAID,
+          note: sanitizedNote ?? undefined,
         })
         .build();
+
+      if (firstInstallment) {
+        await Installment.updateByUid(firstInstallment.uid, {
+          cash_uid: transaction.uid,
+        });
+      }
+
+      if (totalInstallmentsInt === 1) {
+        await InstallmentPlan.updateByUid(installmentPlan.uid, {
+          status: InstallmentPlanStatus.COMPLETED,
+        });
+        installmentPlan.status = InstallmentPlanStatus.COMPLETED;
+      }
 
       const responseData = {
         transaction: this.presentTransaction(transaction),
         plan: {
           uid: installmentPlan.uid,
           student_id: installmentPlan.student_id,
-          total_amount: installmentPlan.total_amount / 100,
+          total_amount: this.formatAmount(installmentPlan.total_amount),
           total_installments: installmentPlan.total_installments,
           frequency: installmentPlan.frequency,
           custom_days: installmentPlan.custom_days,
           start_date: installmentPlan.start_date,
           status: installmentPlan.status,
+          note: sanitizedNote,
         },
         installments: installments.map(inst => ({
           uid: inst.uid,
           current_installment: inst.current_installment,
           total_installments: inst.total_installments,
-          installment_amount: inst.installment_amount / 100,
+          installment_amount: this.formatAmount(inst.installment_amount),
           due_date: inst.due_date,
           status: inst.status,
-          paid_amount: (inst.paid_amount || 0) / 100,
+          paid_amount: this.formatAmount(inst.paid_amount ?? 0),
           paid_at: inst.paid_at,
         })),
       };
@@ -233,6 +254,9 @@ export class CashController {
       res.status(201).json(response);
 
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.error('创建分期付款失败:', error);
       res.status(500).json({
         success: false,
@@ -444,6 +468,57 @@ export class CashController {
     const amount = transaction.getAmount();
     const prefix = transaction.isIncome() ? '收入' : '支出';
     return `${prefix} ¥${amount.toFixed(2)}`;
+  }
+
+  private normalizeFrequency(value: unknown): PaymentFrequency | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const matched = Object.values(PaymentFrequency).find(item => item === value);
+    return matched ?? null;
+  }
+
+  private normalizePositiveInteger(value: unknown): number | null {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+    const numeric = Number(value);
+    if (!Number.isInteger(numeric) || numeric <= 0) {
+      return null;
+    }
+    return numeric;
+  }
+
+  private calculateNextDueDate(current: Date, frequency: PaymentFrequency, customDays?: number | null): Date {
+    const next = new Date(current);
+
+    switch (frequency) {
+      case PaymentFrequency.WEEKLY:
+        next.setDate(next.getDate() + 7);
+        break;
+      case PaymentFrequency.MONTHLY:
+        next.setMonth(next.getMonth() + 1);
+        break;
+      case PaymentFrequency.QUARTERLY:
+        next.setMonth(next.getMonth() + 3);
+        break;
+      case PaymentFrequency.CUSTOM:
+        next.setDate(next.getDate() + (customDays ?? 0));
+        break;
+      default:
+        break;
+    }
+
+    return next;
+  }
+
+  private formatAmount(cents: number): number {
+    return Number((cents / 100).toFixed(2));
+  }
+
+  private buildInstallmentNote(baseNote: string | null, current: number, total: number): string {
+    const label = baseNote ? baseNote : '分期付款';
+    return `${label}: 第${current}/${total}期`;
   }
 
   // 获取财务统计信息 - 优化版本
