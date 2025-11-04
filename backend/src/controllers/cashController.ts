@@ -29,6 +29,24 @@ interface IPaginatedResponse<T> {
   };
 }
 
+const CASH_SORT_FIELDS = ['uid', 'student_id', 'cash', 'created_at', 'updated_at'] as const;
+type CashSortField = typeof CASH_SORT_FIELDS[number];
+type CashSortOrder = NonNullable<ICashSearchOptions['sortOrder']>;
+const isCashSortField = (value: unknown): value is CashSortField =>
+  typeof value === 'string' && (CASH_SORT_FIELDS as readonly string[]).includes(value);
+const normalizeCashSortOrder = (value: unknown): CashSortOrder | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const upper = value.toUpperCase();
+  return upper === 'ASC' || upper === 'DESC' ? upper as CashSortOrder : undefined;
+};
+
+const INSTALLMENT_PLAN_SORT_FIELDS = ['created_at', 'start_date', 'total_amount', 'status', 'updated_at'] as const;
+type InstallmentPlanSortField = typeof INSTALLMENT_PLAN_SORT_FIELDS[number];
+const isInstallmentPlanSortField = (value: unknown): value is InstallmentPlanSortField =>
+  typeof value === 'string' && (INSTALLMENT_PLAN_SORT_FIELDS as readonly string[]).includes(value);
+
 // 财务控制器
 export class CashController {
   // 获取所有交易记录
@@ -385,14 +403,15 @@ export class CashController {
       options.limit = Number(limitValue);
     }
 
-    const sortBy = query.sortBy ?? query.sort_by;
-    if (typeof sortBy === 'string') {
-      options.sortBy = sortBy;
+    const sortByCandidate = query.sortBy ?? query.sort_by;
+    if (isCashSortField(sortByCandidate)) {
+      options.sortBy = sortByCandidate;
     }
 
-    const sortOrder = query.sortOrder ?? query.sort_order;
-    if (typeof sortOrder === 'string') {
-      options.sortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    const sortOrderCandidate = query.sortOrder ?? query.sort_order;
+    const normalizedSortOrder = normalizeCashSortOrder(sortOrderCandidate);
+    if (normalizedSortOrder) {
+      options.sortOrder = normalizedSortOrder;
     }
 
     return options;
@@ -615,9 +634,12 @@ export class CashController {
       whereCondition.status = status;
     }
 
-    const sortField = sort_by === 'created_at' ? 'created_at' : sort_by;
-    const sortOrder = sort_order === 'DESC' ? -1 : 1;
-    const sort = { [sortField]: sortOrder };
+    const sortFieldCandidate = typeof sort_by === 'string' ? sort_by : undefined;
+    const sortField: InstallmentPlanSortField = sortFieldCandidate && isInstallmentPlanSortField(sortFieldCandidate)
+      ? sortFieldCandidate
+      : 'created_at';
+    const sortOrder: 1 | -1 = typeof sort_order === 'string' && sort_order.toUpperCase() === 'ASC' ? 1 : -1;
+    const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     // 获取分期计划数据
     const result = await InstallmentPlan.findWithPagination(
@@ -735,26 +757,43 @@ export class CashController {
 
   // 私有辅助方法：获取状态文本
   private getStatusText(status: string): string {
-    const statusMap: { [key: string]: string } = {
-      'Pending': '待支付',
-      'Paid': '已支付',
-      'Overdue': '已逾期',
-      'Cancelled': '已取消',
-      'Active': '进行中',
-      'Completed': '已完成',
-    };
-    return statusMap[status] || status;
+    switch (status) {
+      case InstallmentStatus.PENDING:
+        return '待支付';
+      case InstallmentStatus.PAID:
+        return '已支付';
+      case InstallmentStatus.OVERDUE:
+        return '已逾期';
+      case InstallmentStatus.CANCELLED:
+      case InstallmentPlanStatus.CANCELLED:
+        return '已取消';
+      case InstallmentPlanStatus.ACTIVE:
+        return '进行中';
+      case InstallmentPlanStatus.COMPLETED:
+        return '已完成';
+      default:
+        return status;
+    }
   }
 
   // 私有辅助方法：获取频率文本
-  private getFrequencyText(frequency: string, customDays?: number): string {
-    const frequencyMap: { [key: string]: string } = {
-      'Weekly': '周付',
-      'Monthly': '月付',
-      'Quarterly': '季付',
-      'Custom': customDays ? `${customDays}天一次` : '自定义',
-    };
-    return frequencyMap[frequency] || frequency;
+  private getFrequencyText(frequency: PaymentFrequency | string, customDays?: number | null): string {
+    const safeCustomDays = typeof customDays === 'number' && Number.isFinite(customDays) && customDays > 0
+      ? customDays
+      : null;
+
+    switch (frequency) {
+      case PaymentFrequency.WEEKLY:
+        return '周付';
+      case PaymentFrequency.MONTHLY:
+        return '月付';
+      case PaymentFrequency.QUARTERLY:
+        return '季付';
+      case PaymentFrequency.CUSTOM:
+        return safeCustomDays ? `${safeCustomDays}天一次` : '自定义';
+      default:
+        return typeof frequency === 'string' ? frequency : String(frequency);
+    }
   }
 }
 
