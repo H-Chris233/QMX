@@ -71,18 +71,50 @@ export interface IStudent {
 // 学员创建属性
 export interface IStudentCreationAttributes extends Omit<IStudent, 'uid' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'> {}
 
+// 交易关联的分期快照
+export interface ICashInstallmentSnapshot {
+  plan_uid: number;
+  installment_uid?: number | null;
+  installment_number?: number | null;
+  total_installments?: number | null;
+  due_date?: Date | string | null;
+  status?: InstallmentStatus | string | null;
+  note?: string | null;
+}
+
 // 交易记录接口
 export interface ICash {
   uid: number;
   student_id: number | null;
+  studentId?: number | null;
   cash: number;
+  amount_in_cents?: number;
+  amountInCents?: number;
+  amount: number;
   note: string | null;
-  createdAt: Date;
+  installment?: ICashInstallmentSnapshot | null;
+  student?: Record<string, unknown> | null;
+  is_income: boolean;
+  isIncome?: boolean;
+  is_expense: boolean;
+  isExpense?: boolean;
+  formatted_amount: string;
+  formattedAmount?: string;
+  description?: string;
+  created_at: Date | string;
+  createdAt?: Date;
+  updated_at?: Date | string;
   updatedAt?: Date;
 }
 
 // 交易创建属性
-export interface ICashCreationAttributes extends Omit<ICash, 'uid' | 'createdAt' | 'updatedAt'> {}
+export interface ICashCreationAttributes {
+  student_id?: number | null;
+  studentId?: number | null;
+  amount: number;
+  note?: string | null;
+  installment?: ICashInstallmentSnapshot | null;
+}
 
 // 分期付款计划接口
 export interface IInstallmentPlan {
@@ -168,15 +200,26 @@ export interface IStudentSearchOptions {
 
 // 现金搜索选项
 export interface ICashSearchOptions {
+  studentId?: number | null;
   student_id?: number | null;
+  minAmount?: number | null;
   min_amount?: number | null;
+  maxAmount?: number | null;
   max_amount?: number | null;
+  hasInstallment?: boolean | null;
   has_installment?: boolean | null;
-  date_from?: Date | null;
-  date_to?: Date | null;
+  dateFrom?: Date | string | null;
+  date_from?: Date | string | null;
+  dateTo?: Date | string | null;
+  date_to?: Date | string | null;
+  isIncome?: boolean | null;
+  is_income?: boolean | null;
   page?: number;
   limit?: number;
-  sort_by?: string;
+  created_at?: Record<string, unknown>;
+  sortBy?: 'uid' | 'student_id' | 'cash' | 'created_at' | 'updated_at';
+  sort_by?: 'uid' | 'student_id' | 'cash' | 'created_at' | 'updated_at';
+  sortOrder?: 'ASC' | 'DESC';
   sort_order?: 'ASC' | 'DESC';
 }
 
