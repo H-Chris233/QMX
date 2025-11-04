@@ -17,6 +17,13 @@ export enum SubjectType {
   OTHERS = 'Others',
 }
 
+export enum MembershipStatus {
+  NONE = 'None',
+  ACTIVE = 'Active',
+  EXPIRED = 'Expired',
+  UPCOMING = 'Upcoming',
+}
+
 // 分期付款状态枚举
 export enum InstallmentStatus {
   PENDING = 'Pending',
@@ -36,22 +43,33 @@ export enum PaymentFrequency {
 // 学员接口
 export interface IStudent {
   uid: number;
-  age: number | null;
   name: string;
+  age: number | null;
   phone: string;
-  lesson_left: number | null;
   class: ClassType;
   subject: SubjectType;
   rings: number[];
   note: string;
-  membership_start_date: Date | null;
-  membership_end_date: Date | null;
+  lesson_left: number | null;
+  lessonLeft?: number | null;
+  membership_start_date: string | null;
+  membershipStartDate?: string | null;
+  membership_end_date: string | null;
+  membershipEndDate?: string | null;
+  membership_days_remaining: number | null;
+  membershipDaysRemaining?: number | null;
+  is_membership_active: boolean;
+  isMembershipActive?: boolean;
+  membership_status?: MembershipStatus;
+  membershipStatus?: MembershipStatus;
+  created_at?: string | null;
   createdAt?: Date;
+  updated_at?: string | null;
   updatedAt?: Date;
 }
 
 // 学员创建属性
-export interface IStudentCreationAttributes extends Omit<IStudent, 'uid' | 'createdAt' | 'updatedAt'> {}
+export interface IStudentCreationAttributes extends Omit<IStudent, 'uid' | 'createdAt' | 'updatedAt' | 'created_at' | 'updated_at'> {}
 
 // 交易记录接口
 export interface ICash {
@@ -140,6 +158,8 @@ export interface IStudentSearchOptions {
   class_type?: ClassType | null;
   subject?: SubjectType | null;
   has_membership?: boolean | null;
+  membership_active_at?: Date | string | null;
+  membership_status?: MembershipStatus | null;
   page?: number;
   limit?: number;
   sort_by?: string;
