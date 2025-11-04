@@ -5,6 +5,7 @@ import { Installment } from '@/models/InstallmentMongo';
 import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
+import { AppError } from '@/utils/errors';
 
 // 统计控制器 - 统一使用MongoDB数据源
 export class StatsController {
@@ -89,11 +90,7 @@ export class StatsController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     // 计算支付统计

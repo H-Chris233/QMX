@@ -5,6 +5,7 @@ import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { presentStudent } from '@/services/studentPresenter';
+import { AppError } from '@/utils/errors';
 
 type MembershipType = 'month' | 'year';
 
@@ -49,11 +50,7 @@ export class MembershipController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);
@@ -81,11 +78,7 @@ export class MembershipController {
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const updater = StudentUpdater.fromDocument(student);
@@ -111,21 +104,13 @@ export class MembershipController {
     const { membershipType, startFromToday = true } = req.body;
 
     if (!['month', 'year'].includes(membershipType)) {
-      res.status(400).json({
-        success: false,
-        error: '会员类型无效，只支持 month 或 year',
-      });
-      return;
+      throw AppError.invalidInput('会员类型无效，只支持 month 或 year');
     }
 
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     const now = new Date();
@@ -159,21 +144,13 @@ export class MembershipController {
     const { membershipType, extendFromCurrent = true } = req.body;
 
     if (!['month', 'year'].includes(membershipType)) {
-      res.status(400).json({
-        success: false,
-        error: '会员类型无效，只支持 month 或 year',
-      });
-      return;
+      throw AppError.invalidInput('会员类型无效，只支持 month 或 year');
     }
 
     const student = await Student.findByUid(Number(id));
 
     if (!student) {
-      res.status(404).json({
-        success: false,
-        error: '学员不存在',
-      });
-      return;
+      throw AppError.notFound('学员不存在');
     }
 
     let renewalStart: Date;
@@ -215,19 +192,11 @@ export class MembershipController {
     const { studentIds, membershipType, startFromToday = true } = req.body;
 
     if (!Array.isArray(studentIds) || studentIds.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: '学员ID列表不能为空',
-      });
-      return;
+      throw AppError.invalidInput('学员ID列表不能为空');
     }
 
     if (!['month', 'year'].includes(membershipType)) {
-      res.status(400).json({
-        success: false,
-        error: '会员类型无效，只支持 month 或 year',
-      });
-      return;
+      throw AppError.invalidInput('会员类型无效，只支持 month 或 year');
     }
 
     const results: Array<Record<string, unknown>> = [];

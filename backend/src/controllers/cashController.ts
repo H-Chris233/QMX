@@ -3,11 +3,12 @@ import { CashClass, ICashDoc } from '@/models/CashMongo';
 import { Student } from '@/models/mongo';
 import { Installment } from '@/models/InstallmentMongo';
 import { InstallmentPlan, InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
-import { AppError, catchAsync } from '@/middleware/errorHandler';
+import { catchAsync } from '@/middleware/errorHandler';
 import { CashBuilder, convertAmountToCents, normalizeNote } from '@/services/cashBuilder';
 import { InstallmentStatus, PaymentFrequency } from '@/types';
 import type { ICashSearchOptions } from '@/types';
 import logger from '@/utils/logger';
+import { AppError } from '@/utils/errors';
 
 // 类型定义
 interface IApiResponse<T = any> {
@@ -100,31 +101,19 @@ export class CashController {
     if (student_id !== null && student_id !== undefined) {
       const student = await Student.findByUid(Number(student_id));
       if (!student) {
-        res.status(400).json({
-          success: false,
-          error: '指定的学员不存在',
-        });
-        return;
+        throw AppError.invalidInput('指定的学员不存在');
       }
     }
 
     // 验证输入
     const normalizedFrequency = this.normalizeFrequency(frequency);
     if (!normalizedFrequency) {
-      res.status(400).json({
-        success: false,
-        error: '无效的付款频率',
-      });
-      return;
+      throw AppError.invalidInput('无效的付款频率');
     }
 
     const totalInstallmentsInt = Number(total_installments);
     if (!Number.isInteger(totalInstallmentsInt) || totalInstallmentsInt <= 0) {
-      res.status(400).json({
-        success: false,
-        error: '总期数必须为正整数',
-      });
-      return;
+      throw AppError.invalidInput('总期数必须为正整数');
     }
 
     const customDaysValue = normalizedFrequency === PaymentFrequency.CUSTOM
@@ -132,20 +121,12 @@ export class CashController {
       : null;
 
     if (normalizedFrequency === PaymentFrequency.CUSTOM && customDaysValue === null) {
-      res.status(400).json({
-        success: false,
-        error: '自定义频率必须指定天数且大于0',
-      });
-      return;
+      throw AppError.invalidInput('自定义频率必须指定天数且大于0');
     }
 
     const startDateValue = new Date(start_date);
     if (Number.isNaN(startDateValue.getTime())) {
-      res.status(400).json({
-        success: false,
-        error: '开始日期格式不正确',
-      });
-      return;
+      throw AppError.invalidInput('开始日期格式不正确');
     }
 
     try {
@@ -258,10 +239,7 @@ export class CashController {
         throw error;
       }
       logger.error('创建分期付款失败:', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : '创建分期付款失败',
-      });
+      throw AppError.other('创建分期付款失败', { cause: error });
     }
   });
 
@@ -272,29 +250,22 @@ export class CashController {
     const transaction = await CashClass.findByUid(Number(id));
 
     if (!transaction) {
-      res.status(404).json({
-        success: false,
-        error: '交易记录不存在',
-      });
-      return;
+      throw AppError.notFound('交易记录不存在');
     }
 
     const deleted = await CashClass.deleteByUid(Number(id));
 
-    if (deleted) {
-      const response: IApiResponse = {
-        success: true,
-        message: '交易记录删除成功',
-      };
-
-      logger.info(`删除交易记录成功，UID: ${transaction.uid}`);
-      res.json(response);
-    } else {
-      res.status(500).json({
-        success: false,
-        error: '删除交易记录失败',
-      });
+    if (!deleted) {
+      throw AppError.other('删除交易记录失败');
     }
+
+    const response: IApiResponse = {
+      success: true,
+      message: '交易记录删除成功',
+    };
+
+    logger.info(`删除交易记录成功，UID: ${transaction.uid}`);
+    res.json(response);
   });
 
   // 搜索现金记录
@@ -329,11 +300,7 @@ export class CashController {
     const transaction = await CashClass.findByUid(Number(id));
 
     if (!transaction) {
-      res.status(404).json({
-        success: false,
-        error: '交易记录不存在',
-      });
-      return;
+      throw AppError.notFound('交易记录不存在');
     }
 
     let student = null;
@@ -726,21 +693,13 @@ export class CashController {
 
     const validStatuses = ['Pending', 'Paid', 'Overdue', 'Cancelled'];
     if (!validStatuses.includes(status)) {
-      res.status(400).json({
-        success: false,
-        error: '无效的分期状态',
-      });
-      return;
+      throw AppError.invalidInput('无效的分期状态');
     }
 
     const installment = await Installment.findByUid(Number(id));
 
     if (!installment) {
-      res.status(404).json({
-        success: false,
-        error: '分期记录不存在',
-      });
-      return;
+      throw AppError.notFound('分期记录不存在');
     }
 
     // 如果是支付，创建交易记录
@@ -761,19 +720,16 @@ export class CashController {
       paid_amount: status === 'Paid' ? installment.installment_amount : installment.paid_amount,
     });
 
-    if (updatedInstallment) {
-      logger.info(`更新分期付款状态成功，ID: ${installment.uid}, 状态: ${status}`);
-      res.json({
-        success: true,
-        data: updatedInstallment,
-        message: '分期付款状态更新成功',
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: '更新分期付款状态失败',
-      });
+    if (!updatedInstallment) {
+      throw AppError.other('更新分期付款状态失败');
     }
+
+    logger.info(`更新分期付款状态成功，ID: ${installment.uid}, 状态: ${status}`);
+    res.json({
+      success: true,
+      data: updatedInstallment,
+      message: '分期付款状态更新成功',
+    });
   });
 
   // 私有辅助方法：获取状态文本

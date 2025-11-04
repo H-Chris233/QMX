@@ -3,10 +3,11 @@ import { Student } from '@/models/mongo';
 import { CashClass } from '@/models/CashMongo';
 import { Installment, IInstallmentDoc } from '@/models/InstallmentMongo';
 import { InstallmentPlan, InstallmentPlanStatus, IInstallmentPlanDoc } from '@/models/InstallmentPlanMongo';
-import { AppError, catchAsync } from '@/middleware/errorHandler';
+import { catchAsync } from '@/middleware/errorHandler';
 import { CashBuilder, convertAmountToCents, normalizeNote } from '@/services/cashBuilder';
 import { InstallmentStatus, PaymentFrequency } from '@/types';
 import logger from '@/utils/logger';
+import { AppError } from '@/utils/errors';
 
 const ALLOWED_SORT_FIELDS = new Set(['created_at', 'start_date', 'total_amount', 'status', 'updated_at']);
 
@@ -76,11 +77,7 @@ export class InstallmentController {
     const plan = await InstallmentPlan.findByUid(Number(id));
 
     if (!plan) {
-      res.status(404).json({
-        success: false,
-        error: '分期计划不存在',
-      });
-      return;
+      throw AppError.notFound('分期计划不存在');
     }
 
     const responseData = await this.buildPlanResponse(plan, { includeInstallments: true });
@@ -107,51 +104,31 @@ export class InstallmentController {
     if (student_id !== null && student_id !== undefined) {
       const student = await Student.findByUid(Number(student_id));
       if (!student) {
-        res.status(400).json({
-          success: false,
-          error: '指定的学员不存在',
-        });
-        return;
+        throw AppError.invalidInput('指定的学员不存在');
       }
     }
 
     const normalizedFrequency = this.normalizeFrequency(frequency);
     if (!normalizedFrequency) {
-      res.status(400).json({
-        success: false,
-        error: '无效的付款频率',
-      });
-      return;
+      throw AppError.invalidInput('无效的付款频率');
     }
 
     const totalInstallmentsInt = Number(total_installments);
     if (!Number.isInteger(totalInstallmentsInt) || totalInstallmentsInt <= 0) {
-      res.status(400).json({
-        success: false,
-        error: '总期数必须为正整数',
-      });
-      return;
+      throw AppError.invalidInput('总期数必须为正整数');
     }
 
     let customDaysValue: number | null = null;
     if (normalizedFrequency === PaymentFrequency.CUSTOM) {
       customDaysValue = this.normalizePositiveInteger(custom_days);
       if (customDaysValue === null) {
-        res.status(400).json({
-          success: false,
-          error: '自定义频率必须指定天数且大于0',
-        });
-        return;
+        throw AppError.invalidInput('自定义频率必须指定天数且大于0');
       }
     }
 
     const startDate = new Date(start_date);
     if (Number.isNaN(startDate.getTime())) {
-      res.status(400).json({
-        success: false,
-        error: '开始日期格式不正确',
-      });
-      return;
+      throw AppError.invalidInput('开始日期格式不正确');
     }
 
     try {
@@ -249,10 +226,7 @@ export class InstallmentController {
         throw error;
       }
       logger.error('创建分期计划失败:', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : '创建分期计划失败',
-      });
+      throw AppError.other('创建分期计划失败', { cause: error });
     }
   });
 
@@ -263,21 +237,13 @@ export class InstallmentController {
 
     const normalizedStatus = this.normalizeInstallmentStatus(status);
     if (!normalizedStatus) {
-      res.status(400).json({
-        success: false,
-        error: '无效的分期状态',
-      });
-      return;
+      throw AppError.invalidInput('无效的分期状态');
     }
 
     const installment = await Installment.findByUid(Number(id));
 
     if (!installment) {
-      res.status(404).json({
-        success: false,
-        error: '分期记录不存在',
-      });
-      return;
+      throw AppError.notFound('分期记录不存在');
     }
 
     const plan = await InstallmentPlan.findByUid(installment.plan_id);
@@ -334,11 +300,7 @@ export class InstallmentController {
       const updatedInstallment = await Installment.updateByUid(installment.uid, updatePayload);
 
       if (!updatedInstallment) {
-        res.status(500).json({
-          success: false,
-          error: '更新分期付款状态失败',
-        });
-        return;
+        throw AppError.other('更新分期付款状态失败');
       }
 
       if (plan) {
@@ -362,10 +324,7 @@ export class InstallmentController {
         throw error;
       }
       logger.error('更新分期付款状态失败:', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : '更新分期付款状态失败',
-      });
+      throw AppError.other('更新分期付款状态失败', { cause: error });
     }
   });
 
@@ -429,11 +388,7 @@ export class InstallmentController {
     const plan = await InstallmentPlan.findByUid(Number(id));
 
     if (!plan) {
-      res.status(404).json({
-        success: false,
-        error: '分期计划不存在',
-      });
-      return;
+      throw AppError.notFound('分期计划不存在');
     }
 
     const installments = await Installment.findByPlanId(plan.uid);
@@ -444,11 +399,7 @@ export class InstallmentController {
     const deleted = await InstallmentPlan.deleteByUid(plan.uid);
 
     if (!deleted) {
-      res.status(500).json({
-        success: false,
-        error: '删除分期计划失败',
-      });
-      return;
+      throw AppError.other('删除分期计划失败');
     }
 
     logger.info(`删除分期计划成功，UID: ${plan.uid}`);
