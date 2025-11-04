@@ -40,8 +40,8 @@ export class InstallmentController {
     }
 
     const sortField = typeof sort_by === 'string' && ALLOWED_SORT_FIELDS.has(sort_by) ? sort_by : 'created_at';
-    const sortOrder = typeof sort_order === 'string' && sort_order.toUpperCase() === 'ASC' ? 1 : -1;
-    const sort = { [sortField]: sortOrder } as Record<string, 1 | -1>;
+    const sortOrder: 1 | -1 = typeof sort_order === 'string' && sort_order.toUpperCase() === 'ASC' ? 1 : -1;
+    const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     const result = await InstallmentPlan.findWithPagination(
       filter,
@@ -147,6 +147,7 @@ export class InstallmentController {
       });
 
       const installments: IInstallmentDoc[] = [];
+      let updatedFirstInstallment: IInstallmentDoc | null = null;
       let dueDateCursor = new Date(startDate);
 
       for (let i = 1; i <= totalInstallmentsInt; i++) {
@@ -214,11 +215,15 @@ export class InstallmentController {
         includeInstallments: true,
         installments,
       });
+      const responsePayload = {
+        ...responseData,
+        first_installment: updatedFirstInstallment ? this.presentInstallment(updatedFirstInstallment) : null,
+      };
 
       logger.info(`创建分期计划成功，UID: ${plan.uid}, 期数: ${totalInstallmentsInt}`);
       res.status(201).json({
         success: true,
-        data: responseData,
+        data: responsePayload,
         message: '分期计划创建成功',
       });
     } catch (error) {
@@ -547,26 +552,42 @@ export class InstallmentController {
   }
 
   private getStatusText(status: string): string {
-    const statusMap: Record<string, string> = {
-      [InstallmentStatus.PENDING]: '待支付',
-      [InstallmentStatus.PAID]: '已支付',
-      [InstallmentStatus.OVERDUE]: '已逾期',
-      [InstallmentStatus.CANCELLED]: '已取消',
-      [InstallmentPlanStatus.ACTIVE]: '进行中',
-      [InstallmentPlanStatus.COMPLETED]: '已完成',
-      [InstallmentPlanStatus.CANCELLED]: '已取消',
-    };
-    return statusMap[status] ?? status;
+    switch (status) {
+      case InstallmentStatus.PENDING:
+        return '待支付';
+      case InstallmentStatus.PAID:
+        return '已支付';
+      case InstallmentStatus.OVERDUE:
+        return '已逾期';
+      case InstallmentStatus.CANCELLED:
+      case InstallmentPlanStatus.CANCELLED:
+        return '已取消';
+      case InstallmentPlanStatus.ACTIVE:
+        return '进行中';
+      case InstallmentPlanStatus.COMPLETED:
+        return '已完成';
+      default:
+        return status;
+    }
   }
 
   private getFrequencyText(frequency: PaymentFrequency, customDays?: number | null): string {
-    const frequencyMap: Record<PaymentFrequency, string> = {
-      [PaymentFrequency.WEEKLY]: '周付',
-      [PaymentFrequency.MONTHLY]: '月付',
-      [PaymentFrequency.QUARTERLY]: '季付',
-      [PaymentFrequency.CUSTOM]: customDays ? `${customDays}天一次` : '自定义',
-    };
-    return frequencyMap[frequency] ?? frequency;
+    const safeCustomDays = typeof customDays === 'number' && Number.isFinite(customDays) && customDays > 0
+      ? customDays
+      : null;
+
+    switch (frequency) {
+      case PaymentFrequency.WEEKLY:
+        return '周付';
+      case PaymentFrequency.MONTHLY:
+        return '月付';
+      case PaymentFrequency.QUARTERLY:
+        return '季付';
+      case PaymentFrequency.CUSTOM:
+        return safeCustomDays ? `${safeCustomDays}天一次` : '自定义';
+      default:
+        return frequency;
+    }
   }
 
   private calculateNextDueDate(current: Date, frequency: PaymentFrequency, customDays?: number | null): Date {

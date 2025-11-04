@@ -6,6 +6,7 @@ import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
 import StatsService from '@/services/statsService';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
+import { PaymentFrequency } from '@/types';
 
 const formatCurrency = (cents: number): number => {
   if (!Number.isFinite(cents)) {
@@ -524,14 +525,23 @@ export class StatsController {
   });
 
   // 私有辅助方法：获取频率文本
-  private getFrequencyText(frequency: string, customDays?: number): string {
-    const frequencyMap: { [key: string]: string } = {
-      'Weekly': '周付',
-      'Monthly': '月付',
-      'Quarterly': '季付',
-      'Custom': customDays ? `${customDays}天一次` : '自定义',
-    };
-    return frequencyMap[frequency] || frequency;
+  private getFrequencyText(frequency: PaymentFrequency | string, customDays?: number | null): string {
+    const safeCustomDays = typeof customDays === 'number' && Number.isFinite(customDays) && customDays > 0
+      ? customDays
+      : null;
+
+    switch (frequency) {
+      case PaymentFrequency.WEEKLY:
+        return '周付';
+      case PaymentFrequency.MONTHLY:
+        return '月付';
+      case PaymentFrequency.QUARTERLY:
+        return '季付';
+      case PaymentFrequency.CUSTOM:
+        return safeCustomDays ? `${safeCustomDays}天一次` : '自定义';
+      default:
+        return typeof frequency === 'string' ? frequency : String(frequency);
+    }
   }
 }
 
