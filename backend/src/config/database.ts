@@ -1,4 +1,4 @@
-import mongoManager from '@/config/mongodb';
+import { mongoManager } from './mongodb';
 import logger from '@/utils/logger';
 
 // 连接数据库
@@ -22,18 +22,6 @@ export const disconnectDatabase = async (): Promise<void> => {
   }
 };
 
-// 优雅关闭处理
-process.on('SIGINT', async () => {
-  logger.info('收到SIGINT信号，正在关闭应用...');
-  await disconnectDatabase();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  logger.info('收到SIGTERM信号，正在关闭应用...');
-  await disconnectDatabase();
-  process.exit(0);
-});
 
 // 检查是否使用MongoDB的函数（用于适配器兼容）
 export function isUsingMongoDB(): boolean {

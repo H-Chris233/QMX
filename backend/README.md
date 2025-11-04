@@ -42,6 +42,14 @@ npm run build
 npm start
 ```
 
+### 启动流程概览
+
+1. **加载环境变量**：`src/config/index.ts` 会通过 `dotenv` 读取 `.env`，同时调用 `validateConfig()` 校验必填项。
+2. **连接数据库**：`src/config/database.ts` 中的 `connectDatabase()` 在应用启动前建立 MongoDB 连接，如连接失败会立即退出。
+3. **启动应用**：`src/index.ts` 引导 `app` 实例监听端口，并输出健康检查、环境等启动日志。
+
+> 待相关模型补齐后，可运行 `npm run build` 确认编译通过。
+
 ## API文档
 
 ### 基础信息
