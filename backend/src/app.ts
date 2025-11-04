@@ -5,6 +5,7 @@ import compression from 'compression';
 import { config } from '@/config';
 import { errorHandler, notFound } from '@/middleware/errorHandler';
 import { rateLimitMiddleware } from '@/middleware/rateLimiter';
+import routes from '@/routes';
 import logger from '@/utils/logger';
 
 const app = express();
@@ -84,8 +85,6 @@ app.get('/api/v1/health/db', async (req, res) => {
 });
 
 // API路由
-import routes from '@/routes';
-
 app.use('/api/v1', (req, res, next) => {
   logger.info(`API v1 ${req.method} ${req.url}`);
   next();
