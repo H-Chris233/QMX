@@ -23,6 +23,27 @@ This directory contains technical documentation for the QMX backend system.
 - Identifying missing implementations
 - Prioritizing development tasks
 
+### [../docs/api-adaptation.md](../../docs/api-adaptation.md)
+**API 接口适配文档** - Detailed API adaptation guide for frontend-backend integration.
+
+**Contents (中文):**
+- 完整的接口对照表（8个业务模块）
+  - 学生管理、成绩管理、交易记录、分期付款、会员管理、统计分析、适配器、认证健康检查
+- 请求/响应结构详细说明
+- 数据结构适配指南（字段命名、金额、日期、ID、枚举）
+- 错误处理对照（AppError 系统 vs Rust Result）
+- 认证授权现状与待办事项
+- 统一规范建议（命名、响应格式、分页、日期时间）
+- 前后端联调注意事项与检查清单
+- 快速参考表与故障排查指南
+
+**Use Cases:**
+- Frontend API integration reference
+- Understanding request/response structures
+- Data transformation guidelines (amount, date, ID conversion)
+- Error handling implementation
+- Frontend-backend collaboration during development
+
 ---
 
 ## 📝 Document Conventions
