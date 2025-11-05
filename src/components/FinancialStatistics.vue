@@ -83,8 +83,8 @@
         <h3>交易记录</h3>
         <div class="filter-controls">
           <select
-            v-model="transactionFilter"
-            @change="applyFilters"
+            :value="filterState.type"
+            @change="onTransactionTypeChange"
             aria-label="交易类型筛选"
           >
             <option value="all">全部交易</option>
@@ -94,10 +94,10 @@
           </select>
           
           <input
-            v-model="searchQuery"
+            :value="filterState.search"
             type="text"
             placeholder="搜索交易..."
-            @input="applyFilters"
+            @input="onSearchInput"
             aria-label="交易搜索"
             class="search-input"
           />
@@ -106,18 +106,18 @@
         <!-- 日期范围搜索 -->
         <div class="date-filter">
           <input
-            v-model="dateFrom"
+            :value="filterState.dateFrom ?? ''"
             type="date"
             placeholder="开始日期"
-            @change="applyFilters"
+            @change="onDateFromChange"
             class="date-input"
           />
           <span class="date-separator">-</span>
           <input
-            v-model="dateTo"
+            :value="filterState.dateTo ?? ''"
             type="date"
             placeholder="结束日期"
-            @change="applyFilters"
+            @change="onDateToChange"
             class="date-input"
           />
           <button 
@@ -259,9 +259,10 @@
           </button>
         </div>
         <div class="modal-body">
-          <TransactionForm 
-            v-model="currentTransaction"
-            :students="students" 
+          <TransactionForm
+            :model-value="currentTransaction"
+            :students="students"
+            @update:modelValue="handleTransactionUpdate"
           />
         </div>
         <div class="modal-footer">
@@ -313,11 +314,18 @@
           </div>
           <div class="form-group">
             <label for="status-select">选择状态</label>
-            <select id="status-select" v-model="selectedStatus">
-              <option value="Pending">待处理</option>
-              <option value="Paid">已支付</option>
-              <option value="Overdue">逾期</option>
-              <option value="Cancelled">已取消</option>
+            <select
+              id="status-select"
+              :value="selectedStatus"
+              @change="onStatusChange"
+            >
+              <option
+                v-for="status in INSTALLMENT_STATUS_VALUES"
+                :key="status"
+                :value="status"
+              >
+                {{ getStatusText(status) }}
+              </option>
             </select>
           </div>
         </div>
@@ -337,25 +345,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, inject, watch } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { formatCurrency as formatCurrencyUtil, formatDate as formatDateUtil } from '../utils/dataTransformers';
 import TransactionForm from './TransactionForm.vue';
-import type { Transaction, Student, InstallmentStatus } from '../types/api';
+import { InstallmentStatus, PaymentFrequency } from '../types/api';
+import type { Transaction, Student } from '../types/api';
+import type { TransactionFormModel, TransactionFilterState, TransactionTypeFilter } from '../types/forms';
 
-// 表单数据类型
-interface TransactionFormData {
-  student_id: number | null;
-  amount: number;
-  note: string;
-  is_installment: boolean;
-  is_expense: boolean;
-  // 分期付款字段
-  total_amount?: number;
-  total_installments?: number;
-  frequency?: string;
-  custom_days?: number | null;
-  due_date?: string;
+
+interface PaginationState {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
 }
 
 interface ErrorHandler {
@@ -388,17 +391,19 @@ const showConfirm = errorHandler?.showConfirm || ((options) => {
 const loading = ref<boolean>(false);
 const transactions = ref<Transaction[]>([]);
 const students = ref<Student[]>([]);
-const transactionFilter = ref<string>('all');
-const searchQuery = ref<string>('');
-const dateFrom = ref<string>('');
-const dateTo = ref<string>('');
+const filterState = ref<TransactionFilterState>({
+  type: 'all',
+  search: '',
+  dateFrom: null,
+  dateTo: null,
+});
 const showAddTransaction = ref<boolean>(false);
 const showUpdateStatus = ref<boolean>(false);
 const selectedTransaction = ref<Transaction | null>(null);
-const selectedStatus = ref<InstallmentStatus>('Pending');
+const selectedStatus = ref<InstallmentStatus>(InstallmentStatus.PENDING);
 
 // 分页状态
-const pagination = ref({
+const pagination = ref<PaginationState>({
   page: 1,
   limit: 20,
   total: 0,
@@ -414,8 +419,11 @@ const timePeriods = [
   { value: 'ThisYear', label: '本年' },
 ];
 
-// 当前交易表单数据
-const currentTransaction = ref<TransactionFormData>({
+const INSTALLMENT_STATUS_VALUES = Object.values(InstallmentStatus) as InstallmentStatus[];
+
+const getTodayString = (): string => new Date().toISOString().split('T')[0];
+
+const createDefaultTransactionFormModel = (): TransactionFormModel => ({
   student_id: null,
   amount: 0,
   note: '',
@@ -423,10 +431,79 @@ const currentTransaction = ref<TransactionFormData>({
   is_expense: false,
   total_amount: 0,
   total_installments: 2,
-  frequency: 'Monthly',
+  frequency: PaymentFrequency.MONTHLY,
   custom_days: null,
-  due_date: new Date().toISOString().split('T')[0],
+  due_date: getTodayString(),
 });
+
+const normalizeTransactionFormModel = (value: TransactionFormModel): TransactionFormModel => {
+  const defaults = createDefaultTransactionFormModel();
+
+  const normalized: TransactionFormModel = {
+    ...defaults,
+    ...value,
+  };
+
+  normalized.student_id = value.student_id ?? defaults.student_id;
+  normalized.amount = Number.isFinite(value.amount) ? value.amount : defaults.amount;
+  normalized.note = value.note ?? defaults.note;
+  normalized.is_installment = Boolean(value.is_installment);
+  normalized.is_expense = Boolean(value.is_expense);
+
+  normalized.total_amount =
+    typeof value.total_amount === 'number' && Number.isFinite(value.total_amount)
+      ? value.total_amount
+      : defaults.total_amount;
+
+  normalized.total_installments =
+    typeof value.total_installments === 'number' &&
+    Number.isFinite(value.total_installments) &&
+    value.total_installments > 0
+      ? Math.floor(value.total_installments)
+      : defaults.total_installments;
+
+  normalized.frequency = value.frequency ?? defaults.frequency;
+  normalized.due_date = value.due_date ?? defaults.due_date;
+
+  if (normalized.is_installment && normalized.frequency === PaymentFrequency.CUSTOM) {
+    normalized.custom_days =
+      typeof value.custom_days === 'number' &&
+      Number.isFinite(value.custom_days) &&
+      value.custom_days > 0
+        ? Math.floor(value.custom_days)
+        : 30;
+  } else {
+    normalized.custom_days = null;
+  }
+
+  return normalized;
+};
+
+const normalizeInstallmentStatus = (
+  status: string | InstallmentStatus | null | undefined,
+): InstallmentStatus => {
+  if (status && INSTALLMENT_STATUS_VALUES.includes(status as InstallmentStatus)) {
+    return status as InstallmentStatus;
+  }
+  return InstallmentStatus.PENDING;
+};
+
+const STATUS_CLASS_MAP: Record<InstallmentStatus, string> = {
+  [InstallmentStatus.PAID]: 'status-paid',
+  [InstallmentStatus.PENDING]: 'status-pending',
+  [InstallmentStatus.OVERDUE]: 'status-overdue',
+  [InstallmentStatus.CANCELLED]: 'status-cancelled',
+};
+
+const STATUS_TEXT_MAP: Record<InstallmentStatus, string> = {
+  [InstallmentStatus.PAID]: '已支付',
+  [InstallmentStatus.PENDING]: '待处理',
+  [InstallmentStatus.OVERDUE]: '逾期',
+  [InstallmentStatus.CANCELLED]: '已取消',
+};
+
+// 当前交易表单数据
+const currentTransaction = ref<TransactionFormModel>(createDefaultTransactionFormModel());
 
 // 计算属性 - 总收入
 const totalIncome = computed(() => {
@@ -455,9 +532,12 @@ const installmentCount = computed(() => {
 });
 
 const pendingInstallments = computed(() => {
-  return transactions.value.filter(
-    (t) => t.is_installment && t.installment?.status === 'Pending'
-  ).length;
+  return transactions.value.filter((t) => {
+    if (!t.is_installment) {
+      return false;
+    }
+    return normalizeInstallmentStatus(t.installment?.status) === InstallmentStatus.PENDING;
+  }).length;
 });
 
 // 方法
@@ -485,33 +565,61 @@ const getTransactionTypeText = (transaction: Transaction): string => {
 };
 
 const getStatusClass = (status: string | null | undefined): string => {
-  switch (status) {
-    case 'Paid':
-      return 'status-paid';
-    case 'Pending':
-      return 'status-pending';
-    case 'Overdue':
-      return 'status-overdue';
-    case 'Cancelled':
-      return 'status-cancelled';
-    default:
-      return '';
-  }
+  return STATUS_CLASS_MAP[normalizeInstallmentStatus(status)] ?? '';
 };
 
 const getStatusText = (status: string | null | undefined): string => {
-  switch (status) {
-    case 'Paid':
-      return '已支付';
-    case 'Pending':
-      return '待处理';
-    case 'Overdue':
-      return '逾期';
-    case 'Cancelled':
-      return '已取消';
-    default:
-      return '未知';
-  }
+  return STATUS_TEXT_MAP[normalizeInstallmentStatus(status)] ?? '未知';
+};
+
+const handleTransactionUpdate = (value: TransactionFormModel) => {
+  currentTransaction.value = normalizeTransactionFormModel(value);
+};
+
+const onTransactionTypeChange = (event: Event) => {
+  const target = event.currentTarget as HTMLSelectElement | null;
+  if (!target) return;
+  filterState.value = {
+    ...filterState.value,
+    type: target.value as TransactionTypeFilter,
+  };
+  applyFilters();
+};
+
+const onSearchInput = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  filterState.value = {
+    ...filterState.value,
+    search: target.value,
+  };
+  applyFilters();
+};
+
+const onDateFromChange = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  filterState.value = {
+    ...filterState.value,
+    dateFrom: target.value ? target.value : null,
+  };
+  applyFilters();
+};
+
+const onDateToChange = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  filterState.value = {
+    ...filterState.value,
+    dateTo: target.value ? target.value : null,
+  };
+  applyFilters();
+};
+
+const onStatusChange = (event: Event) => {
+  const target = event.currentTarget as HTMLSelectElement | null;
+  if (!target) return;
+  selectedStatus.value = normalizeInstallmentStatus(target.value);
 };
 
 // 加载学员列表
@@ -533,25 +641,31 @@ const loadTransactions = async () => {
 
   try {
     // 构建查询参数
-    const params: any = {
+    const params: Record<string, unknown> = {
       page: pagination.value.page,
       limit: pagination.value.limit,
     };
 
     // 添加筛选条件
-    if (transactionFilter.value === 'income') {
-      params.is_income = true;
-    } else if (transactionFilter.value === 'expense') {
-      params.is_income = false;
-    } else if (transactionFilter.value === 'installment') {
-      params.has_installment = true;
+    switch (filterState.value.type) {
+      case 'income':
+        params.is_income = true;
+        break;
+      case 'expense':
+        params.is_income = false;
+        break;
+      case 'installment':
+        params.has_installment = true;
+        break;
+      default:
+        break;
     }
 
-    if (dateFrom.value) {
-      params.date_from = dateFrom.value;
+    if (filterState.value.dateFrom) {
+      params.date_from = filterState.value.dateFrom;
     }
-    if (dateTo.value) {
-      params.date_to = dateTo.value;
+    if (filterState.value.dateTo) {
+      params.date_to = filterState.value.dateTo;
     }
 
     // 调用 API（返回 { items, pagination }）
@@ -583,10 +697,12 @@ const applyFilters = () => {
 
 // 清除筛选
 const clearFilters = () => {
-  transactionFilter.value = 'all';
-  searchQuery.value = '';
-  dateFrom.value = '';
-  dateTo.value = '';
+  filterState.value = {
+    type: 'all',
+    search: '',
+    dateFrom: null,
+    dateTo: null,
+  };
   applyFilters();
 };
 
@@ -624,26 +740,18 @@ const selectTimePeriod = async (period: string) => {
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
   }
 
-  dateFrom.value = startDate.toISOString().split('T')[0];
-  dateTo.value = today.toISOString().split('T')[0];
-  
+  filterState.value = {
+    ...filterState.value,
+    dateFrom: startDate.toISOString().split('T')[0],
+    dateTo: today.toISOString().split('T')[0],
+  };
+
   applyFilters();
 };
 
 // 打开添加交易模态框
 const openAddTransactionModal = () => {
-  currentTransaction.value = {
-    student_id: null,
-    amount: 0,
-    note: '',
-    is_installment: false,
-    is_expense: false,
-    total_amount: 0,
-    total_installments: 2,
-    frequency: 'Monthly',
-    custom_days: null,
-    due_date: new Date().toISOString().split('T')[0],
-  };
+  currentTransaction.value = createDefaultTransactionFormModel();
   showAddTransaction.value = true;
 };
 
@@ -651,7 +759,9 @@ const openAddTransactionModal = () => {
 const saveTransaction = async () => {
   if (loading.value) return;
 
-  const formData = currentTransaction.value;
+  const normalizedForm = normalizeTransactionFormModel(currentTransaction.value);
+  currentTransaction.value = normalizedForm;
+  const formData = normalizedForm;
 
   // 验证
   if (!formData.is_installment && formData.amount <= 0) {
@@ -660,11 +770,11 @@ const saveTransaction = async () => {
   }
 
   if (formData.is_installment) {
-    if (!formData.total_amount || formData.total_amount <= 0) {
+    if (formData.total_amount <= 0) {
       showError('验证失败', '请输入有效的总金额');
       return;
     }
-    if (!formData.total_installments || formData.total_installments < 2) {
+    if (formData.total_installments < 2) {
       showError('验证失败', '分期数必须至少为2');
       return;
     }
@@ -681,24 +791,25 @@ const saveTransaction = async () => {
       // 保存分期交易
       const data = {
         student_id: formData.student_id,
-        amount: formData.total_amount!,
-        total_installments: formData.total_installments!,
-        frequency: formData.frequency!,
-        custom_days: formData.frequency === 'Custom' ? formData.custom_days : null,
-        start_date: formData.due_date!,
-        note: formData.note || null,
+        amount: formData.total_amount,
+        total_installments: formData.total_installments,
+        frequency: formData.frequency,
+        custom_days:
+          formData.frequency === PaymentFrequency.CUSTOM ? formData.custom_days : null,
+        start_date: formData.due_date,
+        note: formData.note ? formData.note : null,
       };
 
       await ApiService.addInstallmentTransaction(data);
       showSuccess('保存成功', '分期付款已创建');
     } else {
       // 保存普通交易
-      const amount = formData.is_expense ? -formData.amount : formData.amount;
-      
+      const amount = formData.is_expense ? -Math.abs(formData.amount) : Math.abs(formData.amount);
+
       const data = {
         student_id: formData.student_id,
-        amount: amount,
-        note: formData.note || null,
+        amount,
+        note: formData.note ? formData.note : null,
       };
 
       await ApiService.addCashTransaction(data);
@@ -749,7 +860,7 @@ const deleteTransaction = async (uid: number) => {
 // 显示更新状态模态框
 const showUpdateStatusModal = (transaction: Transaction) => {
   selectedTransaction.value = transaction;
-  selectedStatus.value = (transaction.installment?.status as InstallmentStatus) || 'Pending';
+  selectedStatus.value = normalizeInstallmentStatus(transaction.installment?.status);
   showUpdateStatus.value = true;
 };
 
@@ -779,6 +890,8 @@ const closeModals = () => {
   showAddTransaction.value = false;
   showUpdateStatus.value = false;
   selectedTransaction.value = null;
+  currentTransaction.value = createDefaultTransactionFormModel();
+  selectedStatus.value = InstallmentStatus.PENDING;
 };
 
 // 强制刷新
