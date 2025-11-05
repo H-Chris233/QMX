@@ -209,11 +209,27 @@
         <div class="batch-buttons">
           <button
             class="batch-btn"
+            @click="showBatchAddDialog"
+            :disabled="loading"
+            aria-label="批量添加成绩"
+          >
+            ➕ 批量添加
+          </button>
+          <button
+            class="batch-btn"
             @click="exportScores"
             :disabled="loading"
             aria-label="导出成绩数据"
           >
             📊 导出成绩
+          </button>
+          <button
+            class="batch-btn danger"
+            @click="clearAllScores"
+            :disabled="loading"
+            aria-label="清空所有成绩"
+          >
+            🗑️ 清空成绩
           </button>
         </div>
       </div>
@@ -385,6 +401,37 @@
       </div>
     </div>
 
+    <!-- 批量添加成绩模态框 -->
+    <div
+      v-if="showBatchAdd"
+      class="modal-overlay"
+      @click="closeBatchAddDialog"
+    >
+      <div class="modal" @click.stop>
+        <div class="modal-header">
+          <h3>批量添加成绩</h3>
+          <button class="close-btn" @click="closeBatchAddDialog">✖️</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>成绩列表（每行一个成绩）</label>
+            <textarea
+              v-model="batchScoresText"
+              rows="10"
+              placeholder="输入成绩，每行一个&#10;例如：&#10;8.5&#10;9.0&#10;7.8"
+            ></textarea>
+            <div class="help-text">
+              每行输入一个成绩，支持小数（保留一位）
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeBatchAddDialog">取消</button>
+          <button class="save-btn" @click="batchAddScores">添加</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -393,7 +440,7 @@ import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import type { Student } from '../types/api';
 import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
-import { validateScoreInput } from '../utils/dataTransformers';
+import { validateScoreInput, safeParseNumber } from '../utils/dataTransformers';
 import DatePicker from './DatePicker.vue';
 
 
@@ -432,6 +479,8 @@ interface ErrorHandler {
     const studentSearch = ref('');
     const showAddGrade = ref(false);
     const showEditGrade = ref(false);
+    const showBatchAdd = ref(false);
+    const batchScoresText = ref('');
     const currentGrade = ref<{
       id: number | null;
       studentId: string;
@@ -1002,7 +1051,165 @@ interface ErrorHandler {
       };
     };
 
+    // 批量添加成绩
+    const showBatchAddDialog = (): void => {
+      if (!selectedStudent.value) {
+        showError('操作失败', '请先选择学员');
+        return;
+      }
+      showBatchAdd.value = true;
+      batchScoresText.value = '';
+    };
 
+    const closeBatchAddDialog = (): void => {
+      showBatchAdd.value = false;
+      batchScoresText.value = '';
+    };
+
+    const batchAddScores = async (): Promise<void> => {
+      if (loading.value) {
+        if (import.meta.env?.MODE !== 'production') console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!selectedStudent.value) {
+        showError('操作失败', '请先选择学员');
+        return;
+      }
+
+      if (!batchScoresText.value.trim()) {
+        handleValidationError('empty_scores', '请输入至少一个成绩');
+        return;
+      }
+
+      // 解析成绩文本
+      const lines = batchScoresText.value.split('\n').map(line => line.trim()).filter(line => line !== '');
+      const scores: number[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const score = Number(line);
+        const validation = validateScoreInput(score);
+        
+        if (!validation.valid) {
+          errors.push(`第 ${i + 1} 行: ${validation.errors.join(', ')}`);
+        } else {
+          // 保留一位小数
+          scores.push(parseFloat(score.toFixed(1)));
+        }
+      }
+
+      if (errors.length > 0) {
+        handleValidationError('batch_score_validation', '部分成绩无效:\n' + errors.join('\n'));
+        return;
+      }
+
+      if (scores.length === 0) {
+        handleValidationError('no_valid_scores', '没有有效的成绩');
+        return;
+      }
+
+      loading.value = true;
+      try {
+        const studentUid = Number(selectedStudent.value);
+        const studentName = students.value.find((s: any) => s.uid === studentUid)?.name || '未知学员';
+        
+        // 批量添加成绩：逐个调用 addScore API
+        for (const score of scores) {
+          await ApiService.addScore(studentUid, score);
+        }
+        
+        if (import.meta.env?.MODE !== 'production') console.log(`成功为学员 ${studentUid} 批量添加 ${scores.length} 个成绩`);
+        
+        // 保存当前页面状态
+        try {
+          localStorage.setItem('qmx_active_tab', 'grades');
+          localStorage.setItem('qmx_last_operation', `已为${studentName}批量添加${scores.length}个成绩`);
+          localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+        } catch (error: any) {
+          if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
+        }
+        
+        if (import.meta.env?.MODE !== 'production') console.log(`✅ 已为${studentName}批量添加${scores.length}个成绩，刷新当前学员数据`);
+        
+        showSuccess('批量添加成功', `已为${studentName}添加${scores.length}个成绩`);
+        closeBatchAddDialog();
+        await onStudentChange();
+      } catch (error: any) {
+        if (import.meta.env?.MODE !== 'production') console.error('批量添加成绩失败:', error);
+        showError(
+          '批量添加失败', 
+          '批量添加学员成绩时发生错误，请稍后重试', 
+          error.message || '未知错误'
+        );
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // 清空所有成绩
+    const clearAllScores = (): void => {
+      if (loading.value) {
+        if (import.meta.env?.MODE !== 'production') console.warn('正在处理中，请勿重复操作');
+        return;
+      }
+
+      if (!selectedStudent.value) {
+        showError('操作失败', '请先选择学员');
+        return;
+      }
+
+      if (!selectedStudentData.value || selectedStudentData.value.rings.length === 0) {
+        showError('操作失败', '该学员暂无成绩记录');
+        return;
+      }
+
+      const studentName = students.value.find((s: any) => s.uid === Number(selectedStudent.value))?.name || '未知学员';
+      const scoreCount = selectedStudentData.value.rings.length;
+
+      showConfirm({
+        title: '清空成绩',
+        message: `确定要清空${studentName}的所有${scoreCount}条成绩记录吗？此操作不可恢复！`,
+        confirmText: '清空',
+        cancelText: '取消',
+        confirmType: 'danger',
+        onConfirm: async () => {
+          loading.value = true;
+          try {
+            const studentUid = Number(selectedStudent.value);
+            
+            // 清空成绩：使用批量更新API设置为空数组
+            await ApiService.updateScoresBatch(studentUid, []);
+            
+            if (import.meta.env?.MODE !== 'production') console.log(`成功清空学员 ${studentUid} 的所有成绩`);
+            
+            // 保存当前页面状态
+            try {
+              localStorage.setItem('qmx_active_tab', 'grades');
+              localStorage.setItem('qmx_last_operation', `已清空${studentName}的${scoreCount}条成绩记录`);
+              localStorage.setItem('qmx_last_operation_time', Date.now().toString());
+            } catch (error: any) {
+              if (import.meta.env?.MODE !== 'production') console.warn('保存页面状态失败:', error);
+            }
+            
+            if (import.meta.env?.MODE !== 'production') console.log(`✅ 已清空${studentName}的所有成绩，刷新当前学员数据`);
+            
+            showSuccess('清空成功', `已清空${studentName}的所有成绩`);
+            await onStudentChange();
+          } catch (error: any) {
+            if (import.meta.env?.MODE !== 'production') console.error('清空成绩失败:', error);
+            showError(
+              '清空失败', 
+              '清空学员成绩时发生错误，请稍后重试', 
+              error.message || '未知错误'
+            );
+          } finally {
+            loading.value = false;
+          }
+        }
+      });
+    };
 
     // 删除成绩
     const deleteScore = async (scoreIndex: number, score: number): Promise<void> => {
@@ -1069,16 +1276,19 @@ interface ErrorHandler {
         return;
       }
 
-      const newScore = prompt(`请输入新的成绩 (0-${getMaxScore()}):`, String(currentScore));
-      if (newScore === null) return; // 用户取消
+      const newScoreInput = prompt(`请输入新的成绩 (0-${getMaxScore()}):`, String(currentScore));
+      if (newScoreInput === null) return; // 用户取消
       
-      const validation = validateScoreInput(Number(newScore));
+      // 安全解析数字并保留一位小数
+      const parsedScore = safeParseNumber(newScoreInput, 0, { min: 0, max: 1000, decimals: 1 });
+      
+      const validation = validateScoreInput(parsedScore);
       if (!validation.valid) {
         handleValidationError('score_input', validation.errors.join('；'));
         return;
       }
       
-      const score = Number(newScore);
+      const score = parsedScore;
       if (score === currentScore) {
         return; // 没有变化
       }
@@ -1132,7 +1342,10 @@ interface ErrorHandler {
       abortController.value = new AbortController();
 
       try {
-        const data = await ApiService.getAllStudents();
+        const response = await ApiService.getAllStudents();
+        
+        // 解析响应包装：{ students, pagination }
+        const data = response.students || [];
         
         // 验证返回的数据
         if (!Array.isArray(data)) {
@@ -1255,14 +1468,17 @@ interface ErrorHandler {
         return;
       }
 
+      // 安全解析数字并保留一位小数
+      const parsedScore = safeParseNumber(quickScore.value, 0, { min: 0, max: 1000, decimals: 1 });
+      
       // 验证成绩输入
-      const validation = validateScoreInput(Number(quickScore.value));
+      const validation = validateScoreInput(parsedScore);
       if (!validation.valid) {
         handleValidationError('quick_score_validation', validation.errors.join('；'));
         return;
       }
 
-      const score = Number(quickScore.value);
+      const score = parsedScore;
       const studentUid = Number(selectedStudent.value);
 
       loading.value = true;
@@ -1858,6 +2074,14 @@ interface ErrorHandler {
   cursor: not-allowed;
 }
 
+.batch-btn.danger {
+  background-color: #f44336;
+}
+
+.batch-btn.danger:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
 .no-selection {
   flex: 1;
   display: flex;
@@ -2164,6 +2388,12 @@ interface ErrorHandler {
 .form-group textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+.help-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }
 
 .modal-footer {
