@@ -1,7 +1,10 @@
-import mongoose, { Schema, Document, FilterQuery, FilterOperators, Model, PipelineStage, Aggregate } from 'mongoose';
+import mongoose, { Schema, Document, FilterQuery, Model, PipelineStage, Aggregate } from 'mongoose';
 import { AppError } from '@/utils/errors';
 import { getNextSequence, CASH_SEQUENCE_NAME } from './counter';
 import type { ICashInstallmentSnapshot, ICashSearchOptions } from '@/types';
+
+// Custom type for MongoDB filter operators since mongoose doesn't export FilterOperators
+type FilterOperators<T> = Partial<Record<'$gt' | '$gte' | '$lt' | '$lte' | '$eq' | '$ne' | '$in' | '$nin', T>>;
 
 export interface ICashCreatePayload {
   student_id?: number | null;
