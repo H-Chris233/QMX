@@ -29,6 +29,37 @@ interface IPaginatedResponse<T> {
   };
 }
 
+interface CashStatsAggregate {
+  _id: null;
+  total_income: number;
+  total_expense: number;
+  transaction_count: number;
+  total_transactions: unknown[];
+}
+
+interface StudentIncomeAggregate {
+  _id: number;
+  amount: number;
+}
+
+interface StudentIncomeSummary {
+  student_id: number;
+  amount: number;
+  student_name: string;
+}
+
+interface FinancialStatsResponse {
+  period: string;
+  date_from: Date;
+  date_to: Date;
+  total_income: number;
+  total_expense: number;
+  net_income: number;
+  transaction_count: number;
+  student_income: StudentIncomeSummary[];
+  monthly_stats: unknown[];
+}
+
 const CASH_SORT_FIELDS = ['uid', 'student_id', 'cash', 'created_at', 'updated_at'] as const;
 type CashSortField = typeof CASH_SORT_FIELDS[number];
 type CashSortOrder = NonNullable<ICashSearchOptions['sortOrder']>;
@@ -508,9 +539,14 @@ export class CashController {
     return `${label}: 第${current}/${total}期`;
   }
 
+  private getStudentDisplayName(studentId: number): string {
+    return `学员${studentId}`;
+  }
+
   // 获取财务统计信息 - 优化版本
   public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { period = 'month' } = req.query;
+    const periodParam = req.query.period;
+    const period = typeof periodParam === 'string' ? periodParam : 'month';
 
     let dateFrom: Date;
     const now = new Date();
@@ -539,74 +575,77 @@ export class CashController {
       {
         $group: {
           _id: null,
-          total_income: { 
-            $sum: { 
-              $cond: [{ $gt: ["$cash", 0] }, { $divide: [{ $abs: "$cash" }, 100] }, 0] 
+          total_income: {
+            $sum: {
+              $cond: [{ $gt: ["$cash", 0] }, { $divide: [{ $abs: "$cash" }, 100] }, 0]
             }
           },
-          total_expense: { 
-            $sum: { 
-              $cond: [{ $lt: ["$cash", 0] }, { $divide: [{ $abs: "$cash" }, 100] }, 0] 
+          total_expense: {
+            $sum: {
+              $cond: [{ $lt: ["$cash", 0] }, { $divide: [{ $abs: "$cash" }, 100] }, 0]
             }
           },
           transaction_count: { $sum: 1 },
-          total_transactions: { $push: "$ROOT" } // 临时保留所有交易以便后续处理
+          total_transactions: { $push: "$ROOT" }
         }
       }
     ];
 
-    const results = await CashClass.aggregate(pipeline).exec();
-    const stats = results[0] || { 
-      total_income: 0, 
-      total_expense: 0, 
-      transaction_count: 0, 
-      total_transactions: [] 
+    const statsResults = await CashClass.aggregate<CashStatsAggregate>(pipeline).exec();
+    const stats: CashStatsAggregate = statsResults[0] ?? {
+      _id: null,
+      total_income: 0,
+      total_expense: 0,
+      transaction_count: 0,
+      total_transactions: [],
     };
 
     const net_income = stats.total_income - stats.total_expense;
 
     // 按学生ID聚合收入，限制在聚合阶段完成，而不是在应用层
     const studentIncomePipeline: PipelineStage[] = [
-      { $match: { 
+      {
+        $match: {
           created_at: { $gte: dateFrom },
-          cash: { $gt: 0 }, // 只统计收入
-          student_id: { $ne: null } // 只统计有关联学生的交易
-        } 
+          cash: { $gt: 0 },
+          student_id: { $ne: null }
+        }
       },
       {
         $group: {
           _id: "$student_id",
-          amount: { 
-            $sum: { $divide: [{ $abs: "$cash" }, 100] } 
+          amount: {
+            $sum: { $divide: [{ $abs: "$cash" }, 100] }
           }
         }
       },
       { $sort: { amount: -1 } },
-      { $limit: 10 } // 限制为前10名
+      { $limit: 10 }
     ];
 
-    const studentIncomeResults = await CashClass.aggregate(studentIncomePipeline).exec();
-    
-    // 简化版本，不查询学员姓名
-    const student_income = studentIncomeResults.map(item => ({
-      student_id: item._id,
-      amount: item.amount,
-      student_name: '学员' + item._id // 简化显示
+    const studentIncomeResults = await CashClass.aggregate<StudentIncomeAggregate>(studentIncomePipeline).exec();
+
+    const student_income: StudentIncomeSummary[] = studentIncomeResults.map((aggregate): StudentIncomeSummary => ({
+      student_id: aggregate._id,
+      amount: aggregate.amount,
+      student_name: this.getStudentDisplayName(aggregate._id),
     }));
 
-    const response = {
+    const responseData: FinancialStatsResponse = {
+      period,
+      date_from: dateFrom,
+      date_to: now,
+      total_income: stats.total_income,
+      total_expense: stats.total_expense,
+      net_income,
+      transaction_count: stats.transaction_count,
+      student_income,
+      monthly_stats: [],
+    };
+
+    const response: IApiResponse<FinancialStatsResponse> = {
       success: true,
-      data: {
-        period,
-        date_from: dateFrom,
-        date_to: now,
-        total_income: stats.total_income,
-        total_expense: stats.total_expense,
-        net_income,
-        transaction_count: stats.transaction_count,
-        student_income,
-        monthly_stats: [], // 暂时为空数组
-      },
+      data: responseData,
     };
 
     logger.info(`获取财务统计成功，周期: ${period}, 收入: ¥${stats.total_income}, 支出: ¥${stats.total_expense}`);
