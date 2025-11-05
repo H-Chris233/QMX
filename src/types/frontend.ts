@@ -4,33 +4,37 @@ import type { Student, Transaction, InstallmentStatus } from './api';
 
 /**
  * 前端交易数据模型
- * 与后端 Transaction 接口保持一致，但使用不同的属性名
+ * 使用新的 Transaction 类型，但保留前端特有的 type 字段
  */
 export interface FrontendTransaction {
   /** 交易ID */
   id: number;
-  /** 交易类型 */
+  /** 交易类型（前端专用字段） */
   type: 'income' | 'expense';
   /** 交易描述 */
   description: string;
-  /** 交易金额 */
+  /** 交易金额（绝对值，单位：元） */
   amount: number;
   /** 备注信息 */
   note: string | null;
   /** 是否为分期付款 */
   is_installment: boolean;
-  /** 当前分期 */
-  installment_current: number | null;
-  /** 总分期数 */
-  installment_total: number | null;
-  /** 分期付款状态 */
-  installment_status: InstallmentStatus | null;
+  /** 分期付款信息快照 */
+  installment: {
+    plan_uid: number;
+    installment_uid?: number | null;
+    installment_number?: number | null;
+    total_installments?: number | null;
+    due_date?: string | null;
+    status?: InstallmentStatus | string | null;
+    note?: string | null;
+  } | null;
   /** 关联的学员ID */
   student_id: number | null;
-  /** 分期计划ID */
-  installment_plan_id: number | null;
-  /** 分期付款到期日期 */
-  installment_due_date: string | null;
+  /** 创建时间 */
+  created_at?: string;
+  /** 更新时间 */
+  updated_at?: string;
 }
 
 /**
@@ -70,9 +74,9 @@ export interface Grade {
 export interface SearchOptions {
   /** 学员ID */
   student_id: number | null;
-  /** 最小金额 */
+  /** 最小金额（单位：元） */
   min_amount: number | null;
-  /** 最大金额 */
+  /** 最大金额（单位：元） */
   max_amount: number | null;
   /** 是否有分期付款 */
   has_installment: boolean | null;
@@ -83,34 +87,63 @@ export interface SearchOptions {
 }
 
 // 类型转换函数
+/**
+ * 将 API Transaction 转换为前端 FrontendTransaction
+ * @param transaction - API 返回的交易数据
+ * @returns 前端交易数据
+ */
 export function mapApiTransactionToFrontend(transaction: Transaction): FrontendTransaction {
-  return {
+  const result: FrontendTransaction = {
     id: transaction.uid,
-    type: transaction.amount > 0 ? 'income' : 'expense',
-    description: transaction.description,
+    type: transaction.amount >= 0 ? 'income' : 'expense',
+    description: transaction.description ?? '',
     amount: Math.abs(transaction.amount),
     note: transaction.note || null,
-    is_installment: transaction.is_installment,
-    installment_current: transaction.installment_current,
-    installment_total: transaction.installment_total,
-    installment_status: transaction.installment_status,
+    is_installment: transaction.is_installment ?? false,
+    installment: transaction.installment ?? null,
     student_id: transaction.student_id,
-    installment_plan_id: transaction.installment_plan_id,
-    installment_due_date: transaction.installment_due_date,
   };
+  if (transaction.created_at !== undefined) {
+    result.created_at = transaction.created_at;
+  }
+  if (transaction.updated_at !== undefined) {
+    result.updated_at = transaction.updated_at;
+  }
+  return result;
 }
 
 // 类型守卫函数
+/**
+ * 检查对象是否为有效的 FrontendTransaction
+ * @param obj - 待检查的对象
+ * @returns 是否为 FrontendTransaction
+ */
 export function isFrontendTransaction(obj: unknown): obj is FrontendTransaction {
   if (!obj || typeof obj !== 'object') return false;
   const transaction = obj as Record<string, unknown>;
-  
+
   return (
     typeof transaction.id === 'number' &&
     (transaction.type === 'income' || transaction.type === 'expense') &&
-    typeof transaction.description === 'string' &&
+    (typeof transaction.description === 'string' || transaction.description === undefined) &&
     typeof transaction.amount === 'number' &&
-    (typeof transaction.note === 'string' || transaction.note === null) &&
-    typeof transaction.is_installment === 'boolean'
+    (typeof transaction.note === 'string' || transaction.note === null)
+  );
+}
+
+/**
+ * 检查对象是否为有效的 Student
+ * @param obj - 待检查的对象
+ * @returns 是否为 Student
+ */
+export function isStudent(obj: unknown): obj is Student {
+  if (!obj || typeof obj !== 'object') return false;
+  const student = obj as Record<string, unknown>;
+
+  return (
+    typeof student.uid === 'number' &&
+    typeof student.name === 'string' &&
+    typeof student.phone === 'string' &&
+    Array.isArray(student.rings)
   );
 }
