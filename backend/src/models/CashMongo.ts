@@ -205,8 +205,8 @@ export class CashClass {
     return await CashModel.find().sort({ created_at: -1 }).exec();
   }
 
-  static aggregate<T = unknown>(pipeline: PipelineStage[]): Aggregate<T[]> {
-    return CashModel.aggregate<T>(pipeline);
+  static aggregate<TResult = unknown>(pipeline: PipelineStage[]): Aggregate<TResult[]> {
+    return CashModel.aggregate<TResult>(pipeline);
   }
 
   static async findWithPagination(
