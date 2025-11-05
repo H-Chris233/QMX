@@ -36,7 +36,7 @@ const SystemConfigSchema = new Schema<ISystemConfigDoc>({
 });
 
 SystemConfigSchema.set('toJSON', {
-  transform: (_doc, ret: Record<string, unknown>) => {
+  transform: (_doc, ret) => {
     const { _id: _omitId, __v: _omitVersion, ...rest } = ret;
     return rest;
   }
