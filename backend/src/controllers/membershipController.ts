@@ -4,7 +4,7 @@ import { IApiResponse, MembershipStatus } from '@/types';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
 import { StudentUpdater } from '@/services/studentUpdater';
-import { presentStudent } from '@/services/studentPresenter';
+import { presentStudent, type PresentedStudent } from '@/services/studentPresenter';
 import { AppError } from '@/utils/errors';
 
 type MembershipType = 'month' | 'year';
@@ -34,26 +34,38 @@ const normalizeMembershipStatus = (value: unknown): MembershipStatus => {
   return MembershipStatus.NONE;
 };
 
-const buildMembershipResponse = (student: IStudentDoc, extra: Record<string, unknown> = {}) => {
-  const presentedStudent = presentStudent(student);
-  const membershipStatus = normalizeMembershipStatus(
-    presentedStudent.membershipStatus ?? presentedStudent.membership_status,
-  );
+interface MembershipResponseBase {
+  uid: number;
+  name: string;
+  membershipStartDate: string | null;
+  membership_start_date: string | null;
+  membershipEndDate: string | null;
+  membership_end_date: string | null;
+  isMembershipActive: boolean;
+  is_membership_active: boolean;
+  membershipDaysRemaining: number | null;
+  membership_days_remaining: number | null;
+  membershipStatus: MembershipStatus;
+  membership_status: MembershipStatus;
+  student: PresentedStudent;
+}
 
-  const membershipStartDate = presentedStudent.membershipStartDate
-    ?? presentedStudent.membership_start_date
-    ?? null;
-  const membershipEndDate = presentedStudent.membershipEndDate
-    ?? presentedStudent.membership_end_date
-    ?? null;
+const buildMembershipResponse = <T extends Record<string, unknown> = Record<string, never>>(
+  student: IStudentDoc,
+  extra?: T,
+): MembershipResponseBase & T => {
+  const presentedStudent = presentStudent(student);
+
+  const membershipStatus = normalizeMembershipStatus(presentedStudent.membershipStatus);
+  const membershipStartDate = presentedStudent.membershipStartDate ?? null;
+  const membershipEndDate = presentedStudent.membershipEndDate ?? null;
   const isMembershipActive = typeof presentedStudent.isMembershipActive === 'boolean'
     ? presentedStudent.isMembershipActive
     : student.hasMembership();
-  const membershipDaysRemaining = typeof presentedStudent.membershipDaysRemaining === 'number'
-    ? presentedStudent.membershipDaysRemaining
-    : presentedStudent.membership_days_remaining ?? student.getMembershipDaysRemaining();
+  const membershipDaysRemaining = presentedStudent.membershipDaysRemaining
+    ?? student.getMembershipDaysRemaining();
 
-  const normalizedStudent = {
+  const normalizedStudent: PresentedStudent = {
     ...presentedStudent,
     membershipStatus,
     membership_status: membershipStatus,
@@ -66,6 +78,8 @@ const buildMembershipResponse = (student: IStudentDoc, extra: Record<string, unk
     membershipDaysRemaining,
     membership_days_remaining: membershipDaysRemaining,
   };
+
+  const extras = (extra ?? {}) as T;
 
   return {
     uid: student.uid,
@@ -81,7 +95,7 @@ const buildMembershipResponse = (student: IStudentDoc, extra: Record<string, unk
     membershipStatus,
     membership_status: membershipStatus,
     student: normalizedStudent,
-    ...extra,
+    ...extras,
   };
 };
 
