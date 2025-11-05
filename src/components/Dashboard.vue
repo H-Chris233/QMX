@@ -278,6 +278,7 @@ const loadDashboardData = async (): Promise<void> => {
             total_students: 0,
             average_score: 0,
             total_expense: 0,
+            net_income: 0,
             max_score: 0,
             active_courses: 0
           };
@@ -324,9 +325,6 @@ const loadDashboardData = async (): Promise<void> => {
         abortController.value = null;
       }
     };
-
-// 从工具函数导入安全解析函数
-import { safeParseNumber } from '../utils/dataTransformers';
 
 // 增强的格式化方法
 const formatNumber = (value: number | string): string => {
