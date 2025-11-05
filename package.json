@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "test": "vitest",
     "preview": "vite preview",
     "serve": "vite preview --port 1420",
     "backend": "cd backend && npm run dev",
@@ -17,10 +18,13 @@
     "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@types/node": "^24.10.0",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vitest/coverage-c8": "^0.33.0",
     "prettier": "^3.6.2",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
+    "vitest": "^0.34.6",
     "vue-tsc": "^2.1.10"
   }
 }

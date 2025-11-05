@@ -106,10 +106,26 @@ const invalidInput = validateTransactionInput({
 });
 console.log('无效输入：', invalidInput);
 
+console.log('\n【5. validateSimplifiedTransaction - 简化交易快速验证】');
+const simplifiedValidTransaction = {
+  amount: 200,
+  student_id: 2,
+  is_installment: false,
+};
+console.log('有效交易验证（简化版）：', validateSimplifiedTransaction(simplifiedValidTransaction));
+
+const simplifiedInvalidTransaction = {
+  amount: Number.NaN,
+  is_installment: true,
+  installment_current: 2,
+  installment_total: 1,
+};
+console.log('无效交易验证（简化版）：', validateSimplifiedTransaction(simplifiedInvalidTransaction));
+
 // ============================================================================
-// 5. 成绩数据处理演示
+// 6. 成绩数据处理演示
 // ============================================================================
-console.log('\n【5. 成绩数据处理】');
+console.log('\n【6. 成绩数据处理】');
 console.log('validateScoreInput(85.5) =>', validateScoreInput(85.5));
 console.log('validateScoreInput(1500) =>', validateScoreInput(1500));
 console.log('validateScoreInput("abc") =>', validateScoreInput("abc"));
@@ -130,9 +146,9 @@ console.log('    - 最低分：', scoreStats.min);
 console.log('    - 记录数：', scoreStats.count);
 
 // ============================================================================
-// 6. 会员数据处理演示
+// 7. 会员数据处理演示
 // ============================================================================
-console.log('\n【6. 会员数据处理】');
+console.log('\n【7. 会员数据处理】');
 const memberRecord = {
   uid: 1,
   name: '张三',
@@ -170,9 +186,9 @@ console.log('  是否即将过期（7天内）：', isMembershipExpiringSoon(5, 
 console.log('  是否即将过期（3天内）：', isMembershipExpiringSoon(5, 3));
 
 // ============================================================================
-// 7. 格式化工具演示
+// 8. 格式化工具演示
 // ============================================================================
-console.log('\n【7. 格式化工具】');
+console.log('\n【8. 格式化工具】');
 console.log('formatCurrency 示例：');
 console.log('  ¥1,234.56 =>', formatCurrency(1234.56));
 console.log('  -¥100.00 =>', formatCurrency(-100));
@@ -186,18 +202,18 @@ console.log('  时间格式：', formatDate(now, 'time'));
 console.log('  空值处理：', formatDate(null));
 
 // ============================================================================
-// 8. 常量展示
+// 9. 常量展示
 // ============================================================================
-console.log('\n【8. 导出的常量】');
+console.log('\n【9. 导出的常量】');
 console.log('  MAX_SAFE_AMOUNT:', MAX_SAFE_AMOUNT, '元');
 console.log('  MIN_AMOUNT:', MIN_AMOUNT, '元');
 console.log('  AMOUNT_DECIMALS:', AMOUNT_DECIMALS, '位小数');
 console.log('  SCORE_DECIMALS:', SCORE_DECIMALS, '位小数');
 
 // ============================================================================
-// 9. 完整使用场景：处理交易列表
+// 10. 完整使用场景：处理交易列表
 // ============================================================================
-console.log('\n【9. 完整场景：处理API返回的交易数据】');
+console.log('\n【10. 完整场景：处理API返回的交易数据】');
 import { safeMapApiTransactionToFrontend } from './dataTransformers';
 
 // 模拟API返回的交易数据（金额已经是元）

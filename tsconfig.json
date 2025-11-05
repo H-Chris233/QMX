@@ -4,6 +4,7 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "vitest", "vitest/globals", "node"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -32,5 +33,6 @@
     "exactOptionalPropertyTypes": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "exclude": ["src/utils/__tests__", "**/*.demo.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
