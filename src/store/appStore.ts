@@ -3,26 +3,29 @@
  * 全局状态和方法
  */
 import { reactive, ref } from 'vue';
+import type { ErrorPriorityLevel } from '../utils/errorHandler';
+
+type ConfirmType = 'primary' | 'danger' | 'warning';
 
 // 错误模态框状态
-interface ErrorModal {
+interface ErrorModalState {
   show: boolean;
   title: string;
   message: string;
-  details?: string | undefined;
-  showRetry?: boolean;
-  priority?: 'low' | 'medium' | 'high';
+  details?: string;
+  showRetry: boolean;
+  priority: ErrorPriorityLevel;
 }
 
 // 确认模态框状态
-interface ConfirmModal {
+interface ConfirmModalState {
   show: boolean;
   title: string;
   message: string;
-  details?: string | undefined;
-  confirmText?: string | undefined;
-  cancelText?: string | undefined;
-  confirmType?: 'primary' | 'danger' | 'warning' | undefined;
+  details?: string;
+  confirmText: string;
+  cancelText: string;
+  confirmType: ConfirmType;
   onConfirm?: (() => void) | undefined;
   onCancel?: (() => void) | undefined;
 }
@@ -51,17 +54,17 @@ const createAppStore = () => {
   const theme = ref<string>('dark');
   
   // 错误模态框
-  const errorModal = reactive<ErrorModal>({
+  const errorModal = reactive<ErrorModalState>({
     show: false,
     title: '',
     message: '',
-    details: '',
+    details: undefined,
     showRetry: false,
     priority: 'medium',
   });
 
   // 确认模态框
-  const confirmModal = reactive<ConfirmModal>({
+  const confirmModal = reactive<ConfirmModalState>({
     show: false,
     title: '',
     message: '',
@@ -99,7 +102,7 @@ const createAppStore = () => {
     message: string,
     details?: string,
     showRetry: boolean = false,
-    priority: 'low' | 'medium' | 'high' = 'medium'
+    priority: ErrorPriorityLevel = 'medium'
   ) => {
     errorModal.show = true;
     errorModal.title = title;
@@ -116,6 +119,7 @@ const createAppStore = () => {
     errorModal.message = '';
     errorModal.details = undefined;
     errorModal.showRetry = false;
+    errorModal.priority = 'medium';
   };
 
   // 显示确认框
@@ -125,17 +129,17 @@ const createAppStore = () => {
     details?: string;
     confirmText?: string;
     cancelText?: string;
-    confirmType?: 'primary' | 'danger' | 'warning';
+    confirmType?: ConfirmType;
     onConfirm?: () => void;
     onCancel?: () => void;
   }) => {
     confirmModal.show = true;
     confirmModal.title = options.title;
     confirmModal.message = options.message;
-    confirmModal.details = options.details;
-    confirmModal.confirmText = options.confirmText || '确认';
-    confirmModal.cancelText = options.cancelText || '取消';
-    confirmModal.confirmType = options.confirmType || 'primary';
+    confirmModal.details = options.details ?? undefined;
+    confirmModal.confirmText = options.confirmText ?? '确认';
+    confirmModal.cancelText = options.cancelText ?? '取消';
+    confirmModal.confirmType = options.confirmType ?? 'primary';
     confirmModal.onConfirm = options.onConfirm;
     confirmModal.onCancel = options.onCancel;
   };
@@ -146,6 +150,9 @@ const createAppStore = () => {
     confirmModal.title = '';
     confirmModal.message = '';
     confirmModal.details = undefined;
+    confirmModal.confirmText = '确认';
+    confirmModal.cancelText = '取消';
+    confirmModal.confirmType = 'primary';
     confirmModal.onConfirm = undefined;
     confirmModal.onCancel = undefined;
   };
