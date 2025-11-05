@@ -50,7 +50,7 @@
       <select
         id="student-select"
         :value="modelValue.student_id"
-        @change="updateField('student_id', $event.target.value ? Number($event.target.value) : null)"
+        @change="onStudentChange"
         class="form-select"
       >
         <option :value="null">无关联学员</option>
@@ -76,7 +76,7 @@
             id="amount-input"
             type="number"
             :value="modelValue.amount"
-            @input="updateField('amount', parseFloat($event.target.value) || 0)"
+            @input="onAmountInput"
             placeholder="请输入金额"
             min="0"
             step="0.01"
@@ -93,7 +93,7 @@
         <textarea
           id="note-input"
           :value="modelValue.note"
-          @input="updateField('note', $event.target.value)"
+          @input="onNoteInput"
           placeholder="请输入备注信息"
           rows="3"
           class="form-textarea"
@@ -113,7 +113,7 @@
             id="total-amount-input"
             type="number"
             :value="modelValue.total_amount"
-            @input="updateField('total_amount', parseFloat($event.target.value) || 0)"
+            @input="onTotalAmountInput"
             placeholder="请输入总金额"
             min="0"
             step="0.01"
@@ -131,7 +131,7 @@
           id="installments-input"
           type="number"
           :value="modelValue.total_installments"
-          @input="updateField('total_installments', parseInt($event.target.value) || 2)"
+          @input="onInstallmentsInput"
           placeholder="请输入分期数"
           min="2"
           max="100"
@@ -150,18 +150,18 @@
         <select
           id="frequency-select"
           :value="modelValue.frequency"
-          @change="updateField('frequency', $event.target.value)"
+          @change="onFrequencyChange"
           class="form-select"
         >
-          <option value="Weekly">每周</option>
-          <option value="Monthly">每月</option>
-          <option value="Quarterly">每季度</option>
-          <option value="Custom">自定义</option>
+          <option :value="PaymentFrequency.WEEKLY">每周</option>
+          <option :value="PaymentFrequency.MONTHLY">每月</option>
+          <option :value="PaymentFrequency.QUARTERLY">每季度</option>
+          <option :value="PaymentFrequency.CUSTOM">自定义</option>
         </select>
       </div>
 
       <!-- 自定义频率 -->
-      <div v-if="modelValue.frequency === 'Custom'" class="form-section">
+      <div v-if="modelValue.frequency === PaymentFrequency.CUSTOM" class="form-section">
         <label class="form-label" for="custom-days-input">
           自定义天数 <span class="required">*</span>
         </label>
@@ -169,7 +169,7 @@
           id="custom-days-input"
           type="number"
           :value="modelValue.custom_days"
-          @input="updateField('custom_days', parseInt($event.target.value) || 30)"
+          @input="onCustomDaysInput"
           placeholder="请输入天数"
           min="1"
           max="365"
@@ -186,7 +186,7 @@
           id="due-date-input"
           type="date"
           :value="modelValue.due_date"
-          @input="updateField('due_date', $event.target.value)"
+          @input="onDueDateInput"
           class="form-input"
           required
         />
@@ -199,7 +199,7 @@
         <textarea
           id="installment-note-input"
           :value="modelValue.note"
-          @input="updateField('note', $event.target.value)"
+          @input="onNoteInput"
           placeholder="请输入备注信息"
           rows="3"
           class="form-textarea"
@@ -210,39 +210,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { Student } from '../types/api';
+import { PaymentFrequency } from '../types/api';
+import type { TransactionFormModel } from '../types/forms';
 
-// Props
 interface Props {
-  modelValue: TransactionFormData;
+  modelValue: TransactionFormModel;
   students: Student[];
-}
-
-// 表单数据类型
-interface TransactionFormData {
-  student_id: number | null;
-  amount: number;
-  note: string;
-  is_installment: boolean;
-  is_expense: boolean;
-  // 分期付款字段
-  total_amount?: number;
-  total_installments?: number;
-  frequency?: string;
-  custom_days?: number | null;
-  due_date?: string;
 }
 
 const props = defineProps<Props>();
 
-// Emits
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: TransactionFormData): void;
+  (e: 'update:modelValue', value: TransactionFormModel): void;
 }>();
 
-// 方法
-const updateField = (field: keyof TransactionFormData, value: any) => {
+const updateField = <K extends keyof TransactionFormModel>(
+  field: K,
+  value: TransactionFormModel[K],
+) => {
   emit('update:modelValue', {
     ...props.modelValue,
     [field]: value,
@@ -250,25 +236,26 @@ const updateField = (field: keyof TransactionFormData, value: any) => {
 };
 
 const setTransactionType = (isInstallment: boolean) => {
-  const updated: TransactionFormData = {
+  const today = new Date().toISOString().split('T')[0];
+  const updated: TransactionFormModel = {
     ...props.modelValue,
     is_installment: isInstallment,
   };
 
   if (isInstallment) {
-    // 初始化分期字段
-    updated.total_amount = props.modelValue.amount || 0;
-    updated.total_installments = 2;
-    updated.frequency = 'Monthly';
-    updated.custom_days = null;
-    updated.due_date = new Date().toISOString().split('T')[0];
+    const frequency = props.modelValue.frequency ?? PaymentFrequency.MONTHLY;
+    updated.total_amount = props.modelValue.total_amount ?? props.modelValue.amount;
+    updated.total_installments = props.modelValue.total_installments ?? 2;
+    updated.frequency = frequency;
+    updated.custom_days =
+      frequency === PaymentFrequency.CUSTOM ? props.modelValue.custom_days ?? 30 : null;
+    updated.due_date = props.modelValue.due_date ?? today;
   } else {
-    // 清除分期字段
-    delete updated.total_amount;
-    delete updated.total_installments;
-    delete updated.frequency;
-    delete updated.custom_days;
-    delete updated.due_date;
+    updated.total_amount = null;
+    updated.total_installments = null;
+    updated.frequency = null;
+    updated.custom_days = null;
+    updated.due_date = null;
   }
 
   emit('update:modelValue', updated);
@@ -278,11 +265,84 @@ const setIncomeExpense = (isExpense: boolean) => {
   updateField('is_expense', isExpense);
 };
 
+const onStudentChange = (event: Event) => {
+  const target = event.currentTarget as HTMLSelectElement | null;
+  if (!target) return;
+  const rawValue = target.value;
+  if (rawValue === '' || rawValue === 'null') {
+    updateField('student_id', null);
+    return;
+  }
+  updateField('student_id', Number(rawValue));
+};
+
+const onAmountInput = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  const value = Number.parseFloat(target.value);
+  updateField('amount', Number.isFinite(value) ? value : 0);
+};
+
+const onNoteInput = (event: Event) => {
+  const target = event.currentTarget as HTMLTextAreaElement | HTMLInputElement | null;
+  if (!target) return;
+  updateField('note', target.value);
+};
+
+const onTotalAmountInput = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  const value = Number.parseFloat(target.value);
+  updateField('total_amount', Number.isFinite(value) ? value : 0);
+};
+
+const onInstallmentsInput = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  const value = Number.parseInt(target.value, 10);
+  const sanitized = Number.isFinite(value) ? Math.max(2, value) : 2;
+  updateField('total_installments', sanitized);
+};
+
+const onFrequencyChange = (event: Event) => {
+  const target = event.currentTarget as HTMLSelectElement | null;
+  if (!target) return;
+  const frequency = target.value as PaymentFrequency;
+  updateField('frequency', frequency);
+
+  if (frequency !== PaymentFrequency.CUSTOM) {
+    updateField('custom_days', null);
+    return;
+  }
+
+  const currentDays = props.modelValue.custom_days ?? 30;
+  updateField('custom_days', currentDays);
+};
+
+const onCustomDaysInput = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  const value = Number.parseInt(target.value, 10);
+  const sanitized = Number.isFinite(value) && value > 0 ? value : 30;
+  updateField('custom_days', sanitized);
+};
+
+const onDueDateInput = (event: Event) => {
+  const target = event.currentTarget as HTMLInputElement | null;
+  if (!target) return;
+  updateField('due_date', target.value ? target.value : null);
+};
+
 const calculateInstallmentAmount = (): string => {
-  const total = props.modelValue.total_amount || 0;
-  const installments = props.modelValue.total_installments || 2;
+  const total = props.modelValue.total_amount ?? 0;
+  const installments = props.modelValue.total_installments ?? 2;
+
+  if (!installments) {
+    return '0.00';
+  }
+
   const perInstallment = total / installments;
-  return perInstallment.toFixed(2);
+  return Number.isFinite(perInstallment) ? perInstallment.toFixed(2) : '0.00';
 };
 </script>
 
