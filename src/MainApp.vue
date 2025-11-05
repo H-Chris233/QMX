@@ -1,5 +1,5 @@
 <template>
-  <div :class="['main-app', appStore.theme]">
+  <div :class="['main-app', theme]">
     <!-- 顶部导航栏（同时承载移动端侧边栏触发按钮） -->
     <nav class="navbar">
       <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
@@ -13,7 +13,7 @@
         <div
           v-for="item in menuItems"
           :key="item.id"
-          :class="['nav-menu-item', { active: appStore.activeTab === item.id }]"
+          :class="['nav-menu-item', { active: activeTab === item.id }]"
           @click="appStore.setActiveTab(item.id)"
         >
           <span class="nav-menu-icon">{{ item.icon }}</span>
@@ -31,7 +31,7 @@
           <li
             v-for="item in menuItems"
             :key="item.id"
-            :class="{ active: appStore.activeTab === item.id }"
+            :class="{ active: activeTab === item.id }"
             @click="handleSidebarItemClick(item.id)"
           >
             <span class="sidebar-icon">{{ item.icon }}</span>
@@ -51,27 +51,27 @@
     <!-- 主内容区域 -->
     <main class="main-content">
       <!-- 学员管理 -->
-      <div v-if="appStore.activeTab === 'students'" class="tab-content">
+      <div v-if="activeTab === 'students'" class="tab-content">
         <StudentManagement />
       </div>
 
       <!-- 收支统计 -->
-      <div v-if="appStore.activeTab === 'finance'" class="tab-content">
+      <div v-if="activeTab === 'finance'" class="tab-content">
         <FinancialStatistics />
       </div>
 
       <!-- 成绩管理 -->
-      <div v-if="appStore.activeTab === 'grades'" class="tab-content">
+      <div v-if="activeTab === 'grades'" class="tab-content">
         <GradeManagement />
       </div>
 
       <!-- 仪表盘 -->
-      <div v-if="appStore.activeTab === 'dashboard'" class="tab-content">
+      <div v-if="activeTab === 'dashboard'" class="tab-content">
         <Dashboard />
       </div>
 
       <!-- 设置 -->
-      <div v-if="appStore.activeTab === 'settings'" class="tab-content">
+      <div v-if="activeTab === 'settings'" class="tab-content">
         <Settings />
       </div>
     </main>
@@ -83,7 +83,7 @@
       :message="appStore.errorModal.message"
       :details="appStore.errorModal.details"
       :show-retry="appStore.errorModal.showRetry"
-      :priority="appStore.errorModal.priority || 'medium'"
+      :priority="appStore.errorModal.priority"
       @close="appStore.hideError"
       @retry="retryWithError"
     />
@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, provide } from 'vue';
+import { ref, onMounted, onUnmounted, provide, computed } from 'vue';
 import { appStore } from './store/appStore';
 import ErrorModal from './components/ErrorModal.vue';
 import StudentManagement from './components/StudentManagement.vue';
@@ -133,6 +133,9 @@ const menuItems: MenuItem[] = [
 const sidebarRef = ref<HTMLElement | null>(null);
 const toggleButtonRef = ref<HTMLElement | null>(null);
 const isSidebarOpen = ref(false);
+
+const activeTab = computed(() => appStore.activeTab.value);
+const theme = computed(() => appStore.theme.value);
 
 const toggleSidebar = (): void => {
   const newState = !isSidebarOpen.value;
@@ -255,12 +258,18 @@ provide('refreshSystem', {
 });
 
 // 添加全局错误显示方法
-(window as any).showError = appStore.showError;
+window.showError = appStore.showError;
 
 // 监听全局错误事件
-window.addEventListener('showAppError', (event: any) => {
+window.addEventListener('showAppError', (event) => {
   const detail = event.detail;
-  appStore.showError(detail.title, detail.message, detail.details, detail.showRetry, detail.priority);
+  appStore.showError(
+    detail.title,
+    detail.message,
+    detail.details,
+    detail.showRetry ?? false,
+    detail.priority ?? 'medium'
+  );
 });
 </script>
 

@@ -9,6 +9,16 @@ export enum ErrorPriority {
   CRITICAL = 'critical'
 }
 
+export type ErrorPriorityLevel = `${ErrorPriority}`;
+
+export interface ShowAppErrorDetail {
+  title: string;
+  message: string;
+  details?: string;
+  showRetry?: boolean;
+  priority?: ErrorPriorityLevel;
+}
+
 // 错误类型定义
 export interface AppError {
   id: string;
@@ -98,28 +108,34 @@ export async function handleApiOperation<T>(
     const displayTitle = `${operationName}失败 (高优先级)`;
     
     // 在浏览器环境中，我们希望通过UI显示错误
-    if (typeof window !== 'undefined' && (window as any).showError) {
-      (window as any).showError(displayTitle, displayMessage, JSON.stringify({
-        operation: operationName,
-        context: options.context,
-        originalError: errorMessage,
-        timestamp: new Date().toISOString()
-      }), options.retryable, 'high');
-    } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-      // 尝试通过全局事件发送错误
-      const event = new CustomEvent('showAppError', {
-        detail: {
-          title: displayTitle,
-          message: displayMessage,
-          details: JSON.stringify({
-            operation: operationName,
-            context: options.context,
-            originalError: errorMessage,
-            timestamp: new Date().toISOString()
-          }),
-          showRetry: options.retryable,
-          priority: 'high'
-        }
+    if (typeof window !== 'undefined' && typeof window.showError === 'function') {
+      window.showError(
+        displayTitle,
+        displayMessage,
+        JSON.stringify({
+          operation: operationName,
+          context: options.context,
+          originalError: errorMessage,
+          timestamp: new Date().toISOString()
+        }),
+        options.retryable,
+        'high'
+      );
+    } else if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      const eventDetail: ShowAppErrorDetail = {
+        title: displayTitle,
+        message: displayMessage,
+        details: JSON.stringify({
+          operation: operationName,
+          context: options.context,
+          originalError: errorMessage,
+          timestamp: new Date().toISOString()
+        }),
+        showRetry: options.retryable,
+        priority: 'high'
+      };
+      const event = new CustomEvent<ShowAppErrorDetail>('showAppError', {
+        detail: eventDetail
       });
       window.dispatchEvent(event);
     } else {
@@ -147,17 +163,23 @@ export function handleValidationError(
   const displayTitle = '验证错误 (低优先级)';
   
   // 在浏览器环境中，我们希望通过UI显示错误
-  if (typeof window !== 'undefined' && (window as any).showError) {
-    (window as any).showError(displayTitle, displayMessage, JSON.stringify({ field, value }), false, 'low');
-  } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-    // 尝试通过全局事件发送错误
-    const event = new CustomEvent('showAppError', {
-      detail: {
-        title: displayTitle,
-        message: displayMessage,
-        details: JSON.stringify({ field, value }),
-        priority: 'low'
-      }
+  if (typeof window !== 'undefined' && typeof window.showError === 'function') {
+    window.showError(
+      displayTitle,
+      displayMessage,
+      JSON.stringify({ field, value }),
+      false,
+      'low'
+    );
+  } else if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    const eventDetail: ShowAppErrorDetail = {
+      title: displayTitle,
+      message: displayMessage,
+      details: JSON.stringify({ field, value }),
+      priority: 'low'
+    };
+    const event = new CustomEvent<ShowAppErrorDetail>('showAppError', {
+      detail: eventDetail
     });
     window.dispatchEvent(event);
   } else {
@@ -178,26 +200,32 @@ export function handleNetworkError(
   const displayTitle = '网络错误 (中优先级)';
   
   // 在浏览器环境中，我们希望通过UI显示错误
-  if (typeof window !== 'undefined' && (window as any).showError) {
-    (window as any).showError(displayTitle, displayMessage, JSON.stringify({
-      operation: operationName,
-      error: errorMessage,
-      timestamp: new Date().toISOString()
-    }), true, 'medium');
-  } else if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-    // 尝试通过全局事件发送错误
-    const event = new CustomEvent('showAppError', {
-      detail: {
-        title: displayTitle,
-        message: displayMessage,
-        details: JSON.stringify({
-          operation: operationName,
-          error: errorMessage,
-          timestamp: new Date().toISOString()
-        }),
-        showRetry: true,
-        priority: 'medium'
-      }
+  if (typeof window !== 'undefined' && typeof window.showError === 'function') {
+    window.showError(
+      displayTitle,
+      displayMessage,
+      JSON.stringify({
+        operation: operationName,
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      }),
+      true,
+      'medium'
+    );
+  } else if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    const eventDetail: ShowAppErrorDetail = {
+      title: displayTitle,
+      message: displayMessage,
+      details: JSON.stringify({
+        operation: operationName,
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      }),
+      showRetry: true,
+      priority: 'medium'
+    };
+    const event = new CustomEvent<ShowAppErrorDetail>('showAppError', {
+      detail: eventDetail
     });
     window.dispatchEvent(event);
   } else {

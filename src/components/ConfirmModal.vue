@@ -38,6 +38,8 @@
 <script setup lang="ts">
 import { watch, onUnmounted, ref } from 'vue';
 
+type ConfirmType = 'primary' | 'danger' | 'warning';
+
 interface Props {
   show?: boolean;
   title?: string;
@@ -46,7 +48,7 @@ interface Props {
   closeOnOverlayClick?: boolean;
   confirmText?: string;
   cancelText?: string;
-  confirmType?: string;
+  confirmType?: ConfirmType;
 }
 
 interface Emits {
@@ -57,11 +59,11 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   show: false,
   title: '确认操作',
-  details: '',
+  details: undefined,
   closeOnOverlayClick: true,
   confirmText: '确定',
   cancelText: '取消',
-  confirmType: 'primary',
+  confirmType: 'primary' as ConfirmType,
 });
 
 const emit = defineEmits<Emits>();

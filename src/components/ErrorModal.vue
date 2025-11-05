@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { watch, onUnmounted, ref, computed } from 'vue';
-import { getPriorityDescription, getPriorityClass } from '../utils/errorHandler';
+import { getPriorityDescription, getPriorityClass, ErrorPriority, type ErrorPriorityLevel } from '../utils/errorHandler';
 
 interface Props {
   show?: boolean;
@@ -44,7 +44,7 @@ interface Props {
   details?: string;
   closeOnOverlayClick?: boolean;
   showRetry?: boolean;
-  priority?: string;
+  priority?: ErrorPriorityLevel;
 }
 
 interface Emits {
@@ -55,38 +55,32 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   show: false,
   title: '错误',
-  details: '',
+  details: undefined,
   closeOnOverlayClick: true,
   showRetry: false,
-  priority: 'medium',
+  priority: 'medium' as ErrorPriorityLevel,
 });
 
 // 计算属性：优先级描述和样式类
-const priorityText = computed(() => {
-  if (!props.priority) return '';
-  // 将字符串转换为ErrorPriority枚举值
-  const priorityMap: Record<string, any> = {
-    'critical': 'critical',
-    'high': 'high',
-    'medium': 'medium',
-    'low': 'low'
-  };
-  const enumValue = priorityMap[props.priority.toLowerCase()] || 'medium';
-  return getPriorityDescription(enumValue);
-});
+const normalizePriority = (priority?: ErrorPriorityLevel): ErrorPriority => {
+  switch (priority) {
+    case 'critical':
+      return ErrorPriority.CRITICAL;
+    case 'high':
+      return ErrorPriority.HIGH;
+    case 'low':
+      return ErrorPriority.LOW;
+    case 'medium':
+    default:
+      return ErrorPriority.MEDIUM;
+  }
+};
 
-const priorityClass = computed(() => {
-  if (!props.priority) return 'error-medium';
-  // 将字符串转换为ErrorPriority枚举值
-  const priorityMap: Record<string, any> = {
-    'critical': 'critical',
-    'high': 'high',
-    'medium': 'medium',
-    'low': 'low'
-  };
-  const enumValue = priorityMap[props.priority.toLowerCase()] || 'medium';
-  return getPriorityClass(enumValue);
-});
+const resolvedPriority = computed(() => normalizePriority(props.priority));
+
+const priorityText = computed(() => getPriorityDescription(resolvedPriority.value));
+
+const priorityClass = computed(() => getPriorityClass(resolvedPriority.value));
 
 const emit = defineEmits<Emits>();
 const closeModal = (): void => {
