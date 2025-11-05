@@ -30,7 +30,7 @@ jobs:
           CI: true
 
       - name: Upload frontend artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: dist/
@@ -61,7 +61,7 @@ jobs:
           npm test
 
       - name: Upload backend artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: backend-dist
           path: backend/dist/
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Verify artifacts
         run: |
