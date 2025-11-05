@@ -91,6 +91,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, inject, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
+import { appStore } from '../store/appStore';
 
 interface Student {
   uid: number;
@@ -98,6 +99,7 @@ interface Student {
   phone?: string;
   membership_days_remaining: number | null;
   membership_end_date?: string | null;
+  membership_start_date?: string | null;
   is_membership_active: boolean;
 }
 
@@ -112,14 +114,22 @@ const expiringMemberships: Ref<Student[]> = ref([]);
 const extendDaysMap: Record<number, number> = reactive({});
 const errorHandler = inject<ErrorHandler>('errorHandler');
 
-const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => {
-  console.error(`${title}: ${message}`, details);
-  // 统一错误处理：移除alert降级
-});
+// 使用 appStore 的统一错误处理
+const showError = (title: string, message: string, details?: string) => {
+  if (errorHandler?.showError) {
+    errorHandler.showError(title, message, details);
+  } else {
+    appStore.showError(title, message, details || '');
+  }
+};
 
-const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => {
-  console.log(`✅ ${title}: ${message}`);
-});
+const showSuccess = (title: string, message: string) => {
+  if (errorHandler?.showSuccess) {
+    errorHandler.showSuccess(title, message);
+  } else {
+    appStore.showSuccess(title, message);
+  }
+};
 
 // 加载即将过期的会员
 const loadExpiringMemberships = async (): Promise<void> => {
@@ -134,18 +144,25 @@ const loadExpiringMemberships = async (): Promise<void> => {
 
       loading.value = true;
       try {
-        // 使用新的v2 API方法
-        const expiring = await ApiService.getMembershipExpiringSoon(7); // 7天内过期
+        // 使用 API 方法获取7天内即将过期的会员
+        const expiring = await ApiService.getMembershipExpiringSoon(7);
         
+        // 验证返回的数据格式
         if (!Array.isArray(expiring)) {
           throw new Error('返回的数据格式不正确，期望数组格式');
         }
 
+        // 过滤并验证学员数据的完整性
         expiringMemberships.value = expiring.filter((student: any): student is Student => 
-          student && student.uid && student.name
+          student && 
+          student.uid && 
+          student.name &&
+          typeof student.uid === 'number'
         ) as Student[];
 
-        console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
+        if (import.meta.env?.MODE !== 'production') {
+          console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
+        }
         
         // 如果没有即将过期的会员，2.5秒后自动隐藏
         if (expiringMemberships.value.length === 0) {
@@ -158,7 +175,8 @@ const loadExpiringMemberships = async (): Promise<void> => {
       } catch (error) {
         console.error('加载即将过期会员失败:', error);
         expiringMemberships.value = [];
-        showError('加载失败', '无法获取即将过期的会员信息', (error as Error).message || '未知错误');
+        const errorMessage = (error as any)?.message || (error as Error).message || '未知错误';
+        showError('加载失败', '无法获取即将过期的会员信息，请检查网络连接或稍后重试', errorMessage);
       } finally {
         loading.value = false;
       }
@@ -179,23 +197,36 @@ const loadExpiringMemberships = async (): Promise<void> => {
 
       loading.value = true;
       try {
-        const base = student.is_membership_active && student.membership_end_date ? new Date(student.membership_end_date) : new Date();
-        const newEnd = new Date(base);
-        newEnd.setDate(newEnd.getDate() + days);
-        const iso = newEnd.toISOString();
-        if (typeof (ApiService as any).setMembershipEndDate === 'function') {
-          await (ApiService as any).setMembershipEndDate(student.uid, iso);
-        } else if (typeof (ApiService as any).setMembershipByDays === 'function') {
-          await (ApiService as any).setMembershipByDays(student.uid, days);
-        } else {
-          await ApiService.setMembershipByType(student.uid, 'month', true);
-        }
+        // 计算新的会员结束日期
+        // 如果会员当前是活跃的且有结束日期，从结束日期开始续费；否则从今天开始
+        const baseDate = student.is_membership_active && student.membership_end_date 
+          ? new Date(student.membership_end_date) 
+          : new Date();
+        
+        const newEndDate = new Date(baseDate);
+        newEndDate.setDate(newEndDate.getDate() + days);
+        
+        // 计算新的开始日期
+        // 如果会员有开始日期则保留，否则使用基础日期
+        const startDate = student.membership_start_date 
+          ? student.membership_start_date 
+          : baseDate.toISOString();
+        
+        // 调用 setStudentMembership API
+        await ApiService.setStudentMembership(student.uid, {
+          startDate: startDate,
+          endDate: newEndDate.toISOString()
+        });
+        
         showSuccess('续费成功', `已为 ${student.name} 续费 ${days} 天`);
         extendDaysMap[student.uid] = 0 as any;
+        
+        // 刷新会员列表
         await loadExpiringMemberships();
       } catch (error) {
         console.error('续费失败:', error);
-        showError('续费失败', '续费时发生错误', (error as Error).message || '未知错误');
+        const errorMessage = (error as any)?.message || (error as Error).message || '未知错误';
+        showError('续费失败', '续费时发生错误，请稍后重试', errorMessage);
       } finally {
         loading.value = false;
       }
