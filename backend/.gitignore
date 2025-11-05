@@ -111,9 +111,6 @@ dist/
 build/
 
 # Database
-*.db
-*.sqlite
-*.sqlite3
 data/
 
 # Uploads

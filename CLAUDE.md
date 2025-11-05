@@ -43,9 +43,6 @@ npm run dev:full
 ### 数据库操作
 ```bash
 cd backend
-npm run migrate                # 数据迁移
-npm run migrate sample        # 创建示例数据
-npm run migrate-mongo         # 迁移到MongoDB
 npm run seed                   # 数据库初始化
 ```
 
@@ -61,10 +58,10 @@ npm run seed                   # 数据库初始化
 ### 后端架构 (Node.js + Express + TypeScript)
 - **入口**: `backend/src/index.ts` - 服务器启动和配置验证
 - **应用核心**: `backend/src/app.ts` - Express应用配置，中间件，安全设置
-- **数据库**: 支持SQLite和MongoDB双模式，通过适配器模式切换
+- **数据库**: MongoDB，使用Mongoose进行数据建模
 - **路由**: `backend/src/routes/` - RESTful API路由定义
-- **模型层**: 使用Sequelize ORM和Mongoose双重数据建模
-- **中间件**: 认证、速率限制、错误处理、请求验证
+- **模型层**: 使用Mongoose ODM进行数据建模
+- **中间���**: 认证、速率限制、错误处理、请求验证
 
 ### 数据流动
 - 前端通过Axios调用REST API，数据经过transformers验证和转换
@@ -103,7 +100,7 @@ npm run seed                   # 数据库初始化
 
 ### 后端开发
 - 新API端点需要在routes、controllers、models、types四个层面对应实现
-- 数据库操作优先使用Sequelize ORM，MongoDB模式使用Mongoose
+- 数据库操作使用Mongoose ODM
 - 所有API返回必须遵循统一格式，使用中间件确保一致性
 - 配置管理通过`backend/src/config/`统一处理，支持环境变量
 
@@ -115,6 +112,6 @@ npm run seed                   # 数据库初始化
 
 ### 环境配置
 - 开发环境端口：前端1420，后端3001
-- 数据库配置：默认SQLite，可通过环境变量切换MongoDB
+- 数据库：MongoDB
 - 日志级别可通过环境变量控制
 - CORS和安全设置已预配置

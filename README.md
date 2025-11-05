@@ -14,8 +14,8 @@
 - **Node.js** - 运行时环境
 - **TypeScript** - 类型安全的JavaScript
 - **Express.js** - Web应用框架
-- **Sequelize ORM** - 数据库ORM
-- **SQLite** - 轻量级数据库
+- **Mongoose** - MongoDB ODM
+- **MongoDB** - NoSQL数据库
 
 ## 📦 快速开始
 
@@ -139,12 +139,9 @@ QMX/
 ### 数据库操作
 
 ```bash
-# 数据迁移
 cd backend
-npm run migrate
-
-# 创建示例数据
-npm run migrate sample
+# 数据库初始化
+npm run seed
 ```
 
 ### 环境配置
@@ -157,8 +154,7 @@ PORT=3001
 NODE_ENV=development
 
 # 数据库配置
-DB_TYPE=sqlite
-SQLITE_PATH=./data/qmx.db
+MONGODB_URI=mongodb://localhost:27017/qmx
 
 # 安全配置
 JWT_SECRET=your-secret-key
@@ -248,7 +244,7 @@ npm start
 
 - Vue.js 团队提供优秀的前端框架
 - Express.js 团队提供强大的后端框架
-- Sequelize 团队提供优秀的ORM工具
+- MongoDB 团队提供强大的数据库解决方案
 
 ---
 

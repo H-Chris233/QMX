@@ -6,8 +6,8 @@ QMX学生管理系统的后端服务，提供完整的RESTful API支持。
 
 - **Node.js** + **TypeScript** - 运行时和编程语言
 - **Express.js** - Web框架
-- **Sequelize ORM** - 数据库ORM
-- **SQLite/PostgreSQL** - 数据库
+- **Mongoose** - MongoDB ODM
+- **MongoDB** - NoSQL数据库
 - **Joi** - 数据验证
 - **Winston** - 日志管理
 - **JWT** - 身份认证
@@ -170,10 +170,10 @@ backend/
 |--------|------|--------|
 | PORT | 服务端口 | 3001 |
 | NODE_ENV | 运行环境 | development |
-| DB_TYPE | 数据库类型 | sqlite |
-| DB_NAME | 数据库名称 | qmx_db |
+| MONGODB_URI | MongoDB连接URI | mongodb://localhost:27017/qmx |
 | JWT_SECRET | JWT密钥 | - |
 | CORS_ORIGIN | CORS源 | http://localhost:1420 |
+| LOG_LEVEL | 日志级别 | info |
 
 ## 开发指南
 
@@ -184,10 +184,10 @@ backend/
 3. 在`routes/`中定义路由
 4. 在`middleware/validation.ts`中添加验证规则
 
-### 数据库迁移
+### 数据库初始化
 
 ```bash
-npm run migrate
+npm run seed
 ```
 
 ### 运行测试
