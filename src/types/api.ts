@@ -245,25 +245,25 @@ export interface StudentUpdateBatch {
  */
 export interface StudentSearchOptions {
   /** 姓名包含 */
-  name_contains?: string | null;
+  name_contains?: string | null | undefined;
   /** 最小年龄 */
-  min_age?: number | null;
+  min_age?: number | null | undefined;
   /** 最大年龄 */
-  max_age?: number | null;
+  max_age?: number | null | undefined;
   /** 最低分 */
-  min_score?: number | null;
+  min_score?: number | null | undefined;
   /** 最高分 */
-  max_score?: number | null;
+  max_score?: number | null | undefined;
   /** 班级类型 */
-  class_type?: ClassType | string | null;
+  class_type?: ClassType | string | null | undefined;
   /** 科目 */
-  subject?: SubjectType | string | null;
+  subject?: SubjectType | string | null | undefined;
   /** 是否有会员 */
-  has_membership?: boolean | null;
+  has_membership?: boolean | null | undefined;
   /** 会员在指定日期是否激活 */
-  membership_active_at?: string | null;
+  membership_active_at?: string | null | undefined;
   /** 会员状态 */
-  membership_status?: MembershipStatus | null;
+  membership_status?: MembershipStatus | null | undefined;
   /** 页码 */
   page?: number;
   /** 每页条数 */
@@ -404,19 +404,19 @@ export interface TransactionCreateData {
  */
 export interface CashSearchOptions {
   /** 学员ID */
-  student_id?: number | null;
+  student_id?: number | null | undefined;
   /** 最小金额（单位：元） */
-  min_amount?: number | null;
+  min_amount?: number | null | undefined;
   /** 最大金额（单位：元） */
-  max_amount?: number | null;
+  max_amount?: number | null | undefined;
   /** 是否有分期付款 */
-  has_installment?: boolean | null;
+  has_installment?: boolean | null | undefined;
   /** 开始日期 */
-  date_from?: string | null;
+  date_from?: string | null | undefined;
   /** 结束日期 */
-  date_to?: string | null;
+  date_to?: string | null | undefined;
   /** 是否为收入 */
-  is_income?: boolean | null;
+  is_income?: boolean | null | undefined;
   /** 页码 */
   page?: number;
   /** 每页条数 */
