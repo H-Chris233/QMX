@@ -1072,8 +1072,8 @@ interface ErrorHandler {
       const newScore = prompt(`请输入新的成绩 (0-${getMaxScore()}):`, String(currentScore));
       if (newScore === null) return; // 用户取消
       
-      const validation = validateScoreInput(newScore, selectedStudentData.value);
-      if (!validation.isValid) {
+      const validation = validateScoreInput(Number(newScore));
+      if (!validation.valid) {
         handleValidationError('score_input', validation.errors.join('；'));
         return;
       }
@@ -1150,7 +1150,7 @@ interface ErrorHandler {
           }
           
           // 过滤无效成绩
-          student.rings = student.rings.filter(score => 
+          student.rings = student.rings.filter((score: number) => 
             typeof score === 'number' && !isNaN(score) && isFinite(score)
           );
           
@@ -1256,8 +1256,8 @@ interface ErrorHandler {
       }
 
       // 验证成绩输入
-      const validation = validateScoreInput(quickScore.value, selectedStudentData.value);
-      if (!validation.isValid) {
+      const validation = validateScoreInput(Number(quickScore.value));
+      if (!validation.valid) {
         handleValidationError('quick_score_validation', validation.errors.join('；'));
         return;
       }
