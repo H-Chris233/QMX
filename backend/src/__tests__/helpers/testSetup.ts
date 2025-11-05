@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { Student, studentModel } from '@/models/mongo';
-import { Cash } from '@/models/CashMongo';
-import { Installment, InstallmentModel } from '@/models/InstallmentMongo';
-import { InstallmentPlan, InstallmentPlanModel } from '@/models/InstallmentPlanMongo';
+import { Student, studentModel, type IStudentDoc } from '@/models/mongo';
+import { Cash, type ICashDoc } from '@/models/CashMongo';
+import { Installment, InstallmentModel, type IInstallmentDoc } from '@/models/InstallmentMongo';
+import { InstallmentPlan, InstallmentPlanModel, type IInstallmentPlanDoc } from '@/models/InstallmentPlanMongo';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
 import CounterModel, {
@@ -31,22 +31,30 @@ export async function cleanupTestDatabase(mongoServer: MongoMemoryServer): Promi
 }
 
 export async function clearAllCollections(): Promise<void> {
-  await Promise.all([
-    studentModel.deleteMany({}),
-    Cash.deleteMany({}),
-    InstallmentModel.deleteMany({}),
-    InstallmentPlanModel.deleteMany({}),
-    CounterModel.deleteMany({}),
-  ]).catch(() => {});
+  try {
+    await Promise.all([
+      studentModel.deleteMany({}).exec(),
+      Cash.deleteMany({}).exec(),
+      InstallmentModel.deleteMany({}).exec(),
+      InstallmentPlanModel.deleteMany({}).exec(),
+      CounterModel.deleteMany({}).exec(),
+    ]);
+  } catch (error) {
+    console.warn('[testSetup] Failed to clear collections', error);
+  }
 }
 
 export async function resetAllSequences(): Promise<void> {
-  await Promise.all([
-    resetSequence(STUDENT_SEQUENCE_NAME),
-    resetSequence(CASH_SEQUENCE_NAME),
-    resetSequence(INSTALLMENT_SEQUENCE_NAME),
-    resetSequence(INSTALLMENT_PLAN_SEQUENCE_NAME),
-  ]);
+  try {
+    await Promise.all([
+      resetSequence(STUDENT_SEQUENCE_NAME),
+      resetSequence(CASH_SEQUENCE_NAME),
+      resetSequence(INSTALLMENT_SEQUENCE_NAME),
+      resetSequence(INSTALLMENT_PLAN_SEQUENCE_NAME),
+    ]);
+  } catch (error) {
+    console.warn('[testSetup] Failed to reset counter sequences', error);
+  }
 }
 
 export async function createTestStudent(
@@ -58,7 +66,7 @@ export async function createTestStudent(
     rings?: number[];
     membership?: { startDate: Date; endDate: Date } | null;
   } = {}
-) {
+): Promise<IStudentDoc> {
   const builder = StudentBuilder.create()
     .name(overrides.name || 'Test Student')
     .phone(overrides.phone || '13800138000')
@@ -80,7 +88,7 @@ export async function createTestCashTransaction(
   amount: number,
   studentId?: number | null,
   note?: string
-) {
+): Promise<ICashDoc> {
   const builder = CashBuilder.create().amount(amount);
 
   if (studentId !== undefined) {
@@ -101,7 +109,7 @@ export async function createTestInstallmentPlan(
   startDate: Date,
   studentId?: number | null,
   customDays?: number
-) {
+): Promise<IInstallmentPlanDoc> {
   const payload = {
     student_id: studentId ?? null,
     total_amount: totalAmount * 100,
@@ -122,7 +130,7 @@ export async function createTestInstallment(
   amount: number,
   dueDate: Date,
   status: InstallmentStatus = InstallmentStatus.PENDING
-) {
+): Promise<IInstallmentDoc> {
   return await Installment.create({
     plan_id: planId,
     student_id: studentId,
