@@ -1,4 +1,3 @@
-# .github/workflows/node-ci.yml
 name: Full-Stack CI
 
 on:
@@ -8,42 +7,75 @@ on:
     branches: [release]
 
 jobs:
-  build-and-test:
+  # 前端构建任务
+  frontend:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x]
-
     steps:
-    # 1. 基础环境设置
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
-    # 2. 前端构建 (假设前端在根目录)
-    - name: Build Vue Frontend
-      run: |
-        npm ci
-        npm run build
-      env:
-        CI: true
+      - name: Install dependencies
+        run: npm ci
 
-    # 3. 后端处理 (关键：指定子目录路径)
-    - name: Build Express Backend
-      working-directory: ./backend  # 你的后端子目录名
-      run: |
-        npm ci
-        npm run build  # 确保package.json有tsc构建命令
-        npm test       # 建议包含测试用例
+      - name: Build Vue Frontend
+        run: npm run build
+        env:
+          CI: true
 
-    # 4. 完整性检查（可选但推荐）
-    - name: Verify build artifacts
-      run: |
-        test -d dist && echo "Frontend built successfully"
-        test -d backend/dist && echo "Backend built successfully"
-        
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-dist
+          path: dist/
+
+  # 后端构建任务
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Express Backend
+        run: |
+          npm run build
+          npm test
+
+      - name: Upload backend artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-dist
+          path: backend/dist/
+
+  # 最终合并任务（可选）
+  deploy-ready:
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Verify artifacts
+        run: |
+          ls -la frontend-dist/ || echo "Frontend artifact missing"
+          ls -la backend-dist/ || echo "Backend artifact missing"
+          
