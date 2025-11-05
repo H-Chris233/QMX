@@ -1,11 +1,12 @@
 import Joi from 'joi';
 import express from 'express';
+import type { Router } from 'express';
 import installmentController from '@/controllers/installmentController';
 import { validate, validateParams, validateQuery, commonValidations } from '@/middleware/validation';
 import { apiRateLimitMiddleware } from '@/middleware/rateLimiter';
 import { InstallmentStatus, PaymentFrequency, InstallmentPlanStatus } from '@/types';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // 应用速率限制
 router.use(apiRateLimitMiddleware);

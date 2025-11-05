@@ -1,7 +1,8 @@
 import express from 'express';
+import type { NextFunction, Request, Response, Router } from 'express';
 import adapterController from '@/controllers/adapterController';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // MongoDB专用路由
 
@@ -20,7 +21,7 @@ router.get('/financial-stats', adapterController.getFinancialStats);
 router.get('/health', adapterController.getHealthStatus);
 
 // 适配器信息接口
-router.get('/info', (req, res) => {
+router.get('/info', (_req: Request, res: Response, _next: NextFunction): void => {
   res.json({
     success: true,
     data: {

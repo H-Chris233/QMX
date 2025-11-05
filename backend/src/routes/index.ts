@@ -1,4 +1,5 @@
 import express from 'express';
+import type { NextFunction, Request, Response, Router } from 'express';
 import studentRoutes from '@/routes/studentRoutes';
 import scoreRoutes from '@/routes/scoreRoutes';
 import cashRoutes from '@/routes/cashRoutes';
@@ -7,10 +8,10 @@ import statsRoutes from '@/routes/statsRoutes';
 import membershipRoutes from '@/routes/membershipRoutes';
 import adapterRoutes from '@/routes/adapterRoutes';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // API版本信息
-router.get('/', (req, res) => {
+router.get('/', (_req: Request, res: Response, _next: NextFunction): void => {
   res.json({
     name: 'QMX Backend API',
     version: '1.0.0',
