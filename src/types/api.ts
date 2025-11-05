@@ -648,15 +648,15 @@ export interface CurrentStudentInput {
   /** 班级类型 */
   class: ClassType | string;
   /** 备注信息 */
-  note?: string;
+  note?: string | undefined;
   /** 科目类型 */
   subject: SubjectType | string;
   /** 剩余课程数 */
-  lesson_left?: number | null;
+  lesson_left?: number | null | undefined;
   /** 会员开始日期 */
-  membership_start_date?: string | null;
+  membership_start_date?: string | null | undefined;
   /** 会员结束日期 */
-  membership_end_date?: string | null;
+  membership_end_date?: string | null | undefined;
 }
 
 // ============================================================================

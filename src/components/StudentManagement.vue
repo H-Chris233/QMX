@@ -31,6 +31,19 @@
             <option value="Year">年卡</option>
             <option value="Others">其他</option>
           </select>
+
+          <select v-model="searchFilters.hasMembership" @change="performSearch">
+            <option value="">所有会员状态</option>
+            <option value="true">有会员</option>
+            <option value="false">无会员</option>
+          </select>
+
+          <select v-model="searchFilters.membershipStatus" @change="performSearch">
+            <option value="">会员筛选</option>
+            <option value="Active">激活中</option>
+            <option value="Expired">已过期</option>
+            <option value="Upcoming">即将开始</option>
+          </select>
         </div>
       </div>
       
@@ -91,7 +104,7 @@
         </div>
         
         <div class="student-actions">
-          <button @click.stop="showEditForm = true; currentStudent = { ...student }" class="edit-btn">
+          <button @click.stop="editStudent(student)" class="edit-btn">
             <span class="btn-icon">✏️</span>
             编辑
           </button>
@@ -137,7 +150,7 @@
       
       <div class="modal-body">
         <StudentForm 
-          v-model="currentStudent"
+          :model-value="currentStudent"
           @save="saveStudent"
           @cancel="closeForm"
         />
@@ -147,19 +160,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { appStore } from '../store/appStore';
 import StudentForm from './StudentForm.vue';
-import { ApiService, type Student } from '../api/ApiService';
-import { validateStudentInput } from '../utils/validation';
-import type { CurrentStudent } from '../types/api';
+import { ApiService } from '../api/ApiService';
+import type { Student, CurrentStudentInput } from '../types/api';
 
 // 响应式数据
 const students = ref<Student[]>([]);
 const searchQuery = ref('');
 const searchFilters = ref({
   subject: '',
-  classType: ''
+  classType: '',
+  hasMembership: '',
+  membershipStatus: ''
 });
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -169,34 +183,14 @@ const selectedStudent = ref<Student | null>(null);
 // 表单状态
 const showAddStudentForm = ref(false);
 const showEditForm = ref(false);
-const currentStudent = ref<CurrentStudent>({
-  uid: null,
-  name: '',
-  age: null,
-  phone: '',
-  classType: '',
-  note: '',
-  subject: 'Shooting',
-  customMembershipStart: '',
-  enableCustomMembership: false
-});
-
-// 计算属性
-const hasSearchFilters = computed(() => {
-  return searchQuery.value !== '' || 
-         searchFilters.value.subject !== '' || 
-         searchFilters.value.classType !== '';
-});
+const currentStudent = ref<Student | null>(null);
 
 // 搜索学员
 const performSearch = async (): Promise<void> => {
   try {
-    const response = await ApiService.searchStudents({
-      name_contains: searchQuery.value || null,
-      subject: searchFilters.value.subject || null,
-      class_type: searchFilters.value.classType || null
-    });
-    students.value = response;
+    // 重置到第一页并执行搜索
+    currentPage.value = 1;
+    await fetchStudents(1);
   } catch (error) {
     console.error('搜索学员失败:', error);
     appStore.showError('搜索失败', '无法搜索学员，请稍后重试');
@@ -206,13 +200,30 @@ const performSearch = async (): Promise<void> => {
 // 获取所有学员
 const fetchStudents = async (page: number = 1): Promise<void> => {
   try {
-    const response = await ApiService.getAllStudents({
+    // 构建查询参数
+    const params: any = {
       page,
       limit: 20,
-      name_contains: searchQuery.value || undefined,
-      subject: searchFilters.value.subject || undefined,
-      class_type: searchFilters.value.classType || undefined
-    });
+    };
+
+    // 添加搜索条件
+    if (searchQuery.value) {
+      params.name_contains = searchQuery.value;
+    }
+    if (searchFilters.value.subject) {
+      params.subject = searchFilters.value.subject;
+    }
+    if (searchFilters.value.classType) {
+      params.class_type = searchFilters.value.classType;
+    }
+    if (searchFilters.value.hasMembership) {
+      params.has_membership = searchFilters.value.hasMembership === 'true';
+    }
+    if (searchFilters.value.membershipStatus) {
+      params.membership_status = searchFilters.value.membershipStatus;
+    }
+
+    const response = await ApiService.getAllStudents(params);
     
     students.value = response.students;
     currentPage.value = response.pagination.page;
@@ -229,38 +240,22 @@ const selectStudent = (student: Student): void => {
   selectedStudent.value = student;
 };
 
-// 保存学员
-const saveStudent = async (): Promise<void> => {
-  // 表单验证
-  const validation = validateStudentInput(currentStudent.value);
-  if (!validation.isValid) {
-    appStore.showError('输入错误', validation.errors.join(', '));
-    return;
-  }
+// 编辑学员
+const editStudent = (student: Student): void => {
+  currentStudent.value = student;
+  showEditForm.value = true;
+};
 
+// 保存学员
+const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
   try {
     if (showAddStudentForm.value) {
-      await ApiService.addStudent(
-        currentStudent.value.name,
-        currentStudent.value.age || undefined,
-        currentStudent.value.classType,
-        currentStudent.value.phone,
-        currentStudent.value.note,
-        currentStudent.value.subject
-      );
+      // 新增学员
+      await ApiService.addStudent(data);
       appStore.showSuccess('成功', '学员添加成功');
-    } else {
-      await ApiService.updateStudentInfo(
-        currentStudent.value.uid!,
-        {
-          name: currentStudent.value.name,
-          age: currentStudent.value.age,
-          classType: currentStudent.value.classType,
-          phone: currentStudent.value.phone,
-          note: currentStudent.value.note,
-          subject: currentStudent.value.subject
-        }
-      );
+    } else if (currentStudent.value) {
+      // 更新学员
+      await ApiService.updateStudentInfo(currentStudent.value.uid, data);
       appStore.showSuccess('成功', '学员信息更新成功');
     }
     
@@ -269,10 +264,11 @@ const saveStudent = async (): Promise<void> => {
     fetchStudents(currentPage.value);
   } catch (error) {
     console.error('保存学员失败:', error);
+    const errorMessage = (error as any)?.response?.data?.error || (error as Error).message;
     appStore.showError(
       '保存失败', 
       '无法保存学员信息，请稍后重试',
-      'API Error: ' + (error as Error).message,
+      'API Error: ' + errorMessage,
       true
     );
   }
@@ -289,13 +285,21 @@ const deleteStudent = async (uid: number): Promise<void> => {
       try {
         await ApiService.deleteStudent(uid);
         appStore.showSuccess('成功', '学员删除成功');
-        fetchStudents(currentPage.value); // 重新获取数据
+        // 如果当前页没有数据了，回到上一页
+        if (students.value.length === 1 && currentPage.value > 1) {
+          await fetchStudents(currentPage.value - 1);
+        } else {
+          await fetchStudents(currentPage.value);
+        }
       } catch (error) {
         console.error('删除学员失败:', error);
+        const errorMessage = (error as any)?.response?.data?.error || 
+                            (error as any)?.response?.data?.message || 
+                            (error as Error).message;
         appStore.showError(
           '删除失败', 
-          '无法删除学员，请稍后重试',
-          'API Error: ' + (error as Error).message
+          errorMessage || '无法删除学员，请稍后重试',
+          'API Error: ' + errorMessage
         );
       }
     }
@@ -305,12 +309,50 @@ const deleteStudent = async (uid: number): Promise<void> => {
 // 导出学员数据
 const exportStudents = async (): Promise<void> => {
   try {
-    // 创建简单的CSV导出功能
-    const csvContent = 'data:text/csv;charset=utf-8,' + 
-      'ID,姓名,年龄,电话,课程,科目,备注\n' +
-      students.value.map(s => 
-        `${s.uid},"${s.name}",${s.age || ''},"${s.phone}","${s.class}","${s.subject}","${s.note || ''}"`
-      ).join('\n');
+    // 创建CSV表头
+    const headers = [
+      'ID',
+      '姓名',
+      '年龄',
+      '电话',
+      '课程',
+      '科目',
+      '剩余课时',
+      '会员开始日期',
+      '会员结束日期',
+      '会员状态',
+      '备注'
+    ];
+
+    // 创建CSV行数据
+    const rows = students.value.map(s => {
+      const membershipStart = s.membership_start_date 
+        ? new Date(s.membership_start_date).toLocaleDateString('zh-CN')
+        : '';
+      const membershipEnd = s.membership_end_date 
+        ? new Date(s.membership_end_date).toLocaleDateString('zh-CN')
+        : '';
+      const membershipStatus = s.is_membership_active ? '激活' : '未激活';
+      
+      return [
+        s.uid,
+        `"${s.name}"`,
+        s.age || '',
+        `"${s.phone}"`,
+        `"${s.class}"`,
+        `"${getSubjectName(s.subject)}"`,
+        s.lesson_left || '',
+        `"${membershipStart}"`,
+        `"${membershipEnd}"`,
+        `"${membershipStatus}"`,
+        `"${s.note || ''}"`
+      ].join(',');
+    });
+
+    // 合并CSV内容
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + 
+      headers.join(',') + '\n' +
+      rows.join('\n');
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -356,17 +398,7 @@ const formatDate = (dateString: string): string => {
 const closeForm = (): void => {
   showAddStudentForm.value = false;
   showEditForm.value = false;
-  currentStudent.value = {
-    uid: null,
-    name: '',
-    age: null,
-    phone: '',
-    classType: '',
-    note: '',
-    subject: 'Shooting',
-    customMembershipStart: '',
-    enableCustomMembership: false
-  };
+  currentStudent.value = null;
 };
 
 // 组件挂载时加载数据
