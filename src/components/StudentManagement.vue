@@ -1,5 +1,5 @@
 <template>
-  <div class="student-management" :class="appStore.theme">
+  <div class="student-management">
     <!-- 顶部操作栏 -->
     <div class="top-bar">
       <div class="search-section">
@@ -161,10 +161,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { appStore } from '../store/appStore';
+import { useAppStore } from '../stores/app';
 import StudentForm from './StudentForm.vue';
 import { ApiService } from '../api/ApiService';
 import type { Student, CurrentStudentInput } from '../types/api';
+
+const appStore = useAppStore();
 
 // 响应式数据
 const students = ref<Student[]>([]);
@@ -193,7 +195,7 @@ const performSearch = async (): Promise<void> => {
     await fetchStudents(1);
   } catch (error) {
     console.error('搜索学员失败:', error);
-    appStore.showError('搜索失败', '无法搜索学员，请稍后重试');
+    appStore.errorHandler.showError('无法搜索学员，请稍后重试');
   }
 };
 
@@ -231,7 +233,7 @@ const fetchStudents = async (page: number = 1): Promise<void> => {
     totalStudents.value = response.pagination.total;
   } catch (error) {
     console.error('获取学员列表失败:', error);
-    appStore.showError('加载失败', '无法获取学员列表，请稍后重试');
+    appStore.errorHandler.showError('无法获取学员列表，请稍后重试');
   }
 };
 
@@ -252,11 +254,11 @@ const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
     if (showAddStudentForm.value) {
       // 新增学员
       await ApiService.addStudent(data);
-      appStore.showSuccess('成功', '学员添加成功');
+      appStore.errorHandler.showSuccess('学员添加成功');
     } else if (currentStudent.value) {
       // 更新学员
       await ApiService.updateStudentInfo(currentStudent.value.uid, data);
-      appStore.showSuccess('成功', '学员信息更新成功');
+      appStore.errorHandler.showSuccess('学员信息更新成功');
     }
     
     // 关闭表单并刷新数据
@@ -265,12 +267,7 @@ const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
   } catch (error) {
     console.error('保存学员失败:', error);
     const errorMessage = (error as any)?.response?.data?.error || (error as Error).message;
-    appStore.showError(
-      '保存失败', 
-      '无法保存学员信息，请稍后重试',
-      'API Error: ' + errorMessage,
-      true
-    );
+    appStore.errorHandler.showError('无法保存学员信息：' + errorMessage);
   }
 };
 
@@ -284,7 +281,7 @@ const deleteStudent = async (uid: number): Promise<void> => {
     onConfirm: async () => {
       try {
         await ApiService.deleteStudent(uid);
-        appStore.showSuccess('成功', '学员删除成功');
+        appStore.errorHandler.showSuccess('学员删除成功');
         // 如果当前页没有数据了，回到上一页
         if (students.value.length === 1 && currentPage.value > 1) {
           await fetchStudents(currentPage.value - 1);
@@ -293,14 +290,10 @@ const deleteStudent = async (uid: number): Promise<void> => {
         }
       } catch (error) {
         console.error('删除学员失败:', error);
-        const errorMessage = (error as any)?.response?.data?.error || 
-                            (error as any)?.response?.data?.message || 
+        const errorMessage = (error as any)?.response?.data?.error ||
+                            (error as any)?.response?.data?.message ||
                             (error as Error).message;
-        appStore.showError(
-          '删除失败', 
-          errorMessage || '无法删除学员，请稍后重试',
-          'API Error: ' + errorMessage
-        );
+        appStore.errorHandler.showError(errorMessage || '无法删除学员，请稍后重试');
       }
     }
   });
@@ -362,14 +355,10 @@ const exportStudents = async (): Promise<void> => {
     link.click();
     document.body.removeChild(link);
     
-    appStore.showSuccess('导出成功', '学员数据已导出为CSV文件');
+    appStore.errorHandler.showSuccess('学员数据已导出为CSV文件');
   } catch (error) {
     console.error('导出学员数据失败:', error);
-    appStore.showError(
-      '导出失败', 
-      '无法导出学员数据，请稍后重试',
-      'Error: ' + (error as Error).message
-    );
+    appStore.errorHandler.showError('无法导出学员数据：' + (error as Error).message);
   }
 };
 

@@ -91,7 +91,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, inject, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
-import { appStore } from '../store/appStore';
+import { useAppStore } from '../stores/app';
+
+const appStore = useAppStore();
 
 interface Student {
   uid: number;
@@ -115,19 +117,19 @@ const extendDaysMap: Record<number, number> = reactive({});
 const errorHandler = inject<ErrorHandler>('errorHandler');
 
 // 使用 appStore 的统一错误处理
-const showError = (title: string, message: string, details?: string) => {
+const showError = (message: string) => {
   if (errorHandler?.showError) {
-    errorHandler.showError(title, message, details);
+    errorHandler.showError(message);
   } else {
-    appStore.showError(title, message, details || '');
+    appStore.errorHandler.showError(message);
   }
 };
 
-const showSuccess = (title: string, message: string) => {
+const showSuccess = (message: string) => {
   if (errorHandler?.showSuccess) {
-    errorHandler.showSuccess(title, message);
+    errorHandler.showSuccess(message);
   } else {
-    appStore.showSuccess(title, message);
+    appStore.errorHandler.showSuccess(message);
   }
 };
 

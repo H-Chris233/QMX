@@ -59,7 +59,11 @@ jobs:
         run: |
           npm run build
           npm test
-
+      
+      - name: Test Express Backend
+        run: |
+          npm run test
+      
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
         with:
