@@ -114,24 +114,9 @@ const showAlerts: Ref<boolean> = ref(true);
 const isFadingOut: Ref<boolean> = ref(false);
 const expiringMemberships: Ref<Student[]> = ref([]);
 const extendDaysMap: Record<number, number> = reactive({});
-const errorHandler = inject<ErrorHandler>('errorHandler');
 
-// 使用 appStore 的统一错误处理
-const showError = (message: string) => {
-  if (errorHandler?.showError) {
-    errorHandler.showError(message);
-  } else {
-    appStore.errorHandler.showError(message);
-  }
-};
-
-const showSuccess = (message: string) => {
-  if (errorHandler?.showSuccess) {
-    errorHandler.showSuccess(message);
-  } else {
-    appStore.errorHandler.showSuccess(message);
-  }
-};
+// 直接使用 appStore 的统一错误处理
+const { showError, showSuccess } = appStore.errorHandler;
 
 // 加载即将过期的会员
 const loadExpiringMemberships = async (): Promise<void> => {
@@ -178,7 +163,7 @@ const loadExpiringMemberships = async (): Promise<void> => {
         console.error('加载即将过期会员失败:', error);
         expiringMemberships.value = [];
         const errorMessage = (error as any)?.message || (error as Error).message || '未知错误';
-        showError('加载失败', '无法获取即将过期的会员信息，请检查网络连接或稍后重试', errorMessage);
+        showError('无法获取即将过期的会员信息，请检查网络连接或稍后重试');
       } finally {
         loading.value = false;
       }
@@ -187,13 +172,13 @@ const loadExpiringMemberships = async (): Promise<void> => {
     // 续费会员
     const extendMembership = async (student: Student): Promise<void> => {
       if (!student || !student.uid) {
-        showError('操作失败', '学员信息无效');
+        showError('学员信息无效');
         return;
       }
 
       const days = extendDaysMap[student.uid] || 0;
       if (!days || days <= 0) {
-        showError('无效天数', '请输入大于0的天数');
+        showError('请输入大于0的天数');
         return;
       }
 
@@ -220,7 +205,7 @@ const loadExpiringMemberships = async (): Promise<void> => {
           endDate: newEndDate.toISOString()
         });
         
-        showSuccess('续费成功', `已为 ${student.name} 续费 ${days} 天`);
+        showSuccess(`已为 ${student.name} 续费 ${days} 天`);
         extendDaysMap[student.uid] = 0 as any;
         
         // 刷新会员列表
@@ -228,7 +213,7 @@ const loadExpiringMemberships = async (): Promise<void> => {
       } catch (error) {
         console.error('续费失败:', error);
         const errorMessage = (error as any)?.message || (error as Error).message || '未知错误';
-        showError('续费失败', '续费时发生错误，请稍后重试', errorMessage);
+        showError('续费时发生错误，请稍后重试');
       } finally {
         loading.value = false;
       }
@@ -237,7 +222,7 @@ const loadExpiringMemberships = async (): Promise<void> => {
     // 联系学员（打开电话应用）
     const contactStudent = (student: Student): void => {
       if (!student || !student.phone) {
-        showError('联系失败', '学员电话信息无效');
+        showError('学员电话信息无效');
         return;
       }
 
@@ -249,10 +234,10 @@ const loadExpiringMemberships = async (): Promise<void> => {
         // 降级方案：复制到剪贴板
         if (navigator.clipboard) {
           navigator.clipboard.writeText(student.phone).then(() => {
-            showSuccess('已复制', `电话号码 ${student.phone} 已复制到剪贴板`);
+            showSuccess(`电话号码 ${student.phone} 已复制到剪贴板`);
           });
         } else {
-          showError('复制失败', `无法复制电话号码，请手动复制: ${student.phone}`);
+          showError(`无法复制电话号码，请手动复制: ${student.phone}`);
         }
       }
     };
