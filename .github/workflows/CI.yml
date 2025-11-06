@@ -7,7 +7,6 @@ on:
     branches: [release]
 
 jobs:
-  # 前端构建任务
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -18,13 +17,25 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -40,7 +51,6 @@ jobs:
           name: frontend-dist
           path: dist/
 
-  # 后端构建任务
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -54,13 +64,25 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          cache: 'pnpm'
-          cache-dependency-path: backend/pnpm-lock.yaml
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -77,7 +99,6 @@ jobs:
           name: backend-dist
           path: backend/dist/
 
-  # 最终合并任务（可选）
   deploy-ready:
     needs: [frontend, backend]
     runs-on: ubuntu-latest
@@ -89,4 +110,3 @@ jobs:
         run: |
           ls -la frontend-dist/ || echo "Frontend artifact missing"
           ls -la backend-dist/ || echo "Backend artifact missing"
-          
