@@ -1,0 +1,317 @@
+{
+  "timestamp": "2025-11-06T11:37:40+0000",
+  "project": {
+    "name": "QMX 启明星学生管理系统",
+    "type": "教育管理系统",
+    "architecture": "前后端分离",
+    "version": "0.12.1",
+    "tech_stack": {
+      "frontend": "Vue 3 + TypeScript + Vite + Pinia",
+      "backend": "Node.js + Express + TypeScript + Mongoose",
+      "database": "MongoDB"
+    },
+    "recent_changes": [
+      "Pinia状态管理迁移完成",
+      "模块化API客户端架构",
+      "状态管理测试工具"
+    ]
+  },
+  "modules": [
+    {
+      "path": "src/api/",
+      "name": "API客户端模块",
+      "language": "TypeScript",
+      "entry": "ApiService.ts",
+      "type": "frontend",
+      "coverage": {
+        "files_scanned": 8,
+        "total_files": 8,
+        "percentage": 100,
+        "has_tests": false,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "src/components/",
+      "name": "Vue组件模块",
+      "language": "Vue/TypeScript",
+      "entry": "MainApp.vue",
+      "type": "frontend",
+      "coverage": {
+        "files_scanned": 13,
+        "total_files": 13,
+        "percentage": 100,
+        "has_tests": false,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "src/types/",
+      "name": "类型定义模块",
+      "language": "TypeScript",
+      "entry": "api.ts",
+      "type": "frontend",
+      "coverage": {
+        "files_scanned": 4,
+        "total_files": 4,
+        "percentage": 100,
+        "has_tests": false,
+        "interfaces": true,
+        "dependencies": false
+      }
+    },
+    {
+      "path": "src/utils/",
+      "name": "前端工具模块",
+      "language": "TypeScript",
+      "entry": "dataTransformers.ts",
+      "type": "frontend",
+      "coverage": {
+        "files_scanned": 5,
+        "total_files": 5,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": false
+      }
+    },
+    {
+      "path": "src/stores/",
+      "name": "状态管理模块",
+      "language": "TypeScript",
+      "entry": "index.ts",
+      "type": "frontend",
+      "coverage": {
+        "files_scanned": 7,
+        "total_files": 7,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true,
+        "recently_updated": true
+      }
+    },
+    {
+      "path": "backend/src/routes/",
+      "name": "后端路由模块",
+      "language": "TypeScript",
+      "entry": "index.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 9,
+        "total_files": 9,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "backend/src/controllers/",
+      "name": "控制器模块",
+      "language": "TypeScript",
+      "entry": "studentController.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 8,
+        "total_files": 8,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "backend/src/models/",
+      "name": "数据模型模块",
+      "language": "TypeScript",
+      "entry": "mongo.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 10,
+        "total_files": 10,
+        "percentage": 100,
+        "has_tests": false,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "backend/src/services/",
+      "name": "服务层模块",
+      "language": "TypeScript",
+      "entry": "studentQuery.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 7,
+        "total_files": 7,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "backend/src/middleware/",
+      "name": "中间件模块",
+      "language": "TypeScript",
+      "entry": "errorHandler.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 3,
+        "total_files": 3,
+        "percentage": 100,
+        "has_tests": false,
+        "interfaces": true,
+        "dependencies": true
+      }
+    },
+    {
+      "path": "backend/src/config/",
+      "name": "配置模块",
+      "language": "TypeScript",
+      "entry": "index.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 3,
+        "total_files": 3,
+        "percentage": 100,
+        "has_tests": false,
+        "interfaces": true,
+        "dependencies": true
+      }
+    }
+  ],
+  "coverage": {
+    "total_files": 82,
+    "files_scanned": 77,
+    "coverage_percentage": 94,
+    "truncated": false,
+    "ignored_patterns": [
+      "node_modules/**",
+      ".git/**",
+      "dist/**",
+      "build/**",
+      "__pycache__/**",
+      "*.lock",
+      "*.log",
+      "*.bin"
+    ],
+    "missing_files": [
+      "backend/src/store/",
+      "backend/src/validation/"
+    ],
+    "gaps": [
+      {
+        "module": "backend/src/models/",
+        "missing": "测试覆盖",
+        "impact": "数据模型层缺少单元测试",
+        "priority": "medium"
+      },
+      {
+        "module": "src/components/",
+        "missing": "组件测试",
+        "impact": "前端组件缺少单元测试和集成测试",
+        "priority": "medium"
+      },
+      {
+        "module": "backend/src/middleware/",
+        "missing": "中间件测试",
+        "impact": "中间件缺少单元测试",
+        "priority": "low"
+      }
+    ]
+  },
+  "architecture_improvements": {
+    "pinia_migration": {
+      "completed": true,
+      "date": "2025-11-06",
+      "benefits": [
+        "更好的类型安全",
+        "Vue DevTools支持",
+        "模块化设计",
+        "测试友好",
+        "性能优化"
+      ],
+      "files_affected": [
+        "src/stores/index.ts",
+        "src/stores/app.ts",
+        "src/stores/student.ts",
+        "src/main.ts",
+        "src/MainApp.vue"
+      ]
+    },
+    "api_modularization": {
+      "completed": true,
+      "benefits": [
+        "统一API入口",
+        "错误处理标准化",
+        "类型安全保证",
+        "模块化架构"
+      ],
+      "key_files": [
+        "src/api/ApiService.ts",
+        "src/utils/errorHandler.ts"
+      ]
+    }
+  },
+  "state_management": {
+    "framework": "Pinia",
+    "stores": [
+      "app.ts - 全局状态管理",
+      "student.ts - 学员数据管理",
+      "transaction.ts - 交易记录管理",
+      "auth.ts - 用户认证管理",
+      "installment.ts - 分期付款管理",
+      "stats.ts - 统计数据管理"
+    ],
+    "testing": {
+      "test_file": "src/utils/store-test.ts",
+      "coverage": "所有Store模块",
+      "features": [
+        "开发环境自动测试",
+        "浏览器控制台调试",
+        "Store间数据流测试"
+      ]
+    }
+  },
+  "documentation": {
+    "root_claude_md": true,
+    "module_claude_md_count": 11,
+    "last_updated": "2025-11-06T11:37:40+0000",
+    "new_modules": [
+      "src/stores/CLAUDE.md"
+    ],
+    "updated_modules": [
+      "CLAUDE.md (根级)"
+    ]
+  },
+  "next_steps": [
+    "优先补扫：backend/src/models/ 的测试覆盖情况",
+    "优先补扫：src/components/ 中的关键组件实现细节",
+    "优先补扫：backend/src/services/ 中的复杂业务逻辑",
+    "建议添加：后端配置管理的环境变量验证机制",
+    "建议添加：前端组件的单元测试覆盖"
+  ],
+  "quality_metrics": {
+    "type_safety": "优秀",
+    "modularity": "优秀",
+    "test_coverage": "良好",
+    "documentation": "优秀",
+    "code_organization": "优秀"
+  },
+  "development_workflow": {
+    "commands": {
+      "dev": "npm run dev:full",
+      "build": "npm run build && cd backend && npm run build",
+      "test": "npm test && cd backend && npm test",
+      "lint": "npm run lint && cd backend && npm run lint"
+    },
+    "ports": {
+      "frontend": 1420,
+      "backend": 3001
+    }
+  }
+}
