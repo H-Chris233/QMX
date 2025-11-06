@@ -28,6 +28,15 @@ import type {
   InstallmentStatus,
 } from '../types/api';
 
+import type {
+  LoginCredentials,
+  User,
+  LoginResponse,
+  RefreshTokenResponse,
+  RegisterData,
+  ChangePasswordData
+} from '../types/api';
+
 // 重新导出认证相关类型
 export type {
   LoginCredentials,
