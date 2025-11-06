@@ -930,3 +930,173 @@ export interface PaginatedResponseLegacy<T> {
     total_pages: number;
   };
 }
+
+// ============================================================================
+// 认证相关类型
+// ============================================================================
+
+/**
+ * 用户登录凭证接口
+ */
+export interface LoginCredentials {
+  /** 用户名 */
+  username: string;
+  /** 密码 */
+  password: string;
+  /** 是否记住登录状态 */
+  rememberMe?: boolean;
+}
+
+/**
+ * 用户信息接口
+ */
+export interface User {
+  /** 用户唯一标识符 */
+  id: string;
+  /** 用户名 */
+  username: string;
+  /** 邮箱地址 */
+  email?: string;
+  /** 用户角色 */
+  role: string;
+  /** 权限列表 */
+  permissions: string[];
+  /** 头像URL */
+  avatar?: string;
+  /** 最后登录时间 */
+  lastLogin?: Date;
+}
+
+/**
+ * 登录响应接口
+ */
+export interface LoginResponse {
+  /** 用户信息 */
+  user: User;
+  /** 访问令牌 */
+  token: string;
+  /** 刷新令牌 */
+  refreshToken: string;
+  /** 令牌过期时间（秒） */
+  expiresIn: number;
+}
+
+/**
+ * 刷新令牌响应接口
+ */
+export interface RefreshTokenResponse {
+  /** 新的访问令牌 */
+  token: string;
+  /** 新的刷新令牌 */
+  refreshToken: string;
+  /** 令牌过期时间（秒） */
+  expiresIn: number;
+}
+
+/**
+ * 注册用户数据接口
+ */
+export interface RegisterData {
+  /** 用户名 */
+  username: string;
+  /** 邮箱地址 */
+  email: string;
+  /** 密码 */
+  password: string;
+  /** 用户角色（可选） */
+  role?: string;
+}
+
+/**
+ * 修改密码数据接口
+ */
+export interface ChangePasswordData {
+  /** 当前密码 */
+  currentPassword: string;
+  /** 新密码 */
+  newPassword: string;
+  /** 确认新密码 */
+  confirmPassword: string;
+}
+
+/**
+ * 重置密码请求数据接口
+ */
+export interface ResetPasswordRequestData {
+  /** 邮箱地址 */
+  email: string;
+}
+
+/**
+ * 重置密码确认数据接口
+ */
+export interface ResetPasswordConfirmData {
+  /** 重置令牌 */
+  token: string;
+  /** 新密码 */
+  newPassword: string;
+}
+
+/**
+ * 用户会话信息接口
+ */
+export interface UserSession {
+  /** 会话ID */
+  id: string;
+  /** 设备信息 */
+  device: string;
+  /** IP地址 */
+  ip: string;
+  /** 地理位置 */
+  location: string;
+  /** 最后活动时间 */
+  lastActivity: string;
+  /** 是否为当前会话 */
+  current: boolean;
+}
+
+/**
+ * 权限信息接口
+ */
+export interface Permission {
+  /** 权限ID */
+  id: string;
+  /** 权限名称 */
+  name: string;
+  /** 权限描述 */
+  description: string;
+  /** 权限分类 */
+  category: string;
+}
+
+/**
+ * 角色信息接口
+ */
+export interface Role {
+  /** 角色ID */
+  id: string;
+  /** 角色名称 */
+  name: string;
+  /** 角色描述 */
+  description: string;
+  /** 角色权限列表 */
+  permissions: string[];
+}
+
+/**
+ * 双因素认证设置响应接口
+ */
+export interface TwoFactorSetupResponse {
+  /** 二维码内容 */
+  qrCode: string;
+  /** 密钥 */
+  secret: string;
+}
+
+/**
+ * 二因素认证确认响应接口
+ */
+export interface TwoFactorConfirmResponse {
+  /** 备用恢复码列表 */
+  backupCodes: string[];
+}

@@ -8,6 +8,7 @@ import { InstallmentsApiService } from './installmentsApi';
 import { StatsApiService, type StatsPeriod } from './statsApi';
 import { MembershipApiService, type MembershipStats } from './membershipApi';
 import { AdapterApiService, type HealthStatus, type AdapterInfo } from './adapterApi';
+import { AuthApiService } from './authApi';
 import { handleApiOperation } from '../utils/errorHandler';
 import type {
   Student,
@@ -27,6 +28,16 @@ import type {
   InstallmentStatus,
 } from '../types/api';
 
+// 重新导出认证相关类型
+export type {
+  LoginCredentials,
+  User,
+  LoginResponse,
+  RefreshTokenResponse,
+  RegisterData,
+  ChangePasswordData
+} from '../types/api';
+
 /**
  * 统一的 API 服务类
  * 提供所有 API 调用的静态方法
@@ -40,11 +51,11 @@ export class ApiService {
    * 获取所有学员（支持分页和搜索）
    * @returns 返回学员列表和分页信息
    */
-  static async getAllStudents(params?: StudentSearchOptions): Promise<StudentListResponse> {
+  static async getAllStudents(params?: StudentSearchOptions, forceRefresh = false): Promise<StudentListResponse> {
     return handleApiOperation(
-      () => StudentApiService.getAllStudents(params),
+      () => StudentApiService.getAllStudents(params, forceRefresh),
       '获取学员列表',
-      { retryable: true, context: { params } }
+      { retryable: true, context: { params, forceRefresh } }
     );
   }
 
@@ -62,11 +73,11 @@ export class ApiService {
   /**
    * 根据 ID 获取学员信息
    */
-  static async getStudentById(uid: number): Promise<Student> {
+  static async getStudentById(uid: number, forceRefresh = false): Promise<Student> {
     return handleApiOperation(
-      () => StudentApiService.getStudentById(uid),
+      () => StudentApiService.getStudentById(uid, forceRefresh),
       '获取学员信息',
-      { retryable: true, context: { uid } }
+      { retryable: true, context: { uid, forceRefresh } }
     );
   }
 
@@ -593,6 +604,91 @@ export class ApiService {
       () => MembershipApiService.batchSetMembership(studentIds, membership),
       '批量设置会员',
       { retryable: false, context: { studentIds, membership } }
+    );
+  }
+
+  // ============================================================================
+  // 认证接口
+  // ============================================================================
+
+  /**
+   * 用户登录
+   */
+  static async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    return handleApiOperation(
+      () => AuthApiService.login(credentials),
+      '用户登录',
+      { retryable: false, context: { username: credentials.username } }
+    );
+  }
+
+  /**
+   * 用户登出
+   */
+  static async logout(): Promise<void> {
+    return handleApiOperation(
+      () => AuthApiService.logout(),
+      '用户登出',
+      { retryable: false }
+    );
+  }
+
+  /**
+   * 刷新访问令牌
+   */
+  static async refreshToken(refreshToken: string): Promise<any> {
+    return handleApiOperation(
+      () => AuthApiService.refreshToken(refreshToken),
+      '刷新令牌',
+      { retryable: true, context: { refreshToken: '***' } }
+    );
+  }
+
+  /**
+   * 获取当前用户信息
+   */
+  static async getCurrentUser(): Promise<User> {
+    return handleApiOperation(
+      () => AuthApiService.getCurrentUser(),
+      '获取用户信息',
+      { retryable: true }
+    );
+  }
+
+  /**
+   * 更新用户信息
+   */
+  static async updateUser(userData: Partial<User>): Promise<User> {
+    return handleApiOperation(
+      () => AuthApiService.updateUser(userData),
+      '更新用户信息',
+      { retryable: false, context: { userData } }
+    );
+  }
+
+  /**
+   * 修改密码
+   */
+  static async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<void> {
+    return handleApiOperation(
+      () => AuthApiService.changePassword(data),
+      '修改密码',
+      { retryable: false }
+    );
+  }
+
+  /**
+   * 检查用户名是否可用
+   */
+  static async checkUsernameAvailability(username: string): Promise<{ available: boolean }> {
+    return handleApiOperation(
+      () => AuthApiService.checkUsernameAvailability(username),
+      '检查用户名可用性',
+      { retryable: true, context: { username } }
     );
   }
 

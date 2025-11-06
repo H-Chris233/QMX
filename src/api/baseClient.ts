@@ -4,6 +4,7 @@
  */
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse } from '../types/api';
+import { apiCache } from './cacheManager';
 
 /**
  * 自定义 API 错误类
@@ -129,17 +130,59 @@ export const baseClient = createAxiosInstance();
  * 用于统一处理 API 响应和错误
  */
 export async function apiCall<T>(
-  request: Promise<any>
+  request: Promise<any>,
+  cacheKey?: string,
+  params?: Record<string, unknown>,
+  forceRefresh = false
 ): Promise<T> {
+  // 如果提供了缓存键，尝试使用缓存
+  if (cacheKey) {
+    if (!forceRefresh) {
+      const cached = apiCache.get<T>(cacheKey, params);
+      if (cached !== null) {
+        return cached;
+      }
+    }
+
+    try {
+      const response = await request;
+      const apiResponse = response.data as ApiResponse<T>;
+
+      // 如果有 data 字段，返回 data；否则返回整个响应
+      let data: T;
+      if ('data' in apiResponse && apiResponse.success) {
+        data = apiResponse.data as T;
+      } else {
+        // 兼容某些直接返回数据的端点
+        data = response.data as T;
+      }
+
+      // 缓存响应数据
+      apiCache.set(cacheKey, data, params);
+      return data;
+    } catch (error) {
+      // 如果API调用失败，尝试返回过期的缓存数据
+      if (!forceRefresh) {
+        const expiredData = apiCache.get<T>(cacheKey, params);
+        if (expiredData !== null) {
+          console.warn('API调用失败，返回过期缓存数据:', error);
+          return expiredData;
+        }
+      }
+      throw error;
+    }
+  }
+
+  // 不使用缓存的原始调用
   try {
     const response = await request;
     const apiResponse = response.data as ApiResponse<T>;
-    
+
     // 如果有 data 字段，返回 data；否则返回整个响应
     if ('data' in apiResponse && apiResponse.success) {
       return apiResponse.data as T;
     }
-    
+
     // 兼容某些直接返回数据的端点
     return response.data as T;
   } catch (error) {

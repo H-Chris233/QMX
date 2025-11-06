@@ -45,18 +45,23 @@ export class StudentApiService {
   /**
    * 获取所有学员（支持分页和搜索）
    */
-  static async getAllStudents(params?: StudentSearchOptions): Promise<StudentListResponse> {
+  static async getAllStudents(params?: StudentSearchOptions, forceRefresh = false): Promise<StudentListResponse> {
     const queryParams = params ? serializeParams(params) : {};
-    
-    const response = await baseClient.get<PaginatedResponse<Student>>('/students', {
-      params: queryParams,
-    });
 
-    // 解包分页数据
-    return {
-      students: response.data.data || [],
-      pagination: response.data.pagination,
-    };
+    return apiCall<StudentListResponse>(
+      baseClient.get<PaginatedResponse<Student>>('/students', {
+        params: queryParams,
+      }).then(response => {
+        // 解包分页数据
+        return {
+          students: response.data.data || [],
+          pagination: response.data.pagination,
+        };
+      }),
+      '/students',
+      params,
+      forceRefresh
+    );
   }
 
   /**
@@ -70,9 +75,12 @@ export class StudentApiService {
   /**
    * 根据 ID 获取学员信息
    */
-  static async getStudentById(uid: number): Promise<Student> {
+  static async getStudentById(uid: number, forceRefresh = false): Promise<Student> {
     return apiCall<Student>(
-      baseClient.get(`/students/${uid}`)
+      baseClient.get(`/students/${uid}`),
+      `/students/${uid}`,
+      { uid },
+      forceRefresh
     );
   }
 
