@@ -132,8 +132,8 @@
 
       <!-- 分页信息 -->
       <div class="pagination-info">
-        <span>共 {{ pagination.total }} 条记录</span>
-        <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 页</span>
+        <span>共 {{ pagination.totalItems }} 条记录</span>
+        <span>第 {{ pagination.currentPage }} / {{ pagination.totalPages }} 页</span>
       </div>
 
       <div class="transactions-table">
@@ -220,18 +220,18 @@
       <!-- 分页控件 -->
       <div class="pagination-controls">
         <button
-          @click="goToPage(pagination.page - 1)"
-          :disabled="pagination.page <= 1 || loading"
+          @click="goToPage(pagination.currentPage - 1)"
+          :disabled="pagination.currentPage <= 1 || loading"
           class="page-btn"
         >
           ← 上一页
         </button>
         <span class="page-info">
-          第 {{ pagination.page }} 页，共 {{ pagination.total_pages }} 页
+          第 {{ pagination.currentPage }} 页，共 {{ pagination.totalPages }} 页
         </span>
         <button
-          @click="goToPage(pagination.page + 1)"
-          :disabled="pagination.page >= pagination.total_pages || loading"
+          @click="goToPage(pagination.currentPage + 1)"
+          :disabled="pagination.currentPage >= pagination.totalPages || loading"
           class="page-btn"
         >
           下一页 →
@@ -345,7 +345,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useAppStore } from '../stores/app';
+import { useTransactionStore } from '../stores/transaction';
 import { ApiService } from '../api/ApiService';
 import { formatCurrency as formatCurrencyUtil, formatDate as formatDateUtil } from '../utils/dataTransformers';
 import TransactionForm from './TransactionForm.vue';
@@ -361,61 +363,42 @@ interface PaginationState {
   total_pages: number;
 }
 
-interface ErrorHandler {
-  showError: (title: string, message: string, details?: string) => void;
-  showSuccess: (title: string, message: string) => void;
-  showConfirm: (options: any) => void;
-}
+// 使用新的Pinia stores
+const appStore = useAppStore();
+const transactionStore = useTransactionStore();
 
-// 注入错误处理器
-const errorHandler = inject<ErrorHandler>('errorHandler');
+// 使用store状态，减少本地状态
+const showUpdateStatus = ref<boolean>(false);
+const selectedStatus = ref<InstallmentStatus>(InstallmentStatus.PENDING);
+const selectedTransaction = ref<Transaction | null>(null);
 
-const showError = errorHandler?.showError || ((title, message, details) => {
-  console.error(title + ': ' + message, details);
-  alert(`${title}: ${message}`);
-});
-
-const showSuccess = errorHandler?.showSuccess || ((title, message) => {
-  console.log(title + ': ' + message);
-  alert(`${title}: ${message}`);
-});
-
-const showConfirm = errorHandler?.showConfirm || ((options) => {
-  const confirmed = confirm(options.message);
-  if (confirmed && options.onConfirm) {
-    options.onConfirm();
-  }
-});
-
-// 状态
-const loading = ref<boolean>(false);
-const transactions = ref<Transaction[]>([]);
-const students = ref<Student[]>([]);
+// 筛选状态
 const filterState = ref<TransactionFilterState>({
   type: 'all',
   search: '',
   dateFrom: null,
   dateTo: null,
 });
-const showAddTransaction = ref<boolean>(false);
-const showUpdateStatus = ref<boolean>(false);
-const selectedTransaction = ref<Transaction | null>(null);
-const selectedStatus = ref<InstallmentStatus>(InstallmentStatus.PENDING);
 
-// 分页状态
-const pagination = ref<PaginationState>({
-  page: 1,
-  limit: 20,
-  total: 0,
-  total_pages: 0,
-});
+// 学生列表
+const students = ref<Student[]>([]);
 
-// 时间周期
-const selectedPeriod = ref<string>('ThisMonth');
+// 获取store中的状态
+const loading = computed(() => appStore.isLoading);
+const transactions = computed(() => transactionStore.transactions);
+const showAddTransaction = computed(() => transactionStore.showAddTransaction);
+
+// 分页状态 - 使用store中的分页
+const pagination = computed(() => transactionStore.pagination);
+
+// 时间周期 - 使用store中的状态
+const selectedPeriod = computed(() => transactionStore.selectedPeriod);
 const timePeriods = [
   { value: 'Today', label: '今日' },
   { value: 'ThisWeek', label: '本周' },
   { value: 'ThisMonth', label: '本月' },
+  { value: 'LastMonth', label: '上月' },
+  { value: 'ThisQuarter', label: '本季' },
   { value: 'ThisYear', label: '本年' },
 ];
 
@@ -505,40 +488,13 @@ const STATUS_TEXT_MAP: Record<InstallmentStatus, string> = {
 // 当前交易表单数据
 const currentTransaction = ref<TransactionFormModel>(createDefaultTransactionFormModel());
 
-// 计算属性 - 总收入
-const totalIncome = computed(() => {
-  return transactions.value
-    .filter((t) => t.amount > 0)
-    .reduce((sum, t) => sum + t.amount, 0);
-});
+// 计算属性 - 直接使用store中的computed
+const totalIncome = computed(() => transactionStore.totalIncome);
+const totalExpense = computed(() => transactionStore.totalExpense);
+const netProfit = computed(() => transactionStore.netProfit);
+const installmentCount = computed(() => transactionStore.installmentTransactions.length);
 
-// 计算属性 - 总支出
-const totalExpense = computed(() => {
-  return Math.abs(
-    transactions.value
-      .filter((t) => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0)
-  );
-});
-
-// 计算属性 - 净收益
-const netProfit = computed(() => {
-  return totalIncome.value - totalExpense.value;
-});
-
-// 计算属性 - 分期付款统计
-const installmentCount = computed(() => {
-  return transactions.value.filter((t) => t.is_installment).length;
-});
-
-const pendingInstallments = computed(() => {
-  return transactions.value.filter((t) => {
-    if (!t.is_installment) {
-      return false;
-    }
-    return normalizeInstallmentStatus(t.installment?.status) === InstallmentStatus.PENDING;
-  }).length;
-});
+const pendingInstallments = computed(() => transactionStore.pendingInstallments);
 
 // 方法
 const formatCurrency = (value: number): string => {
@@ -575,6 +531,10 @@ const getStatusText = (status: string | null | undefined): string => {
 const handleTransactionUpdate = (value: TransactionFormModel) => {
   currentTransaction.value = normalizeTransactionFormModel(value);
 };
+
+// 直接使用appStore的方法
+const { showError, showSuccess } = appStore.errorHandler;
+const showConfirm = appStore.showConfirm;
 
 const onTransactionTypeChange = (event: Event) => {
   const target = event.currentTarget as HTMLSelectElement | null;
@@ -629,69 +589,23 @@ const loadStudents = async () => {
     students.value = response.students || [];
   } catch (error) {
     console.error('加载学员数据失败:', error);
-    showError('加载失败', '加载学员数据时发生错误', (error as Error).message);
+    showError('加载学员数据时发生错误');
   }
 };
 
-// 加载交易列表
+// 加载交易列表 - 使用store的方法
 const loadTransactions = async () => {
-  if (loading.value) return;
-
-  loading.value = true;
-
   try {
-    // 构建查询参数
-    const params: Record<string, unknown> = {
-      page: pagination.value.page,
-      limit: pagination.value.limit,
-    };
-
-    // 添加筛选条件
-    switch (filterState.value.type) {
-      case 'income':
-        params.is_income = true;
-        break;
-      case 'expense':
-        params.is_income = false;
-        break;
-      case 'installment':
-        params.has_installment = true;
-        break;
-      default:
-        break;
-    }
-
-    if (filterState.value.dateFrom) {
-      params.date_from = filterState.value.dateFrom;
-    }
-    if (filterState.value.dateTo) {
-      params.date_to = filterState.value.dateTo;
-    }
-
-    // 调用 API（返回 { items, pagination }）
-    const response = await ApiService.getAllTransactions(params);
-
-    transactions.value = response.items || [];
-    pagination.value = {
-      page: response.pagination.page,
-      limit: response.pagination.limit,
-      total: response.pagination.total,
-      total_pages: response.pagination.total_pages,
-    };
-
-    console.log(`✅ 成功加载 ${transactions.value.length} 条交易记录`);
+    await transactionStore.fetchTransactions();
+    console.log(`✅ 成功加载 ${transactionStore.transactions.length} 条交易记录`);
   } catch (error) {
     console.error('加载交易数据失败:', error);
-    transactions.value = [];
-    showError('加载失败', '加载交易数据时发生错误', (error as Error).message);
-  } finally {
-    loading.value = false;
+    appStore.errorHandler.showError('加载失败', '加载交易数据时发生错误');
   }
 };
 
 // 应用筛选
 const applyFilters = () => {
-  pagination.value.page = 1; // 重置到第一页
   loadTransactions();
 };
 
@@ -708,51 +622,25 @@ const clearFilters = () => {
 
 // 分页
 const goToPage = (page: number) => {
-  if (page < 1 || page > pagination.value.total_pages) return;
-  pagination.value.page = page;
+  if (page < 1 || page > pagination.value.totalPages) return;
   loadTransactions();
 };
 
 // 时间周期选择
+// 时间周期选择 - 使用store的方法
 const selectTimePeriod = async (period: string) => {
-  if (loading.value) return;
-  selectedPeriod.value = period;
-  
-  // 根据周期设置日期范围
-  const today = new Date();
-  let startDate: Date;
-
-  switch (period) {
-    case 'Today':
-      startDate = today;
-      break;
-    case 'ThisWeek':
-      startDate = new Date(today);
-      startDate.setDate(today.getDate() - today.getDay());
-      break;
-    case 'ThisMonth':
-      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-      break;
-    case 'ThisYear':
-      startDate = new Date(today.getFullYear(), 0, 1);
-      break;
-    default:
-      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  try {
+    await transactionStore.setSelectedPeriod(period);
+    await loadTransactions();
+  } catch (error) {
+    appStore.errorHandler.showError('切换时间周期失败', '无法切换到选定的时间周期');
   }
-
-  filterState.value = {
-    ...filterState.value,
-    dateFrom: startDate.toISOString().split('T')[0],
-    dateTo: today.toISOString().split('T')[0],
-  };
-
-  applyFilters();
 };
 
-// 打开添加交易模态框
+// 打开添加交易模态框 - 使用store的方法
 const openAddTransactionModal = () => {
   currentTransaction.value = createDefaultTransactionFormModel();
-  showAddTransaction.value = true;
+  transactionStore.toggleAddTransaction(true);
 };
 
 // 保存交易
@@ -765,43 +653,41 @@ const saveTransaction = async () => {
 
   // 验证
   if (!formData.is_installment && formData.amount <= 0) {
-    showError('验证失败', '请输入有效的金额');
+    showError('请输入有效的金额');
     return;
   }
 
   if (formData.is_installment) {
-    if (formData.total_amount <= 0) {
-      showError('验证失败', '请输入有效的总金额');
+    if (!formData.total_amount || formData.total_amount <= 0) {
+      showError('请输入有效的总金额');
       return;
     }
-    if (formData.total_installments < 2) {
-      showError('验证失败', '分期数必须至少为2');
+    if (!formData.total_installments || formData.total_installments < 2) {
+      showError('分期数必须至少为2');
       return;
     }
     if (!formData.due_date) {
-      showError('验证失败', '请选择首次到期日');
+      showError('请选择首次到期日');
       return;
     }
   }
-
-  loading.value = true;
 
   try {
     if (formData.is_installment) {
       // 保存分期交易
       const data = {
         student_id: formData.student_id,
-        amount: formData.total_amount,
-        total_installments: formData.total_installments,
-        frequency: formData.frequency,
+        amount: formData.total_amount!,
+        total_installments: formData.total_installments!,
+        frequency: String(formData.frequency!),
         custom_days:
           formData.frequency === PaymentFrequency.CUSTOM ? formData.custom_days : null,
-        start_date: formData.due_date,
+        start_date: formData.due_date || undefined,
         note: formData.note ? formData.note : null,
       };
 
       await ApiService.addInstallmentTransaction(data);
-      showSuccess('保存成功', '分期付款已创建');
+      showSuccess('分期付款已创建');
     } else {
       // 保存普通交易
       const amount = formData.is_expense ? -Math.abs(formData.amount) : Math.abs(formData.amount);
@@ -813,16 +699,14 @@ const saveTransaction = async () => {
       };
 
       await ApiService.addCashTransaction(data);
-      showSuccess('保存成功', '交易已保存');
+      showSuccess('交易已保存');
     }
 
     closeModals();
     await loadTransactions();
   } catch (error) {
     console.error('保存交易失败:', error);
-    showError('保存失败', '保存交易时发生错误', (error as Error).message);
-  } finally {
-    loading.value = false;
+    showError('保存交易时发生错误');
   }
 };
 
@@ -840,18 +724,13 @@ const deleteTransaction = async (uid: number) => {
     cancelText: '取消',
     confirmType: 'danger',
     onConfirm: async () => {
-      loading.value = true;
       try {
         await ApiService.deleteCashTransaction(uid);
-        showSuccess('删除成功', '交易记录已删除');
+        showSuccess('交易记录已删除');
         await loadTransactions();
       } catch (error: any) {
         console.error('删除交易失败:', error);
-        // 显示后端返回的 message
-        const errorMessage = error.response?.data?.message || error.message || '删除交易记录时发生错误';
-        showError('删除失败', errorMessage);
-      } finally {
-        loading.value = false;
+        showError('删除交易记录时发生错误');
       }
     },
   });
@@ -868,26 +747,23 @@ const showUpdateStatusModal = (transaction: Transaction) => {
 const updateInstallmentStatus = async () => {
   if (!selectedTransaction.value || !selectedTransaction.value.installment) return;
 
-  loading.value = true;
   try {
     // 使用 installment_uid 或交易 uid
     const installmentId = selectedTransaction.value.installment.installment_uid || selectedTransaction.value.uid;
-    
+
     await ApiService.updateInstallmentStatus(installmentId, selectedStatus.value);
-    showSuccess('更新成功', '分期状态已更新');
+    showSuccess('分期状态已更新');
     closeModals();
     await loadTransactions();
   } catch (error) {
     console.error('更新分期状态失败:', error);
-    showError('更新失败', '更新分期状态时发生错误', (error as Error).message);
-  } finally {
-    loading.value = false;
+    showError('更新分期状态时发生错误');
   }
 };
 
 // 关闭模态框
 const closeModals = () => {
-  showAddTransaction.value = false;
+  transactionStore.toggleAddTransaction(false);
   showUpdateStatus.value = false;
   selectedTransaction.value = null;
   currentTransaction.value = createDefaultTransactionFormModel();

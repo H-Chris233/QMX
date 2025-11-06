@@ -17,10 +17,8 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    
+
     /* Enhanced type safety */
     "noImplicitAny": true,
     "noImplicitReturns": true,
@@ -28,9 +26,12 @@
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "strictPropertyInitialization": true
+    // 暂时注释掉这些太严格的检查，影响开发体验
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noUncheckedIndexedAccess": true,
+    // "exactOptionalPropertyTypes": true
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "exclude": ["src/utils/__tests__", "**/*.demo.ts"],

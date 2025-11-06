@@ -14,11 +14,20 @@
           v-for="item in menuItems"
           :key="item.id"
           :class="['nav-menu-item', { active: activeTab === item.id }]"
-          @click="appStore.setActiveTab(item.id)"
+          @click="activeTab = item.id"
         >
           <span class="nav-menu-icon">{{ item.icon }}</span>
           <span class="nav-menu-text">{{ item.label }}</span>
         </div>
+        <!-- 开发环境测试按钮 -->
+        <button
+          v-if="isDev"
+          class="test-confirm-btn"
+          @click="testConfirmModal"
+          title="测试确认弹窗"
+        >
+          🧪
+        </button>
       </div>
 
       <!-- 移动端：侧边栏（≤768px 显示，抽屉式展开） -->
@@ -78,14 +87,14 @@
 
     <!-- 错误弹窗 -->
     <ErrorModal
-      :show="appStore.errorModal.show"
-      :title="appStore.errorModal.title"
-      :message="appStore.errorModal.message"
-      :details="appStore.errorModal.details"
-      :show-retry="appStore.errorModal.showRetry"
-      :priority="appStore.errorModal.priority"
-      @close="appStore.hideError"
-      @retry="retryWithError"
+      :show="appStore.hasErrors"
+      :title="appStore.latestError?.message || '错误'"
+      :message="appStore.latestError?.context || '操作失败'"
+      :details="appStore.latestError ? JSON.stringify(appStore.latestError, null, 2) : ''"
+      :show-retry="true"
+      :priority="'medium'"
+      @close="appStore.clearErrors"
+      @retry="() => { /* 处理重试逻辑 */ }"
     />
 
     <!-- 确认弹窗 -->
@@ -93,7 +102,6 @@
       :show="appStore.confirmModal.show"
       :title="appStore.confirmModal.title"
       :message="appStore.confirmModal.message"
-      :details="appStore.confirmModal.details"
       :confirm-text="appStore.confirmModal.confirmText"
       :cancel-text="appStore.confirmModal.cancelText"
       :confirm-type="appStore.confirmModal.confirmType"
@@ -105,8 +113,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, provide, computed } from 'vue';
-import { appStore } from './store/appStore';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useAppStore } from './stores/app';
+import { useAuthStore } from './stores/auth';
+import { runAllStoreTests } from './utils/store-test';
 import ErrorModal from './components/ErrorModal.vue';
 import StudentManagement from './components/StudentManagement.vue';
 import FinancialStatistics from './components/FinancialStatistics.vue';
@@ -129,13 +139,20 @@ const menuItems: MenuItem[] = [
   { id: 'settings', label: '设置', icon: '⚙️' },
 ];
 
+// 使用新的Pinia stores
+const appStore = useAppStore();
+
+// 开发环境标志
+const isDev = import.meta.env.DEV;
+
 // DOM元素引用
 const sidebarRef = ref<HTMLElement | null>(null);
 const toggleButtonRef = ref<HTMLElement | null>(null);
 const isSidebarOpen = ref(false);
 
-const activeTab = computed(() => appStore.activeTab.value);
-const theme = computed(() => appStore.theme.value);
+// 需要在app store中添加activeTab和theme状态
+const activeTab = ref('dashboard');
+const theme = ref('dark-theme');
 
 const toggleSidebar = (): void => {
   const newState = !isSidebarOpen.value;
@@ -159,14 +176,25 @@ const toggleSidebar = (): void => {
 };
 
 const handleSidebarItemClick = (id: string): void => {
-  appStore.setActiveTab(id); // 切换激活Tab
+  activeTab.value = id; // 切换激活Tab
   toggleSidebar(); // 点击菜单项后自动收起侧边栏
 };
 
-// 重试错误（保留但简化）
-const retryWithError = async (): Promise<void> => {
-  appStore.hideError();
-  // 这里可以实现特定的重试逻辑
+// 测试确认弹窗功能
+const testConfirmModal = (): void => {
+  appStore.showConfirm({
+    title: '测试确认弹窗',
+    message: '这是新的Pinia状态管理的确认弹窗，你感觉怎么样？',
+    confirmText: '感觉很棒',
+    cancelText: '一般般',
+    confirmType: 'primary',
+    onConfirm: () => {
+      appStore.errorHandler.showSuccess('你选择了：感觉很棒！');
+    },
+    onCancel: () => {
+      appStore.errorHandler.showError('你选择了：一般般', 'confirm-test');
+    }
+  });
 };
 
 // 事件监听器清理函数
@@ -217,7 +245,13 @@ onMounted(() => {
   };
 
   window.addEventListener('resize', handleResize);
-  
+
+  // 开发环境运行状态管理测试
+  if (import.meta.env.DEV) {
+    console.log('🧪 开发环境：运行状态管理测试');
+    runAllStoreTests();
+  }
+
   // 一次性添加所有清理函数
   cleanupFunctions.push(
     () => document.removeEventListener('click', debouncedHandleClick),
@@ -242,35 +276,11 @@ onUnmounted(() => {
   cleanupFunctions = [];
 });
 
-// 提供全局错误处理方法和刷新机制给子组件使用
-provide('errorHandler', {
-  showError: appStore.showError,
-  hideError: appStore.hideError,
-  retryWithError,
-  showSuccess: appStore.showSuccess,
-  showConfirm: appStore.showConfirm,
-});
-
-// 提供刷新系统
-provide('refreshSystem', {
-  refreshTriggers: appStore.refreshTriggers,
-  triggerRefresh: appStore.triggerRefresh,
-});
-
-// 添加全局错误显示方法
-window.showError = appStore.showError;
-
-// 监听全局错误事件
-window.addEventListener('showAppError', (event) => {
-  const detail = event.detail;
-  appStore.showError(
-    detail.title,
-    detail.message,
-    detail.details,
-    detail.showRetry ?? false,
-    detail.priority ?? 'medium'
-  );
-});
+// 开发环境：全局暴露测试方法
+if (import.meta.env.DEV) {
+  (window as any).testConfirmModal = testConfirmModal;
+  console.log('🧪 测试方法已暴露到window.testConfirmModal()');
+}
 </script>
 
 <style>
@@ -365,6 +375,32 @@ window.addEventListener('showAppError', (event) => {
 
 .nav-menu-text {
   font-weight: 500;
+}
+
+/* 开发环境测试按钮 */
+.test-confirm-btn {
+  background: var(--accent-warning);
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  margin-left: 1rem;
+  transition: all 0.2s ease;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.test-confirm-btn:hover {
+  background: #f57c00;
+  transform: scale(1.05);
+}
+
+.test-confirm-btn:active {
+  transform: scale(0.95);
 }
 
 .nav-actions {

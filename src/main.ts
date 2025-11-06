@@ -1,6 +1,8 @@
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import UserAgreement from './components/UserAgreement.vue';
 import MainApp from './MainApp.vue';
+import pinia from './stores';
 
 const KEY_AGREED = 'qmx_agreed_to_terms';
 
@@ -10,7 +12,11 @@ try {
 } catch {}
 
 if (agreedToTerms === 'true') {
-  createApp(MainApp).mount('#app');
+  const app = createApp(MainApp);
+  app.use(pinia);
+  app.mount('#app');
 } else {
-  createApp(UserAgreement).mount('#app');
+  const app = createApp(UserAgreement);
+  app.use(createPinia()); // 为协议页面也创建Pinia实例
+  app.mount('#app');
 }

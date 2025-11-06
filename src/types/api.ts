@@ -714,6 +714,202 @@ export type ApiEndpoint =
   | '/membership/students/:id/membership/renew';
 
 // ============================================================================
+// Store 相关类型
+// ============================================================================
+
+/**
+ * 学员搜索参数类型 - 用于Store状态管理
+ */
+export interface StudentSearchParams {
+  /** 页码 */
+  page: number;
+  /** 每页条数 */
+  limit: number;
+  /** 搜索关键词 */
+  keyword: string;
+  /** 班级 */
+  class: string;
+  /** 科目 */
+  subject: string;
+  /** 学员状态 */
+  status?: boolean | undefined;
+}
+
+/**
+ * 学员创建数据类型 - 用于API调用
+ */
+export interface StudentCreateData {
+  /** 学员姓名 */
+  name: string;
+  /** 学员年龄 */
+  age?: number | null;
+  /** 班级类型 */
+  class: ClassType | string;
+  /** 联系电话 */
+  phone: string;
+  /** 备注信息 */
+  note?: string | null;
+  /** 科目类型 */
+  subject: SubjectType | string;
+  /** 剩余课程数 */
+  lesson_left?: number | null;
+  /** 会员开始日期 */
+  membership_start_date?: string | null;
+  /** 会员结束日期 */
+  membership_end_date?: string | null;
+}
+
+/**
+ * 交易搜索参数类型 - 用于Store状态管理
+ */
+export interface TransactionSearchParams {
+  /** 页码 */
+  page: number;
+  /** 每页条数 */
+  limit: number;
+  /** 学员ID */
+  studentId: string;
+  /** 交易类型 */
+  transactionType: string;
+  /** 开始日期 */
+  startDate?: string | undefined;
+  /** 结束日期 */
+  endDate?: string | undefined;
+}
+
+/**
+ * 交易创建数据类型 - 用于API调用
+ */
+export interface TransactionCreateData {
+  /** 关联的学员ID */
+  student_id?: number | null;
+  /** 交易金额（单位：元） */
+  amount: number;
+  /** 交易描述 */
+  description?: string;
+  /** 备注信息 */
+  note?: string | null;
+  /** 付款频率 */
+  frequency?: PaymentFrequency;
+  /** 总分期数 */
+  total_installments?: number;
+  /** 自定义天数 */
+  custom_days?: number;
+  /** 到期日期 */
+  due_date?: string;
+  /** 分期状态 */
+  installment_status?: InstallmentStatus;
+  /** 分期付款信息 */
+  installment?: {
+    plan_uid: number;
+    installment_uid?: number | null;
+    installment_number?: number | null;
+    total_installments?: number | null;
+    due_date?: string | null;
+    status?: InstallmentStatus | string | null;
+    note?: string | null;
+  } | null;
+}
+
+/**
+ * 交易更新数据类型 - 用于API调用
+ */
+export interface TransactionUpdateData {
+  /** 交易ID */
+  uid: number;
+  /** 交易金额（单位：元） */
+  amount?: number;
+  /** 交易描述 */
+  description?: string;
+  /** 备注信息 */
+  note?: string | null;
+  /** 分期状态 */
+  installment_status?: InstallmentStatus;
+}
+
+/**
+ * 分期付款搜索参数类型 - 用于Store状态管理
+ */
+export interface InstallmentSearchParams {
+  /** 页码 */
+  page: number;
+  /** 每页条数 */
+  limit: number;
+  /** 学员ID */
+  studentId: string;
+  /** 分期状态 */
+  status?: InstallmentStatus | undefined;
+}
+
+/**
+ * 分期付款计划创建数据类型
+ */
+export interface InstallmentPlanCreateData {
+  /** 关联的学员ID */
+  student_id: number;
+  /** 总金额（单位：元） */
+  total_amount: number;
+  /** 总分期数 */
+  total_installments: number;
+  /** 付款频率 */
+  frequency: PaymentFrequency;
+  /** 自定义天数（当频率为 Custom 时使用） */
+  custom_days?: number | null;
+  /** 开始日期（ISO 格式字符串） */
+  start_date: string;
+  /** 计划状态 */
+  status?: InstallmentPlanStatus;
+  /** 备注 */
+  note?: string | null;
+}
+
+/**
+ * 学员列表响应类型
+ */
+export interface StudentListResponse {
+  /** 学员列表 */
+  students: Student[];
+  /** 分页信息 */
+  pagination: {
+    /** 当前页码 */
+    currentPage: number;
+    /** 每页条数 */
+    itemsPerPage: number;
+    /** 总记录数 */
+    totalItems: number;
+    /** 总页数 */
+    totalPages: number;
+    /** 是否有下一页 */
+    hasNextPage: boolean;
+    /** 是否有上一页 */
+    hasPrevPage: boolean;
+  };
+}
+
+/**
+ * 交易列表响应类型
+ */
+export interface TransactionListResponse {
+  /** 交易列表 */
+  transactions: Transaction[];
+  /** 分页信息 */
+  pagination: {
+    /** 当前页码 */
+    currentPage: number;
+    /** 每页条数 */
+    itemsPerPage: number;
+    /** 总记录数 */
+    totalItems: number;
+    /** 总页数 */
+    totalPages: number;
+    /** 是否有下一页 */
+    hasNextPage: boolean;
+    /** 是否有上一页 */
+    hasPrevPage: boolean;
+  };
+}
+
+// ============================================================================
 // 向后兼容的类型别名（已废弃，保留以避免破坏性变更）
 // ============================================================================
 
