@@ -58,7 +58,6 @@ jobs:
       - name: Build Express Backend
         run: |
           npm run build
-          npm test
       
       - name: Test Express Backend
         run: |
