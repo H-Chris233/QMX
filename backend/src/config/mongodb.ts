@@ -18,11 +18,15 @@ export function getMongoConfig(): MongoConfig {
 
   const options: mongoose.ConnectOptions = {
     maxPoolSize: 10, // 连接池最大连接数
-    serverSelectionTimeoutMS: 5000, // 服务器选择超时
-    socketTimeoutMS: 45000, // Socket超时
+    serverSelectionTimeoutMS: 10000, // 服务器选择超时 (增加到10秒)
+    socketTimeoutMS: 60000, // Socket超时 (增加到60秒)
+    connectTimeoutMS: 15000, // 连接超时 (增加到15秒)
     bufferCommands: false, // 禁用mongoose缓冲
     retryWrites: true, // 启用重试写入
     w: 'majority', // 写入确认
+    maxIdleTimeMS: 30000, // 连接空闲超时
+    heartbeatFrequencyMS: 10000, // 心跳频率
+    family: 4, // 强制使用IPv4
   };
 
   return { uri, options };

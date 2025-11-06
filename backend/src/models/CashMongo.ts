@@ -41,7 +41,6 @@ const InstallmentSnapshotSchema = new Schema<ICashInstallmentSnapshot>({
   plan_uid: {
     type: Number,
     required: true,
-    index: true,
     comment: '分期计划UID'
   },
   installment_uid: {
