@@ -21,7 +21,7 @@ export function getMongoConfig(): MongoConfig {
     serverSelectionTimeoutMS: 10000, // 服务器选择超时 (增加到10秒)
     socketTimeoutMS: 60000, // Socket超时 (增加到60秒)
     connectTimeoutMS: 15000, // 连接超时 (增加到15秒)
-    bufferCommands: false, // 禁用mongoose缓冲
+    bufferCommands: true, // 启用mongoose缓冲，等待连接完成
     retryWrites: true, // 启用重试写入
     w: 'majority', // 写入确认
     maxIdleTimeMS: 30000, // 连接空闲超时
