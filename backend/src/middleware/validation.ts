@@ -86,8 +86,17 @@ const installmentSnapshotSchema = Joi.object({
     'date.format': '分期应付日期格式不正确',
   }),
   status: Joi.string().optional().allow(null, ''),
-  note: Joi.string().max(1000).optional().allow(null, '').messages({
-    'string.base': '分期备注必须是字符串',
+  note: Joi.any().optional().allow(null).custom((value, helpers) => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    // 转换为字符串
+    const strValue = String(value);
+    if (strValue.length > 1000) {
+      return helpers.error('string.max');
+    }
+    return strValue;
+  }).messages({
     'string.max': '分期备注长度不能超过1000字符',
   }),
 })
