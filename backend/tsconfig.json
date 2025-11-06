@@ -25,7 +25,6 @@
     "exactOptionalPropertyTypes": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "suppressImplicitAnyIndexErrors": true,
     "moduleResolution": "node",
     "baseUrl": "./src",
     "paths": {
