@@ -1,0 +1,176 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    branches: [main, release]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        # 运行多个浏览器的测试
+        browser: [chromium, firefox, webkit]
+        # 可以配置失败重试
+        retry: [0]
+    
+    timeout-minutes: 30 # 设置超时时间
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm run e2e:install
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnspr4 libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libcairo2 libpango-1.0-0 libasound2t64
+
+      - name: Setup test environment
+        run: |
+          # 复制测试环境配置
+          cp .env.test .env
+          
+          # 设置测试环境变量
+          echo "NODE_ENV=test" >> $GITHUB_ENV
+          echo "CI=true" >> $GITHUB_ENV
+          echo "BASE_URL=http://localhost:1420" >> $GITHUB_ENV
+          echo "VITE_API_BASE_URL=http://localhost:3001/api/v1" >> $GITHUB_ENV
+
+      - name: Start MongoDB (if not using external)
+        if: ${{ !contains(env.MONGODB_URI, 'mongodb+srv') }}
+        run: |
+          # 启动 MongoDB (如果需要本地数据库)
+          docker run -d --name mongodb-test -p 27017:27017 mongo:latest
+          sleep 10
+          echo "MONGODB_URI=mongodb://localhost:27017/qmx_test" >> $GITHUB_ENV
+
+      - name: Wait for services and run tests
+        run: |
+          # 运行 E2E 测试
+          pnpm run e2e --project=${{ matrix.browser }} --reporter=json,html --output-file=test-results/results-${{ matrix.browser }}.json
+        env:
+          CI: true
+          NODE_ENV: test
+          BASE_URL: http://localhost:1420
+          VITE_API_BASE_URL: http://localhost:3001/api/v1
+
+      - name: Upload test results
+        if: always() # 无论测试是否成功都上传结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ matrix.browser }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload traces
+        if: failure() # 仅在失败时上传 trace
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ matrix.browser }}
+          path: test-results/traces/
+          retention-days: 7
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'test-results/results-${{ matrix.browser }}.json';
+            
+            let commentBody = `## 🎭 E2E 测试结果 (${{ matrix.browser }})\n\n`;
+            
+            try {
+              if (fs.existsSync(path)) {
+                const results = JSON.parse(fs.readFileSync(path, 'utf8'));
+                const passed = results.suites?.reduce((acc, suite) => 
+                  acc + suite.specs?.reduce((specAcc, spec) => 
+                    specAcc + (spec.tests?.filter(t => t.results?.[0]?.status === 'passed').length || 0), 0), 0) || 0;
+                const failed = results.suites?.reduce((acc, suite) => 
+                  acc + suite.specs?.reduce((specAcc, spec) => 
+                    specAcc + (spec.tests?.filter(t => t.results?.[0]?.status === 'failed').length || 0), 0), 0) || 0;
+                const skipped = results.suites?.reduce((acc, suite) => 
+                  acc + suite.specs?.reduce((specAcc, spec) => 
+                    specAcc + (spec.tests?.filter(t => t.results?.[0]?.status === 'skipped').length || 0), 0), 0) || 0;
+                
+                commentBody += `| 状态 | 数量 |\n`;
+                commentBody += `|------|------|\n`;
+                commentBody += `| ✅ 通过 | ${passed} |\n`;
+                commentBody += `| ❌ 失败 | ${failed} |\n`;
+                commentBody += `| ⏭️ 跳过 | ${skipped} |\n`;
+                commentBody += `| ⏱️ 耗时 | ${(results.duration / 1000).toFixed(2)}s |\n\n`;
+                
+                if (failed > 0) {
+                  commentBody += `❌ 测试失败，请查看 [详细报告](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})。\n`;
+                } else {
+                  commentBody += `✅ 所有测试通过！\n`;
+                }
+              } else {
+                commentBody += `⚠️ 无法加载测试结果文件。\n`;
+              }
+            } catch (error) {
+              commentBody += `⚠️ 解析测试结果时出错：${error.message}\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+
+  # 清理作业
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: e2e
+    if: always() && (needs.e2e.result == 'failure' || needs.e2e.result == 'success')
+    
+    steps:
+      - name: Cleanup MongoDB
+        if: ${{ !contains(env.MONGODB_URI, 'mongodb+srv') }}
+        run: |
+          docker stop mongodb-test || true
+          docker rm mongodb-test || true

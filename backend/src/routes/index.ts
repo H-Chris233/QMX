@@ -7,6 +7,8 @@ import installmentRoutes from '@/routes/installmentRoutes';
 import statsRoutes from '@/routes/statsRoutes';
 import membershipRoutes from '@/routes/membershipRoutes';
 import adapterRoutes from '@/routes/adapterRoutes';
+import testRoutes from '@/routes/testRoutes';
+import healthRoutes from '@/routes/healthRoutes';
 
 const router: Router = express.Router();
 
@@ -24,9 +26,9 @@ router.get('/', (_req: Request, res: Response, _next: NextFunction): void => {
       membership: '/membership',
       dashboard: '/dashboard',
       adapter: '/adapter', // 数据库适配器路由
+      health: '/health',
     },
     documentation: '/docs',
-    health: '/health',
   });
 });
 
@@ -38,5 +40,11 @@ router.use('/installments', installmentRoutes);
 router.use('/membership', membershipRoutes);
 router.use('/dashboard', statsRoutes);
 router.use('/adapter', adapterRoutes); // 数据库适配器路由
+router.use('/health', healthRoutes); // 健康检查路由
+
+// 测试路由 - 仅在测试环境启用
+if (process.env.NODE_ENV === 'test' || process.env.TEST_DATA_CLEANUP === 'true') {
+  router.use('/test', testRoutes);
+}
 
 export default router;
