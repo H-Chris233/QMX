@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mountWithPinia } from '../../../tests/helpers/mount';
+import { mountWithPinia, waitForDOMUpdate, flushPromises } from '../../../tests/helpers/mount';
 import StudentManagement from '../StudentManagement.vue';
 import { ApiService } from '../../api/ApiService';
 import { useAppStore } from '../../stores/app';
@@ -83,8 +83,7 @@ describe('StudentManagement', () => {
       vi.spyOn(ApiService, 'getAllStudents').mockResolvedValue(mockResponse);
 
       mountComponent();
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       expect(ApiService.getAllStudents).toHaveBeenCalledWith({ page: 1, limit: 20 });
       expect(wrapper.vm.students).toEqual(mockStudents);
@@ -100,8 +99,7 @@ describe('StudentManagement', () => {
       vi.spyOn(ApiService, 'getAllStudents').mockResolvedValue(mockResponse);
 
       mountComponent();
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const cards = wrapper.findAll('.student-card');
       expect(cards).toHaveLength(1);
@@ -126,8 +124,7 @@ describe('StudentManagement', () => {
       vi.spyOn(ApiService, 'getAllStudents').mockResolvedValue(mockResponse);
 
       mountComponent();
-      await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const paginationInfo = wrapper.find('.page-info');
       expect(paginationInfo.text()).toContain('1 / 2 (共 40 人)');
@@ -140,7 +137,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       expect(appStore.errors.length).toBeGreaterThan(0);
       expect(appStore.errors[appStore.errors.length - 1].message).toContain(
@@ -155,7 +152,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const cards = wrapper.findAll('.student-card');
       expect(cards).toHaveLength(0);
@@ -189,7 +186,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       // 更新搜索查询
       wrapper.vm.searchQuery = '张三';
@@ -216,7 +213,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       // 更新科目筛选
       wrapper.vm.searchFilters.subject = 'Shooting';
@@ -241,7 +238,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.searchFilters.classType = 'Month';
       await wrapper.vm.performSearch();
@@ -265,7 +262,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.searchFilters.hasMembership = 'true';
       await wrapper.vm.performSearch();
@@ -289,7 +286,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.searchFilters.membershipStatus = 'Active';
       await wrapper.vm.performSearch();
@@ -321,7 +318,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       await wrapper.vm.changePage(2);
 
@@ -346,7 +343,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.currentPage = 5;
       wrapper.vm.searchQuery = '新搜索';
@@ -372,7 +369,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       await wrapper.vm.changePage(2);
 
@@ -408,7 +405,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const card = wrapper.find('.student-card');
       await card.trigger('click');
@@ -424,7 +421,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       expect(wrapper.vm.showEditForm).toBe(false);
 
@@ -443,7 +440,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const deleteBtn = wrapper.find('.delete-btn');
       await deleteBtn.trigger('click');
@@ -463,7 +460,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       // 直接调用删除函数以避免确认对话框复杂性
       await wrapper.vm.deleteStudent(mockStudent.uid);
@@ -471,7 +468,7 @@ describe('StudentManagement', () => {
       // 手动执行确认回调
       if (appStore.confirmModal.onConfirm) {
         appStore.confirmModal.onConfirm();
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await waitForDOMUpdate();
       }
 
       expect(ApiService.deleteStudent).toHaveBeenCalledWith(mockStudent.uid);
@@ -488,7 +485,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const initialErrorCount = appStore.errors.length;
 
@@ -498,7 +495,7 @@ describe('StudentManagement', () => {
       // 手动执行确认回调
       if (appStore.confirmModal.onConfirm) {
         appStore.confirmModal.onConfirm();
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await waitForDOMUpdate();
       }
 
       // 验证错误被记录
@@ -516,7 +513,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.currentPage = 2;
       wrapper.vm.students = [mockStudent];
@@ -525,7 +522,7 @@ describe('StudentManagement', () => {
       
       if (appStore.confirmModal.onConfirm) {
         appStore.confirmModal.onConfirm();
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await waitForDOMUpdate();
       }
 
       expect(ApiService.getAllStudents).toHaveBeenLastCalledWith(
@@ -542,7 +539,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       expect(wrapper.vm.showAddStudentForm).toBe(false);
 
@@ -561,7 +558,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.showAddStudentForm = true;
 
@@ -578,7 +575,7 @@ describe('StudentManagement', () => {
       };
 
       await wrapper.vm.saveStudent(formData);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       expect(wrapper.vm.showAddStudentForm).toBe(false);
       expect(ApiService.addStudent).toHaveBeenCalled();
@@ -594,7 +591,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.currentStudent = student;
       wrapper.vm.showEditForm = true;
@@ -612,7 +609,7 @@ describe('StudentManagement', () => {
       };
 
       await wrapper.vm.saveStudent(formData);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       expect(wrapper.vm.showEditForm).toBe(false);
       expect(ApiService.updateStudentInfo).toHaveBeenCalled();
@@ -632,7 +629,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const pagination = wrapper.find('.pagination');
       expect(pagination.exists()).toBe(false);
@@ -650,7 +647,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const prevBtn = wrapper.find('.pagination .page-btn:first-child');
       expect((prevBtn.element as HTMLButtonElement).disabled).toBe(true);
@@ -668,7 +665,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const buttons = wrapper.findAll('.pagination .page-btn');
       const nextBtn = buttons[buttons.length - 1];
@@ -687,7 +684,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const initialCallCount = (ApiService.getAllStudents as any).mock.calls.length;
 
@@ -725,7 +722,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const cards = wrapper.findAll('.student-card');
       expect(cards[0].text()).toContain('至');
@@ -751,7 +748,7 @@ describe('StudentManagement', () => {
 
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const card = wrapper.find('.student-card');
       expect(card.text()).toContain('未设置'); // 年龄未设置时的显示
@@ -804,7 +801,7 @@ describe('StudentManagement', () => {
     it('应该在导出时触发下载', async () => {
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       const exportBtn = wrapper.find('.export-btn');
       await exportBtn.trigger('click');
@@ -825,7 +822,7 @@ describe('StudentManagement', () => {
     it('应该正确关闭添加表单', async () => {
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.showAddStudentForm = true;
       expect(wrapper.vm.showAddStudentForm).toBe(true);
@@ -840,7 +837,7 @@ describe('StudentManagement', () => {
     it('应该正确关闭编辑表单', async () => {
       mountComponent();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForDOMUpdate();
 
       wrapper.vm.showEditForm = true;
       wrapper.vm.currentStudent = createMockStudent();

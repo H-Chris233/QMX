@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import type {
   Student,
   Transaction,
@@ -11,6 +11,55 @@ import type {
 } from '@/types/api';
 
 const API_BASE_URL = 'http://localhost:3001/api/v1';
+
+/**
+ * 错误场景处理器
+ */
+const errorHandlers = [
+  // 网络错误场景
+  http.get(`${API_BASE_URL}/students/network-error`, () => {
+    return HttpResponse.error();
+  }),
+  
+  // 404 错误场景
+  http.get(`${API_BASE_URL}/students/not-found`, () => {
+    return HttpResponse.json(
+      {
+        success: false,
+        error: '学员不存在',
+      },
+      { status: 404 }
+    );
+  }),
+  
+  // 500 错误场景
+  http.get(`${API_BASE_URL}/students/server-error`, () => {
+    return HttpResponse.json(
+      {
+        success: false,
+        error: '服务器内部错误',
+      },
+      { status: 500 }
+    );
+  }),
+  
+  // 超时场景
+  http.get(`${API_BASE_URL}/students/timeout`, async () => {
+    await delay(10000); // 10秒延迟模拟超时
+    return HttpResponse.json({ success: true, data: null });
+  }),
+  
+  // 权限错误场景
+  http.delete(`${API_BASE_URL}/students/permission-denied`, () => {
+    return HttpResponse.json(
+      {
+        success: false,
+        error: 'Permission denied',
+      },
+      { status: 403 }
+    );
+  }),
+];
 
 /**
  * 学员列表响应工厂
@@ -436,4 +485,49 @@ export const handlers = [
       { status: 200 }
     );
   }),
+
+  // ============================================================================
+  // CSV 导出
+  // ============================================================================
+
+  /**
+   * 导出学员数据为 CSV
+   */
+  http.get(`${API_BASE_URL}/students/export/csv`, () => {
+    const csvContent = `uid,name,age,phone,class,subject\n1,张三,20,13800138000,Month,Shooting\n2,李四,22,13800138001,Year,Archery`;
+    
+    return new HttpResponse(csvContent, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': 'attachment; filename="students.csv"',
+      },
+    });
+  }),
+
+  // ============================================================================
+  // 健康检查
+  // ============================================================================
+
+  /**
+   * 健康检查端点
+   */
+  http.get(`${API_BASE_URL}/health`, () => {
+    return HttpResponse.json(
+      {
+        success: true,
+        data: {
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+        },
+      },
+      { status: 200 }
+    );
+  }),
 ];
+
+// 导出所有处理器，包括错误场景
+export const allHandlers = [...handlers, ...errorHandlers];
+
+// 默认导出正常处理器
+export { handlers as defaultHandlers };
