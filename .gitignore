@@ -28,3 +28,15 @@ src-tauri/data/
 src-tauri/data/*
 
 commit.sh
+
+# E2E Test results
+test-results/
+playwright-report/
+.playwright/
+test-results.xml
+test-results.json
+
+# Environment files
+.env
+.env.local
+.env.*.local
