@@ -30,7 +30,14 @@
     "e2e:debug": "playwright test --debug",
     "e2e:report": "playwright show-report",
     "e2e:install": "playwright install",
-    "e2e:clean": "rm -rf test-results playwright-report .playwright"
+    "e2e:clean": "rm -rf test-results playwright-report .playwright",
+    "e2e:core": "node scripts/run-e2e-core.js",
+    "e2e:core:headed": "node scripts/run-e2e-core.js --headed",
+    "e2e:core:report": "node scripts/run-e2e-core.js --report",
+    "e2e:core:chrome": "node scripts/run-e2e-core.js --browser chromium",
+    "e2e:core:firefox": "node scripts/run-e2e-core.js --browser firefox",
+    "e2e:core:safari": "node scripts/run-e2e-core.js --browser webkit",
+    "e2e:verify": "node scripts/verify-e2e-structure.cjs"
   },
   "dependencies": {
     "axios": "^1.7.9",

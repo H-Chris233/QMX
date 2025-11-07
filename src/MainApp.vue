@@ -9,12 +9,13 @@
       </div>
 
       <!-- 大屏：原有水平导航菜单（≥769px 显示） -->
-      <div class="nav-menu-desktop">
+      <div class="nav-menu-desktop" data-testid="nav-menu-desktop">
         <div
           v-for="item in menuItems"
           :key="item.id"
           :class="['nav-menu-item', { active: activeTab === item.id }]"
           @click="activeTab = item.id"
+          :data-testid="`nav-${item.id}`"
         >
           <span class="nav-menu-icon">{{ item.icon }}</span>
           <span class="nav-menu-text">{{ item.label }}</span>
@@ -58,29 +59,29 @@
     </nav>
 
     <!-- 主内容区域 -->
-    <main class="main-content">
+    <main class="main-content" data-testid="main-content">
       <!-- 学员管理 -->
-      <div v-if="activeTab === 'students'" class="tab-content">
+      <div v-if="activeTab === 'students'" class="tab-content" data-testid="students-tab">
         <StudentManagement />
       </div>
 
       <!-- 收支统计 -->
-      <div v-if="activeTab === 'finance'" class="tab-content">
+      <div v-if="activeTab === 'finance'" class="tab-content" data-testid="finance-tab">
         <FinancialStatistics />
       </div>
 
       <!-- 成绩管理 -->
-      <div v-if="activeTab === 'grades'" class="tab-content">
+      <div v-if="activeTab === 'grades'" class="tab-content" data-testid="grades-tab">
         <GradeManagement />
       </div>
 
       <!-- 仪表盘 -->
-      <div v-if="activeTab === 'dashboard'" class="tab-content">
+      <div v-if="activeTab === 'dashboard'" class="tab-content" data-testid="dashboard-tab">
         <Dashboard />
       </div>
 
       <!-- 设置 -->
-      <div v-if="activeTab === 'settings'" class="tab-content">
+      <div v-if="activeTab === 'settings'" class="tab-content" data-testid="settings-tab">
         <Settings />
       </div>
     </main>
