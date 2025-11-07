@@ -29,7 +29,7 @@ jobs:
         run: pnpm install --frozen-lockfile --no-optional
 
       - name: Build Vue Frontend
-        run: pnpm build
+        run: pnpm build:frontend
         env:
           CI: true
 
@@ -62,13 +62,13 @@ jobs:
           rm -rf ~/.pnpm-store
           pnpm store prune --force
 
-      - name: Install backend dependencies
-        run: pnpm install --filter ./backend --frozen-lockfile --no-optional
+      - name: Install all dependencies
+        run: pnpm install --frozen-lockfile --no-optional
         env:
           PNPM_STATE_DIR: /tmp/pnpm-state
 
       - name: Build Express Backend
-        run: pnpm run --filter ./backend build
+        run: pnpm build:backend
 
       - name: Test Express Backend
-        run: pnpm test --filter ./backend
+        run: pnpm test:backend
