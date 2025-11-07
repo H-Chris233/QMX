@@ -1,7 +1,7 @@
 <template>
-  <div class="financial-statistics">
+  <div class="financial-statistics" data-testid="financial-statistics">
     <!-- 加载进度条 -->
-    <div v-if="loading" class="loading-progress"></div>
+    <div v-if="loading" class="loading-progress" data-testid="loading-progress"></div>
 
     <div class="section-header">
       <h2>收支统计</h2>
@@ -11,6 +11,7 @@
           @click="forceRefresh"
           :disabled="loading"
           title="刷新数据"
+          data-testid="refresh-btn"
         >
           🔄 刷新
         </button>
@@ -19,6 +20,7 @@
           @click="openAddTransactionModal"
           :disabled="loading"
           aria-label="添加新交易"
+          data-testid="add-transaction-btn"
         >
           {{ loading ? '加载中...' : '➕ 添加交易' }}
         </button>
@@ -42,37 +44,37 @@
     </div>
 
     <!-- 总览卡片 -->
-    <div class="overview-cards">
-      <div class="overview-card income">
+    <div class="overview-cards" data-testid="overview-cards">
+      <div class="overview-card income" data-testid="income-card">
         <div class="card-icon">💰</div>
         <div class="card-content">
           <h3>总收入</h3>
-          <div class="card-value">{{ formatCurrency(totalIncome) }}</div>
+          <div class="card-value" data-testid="total-income">{{ formatCurrency(totalIncome) }}</div>
         </div>
       </div>
 
-      <div class="overview-card expense">
+      <div class="overview-card expense" data-testid="expense-card">
         <div class="card-icon">💸</div>
         <div class="card-content">
           <h3>总支出</h3>
-          <div class="card-value">{{ formatCurrency(totalExpense) }}</div>
+          <div class="card-value" data-testid="total-expense">{{ formatCurrency(totalExpense) }}</div>
         </div>
       </div>
 
-      <div class="overview-card balance">
+      <div class="overview-card balance" data-testid="balance-card">
         <div class="card-icon">💎</div>
         <div class="card-content">
           <h3>净收益</h3>
-          <div class="card-value">{{ formatCurrency(netProfit) }}</div>
+          <div class="card-value" data-testid="net-profit">{{ formatCurrency(netProfit) }}</div>
         </div>
       </div>
 
-      <div class="overview-card installment">
+      <div class="overview-card installment" data-testid="installment-card">
         <div class="card-icon">📅</div>
         <div class="card-content">
           <h3>分期付款</h3>
-          <div class="card-value">{{ installmentCount }}</div>
-          <div class="card-subtext">待处理: {{ pendingInstallments }}</div>
+          <div class="card-value" data-testid="installment-count">{{ installmentCount }}</div>
+          <div class="card-subtext" data-testid="pending-installments">待处理: {{ pendingInstallments }}</div>
         </div>
       </div>
     </div>

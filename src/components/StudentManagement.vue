@@ -1,7 +1,7 @@
 <template>
-  <div class="student-management">
+  <div class="student-management" data-testid="student-management">
     <!-- 顶部操作栏 -->
-    <div class="top-bar">
+    <div class="top-bar" data-testid="student-top-bar">
       <div class="search-section">
         <div class="search-input-group">
           <input
@@ -9,22 +9,23 @@
             type="text"
             placeholder="搜索学员姓名、电话、科目等..."
             class="search-input"
+            data-testid="student-search-input"
             @keyup.enter="performSearch"
           />
-          <button @click="performSearch" class="search-button">
+          <button @click="performSearch" class="search-button" data-testid="student-search-button">
             <span class="search-icon">🔍</span>
           </button>
         </div>
         
         <div class="search-filters">
-          <select v-model="searchFilters.subject" @change="performSearch">
+          <select v-model="searchFilters.subject" @change="performSearch" data-testid="filter-subject">
             <option value="">所有科目</option>
             <option value="Shooting">射击</option>
             <option value="Archery">射箭</option>
             <option value="Others">其他</option>
           </select>
           
-          <select v-model="searchFilters.classType" @change="performSearch">
+          <select v-model="searchFilters.classType" @change="performSearch" data-testid="filter-class-type">
             <option value="">所有课程</option>
             <option value="TenTry">体验课</option>
             <option value="Month">月卡</option>
@@ -32,13 +33,13 @@
             <option value="Others">其他</option>
           </select>
 
-          <select v-model="searchFilters.hasMembership" @change="performSearch">
+          <select v-model="searchFilters.hasMembership" @change="performSearch" data-testid="filter-has-membership">
             <option value="">所有会员状态</option>
             <option value="true">有会员</option>
             <option value="false">无会员</option>
           </select>
 
-          <select v-model="searchFilters.membershipStatus" @change="performSearch">
+          <select v-model="searchFilters.membershipStatus" @change="performSearch" data-testid="filter-membership-status">
             <option value="">会员筛选</option>
             <option value="Active">激活中</option>
             <option value="Expired">已过期</option>
@@ -48,11 +49,11 @@
       </div>
       
       <div class="action-buttons">
-        <button @click="showAddStudentForm = true" class="add-student-btn">
+        <button @click="showAddStudentForm = true" class="add-student-btn" data-testid="add-student-btn">
           <span class="btn-icon">➕</span>
           添加学员
         </button>
-        <button @click="exportStudents" class="export-btn">
+        <button @click="exportStudents" class="export-btn" data-testid="export-students-btn">
           <span class="btn-icon">📤</span>
           导出数据
         </button>
@@ -60,12 +61,13 @@
     </div>
 
     <!-- 学员列表 -->
-    <div class="student-list">
+    <div class="student-list" data-testid="student-list">
       <div 
         v-for="student in students" 
         :key="student.uid" 
         :class="['student-card', { selected: selectedStudent?.uid === student.uid }]"
         @click="selectStudent(student)"
+        :data-testid="`student-card-${student.uid}`"
       >
         <div class="student-header">
           <h3>{{ student.name }}</h3>
@@ -104,11 +106,11 @@
         </div>
         
         <div class="student-actions">
-          <button @click.stop="editStudent(student)" class="edit-btn">
+          <button @click.stop="editStudent(student)" class="edit-btn" :data-testid="`edit-student-${student.uid}`">
             <span class="btn-icon">✏️</span>
             编辑
           </button>
-          <button @click.stop="deleteStudent(student.uid)" class="delete-btn">
+          <button @click.stop="deleteStudent(student.uid)" class="delete-btn" :data-testid="`delete-student-${student.uid}`">
             <span class="btn-icon">🗑️</span>
             删除
           </button>
@@ -117,16 +119,17 @@
     </div>
 
     <!-- 分页 -->
-    <div class="pagination" v-if="totalPages > 1">
+    <div class="pagination" v-if="totalPages > 1" data-testid="student-pagination">
       <button 
         @click="changePage(currentPage - 1)" 
         :disabled="currentPage === 1"
         class="page-btn"
+        data-testid="prev-page-btn"
       >
         上一页
       </button>
       
-      <span class="page-info">
+      <span class="page-info" data-testid="page-info">
         {{ currentPage }} / {{ totalPages }} (共 {{ totalStudents }} 人)
       </span>
       
@@ -134,6 +137,7 @@
         @click="changePage(currentPage + 1)" 
         :disabled="currentPage === totalPages"
         class="page-btn"
+        data-testid="next-page-btn"
       >
         下一页
       </button>

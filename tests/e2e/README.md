@@ -1,357 +1,388 @@
-# E2E 测试环境使用指南
+# E2E核心流程测试文档
 
 ## 概述
 
-本项目使用 Playwright 进行端到端（E2E）测试，支持多浏览器、多设备测试，并集成了完整的 CI/CD 流程。
+本项目包含完整的端到端(E2E)测试套件，专门针对QMX学生管理系统的核心业务流程。测试基于Playwright框架，使用Page Object模式提高可维护性，确保关键业务路径无回归。
+
+## 🎯 测试覆盖范围
+
+### 1. 学员管理 (`student-management-core.spec.ts`)
+- ✅ 新建学员（含会员起止日期/剩余课时）
+- ✅ 编辑与删除学员信息
+- ✅ 列表分页与筛选功能
+  - `has_membership` 会员状态筛选
+  - `membership_active_at` 会员激活时间筛选
+  - `membership_status` 会员详细状态筛选
+- ✅ 搜索功能（姓名、电话、科目等）
+
+### 2. 现金交易 (`financial-transactions.spec.ts`)
+- ✅ 创建交易记录
+- ✅ 金额单位转换验证（前端元，后端分）
+- ✅ 交易列表查询与筛选
+- ✅ 财务统计数据一致性验证
+
+### 3. 分期计划 (`installment-management.spec.ts`)
+- ✅ 创建分期计划与期次
+- ✅ 更新一期状态
+- ✅ 校验统计口径同步
+- ✅ 分期付款数据跨端点一致性验证
+
+### 4. 统计仪表盘 (`dashboard-stats.spec.ts`)
+- ✅ 加载 dashboard/student/financial 统计
+- ✅ 校验环比或汇总字段与后端一致
+- ✅ 会员过期提醒功能验证
+- ✅ 数据加载性能和格式验证
+
+### 5. CSV导出 (`csv-export.spec.ts`)
+- ✅ 在筛选结果下导出CSV
+- ✅ 校验文件内容（通过拦截下载）
+- ✅ CSV格式规范验证
+- ✅ 空数据和搜索结果导出验证
+
+### 6. 集成测试 (`integration.spec.ts`)
+- ✅ 跨模块数据一致性验证
+- ✅ 学员-财务-仪表盘数据同步
+- ✅ 多页面导航状态保持
+- ✅ 错误恢复和重试机制
+
+## 🏗️ 架构设计
+
+### Page Object模式
+```
+tests/e2e/
+├── page-objects/          # 页面对象模型
+│   ├── AppPage.ts         # 主应用页面
+│   ├── StudentManagementPage.ts  # 学员管理页面
+│   ├── FinancialStatisticsPage.ts # 财务统计页面
+│   └── DashboardPage.ts   # 仪表盘页面
+├── features/              # 功能测试用例
+├── utils/                 # 测试工具类
+│   └── test-utils.ts      # 通用测试工具
+├── fixtures.ts           # 测试数据和环境
+├── global-setup.ts       # 全局测试设置
+└── global-teardown.ts    # 全局测试清理
+```
+
+### data-testid策略
+为避免选择器脆弱性，所有关键元素都添加了`data-testid`属性：
+
+```vue
+<!-- 导航 -->
+<div data-testid="nav-students">学员管理</div>
+<div data-testid="nav-finance">收支统计</div>
+<div data-testid="nav-dashboard">仪表盘</div>
+
+<!-- 学员管理 -->
+<input data-testid="student-search-input" />
+<button data-testid="add-student-btn" />
+<div data-testid="student-list">
+  <div data-testid="student-card-1">学员卡片</div>
+</div>
+<div data-testid="student-pagination">分页</div>
+
+<!-- 财务统计 -->
+<div data-testid="total-income">总收入</div>
+<div data-testid="total-expense">总支出</div>
+<div data-testid="net-profit">净收益</div>
+
+<!-- 仪表盘 -->
+<div data-testid="total-revenue">总收入</div>
+<div data-testid="active-students">活跃学员</div>
+<div data-testid="average-grade">平均成绩</div>
+```
 
 ## 🚀 快速开始
 
 ### 1. 安装依赖
-
 ```bash
-# 安装项目依赖
-pnpm install
-
-# 安装 Playwright 浏览器
-pnpm run e2e:install
+npm install
+npm run e2e:install  # 安装Playwright浏览器
 ```
 
-### 2. 环境配置
-
-复制测试环境配置文件：
-
+### 2. 启动服务
 ```bash
-cp .env.test .env
+# 启动前后端服务（测试脚本会自动启动）
+npm run dev:full
 ```
 
-确保以下配置正确：
-
-```env
-# 前端配置
-VITE_API_BASE_URL=http://localhost:3001/api/v1
-
-# 后端配置
-PORT=3001
-NODE_ENV=test
-
-# 测试数据库
-MONGODB_URI=mongodb://localhost:27017/qmx_test
-```
-
-### 3. 启动服务
-
+### 3. 运行核心流程测试
 ```bash
-# 启动后端服务
-pnpm run backend
+# 运行所有核心流程测试
+npm run e2e:core
 
-# 启动前端服务（新终端）
-pnpm run dev
+# 显示浏览器界面运行
+npm run e2e:core:headed
+
+# 生成HTML报告
+npm run e2e:core:report
+
+# 仅在Chrome中运行
+npm run e2e:core:chrome
+
+# 仅在Firefox中运行
+npm run e2e:core:firefox
+
+# 仅在Safari中运行
+npm run e2e:core:safari
 ```
 
-### 4. 运行测试
+## 📋 高级用法
 
+### 自定义测试运行
 ```bash
-# 运行所有 E2E 测试
-pnpm run e2e
+# 运行特定测试文件
+npx playwright test tests/e2e/features/student-management-core.spec.ts --config=playwright.core.config.ts
 
-# 运行测试并显示浏览器（调试模式）
-pnpm run e2e:headed
+# 运行匹配的测试
+npx playwright test --grep "学员管理" --config=playwright.core.config.ts
 
-# 调试模式（逐步执行）
-pnpm run e2e:debug
+# 显示浏览器界面并调试
+npx playwright test --debug --headed --config=playwright.core.config.ts
 
-# 查看测试报告
-pnpm run e2e:report
+# 更新截图
+npx playwright test --update-snapshots --config=playwright.core.config.ts
 ```
 
-## 📁 目录结构
+### 使用测试脚本
+```bash
+# 查看帮助
+node scripts/run-e2e-core.js --help
 
+# 运行特定浏览器
+node scripts/run-e2e-core.js --browser chromium --headed
+
+# 运行特定测试
+node scripts/run-e2e-core.js --grep "CSV导出"
+
+# 运行特定项目
+node scripts/run-e2e-core.js --project mobile-chrome-core
 ```
-tests/e2e/
-├── fixtures.ts           # 测试夹具和自定义断言
-├── global-setup.ts       # 全局测试设置
-├── global-teardown.ts    # 全局测试清理
-├── smoke/               # 冒烟测试
-│   └── smoke.spec.ts
-├── features/            # 功能测试
-│   └── student-management.spec.ts
-└── README.md           # 本文档
-```
-
-## 🎭 测试类型
-
-### 1. 冒烟测试 (Smoke Tests)
-
-位置：`tests/e2e/smoke/`
-
-目的：验证应用基本功能是否正常
-
-包含：
-- 应用首页加载
-- 服务健康检查
-- API 代理配置
-- 页面资源加载
-- 控制台错误检查
-
-### 2. 功能测试 (Feature Tests)
-
-位置：`tests/e2e/features/`
-
-目的：验证具体业务功能
-
-包含：
-- 学生管理功能
-- 财务管理功能
-- 会员管理功能
-- 响应式布局测试
 
 ## 🔧 配置说明
 
-### Playwright 配置
+### 核心流程配置 (`playwright.core.config.ts`)
+- **超时设置**: 60秒测试超时，30秒操作超时
+- **自动服务启动**: 自动启动前后端服务
+- **多浏览器支持**: Chrome、Firefox、Safari、移动端
+- **失败捕获**: 自动截图、录制视频、保存追踪
+- **报告生成**: HTML、JSON、JUnit格式报告
 
-配置文件：`playwright.config.ts`
+### 环境变量
+```bash
+# 基础URL（默认: http://localhost:1420）
+BASE_URL=http://localhost:1420
 
-主要特性：
-- 多浏览器支持（Chrome、Firefox、Safari）
-- 移动端测试支持
-- 自动截图和视频录制
-- Trace 生成（失败时）
-- 自动服务启动
+# API基础URL（默认: http://localhost:3001/api/v1）
+VITE_API_BASE_URL=http://localhost:3001/api/v1
 
-### 测试环境隔离
+# CI环境
+CI=true
 
-- 使用独立的测试数据库：`qmx_test`
-- 测试数据自动准备和清理
-- 环境变量隔离
+# 测试环境
+NODE_ENV=test
+```
 
 ## 📊 测试报告
 
-### 本地查看报告
+### 报告类型
+1. **HTML报告** - 交互式报告，包含截图和视频
+2. **JSON报告** - 机器可读的测试结果
+3. **JUnit报告** - CI/CD集成格式
+4. **控制台报告** - 实时测试输出
 
+### 查看报告
 ```bash
-# 启动报告服务器
-pnpm run e2e:report
+# 生成并查看HTML报告
+npm run e2e:core:report
+
+# 或手动查看
+npx playwright show-report
 ```
 
-报告包含：
-- 测试执行结果
-- 失败截图
-- 录制视频
-- 执行追踪（Trace）
-
-### CI/CD 报告
-
-- GitHub Actions 自动生成报告
-- 测试结果自动上传为 artifacts
-- PR 自动评论测试结果
+### 报告内容
+- 📸 失败截图
+- 🎥 测试视频
+- 🔍 详细追踪
+- 📈 性能指标
+- 📝 错误日志
 
 ## 🛠️ 开发指南
 
-### 编写新测试
+### 添加新的测试用例
 
-1. 导入必要的夹具：
-
+1. **创建页面对象**（如果需要新页面）:
 ```typescript
-import { test, expect } from '../fixtures';
+// tests/e2e/page-objects/NewPage.ts
+export class NewPage {
+  constructor(public readonly page: Page) {}
+  
+  async waitForPageLoad(): Promise<void> {
+    await this.page.locator('[data-testid="new-page"]').waitFor();
+  }
+  
+  async performAction(): Promise<void> {
+    await this.page.locator('[data-testid="action-button"]').click();
+  }
+}
 ```
 
-2. 使用自定义夹具：
-
+2. **编写测试用例**:
 ```typescript
-test('我的测试', async ({ page, api, testData }) => {
-  // 测试逻辑
+// tests/e2e/features/new-feature.spec.ts
+import { test, expect } from '../fixtures';
+import { NewPage } from '../page-objects/NewPage';
+
+test.describe('新功能测试', () => {
+  let newPage: NewPage;
+  
+  test.beforeEach(async ({ page }) => {
+    newPage = new NewPage(page);
+    await page.goto('/');
+    await newPage.waitForPageLoad();
+  });
+  
+  test('核心功能验证', async () => {
+    await newPage.performAction();
+    // 添加断言
+    expect(true).toBeTruthy();
+  });
 });
 ```
 
-3. 使用自定义断言：
-
-```typescript
-await expect(element).toBeVisibleAndEnabled();
-expect(apiResponse).toBeValidApiResponse();
+3. **添加data-testid**:
+```vue
+<template>
+  <div data-testid="new-page">
+    <button data-testid="action-button">操作</button>
+  </div>
+</template>
 ```
 
-### 测试最佳实践
+### 最佳实践
 
-1. **测试独立性**：每个测试应该独立运行
-2. **数据隔离**：使用测试夹具提供的数据
-3. **等待策略**：使用 Playwright 的自动等待机制
-4. **错误处理**：适当的错误捕获和报告
-5. **命名规范**：使用描述性的测试名称
+1. **使用Page Object模式**
+   - 封装页面操作逻辑
+   - 提高测试可维护性
+   - 减少重复代码
 
-### 调试技巧
+2. **使用data-testid**
+   - 避免CSS选择器脆弱性
+   - 提高测试稳定性
+   - 便于重构维护
 
-1. **使用调试模式**：
+3. **合理使用等待**
+   - 优先使用`waitForSelector`
+   - 避免固定`waitForTimeout`
+   - 使用`waitForNetworkIdle`
 
-```bash
-pnpm run e2e:debug
-```
+4. **错误处理**
+   - 验证错误提示显示
+   - 测试错误恢复机制
+   - 提供有意义的错误信息
 
-2. **分步执行**：在 VSCode 中使用 Playwright 扩展
-3. **查看 Trace**：失败时查看详细执行追踪
-4. **浏览器开发者工具**：使用 headed 模式
-
-## 🔄 CI/CD 集成
-
-### GitHub Actions
-
-工作流文件：`.github/workflows/e2e.yml`
-
-触发条件：
-- Push 到 main/release 分支
-- Pull Request 到 main/release 分支
-- 手动触发
-
-执行步骤：
-1. 环境准备
-2. 依赖安装
-3. 服务启动
-4. 测试执行
-5. 结果上传
-
-### 环境变量
-
-CI 环境自动设置：
-- `CI=true`
-- `NODE_ENV=test`
-- `BASE_URL=http://localhost:1420`
-- `VITE_API_BASE_URL=http://localhost:3001/api/v1`
-
-## 🧪 测试数据管理
-
-### 自动数据准备
-
-测试开始前自动：
-1. 清空测试数据库
-2. 创建示例学生数据
-3. 创建示例财务记录
-4. 创建示例分期记录
-
-### 数据清理
-
-测试结束后自动：
-1. 清理测试数据
-2. 重置数据库状态
-3. 收集测试结果摘要
-
-### 手动数据管理
-
-```bash
-# 准备测试数据
-curl -X POST http://localhost:3001/api/v1/test/seed
-
-# 清理测试数据
-curl -X POST http://localhost:3001/api/v1/test/cleanup
-
-# 查看数据状态
-curl http://localhost:3001/api/v1/test/status
-```
+5. **数据验证**
+   - 验证前端显示格式
+   - 对比后端API数据
+   - 检查数据一致性
 
 ## 🐛 故障排除
 
 ### 常见问题
 
 1. **服务启动失败**
-   - 检查端口是否被占用
-   - 确认环境变量配置
-   - 查看服务日志
+   ```bash
+   # 检查端口占用
+   lsof -i :1420  # 前端端口
+   lsof -i :3001  # 后端端口
+   
+   # 手动启动服务
+   npm run dev:full
+   ```
 
-2. **数据库连接失败**
-   - 确认 MongoDB 服务状态
-   - 检查连接字符串
-   - 验证数据库权限
+2. **浏览器安装问题**
+   ```bash
+   # 重新安装浏览器
+   npx playwright install
+   
+   # 安装特定浏览器
+   npx playwright install chromium
+   ```
 
 3. **测试超时**
-   - 增加测试超时时间
    - 检查网络连接
-   - 优化等待策略
+   - 验证API响应速度
+   - 调整超时配置
 
-4. **浏览器启动失败**
-   - 重新安装 Playwright 浏览器
-   - 检查系统依赖
-   - 确认显示配置
+4. **元素定位失败**
+   - 确认data-testid存在
+   - 检查元素是否可见
+   - 验证页面加载完成
 
-### 日志查看
+### 调试技巧
 
-```bash
-# 查看详细测试日志
-pnpm run e2e --reporter=list
+1. **显示浏览器界面**:
+   ```bash
+   npm run e2e:core:headed
+   ```
 
-# 查看服务日志
-pnpm run backend  # 后端日志
-pnpm run dev      # 前端日志
+2. **调试模式**:
+   ```bash
+   npx playwright test --debug --config=playwright.core.config.ts
+   ```
+
+3. **生成追踪**:
+   ```typescript
+   // 在测试中添加
+   await page.pause();
+   await page.locator('selector').click();
+   ```
+
+4. **查看网络请求**:
+   ```bash
+   # 在调试模式下打开开发者工具
+   # 查看Network标签页
+   ```
+
+## 📈 持续集成
+
+### GitHub Actions配置
+测试已配置为在CI环境中自动运行：
+
+```yaml
+# .github/workflows/e2e.yml
+name: E2E Tests
+on: [push, pull_request]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm install
+      - run: npm run e2e:install
+      - run: npm run e2e:core
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
 ```
 
-## 📈 性能优化
+### CI配置要点
+- 使用无头模式运行
+- 自动上传测试报告
+- 失败时保存截图和视频
+- 并行执行提高效率
 
-### 并行执行
+## 📚 参考资料
 
-- 默认并行运行测试
-- CI 环境限制并行数
-- 使用 `workers` 配置控制
-
-### 资源复用
-
-- WebServer 自动复用
-- 浏览器上下文隔离
-- 数据库连接池
-
-### 缓存策略
-
-- pnpm 缓存
-- Playwright 浏览器缓存
-- 测试结果缓存
-
-## 🔮 扩展功能
-
-### 添加新浏览器
-
-在 `playwright.config.ts` 中添加新项目：
-
-```typescript
-{
-  name: 'edge',
-  use: { ...devices['Desktop Edge'] },
-}
-```
-
-### 添加移动设备测试
-
-```typescript
-{
-  name: 'Mobile Chrome',
-  use: { ...devices['Pixel 5'] },
-}
-```
-
-### 集成视觉回归测试
-
-```bash
-pnpm add -D @playwright/visual-expect
-```
-
-## 📚 相关文档
-
-- [Playwright 官方文档](https://playwright.dev/)
-- [Vue Test Utils](https://test-utils.vuejs.org/)
-- [项目架构文档](./CLAUDE.md)
-- [后端 API 文档](../backend/README.md)
-
-## 🤝 贡献指南
-
-1. Fork 项目
-2. 创建功能分支
-3. 编写测试用例
-4. 确保所有测试通过
-5. 提交 Pull Request
-
-## 📞 支持
-
-如有问题，请：
-1. 查看本文档
-2. 检查 GitHub Issues
-3. 联系项目维护者
+- [Playwright官方文档](https://playwright.dev/)
+- [Page Object模式指南](https://martinfowler.com/bliki/PageObject.html)
+- [E2E测试最佳实践](https://kentcdodds.com/blog/write-tests)
+- [测试金字塔理论](https://martinfowler.com/bliki/TestPyramid.html)
 
 ---
 
-**最后更新**: 2025-11-07
+**维护者**: H-Chris233  
+**最后更新**: 2025-11-07  
 **版本**: 1.0.0

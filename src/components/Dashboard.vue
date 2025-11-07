@@ -21,14 +21,14 @@
     </div>
 
     <!-- 统计信息 -->
-    <div class="stats-grid" :class="{ 'loading-state': loading }">
+    <div class="stats-grid" :class="{ 'loading-state': loading }" data-testid="stats-grid">
       <!-- 总收入 -->
-      <div class="stat-card" :class="{ 'skeleton': loading }">
+      <div class="stat-card" :class="{ 'skeleton': loading }" data-testid="revenue-card">
         <div class="card-header">
           <h3>总收入</h3>
           <span class="card-icon">💰</span>
         </div>
-        <div class="stat-value" v-if="!loading">
+        <div class="stat-value" v-if="!loading" data-testid="total-revenue">
           {{ formatCurrency(dashboardData.totalRevenue) }}
         </div>
         <div class="skeleton-text" v-else></div>
@@ -38,12 +38,12 @@
       </div>
 
       <!-- 学员总数 -->
-      <div class="stat-card" :class="{ 'skeleton': loading }">
+      <div class="stat-card" :class="{ 'skeleton': loading }" data-testid="students-card">
         <div class="card-header">
           <h3>学员总数</h3>
           <span class="card-icon">👥</span>
         </div>
-        <div class="stat-value" v-if="!loading">
+        <div class="stat-value" v-if="!loading" data-testid="active-students">
           {{ formatNumber(dashboardData.activeStudents) }}
         </div>
         <div class="skeleton-text" v-else></div>
@@ -53,12 +53,12 @@
       </div>
 
       <!-- 平均成绩 -->
-      <div class="stat-card" :class="{ 'skeleton': loading }">
+      <div class="stat-card" :class="{ 'skeleton': loading }" data-testid="grades-card">
         <div class="card-header">
           <h3>平均成绩</h3>
           <span class="card-icon">🎯</span>
         </div>
-        <div class="stat-value" v-if="!loading">
+        <div class="stat-value" v-if="!loading" data-testid="average-grade">
           {{ formatDecimal(dashboardData.averageGrade) }}
         </div>
         <div class="skeleton-text" v-else></div>
