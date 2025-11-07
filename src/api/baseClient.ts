@@ -132,7 +132,7 @@ export const baseClient = createAxiosInstance();
 export async function apiCall<T>(
   request: Promise<any>,
   cacheKey?: string,
-  params?: Record<string, unknown>,
+  params?: Record<string, any>,
   forceRefresh = false
 ): Promise<T> {
   // 如果提供了缓存键，尝试使用缓存

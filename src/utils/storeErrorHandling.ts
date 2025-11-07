@@ -270,35 +270,35 @@ export async function batchStoreActionWrapper<T>(
  */
 export const StoreActionPresets = {
   // 创建操作
-  create: (entityName: string): Partial<StoreActionOptions> => ({
+  create: (entityName: string): StoreActionOptions => ({
     operationName: `创建${entityName}`,
     retryable: false,
     throwOnError: true
   }),
 
   // 更新操作
-  update: (entityName: string): Partial<StoreActionOptions> => ({
+  update: (entityName: string): StoreActionOptions => ({
     operationName: `更新${entityName}`,
     retryable: false,
     throwOnError: true
   }),
 
   // 删除操作
-  delete: (entityName: string): Partial<StoreActionOptions> => ({
+  delete: (entityName: string): StoreActionOptions => ({
     operationName: `删除${entityName}`,
     retryable: false,
     throwOnError: true
   }),
 
   // 获取操作
-  fetch: (entityName: string): Partial<StoreActionOptions> => ({
+  fetch: (entityName: string): StoreActionOptions => ({
     operationName: `获取${entityName}`,
     retryable: true,
     throwOnError: true
   }),
 
   // 搜索操作
-  search: (entityName: string): Partial<StoreActionOptions> => ({
+  search: (entityName: string): StoreActionOptions => ({
     operationName: `搜索${entityName}`,
     retryable: true,
     throwOnError: true

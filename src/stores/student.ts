@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, shallowRef } from 'vue';
 import type { Student, StudentCreateData, StudentUpdateData, StudentSearchParams, CurrentStudentInput } from '../types/api';
+import type { StudentListResponse } from '../api/studentApi';
 import { ApiService } from '../api/ApiService';
 import { storeActionWrapper, StoreActionPresets } from '../utils/storeErrorHandling';
 
@@ -81,7 +82,7 @@ export const useStudentStore = defineStore('student', () => {
   /**
    * 获取学生列表 - 使用统一错误处理
    */
-  async function fetchStudents(params?: Partial<StudentSearchParams>, forceRefresh = false) {
+  async function fetchStudents(params?: Partial<StudentSearchParams>, forceRefresh = false): Promise<StudentListResponse> {
     fetchLoading.value = true;
 
     try {
@@ -105,7 +106,9 @@ export const useStudentStore = defineStore('student', () => {
       }, {
         ...StoreActionPresets.fetch('学生列表'),
         context: { params, forceRefresh },
-        retryCallback: () => fetchStudents(params, true)
+        retryCallback: async () => {
+          await fetchStudents(params, true);
+        }
       });
     } finally {
       fetchLoading.value = false;
