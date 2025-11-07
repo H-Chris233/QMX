@@ -1,29 +1,15 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import CounterModel, { getNextSequence, resetSequence, STUDENT_SEQUENCE_NAME } from '@/models/counter';
+import { getNextSequence, resetSequence, STUDENT_SEQUENCE_NAME } from '@/models/counter';
+import { setupTestDatabase, cleanupTestDatabase } from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Counter utilities', () => {
-  let mongoServer: MongoMemoryServer | undefined;
-
   beforeAll(async () => {
-    const instance = await MongoMemoryServer.create();
-    mongoServer = instance;
-    await mongoose.connect(instance.getUri(), {
-      dbName: 'qmx-counter-tests'
-    });
-  });
-
-  afterEach(async () => {
-    await CounterModel.deleteMany({});
+    await setupTestDatabase();
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    if (mongoServer) {
-      await mongoServer.stop();
-    }
+    await cleanupTestDatabase();
   });
 
   it('should return incremental sequence values', async () => {

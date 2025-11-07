@@ -1,5 +1,3 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { CashBuilder } from '@/services/cashBuilder';
 import { AppError, ErrorType } from '@/utils/errors';
 import { Cash } from '@/models/CashMongo';
@@ -7,28 +5,15 @@ import { Student, studentModel } from '@/models/mongo';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { ClassType, SubjectType } from '@/types';
-import { resetSequence, STUDENT_SEQUENCE_NAME, CASH_SEQUENCE_NAME } from '@/models/counter';
+import { TestDataFactory } from '../../test/setupBackend';
 
 describe('Domain error handling alignment', () => {
-  let mongoServer: MongoMemoryServer;
-
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri(), {
-      dbName: 'qmx-error-handling-tests',
-    });
+    // 数据库设置由全局测试环境处理
   });
 
   afterEach(async () => {
-    await Cash.deleteMany({});
-    await studentModel.deleteMany({});
-    await resetSequence(CASH_SEQUENCE_NAME);
-    await resetSequence(STUDENT_SEQUENCE_NAME);
-  });
-
-  afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    // 清理由全局测试环境处理
   });
 
   it('throws InvalidInput when cash amount is zero', () => {
@@ -47,10 +32,7 @@ describe('Domain error handling alignment', () => {
   });
 
   it('allows negative cash amount for expenses', async () => {
-    const transaction = await CashBuilder.create()
-      .amount(-12.34)
-      .note('租金支出')
-      .build();
+    const transaction = await TestDataFactory.createCashTransaction(-12.34, null, '租金支出');
 
     expect(transaction.cash).toBe(-1234);
     expect(transaction.isIncome()).toBe(false);
@@ -64,12 +46,12 @@ describe('Domain error handling alignment', () => {
   });
 
   it('rejects score operations when index is out of range', async () => {
-    const student = await StudentBuilder.create()
-      .name('Range Guard')
-      .phone('13800000000')
-      .class(ClassType.MONTH)
-      .subject(SubjectType.SHOOTING)
-      .build();
+    const student = await TestDataFactory.createStudent({
+      name: 'Range Guard',
+      phone: '13800000000',
+      class: ClassType.MONTH,
+      subject: SubjectType.SHOOTING,
+    });
 
     const updater = StudentUpdater.fromDocument(student);
     updater.addRing(9);

@@ -1,34 +1,12 @@
-import mongoose from 'mongoose';
 import { CashBuilder, convertAmountToCents } from '@/services/cashBuilder';
 import { CashUpdater } from '@/services/cashUpdater';
 import { Cash, CashClass } from '@/models/CashMongo';
 import { AppError, ErrorType } from '@/utils/errors';
-import {
-  setupTestDatabase,
-  cleanupTestDatabase,
-  clearAllCollections,
-  resetAllSequences,
-  createTestStudent,
-  createTestCashTransaction,
-} from './helpers/testSetup';
+import { TestDataFactory } from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Cash Transaction Service', () => {
-  let mongoServer: any;
-
-  beforeAll(async () => {
-    mongoServer = await setupTestDatabase('qmx-cash-tests');
-  });
-
-  afterEach(async () => {
-    await clearAllCollections();
-    await resetAllSequences();
-  });
-
-  afterAll(async () => {
-    await cleanupTestDatabase(mongoServer);
-  });
 
   describe('CashBuilder - Amount Conversion', () => {
     it('converts positive yuan amount to cents', () => {
@@ -170,14 +148,14 @@ describe('Cash Transaction Service', () => {
 
   describe('Cash Transaction - Search and Pagination', () => {
     beforeEach(async () => {
-      const student1 = await createTestStudent({ name: 'Student A' });
-      const student2 = await createTestStudent({ name: 'Student B' });
+      const student1 = await TestDataFactory.createStudent({ name: 'Student A' });
+      const student2 = await TestDataFactory.createStudent({ name: 'Student B' });
 
-      await createTestCashTransaction(100, student1.uid, 'Payment 1');
-      await createTestCashTransaction(200, student1.uid, 'Payment 2');
-      await createTestCashTransaction(150, student2.uid, 'Payment 3');
-      await createTestCashTransaction(-50, null, 'Expense 1');
-      await createTestCashTransaction(-75, null, 'Expense 2');
+      await TestDataFactory.createCashTransaction(100, student1.uid, 'Payment 1');
+      await TestDataFactory.createCashTransaction(200, student1.uid, 'Payment 2');
+      await TestDataFactory.createCashTransaction(150, student2.uid, 'Payment 3');
+      await TestDataFactory.createCashTransaction(-50, null, 'Expense 1');
+      await TestDataFactory.createCashTransaction(-75, null, 'Expense 2');
     });
 
     it('retrieves all transactions with pagination', async () => {
@@ -190,7 +168,7 @@ describe('Cash Transaction Service', () => {
     });
 
     it('filters transactions by student', async () => {
-      const student = await createTestStudent({ name: 'Student A' });
+      const student = await TestDataFactory.createStudent({ name: 'Student A' });
       const result = await CashClass.search({ student_id: student.uid });
 
       expect(result.data.length).toBe(2);
@@ -280,9 +258,9 @@ describe('Cash Transaction Service', () => {
     });
 
     it('retrieves all transactions sorted by created_at', async () => {
-      await createTestCashTransaction(100, null, 'First');
-      await createTestCashTransaction(200, null, 'Second');
-      await createTestCashTransaction(300, null, 'Third');
+      await TestDataFactory.createCashTransaction(100, null, 'First');
+      await TestDataFactory.createCashTransaction(200, null, 'Second');
+      await TestDataFactory.createCashTransaction(300, null, 'Third');
 
       const all = await CashClass.findAll();
       expect(all.length).toBe(3);
@@ -293,8 +271,8 @@ describe('Cash Transaction Service', () => {
 
   describe('Cash Transaction - JSON Serialization', () => {
     it('serializes transaction with all computed fields', async () => {
-      const student = await createTestStudent();
-      const transaction = await createTestCashTransaction(123.45, student.uid, 'Test');
+      const student = await TestDataFactory.createStudent();
+      const transaction = await TestDataFactory.createCashTransaction(123.45, student.uid, 'Test');
 
       const json = transaction.toJSON();
 
@@ -317,7 +295,7 @@ describe('Cash Transaction Service', () => {
     });
 
     it('serializes expense transaction correctly', async () => {
-      const transaction = await createTestCashTransaction(-50.25, null, 'Expense');
+      const transaction = await TestDataFactory.createCashTransaction(-50.25, null, 'Expense');
 
       const json = transaction.toJSON();
 
