@@ -21,6 +21,9 @@ importers:
         specifier: ^3.5.13
         version: 3.5.17(typescript@5.6.3)
     devDependencies:
+      '@rollup/rollup-linux-x64-gnu':
+        specifier: ^4.52.5
+        version: 4.52.5
       '@types/chai':
         specifier: ^4.3.20
         version: 4.3.20
@@ -929,6 +932,12 @@ packages:
 
   '@rollup/rollup-linux-x64-gnu@4.44.0':
     resolution: {integrity: sha512-iUVJc3c0o8l9Sa/qlDL2Z9UP92UZZW1+EmQ4xfjTc1akr0iUFZNfxrXJ/R1T90h/ILm9iXEY6+iPrmYB3pXKjw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@rollup/rollup-linux-x64-gnu@4.52.5':
+    resolution: {integrity: sha512-hXGLYpdhiNElzN770+H2nlx+jRog8TyynpTVzdlc6bndktjKWyZyiCsuDAlpd+j+W+WNqfcyAWz9HxxIGfZm1Q==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
@@ -4196,6 +4205,8 @@ snapshots:
 
   '@rollup/rollup-linux-x64-gnu@4.44.0':
     optional: true
+
+  '@rollup/rollup-linux-x64-gnu@4.52.5': {}
 
   '@rollup/rollup-linux-x64-musl@4.44.0':
     optional: true

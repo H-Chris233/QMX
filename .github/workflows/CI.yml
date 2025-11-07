@@ -27,6 +27,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile --no-optional
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Install Rollup native modules
+        run: pnpm add -D -w @rollup/rollup-linux-x64-gnu || echo "Rollup native modules already installed"
 
       - name: Build Vue Frontend
         run: pnpm build:frontend
@@ -66,6 +72,8 @@ jobs:
         run: pnpm install --frozen-lockfile --no-optional
         env:
           PNPM_STATE_DIR: /tmp/pnpm-state
+          CYPRESS_INSTALL_BINARY: 0
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
       - name: Build Express Backend
         run: pnpm build:backend
