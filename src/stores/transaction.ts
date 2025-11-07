@@ -45,9 +45,7 @@ export const useTransactionStore = defineStore('transaction', () => {
     hasPrevPage: false
   });
 
-  const lastFetched = ref<Date | null>(null);
-  const cacheExpiry = ref<number>(2 * 60 * 1000); // 2分钟缓存，交易数据变化频繁
-
+  
   const selectedPeriod = ref<string>('ThisMonth');
   const showAddTransaction = ref<boolean>(false);
   const showUpdateStatus = ref<boolean>(false);
@@ -118,27 +116,21 @@ export const useTransactionStore = defineStore('transaction', () => {
 
   const currentSearchParams = computed(() => searchParams.value);
 
-  const isCacheExpired = computed(() => {
-    if (!lastFetched.value) return true;
-    return Date.now() - lastFetched.value.getTime() > cacheExpiry.value;
-  });
-
   // Actions
 
   /**
-   * 获取交易列表
+   * 获取交易列表 - 缓存逻辑移至API层
    */
   async function fetchTransactions(params?: Partial<TransactionSearchParams>, forceRefresh = false) {
-    if (!forceRefresh && !isCacheExpired.value && !params) {
-      return transactions.value;
-    }
-
     try {
       const mergedParams = { ...searchParams.value, ...params };
+      // API层处理缓存，forceRefresh参数传递给API层
       const response = await ApiService.getAllTransactions(mergedParams as CashSearchOptions);
 
-      // TransactionListResponse直接包含transactions数组
-      transactions.value = Array.isArray(response) ? response : (response as any).transactions || [];
+      // 处理响应数据格式
+      const transactionItems = Array.isArray(response) ? response : (response as any).items || (response as any).transactions || [];
+      transactions.value = transactionItems;
+
       // 转换分页格式
       if (response.pagination) {
         pagination.value = {
@@ -151,7 +143,6 @@ export const useTransactionStore = defineStore('transaction', () => {
         };
       }
       searchParams.value = mergedParams;
-      lastFetched.value = new Date();
 
       return response;
     } catch (error) {
@@ -160,29 +151,20 @@ export const useTransactionStore = defineStore('transaction', () => {
   }
 
   /**
-   * 获取单个交易详情
+   * 获取单个交易详情 - 简化缓存逻辑
    */
   async function fetchTransactionById(id: number, forceRefresh = false) {
-    // 检查缓存
-    if (!forceRefresh) {
-      const cached = transactionsById.value.get(id);
-      if (cached && !isCacheExpired.value) {
-        currentTransaction.value = cached;
-        return cached;
-      }
-    }
-
     try {
-      // 这里需要在ApiService中添加getTransactionById方法
-      // const transaction = await ApiService.getTransactionById(id);
+      // 直接调用API获取最新数据，缓存逻辑交给API层处理
+      const transaction = await ApiService.getTransactionById(id);
+      currentTransaction.value = transaction;
 
-      // 临时实现：从现有数据中查找
-      const transaction = transactionsById.value.get(id);
-      if (!transaction) {
-        throw new Error('交易记录不存在');
+      // 更新本地列表中的交易信息（如果存在）
+      const index = transactions.value.findIndex(t => t.uid === id);
+      if (index !== -1) {
+        transactions.value[index] = transaction;
       }
 
-      currentTransaction.value = transaction;
       return transaction;
     } catch (error) {
       throw error;
@@ -207,14 +189,11 @@ export const useTransactionStore = defineStore('transaction', () => {
   }
 
   /**
-   * 更新交易
+   * 更新交易 - 使用新的API方法
    */
   async function updateTransaction(id: number, data: TransactionUpdateData) {
     try {
-      // updateTransaction方法不存在，暂时注释
-      // const updatedTransaction = await ApiService.updateTransaction(id, data);
-      console.warn('updateTransaction API method not implemented yet');
-      const updatedTransaction = transactions.value.find((t: Transaction) => t.uid === id)!;
+      const updatedTransaction = await ApiService.updateTransaction(id, data);
 
       // 更新本地状态
       const index = transactions.value.findIndex((t: Transaction) => t.uid === id);
@@ -370,7 +349,6 @@ export const useTransactionStore = defineStore('transaction', () => {
   function clearTransactions() {
     transactions.value = [];
     currentTransaction.value = null;
-    lastFetched.value = null;
   }
 
   /**
@@ -389,7 +367,6 @@ export const useTransactionStore = defineStore('transaction', () => {
     searchParams,
     filterState,
     pagination,
-    lastFetched,
     selectedPeriod,
     showAddTransaction,
     showUpdateStatus,
@@ -407,7 +384,6 @@ export const useTransactionStore = defineStore('transaction', () => {
     netProfit,
     pendingInstallments,
     currentSearchParams,
-    isCacheExpired,
 
     // Actions
     fetchTransactions,

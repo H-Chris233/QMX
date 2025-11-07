@@ -17,6 +17,7 @@ import type {
   CurrentStudentInput,
   Transaction,
   TransactionCreateData,
+  TransactionUpdateData,
   CashSearchOptions,
   DashboardStats,
   StudentStats,
@@ -268,6 +269,17 @@ export class ApiService {
       () => TransactionApiService.getTransactionById(uid),
       '获取交易信息',
       { retryable: true, context: { uid } }
+    );
+  }
+
+  /**
+   * 更新交易信息
+   */
+  static async updateTransaction(uid: number, data: TransactionUpdateData): Promise<Transaction> {
+    return handleApiOperation(
+      () => TransactionApiService.updateTransaction(uid, data),
+      '更新交易信息',
+      { retryable: false, context: { uid, data } }
     );
   }
 

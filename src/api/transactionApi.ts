@@ -5,6 +5,7 @@ import { baseClient, apiCall } from './baseClient';
 import type {
   Transaction,
   TransactionCreateData,
+  TransactionUpdateData,
   CashSearchOptions,
   PaginatedResponse,
 } from '../types/api';
@@ -72,6 +73,15 @@ export class TransactionApiService {
   static async getTransactionById(uid: number): Promise<Transaction> {
     return apiCall<Transaction>(
       baseClient.get(`/transactions/${uid}`)
+    );
+  }
+
+  /**
+   * 更新交易信息
+   */
+  static async updateTransaction(uid: number, data: TransactionUpdateData): Promise<Transaction> {
+    return apiCall<Transaction>(
+      baseClient.put(`/transactions/${uid}`, data)
     );
   }
 

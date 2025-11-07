@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, shallowRef } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { storeActionWrapper, StoreActionPresets } from '../utils/storeErrorHandling';
+import { secureLocalStorage, secureSessionStorage } from '../utils/secureStorage';
 import type { LoginCredentials, User, LoginResponse } from '../types/api';
 
 /**
@@ -79,13 +80,16 @@ export const useAuthStore = defineStore('auth', () => {
   // Actions
 
   /**
-   * 初始化认证状态
+   * 初始化认证状态 - 使用安全存储
    */
   function initAuth() {
     try {
-      const savedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);
-      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-      const savedRefreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+      const rememberMe = secureLocalStorage.getItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
+      const storage = rememberMe ? secureLocalStorage : secureSessionStorage;
+
+      const savedToken = storage.getItem(STORAGE_KEYS.TOKEN);
+      const savedUser = storage.getItem(STORAGE_KEYS.USER);
+      const savedRefreshToken = storage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 
       if (savedToken && savedUser) {
         token.value = savedToken;
@@ -127,16 +131,16 @@ export const useAuthStore = defineStore('auth', () => {
       refreshToken.value = response.refreshToken;
       user.value = response.user;
 
-      // 保存到本地存储
+      // 使用安全存储保存到本地
       if (credentials.rememberMe) {
-        localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
-        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
-        localStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
+        secureLocalStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+        secureLocalStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+        secureLocalStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
+        secureLocalStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
       } else {
-        sessionStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
-        sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
-        sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
+        secureSessionStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+        secureSessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+        secureSessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
       }
 
       // 重置登录尝试计数
@@ -243,7 +247,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 清除认证状态
+   * 清除认证状态 - 使用安全存储清除
    */
   function clearAuth() {
     user.value = null;
@@ -252,42 +256,42 @@ export const useAuthStore = defineStore('auth', () => {
     loginAttempts.value = 0;
     lastLoginAttempt.value = null;
 
-    // 清除本地存储
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
+    // 清除所有安全存储
+    secureLocalStorage.removeItem(STORAGE_KEYS.TOKEN);
+    secureLocalStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    secureLocalStorage.removeItem(STORAGE_KEYS.USER);
+    secureLocalStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
 
-    sessionStorage.removeItem(STORAGE_KEYS.TOKEN);
-    sessionStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    sessionStorage.removeItem(STORAGE_KEYS.USER);
+    secureSessionStorage.removeItem(STORAGE_KEYS.TOKEN);
+    secureSessionStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    secureSessionStorage.removeItem(STORAGE_KEYS.USER);
   }
 
   /**
-   * 更新本地存储中的token
+   * 更新安全存储中的token
    */
   function updateStorageTokens(token: string, refreshToken: string) {
-    const rememberMe = localStorage.getItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
+    const rememberMe = secureLocalStorage.getItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
 
     if (rememberMe) {
-      localStorage.setItem(STORAGE_KEYS.TOKEN, token);
-      localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+      secureLocalStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      secureLocalStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
     } else {
-      sessionStorage.setItem(STORAGE_KEYS.TOKEN, token);
-      sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+      secureSessionStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      secureSessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
     }
   }
 
   /**
-   * 更新本地存储中的用户信息
+   * 更新安全存储中的用户信息
    */
   function updateStorageUser(userData: User) {
-    const rememberMe = localStorage.getItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
+    const rememberMe = secureLocalStorage.getItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
 
     if (rememberMe) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      secureLocalStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
     } else {
-      sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      secureSessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
     }
   }
 
