@@ -42,6 +42,9 @@ jobs:
           CYPRESS_INSTALL_BINARY: 0
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
+      - name: Run frontend tests
+        run: pnpm test
+
       - name: Build Vue Frontend
         run: pnpm build:frontend
         env:
