@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { ApiService } from '@/api/ApiService';
 import { setupServer } from 'msw/node';
 import { handlers } from './mocks/msw/handlers';
+import { integrationHandlers } from './mocks/msw/integrationHandlers';
 
 /**
  * 全局测试设置
@@ -12,12 +13,12 @@ import { handlers } from './mocks/msw/handlers';
  * - 设置 MSW 服务器
  */
 
-// MSW 服务器设置
-const mswServer = setupServer(...handlers);
+// MSW 服务器设置 - 合并基础handlers和集成handlers
+const mswServer = setupServer(...handlers, ...integrationHandlers);
 
 beforeAll(() => {
   // 启动 MSW 服务器
-  mswServer.listen({ onUnhandledRequest: 'error' });
+  mswServer.listen({ onUnhandledRequest: 'bypass' });
   
   // 初始化 Pinia
   setActivePinia(createPinia());

@@ -24,12 +24,12 @@ function createStudentListResponse(
   return {
     students,
     pagination: {
-      page,
-      limit,
-      total,
-      total_pages: Math.ceil(total / limit),
-      has_next: page * limit < total,
-      has_prev: page > 1,
+      currentPage: page,
+      itemsPerPage: limit,
+      totalItems: total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
     },
   };
 }
@@ -46,12 +46,12 @@ function createTransactionListResponse(
   return {
     transactions,
     pagination: {
-      page,
-      limit,
-      total,
-      total_pages: Math.ceil(total / limit),
-      has_next: page * limit < total,
-      has_prev: page > 1,
+      currentPage: page,
+      itemsPerPage: limit,
+      totalItems: total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
     },
   };
 }
