@@ -125,6 +125,26 @@ function createAxiosInstance(): AxiosInstance {
  */
 export const baseClient = createAxiosInstance();
 
+function unwrapApiResponse<T>(response: unknown): T {
+  if (response && typeof response === 'object' && 'data' in (response as Record<string, unknown>)) {
+    const rawData = (response as { data: unknown }).data;
+
+    if (rawData && typeof rawData === 'object' && rawData !== null && 'success' in (rawData as Record<string, unknown>)) {
+      const apiResponse = rawData as ApiResponse<T>;
+
+      if (apiResponse.success && 'data' in apiResponse) {
+        return apiResponse.data as T;
+      }
+
+      return rawData as T;
+    }
+
+    return rawData as T;
+  }
+
+  return response as T;
+}
+
 /**
  * 通用 API 调用包装器
  * 用于统一处理 API 响应和错误
@@ -146,18 +166,8 @@ export async function apiCall<T>(
 
     try {
       const response = await request;
-      const apiResponse = response.data as ApiResponse<T>;
+      const data = unwrapApiResponse<T>(response);
 
-      // 如果有 data 字段，返回 data；否则返回整个响应
-      let data: T;
-      if ('data' in apiResponse && apiResponse.success) {
-        data = apiResponse.data as T;
-      } else {
-        // 兼容某些直接返回数据的端点
-        data = response.data as T;
-      }
-
-      // 缓存响应数据
       apiCache.set(cacheKey, data, params);
       return data;
     } catch (error) {
@@ -176,15 +186,7 @@ export async function apiCall<T>(
   // 不使用缓存的原始调用
   try {
     const response = await request;
-    const apiResponse = response.data as ApiResponse<T>;
-
-    // 如果有 data 字段，返回 data；否则返回整个响应
-    if ('data' in apiResponse && apiResponse.success) {
-      return apiResponse.data as T;
-    }
-
-    // 兼容某些直接返回数据的端点
-    return response.data as T;
+    return unwrapApiResponse<T>(response);
   } catch (error) {
     // 已经被拦截器处理过的错误，直接抛出
     throw error;
