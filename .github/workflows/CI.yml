@@ -34,6 +34,9 @@ jobs:
       - name: Install additional native modules
         run: pnpm add -D -w @rollup/rollup-linux-x64-gnu @esbuild/linux-x64 || echo "Native modules already installed"
 
+      - name: Run frontend tests
+        run: pnpm test
+
       - name: Build Vue Frontend
         run: pnpm build:frontend
         env:
