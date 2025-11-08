@@ -54,23 +54,23 @@ export const useTransactionStore = defineStore('transaction', () => {
   // Getters
   const transactionsById = computed(() => {
     const map = new Map<number, Transaction>();
-    transactions.value.forEach(transaction => {
+    (transactions.value || []).forEach(transaction => {
       map.set(transaction.uid, transaction);
     });
     return map;
   });
 
   const incomeTransactions = computed(() => {
-    return transactions.value.filter(t => t.amount > 0);
+    return (transactions.value || []).filter(t => t.amount > 0);
   });
 
   const expenseTransactions = computed(() => {
-    return transactions.value.filter(t => t.amount < 0);
+    return (transactions.value || []).filter(t => t.amount < 0);
   });
 
   const transactionsByStudent = computed(() => {
     const groups: Record<string, Transaction[]> = {};
-    transactions.value.forEach(transaction => {
+    (transactions.value || []).forEach(transaction => {
       const studentId = transaction.student_id || 'no_student';
       if (!groups[studentId]) {
         groups[studentId] = [];
@@ -82,7 +82,7 @@ export const useTransactionStore = defineStore('transaction', () => {
 
   const transactionsByType = computed(() => {
     const groups: Record<string, Transaction[]> = {};
-    transactions.value.forEach(transaction => {
+    (transactions.value || []).forEach(transaction => {
       const type = transaction.is_installment ? 'installment' : 'normal';
       if (!groups[type]) {
         groups[type] = [];
@@ -93,7 +93,7 @@ export const useTransactionStore = defineStore('transaction', () => {
   });
 
   const installmentTransactions = computed(() => {
-    return transactions.value.filter(t => t.is_installment);
+    return (transactions.value || []).filter(t => t.is_installment);
   });
 
   const totalIncome = computed(() => {
@@ -109,7 +109,7 @@ export const useTransactionStore = defineStore('transaction', () => {
   });
 
   const pendingInstallments = computed(() => {
-    return transactions.value.filter(t =>
+    return (transactions.value || []).filter(t =>
       t.is_installment && t.installment?.status === InstallmentStatus.PENDING
     ).length;
   });
@@ -128,18 +128,29 @@ export const useTransactionStore = defineStore('transaction', () => {
       const response = await ApiService.getAllTransactions(mergedParams as CashSearchOptions);
 
       // 处理响应数据格式
-      const transactionItems = Array.isArray(response) ? response : (response as any).items || (response as any).transactions || [];
+      // API返回: { success: true, data: { data: [], pagination: {} } }
+      let transactionItems = [];
+      if (response && response.data && response.data.data) {
+        transactionItems = response.data.data;
+      } else if (Array.isArray(response)) {
+        transactionItems = response;
+      } else if (response && (response as any).items) {
+        transactionItems = (response as any).items;
+      } else if (response && (response as any).transactions) {
+        transactionItems = (response as any).transactions;
+      }
       transactions.value = transactionItems;
 
       // 转换分页格式
-      if (response.pagination) {
+      const paginationData = response.data?.pagination || response.pagination;
+      if (paginationData) {
         pagination.value = {
-          currentPage: response.pagination.page,
-          totalPages: response.pagination.total_pages,
-          totalItems: response.pagination.total,
-          itemsPerPage: response.pagination.limit,
-          hasNextPage: response.pagination.page < response.pagination.total_pages,
-          hasPrevPage: response.pagination.page > 1
+          currentPage: paginationData.page,
+          totalPages: paginationData.total_pages,
+          totalItems: paginationData.total,
+          itemsPerPage: paginationData.limit,
+          hasNextPage: paginationData.page < paginationData.total_pages,
+          hasPrevPage: paginationData.page > 1
         };
       }
       searchParams.value = mergedParams;
@@ -219,7 +230,7 @@ export const useTransactionStore = defineStore('transaction', () => {
       await ApiService.deleteCashTransaction(id);
 
       // 更新本地状态
-      transactions.value = transactions.value.filter(t => t.uid !== id);
+      transactions.value = (transactions.value || []).filter(t => t.uid !== id);
       if (currentTransaction.value?.uid === id) {
         currentTransaction.value = null;
       }
