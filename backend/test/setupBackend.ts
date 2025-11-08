@@ -12,7 +12,7 @@ let mongoServer: MongoMemoryServer | null = null;
 const mongoConfig = {
   instance: {
     dbName: 'qmx-test-db',
-    port: 27018, // 固定端口避免冲突
+    // 不指定端口，让系统自动分配随机可用端口，避免并发测试时的端口冲突
   },
   binary: {
     version: '7.0.0', // 固定版本确保稳定性

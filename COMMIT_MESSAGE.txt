@@ -1,0 +1,32 @@
+fix(backend): 修复CI环境中MongoDB Memory Server端口冲突问题
+
+## 问题描述
+在CI环境中并发运行后端测试时，多个测试套件同时尝试启动MongoDB Memory Server，
+由于使用固定端口27018，导致出现EADDRINUSE端口占用冲突错误。
+
+## 解决方案
+移除MongoDB Memory Server的固定端口配置，让系统自动分配随机可用端口：
+- 移除 `port: 27018` 配置
+- 添加说明注释，解释为何使用随机端口
+- 每个测试进程获得独立的随机端口，完全隔离
+
+## 改进效果
+✅ 完全消除端口冲突错误
+✅ 支持安全的并发测试运行（maxWorkers=2/3/4/50%）
+✅ CI环境友好，可以并行运行测试提高速度
+✅ 每个测试进程独立隔离，互不干扰
+
+## 验证测试
+- 单worker: ✅ 通过
+- 2 workers: ✅ 通过
+- 3 workers: ✅ 通过
+- 4 workers: ✅ 通过
+- 无端口冲突错误（EADDRINUSE）
+
+## 相关文件
+- backend/test/setupBackend.ts - MongoDB配置修复
+- backend/test/PORT_CONFLICT_FIX.md - 详细修复说明
+- backend/test/TESTING_GUIDE.md - 测试指南文档
+- backend/test/verify-port-fix.sh - 验证脚本
+
+Fixes: CI环境后端测试端口冲突
