@@ -95,10 +95,23 @@ const applyUpdaterFromPayload = (updater: StudentUpdater, payload: Record<string
 
 export class StudentController {
   public getAllStudents = catchAsync(async (req: Request, res: Response) => {
-    const students = await Student.findAll();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    // 使用新的分页方法
+    const result = await Student.findWithPagination(page, limit);
+
     res.json({
       success: true,
-      data: students.map(presentStudent),
+      data: result.students.map(presentStudent),
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages: result.totalPages,
+        hasNext: result.hasNext,
+        hasPrev: result.hasPrev
+      }
     });
   });
 

@@ -314,6 +314,32 @@ export class Student {
     return await StudentModel.find().sort({ createdAt: -1 }).exec();
   }
 
+  static async findWithPagination(page: number = 1, limit: number = 20): Promise<{
+    students: IStudentDoc[];
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  }> {
+    const skip = (page - 1) * limit;
+    const total = await StudentModel.countDocuments().exec();
+    const students = await StudentModel.find()
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 })
+      .exec();
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      students,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1
+    };
+  }
+
   static async create(data: Partial<IStudentDoc>): Promise<IStudentDoc> {
     const nextUid = await getNextUid();
     return await StudentModel.create({ ...data, uid: nextUid });
