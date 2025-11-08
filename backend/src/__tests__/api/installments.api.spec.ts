@@ -1,7 +1,15 @@
 import request from 'supertest';
 import { PaymentFrequency, InstallmentStatus } from '@/types';
 import { InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
-import { createTestApp, TestDataFactory, dateUtils } from '../../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  createTestApp, 
+  TestDataFactory, 
+  dateUtils 
+} from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
@@ -9,12 +17,22 @@ describe('Installment API Integration Tests', () => {
   let app: any;
 
   beforeAll(async () => {
+    await setupTestDatabase();
     app = await createTestApp();
+  });
+
+  afterEach(async () => {
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   describe('POST /api/v1/installments', () => {
     it('creates monthly installment plan', async () => {
-      const student = await createTestStudent({ name: 'John Doe' });
+      const student = await TestDataFactory.createStudent({ name: 'John Doe' });
       const startDate = new Date();
 
       const response = await request(app)
@@ -117,12 +135,12 @@ describe('Installment API Integration Tests', () => {
 
   describe('GET /api/v1/installments', () => {
     beforeEach(async () => {
-      const student1 = await createTestStudent({ name: 'Student 1' });
-      const student2 = await createTestStudent({ name: 'Student 2' });
+      const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
+      const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
 
-      await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date(), student1.uid);
-      await createTestInstallmentPlan(2000, 3, PaymentFrequency.WEEKLY, new Date(), student1.uid);
-      await createTestInstallmentPlan(1500, 5, PaymentFrequency.MONTHLY, new Date(), student2.uid);
+      await TestDataFactory.createInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date(), student1.uid);
+      await TestDataFactory.createInstallmentPlan(2000, 3, PaymentFrequency.WEEKLY, new Date(), student1.uid);
+      await TestDataFactory.createInstallmentPlan(1500, 5, PaymentFrequency.MONTHLY, new Date(), student2.uid);
     });
 
     it('retrieves all installment plans with pagination', async () => {
@@ -136,7 +154,7 @@ describe('Installment API Integration Tests', () => {
     });
 
     it('filters plans by student', async () => {
-      const student = await createTestStudent({ name: 'Student 1' });
+      const student = await TestDataFactory.createStudent({ name: 'Student 1' });
 
       const response = await request(app)
         .get('/api/v1/installments')
@@ -163,8 +181,8 @@ describe('Installment API Integration Tests', () => {
 
   describe('GET /api/v1/installments/:id', () => {
     it('retrieves installment plan with details', async () => {
-      const student = await createTestStudent({ name: 'Test' });
-      const plan = await createTestInstallmentPlan(
+      const student = await TestDataFactory.createStudent({ name: 'Test' });
+      const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         3,
         PaymentFrequency.MONTHLY,
@@ -192,8 +210,8 @@ describe('Installment API Integration Tests', () => {
 
   describe('GET /api/v1/installments/overdue', () => {
     it('retrieves overdue installments', async () => {
-      const student = await createTestStudent({ name: 'Test' });
-      const plan = await createTestInstallmentPlan(
+      const student = await TestDataFactory.createStudent({ name: 'Test' });
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
@@ -201,8 +219,8 @@ describe('Installment API Integration Tests', () => {
         student.uid
       );
 
-      const overdueDueDate = addDays(new Date(), -10);
-      await createTestInstallment(
+      const overdueDueDate = dateUtils.addDays(new Date(), -10);
+      await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         1,
@@ -212,8 +230,8 @@ describe('Installment API Integration Tests', () => {
         InstallmentStatus.PENDING
       );
 
-      const futureDueDate = addDays(new Date(), 10);
-      await createTestInstallment(
+      const futureDueDate = dateUtils.addDays(new Date(), 10);
+      await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         2,
@@ -235,7 +253,7 @@ describe('Installment API Integration Tests', () => {
     });
 
     it('excludes paid installments from overdue list', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
@@ -243,8 +261,8 @@ describe('Installment API Integration Tests', () => {
         null
       );
 
-      const overdueDueDate = addDays(new Date(), -10);
-      await createTestInstallment(
+      const overdueDueDate = dateUtils.addDays(new Date(), -10);
+      await TestDataFactory.createInstallment(
         plan.uid,
         null,
         1,
@@ -264,8 +282,8 @@ describe('Installment API Integration Tests', () => {
 
   describe('PUT /api/v1/installments/:id/payment', () => {
     it('marks installment as paid', async () => {
-      const student = await createTestStudent({ name: 'Test' });
-      const plan = await createTestInstallmentPlan(
+      const student = await TestDataFactory.createStudent({ name: 'Test' });
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
@@ -273,7 +291,7 @@ describe('Installment API Integration Tests', () => {
         student.uid
       );
 
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         1,
@@ -298,8 +316,8 @@ describe('Installment API Integration Tests', () => {
     });
 
     it('creates cash transaction when payment is made', async () => {
-      const student = await createTestStudent({ name: 'Test' });
-      const plan = await createTestInstallmentPlan(
+      const student = await TestDataFactory.createStudent({ name: 'Test' });
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
@@ -307,7 +325,7 @@ describe('Installment API Integration Tests', () => {
         student.uid
       );
 
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         1,
@@ -346,7 +364,7 @@ describe('Installment API Integration Tests', () => {
     });
 
     it('rejects invalid payment status', async () => {
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -370,7 +388,7 @@ describe('Installment API Integration Tests', () => {
 
   describe('DELETE /api/v1/installments/:id', () => {
     it('deletes installment plan', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
@@ -402,7 +420,7 @@ describe('Installment API Integration Tests', () => {
 
   describe('Installment Plan Response Format', () => {
     it('includes all required fields', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
         PaymentFrequency.MONTHLY,

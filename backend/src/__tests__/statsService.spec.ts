@@ -1,8 +1,11 @@
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import StatsService from '@/services/statsService';
 import { CashClass, Cash } from '@/models/CashMongo';
 import { Installment, InstallmentModel } from '@/models/InstallmentMongo';
 import { InstallmentPlan, InstallmentPlanModel } from '@/models/InstallmentPlanMongo';
 import { studentModel } from '@/models/mongo';
+import { StudentBuilder } from '@/services/studentBuilder';
 import {
   ClassType,
   SubjectType,
@@ -10,17 +13,29 @@ import {
   InstallmentStatus,
   MembershipStatus,
 } from '@/types';
-import { TestDataFactory, dateUtils } from '../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  TestDataFactory, 
+  dateUtils 
+} from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('StatsService', () => {
   beforeAll(async () => {
-    // 数据库设置由全局测试环境处理
+    await setupTestDatabase();
   });
 
   afterEach(async () => {
-    // 清理由全局测试环境处理
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   const createTestDataset = async () => {

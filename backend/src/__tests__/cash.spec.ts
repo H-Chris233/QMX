@@ -1,12 +1,32 @@
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { CashBuilder, convertAmountToCents } from '@/services/cashBuilder';
 import { CashUpdater } from '@/services/cashUpdater';
 import { Cash, CashClass } from '@/models/CashMongo';
 import { AppError, ErrorType } from '@/utils/errors';
-import { TestDataFactory } from '../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  TestDataFactory 
+} from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Cash Transaction Service', () => {
+  beforeAll(async () => {
+    await setupTestDatabase();
+  });
+
+  afterEach(async () => {
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
+  });
 
   describe('CashBuilder - Amount Conversion', () => {
     it('converts positive yuan amount to cents', () => {
@@ -55,7 +75,7 @@ describe('Cash Transaction Service', () => {
     });
 
     it('creates income transaction with student', async () => {
-      const student = await createTestStudent({ name: 'Alice' });
+      const student = await TestDataFactory.createStudent({ name: 'Alice' });
       const transaction = await CashBuilder.create()
         .amount(200)
         .studentId(student.uid)
@@ -151,11 +171,11 @@ describe('Cash Transaction Service', () => {
       const student1 = await TestDataFactory.createStudent({ name: 'Student A' });
       const student2 = await TestDataFactory.createStudent({ name: 'Student B' });
 
-      await TestDataFactory.createCashTransaction(100, student1.uid, 'Payment 1');
-      await TestDataFactory.createCashTransaction(200, student1.uid, 'Payment 2');
-      await TestDataFactory.createCashTransaction(150, student2.uid, 'Payment 3');
-      await TestDataFactory.createCashTransaction(-50, null, 'Expense 1');
-      await TestDataFactory.createCashTransaction(-75, null, 'Expense 2');
+      await TestDataFactory.createCashTransaction(100, { studentId: student1.uid, note: 'Payment 1' });
+      await TestDataFactory.createCashTransaction(200, { studentId: student1.uid, note: 'Payment 2' });
+      await TestDataFactory.createCashTransaction(150, { studentId: student2.uid, note: 'Payment 3' });
+      await TestDataFactory.createCashTransaction(-50, { studentId: null, note: 'Expense 1' });
+      await TestDataFactory.createCashTransaction(-75, { studentId: null, note: 'Expense 2' });
     });
 
     it('retrieves all transactions with pagination', async () => {
@@ -227,7 +247,7 @@ describe('Cash Transaction Service', () => {
 
   describe('Cash Transaction - Deletion', () => {
     it('deletes transaction by uid', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'Test');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Test' });
 
       const deleted = await CashClass.deleteByUid(transaction.uid);
       expect(deleted).toBe(true);
@@ -244,7 +264,7 @@ describe('Cash Transaction Service', () => {
 
   describe('Cash Transaction - Retrieval', () => {
     it('finds transaction by uid', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'Test');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Test' });
 
       const found = await CashClass.findByUid(transaction.uid);
       expect(found).not.toBeNull();
@@ -258,9 +278,9 @@ describe('Cash Transaction Service', () => {
     });
 
     it('retrieves all transactions sorted by created_at', async () => {
-      await TestDataFactory.createCashTransaction(100, null, 'First');
-      await TestDataFactory.createCashTransaction(200, null, 'Second');
-      await TestDataFactory.createCashTransaction(300, null, 'Third');
+      await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'First' });
+      await TestDataFactory.createCashTransaction(200, { studentId: null, note: 'Second' });
+      await TestDataFactory.createCashTransaction(300, { studentId: null, note: 'Third' });
 
       const all = await CashClass.findAll();
       expect(all.length).toBe(3);
@@ -272,7 +292,7 @@ describe('Cash Transaction Service', () => {
   describe('Cash Transaction - JSON Serialization', () => {
     it('serializes transaction with all computed fields', async () => {
       const student = await TestDataFactory.createStudent();
-      const transaction = await TestDataFactory.createCashTransaction(123.45, student.uid, 'Test');
+      const transaction = await TestDataFactory.createCashTransaction(123.45, { studentId: student.uid, note: 'Test' });
 
       const json = transaction.toJSON();
 
@@ -295,7 +315,7 @@ describe('Cash Transaction Service', () => {
     });
 
     it('serializes expense transaction correctly', async () => {
-      const transaction = await TestDataFactory.createCashTransaction(-50.25, null, 'Expense');
+      const transaction = await TestDataFactory.createCashTransaction(-50.25, { studentId: null, note: 'Expense' });
 
       const json = transaction.toJSON();
 
@@ -308,7 +328,7 @@ describe('Cash Transaction Service', () => {
 
   describe('CashUpdater - Transaction Updates', () => {
     it('updates transaction note', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'Old Note');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Old Note' });
 
       const updater = CashUpdater.fromDocument(transaction);
       updater.note('New Note');
@@ -318,7 +338,7 @@ describe('Cash Transaction Service', () => {
     });
 
     it('loads transaction by uid', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'Test');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Test' });
 
       const updater = await CashUpdater.for(transaction.uid);
       updater.note('Updated');
@@ -336,7 +356,7 @@ describe('Cash Transaction Service', () => {
     });
 
     it('clears note when set to empty string', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'Test');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Test' });
 
       const updater = CashUpdater.fromDocument(transaction);
       updater.note('   ');
