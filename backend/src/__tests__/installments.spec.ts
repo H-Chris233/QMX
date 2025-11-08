@@ -1,49 +1,31 @@
-import mongoose from 'mongoose';
 import { InstallmentPlan, InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
 import { Installment, InstallmentModel } from '@/models/InstallmentMongo';
 import { Cash } from '@/models/CashMongo';
 import { PaymentFrequency, InstallmentStatus } from '@/types';
 import { AppError } from '@/utils/errors';
-import {
-  setupTestDatabase,
-  cleanupTestDatabase,
-  clearAllCollections,
-  resetAllSequences,
-  createTestStudent,
-  createTestInstallmentPlan,
-  createTestInstallment,
-  addDays,
-  addMonths,
-} from './helpers/testSetup';
+import { TestDataFactory, dateUtils } from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Installment Service', () => {
-  let mongoServer: any;
-
   beforeAll(async () => {
-    mongoServer = await setupTestDatabase('qmx-installment-tests');
+    // 数据库设置由全局测试环境处理
   });
 
   afterEach(async () => {
-    await clearAllCollections();
-    await resetAllSequences();
-  });
-
-  afterAll(async () => {
-    await cleanupTestDatabase(mongoServer);
+    // 清理由全局测试环境处理
   });
 
   describe('Installment Plan Creation', () => {
     it('creates monthly installment plan', async () => {
-      const student = await createTestStudent({ name: 'Alice' });
+      const student = await TestDataFactory.createStudent({ name: 'Alice' });
       const startDate = new Date();
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1000,
         4,
         PaymentFrequency.MONTHLY,
         startDate,
-        student.uid
+        { studentId: student.uid }
       );
 
       expect(plan.uid).toBeGreaterThan(0);
@@ -57,12 +39,12 @@ describe('Installment Service', () => {
 
     it('creates weekly installment plan', async () => {
       const startDate = new Date();
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         500,
         8,
         PaymentFrequency.WEEKLY,
         startDate,
-        null
+        { studentId: null }
       );
 
       expect(plan.total_amount).toBe(50000);

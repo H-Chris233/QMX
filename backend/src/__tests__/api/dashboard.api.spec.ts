@@ -1,36 +1,15 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
-import app from '@/app';
 import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
 import { StudentUpdater } from '@/services/studentUpdater';
-import {
-  setupTestDatabase,
-  cleanupTestDatabase,
-  clearAllCollections,
-  resetAllSequences,
-  createTestStudent,
-  createTestCashTransaction,
-  createTestInstallmentPlan,
-  createTestInstallment,
-  addDays,
-} from '../helpers/testSetup';
+import { createTestApp, TestDataFactory, dateUtils } from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Dashboard/Stats API Integration Tests', () => {
-  let mongoServer: any;
+  let app: any;
 
   beforeAll(async () => {
-    mongoServer = await setupTestDatabase('qmx-api-dashboard-tests');
-  });
-
-  afterEach(async () => {
-    await clearAllCollections();
-    await resetAllSequences();
-  });
-
-  afterAll(async () => {
-    await cleanupTestDatabase(mongoServer);
+    app = await createTestApp();
   });
 
   describe('GET /api/v1/stats/dashboard', () => {

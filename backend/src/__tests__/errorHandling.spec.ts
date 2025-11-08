@@ -32,7 +32,10 @@ describe('Domain error handling alignment', () => {
   });
 
   it('allows negative cash amount for expenses', async () => {
-    const transaction = await TestDataFactory.createCashTransaction(-12.34, null, '租金支出');
+    const transaction = await TestDataFactory.createCashTransaction(-12.34, { 
+      studentId: null, 
+      note: '租金支出' 
+    });
 
     expect(transaction.cash).toBe(-1234);
     expect(transaction.isIncome()).toBe(false);

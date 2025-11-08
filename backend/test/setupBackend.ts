@@ -44,12 +44,30 @@ export async function setupTestDatabase(): Promise<string> {
 // 清理测试数据库
 export async function cleanupTestDatabase(): Promise<void> {
   try {
+    // 首先断开 mongoose 连接
     if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
+      console.log('[setupBackend] 正在断开 mongoose 连接...');
+      await Promise.race([
+        mongoose.disconnect(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Disconnect timeout')), 5000)
+        )
+      ]).catch(err => {
+        console.warn('[setupBackend] 断开连接时出错:', err.message);
+      });
     }
     
+    // 然后停止 MongoDB 服务器
     if (mongoServer) {
-      await mongoServer.stop();
+      console.log('[setupBackend] 正在停止 MongoDB 服务器...');
+      await Promise.race([
+        mongoServer.stop(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Stop timeout')), 5000)
+        )
+      ]).catch(err => {
+        console.warn('[setupBackend] 停止 MongoDB 时出错:', err.message);
+      });
       mongoServer = null;
     }
     

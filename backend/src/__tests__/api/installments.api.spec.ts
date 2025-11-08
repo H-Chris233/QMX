@@ -1,36 +1,15 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
-import app from '@/app';
 import { PaymentFrequency, InstallmentStatus } from '@/types';
 import { InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
-import {
-  setupTestDatabase,
-  cleanupTestDatabase,
-  clearAllCollections,
-  resetAllSequences,
-  createTestStudent,
-  createTestInstallmentPlan,
-  createTestInstallment,
-  addDays,
-  addMonths,
-} from '../helpers/testSetup';
+import { createTestApp, TestDataFactory, dateUtils } from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Installment API Integration Tests', () => {
-  let mongoServer: any;
+  let app: any;
 
   beforeAll(async () => {
-    mongoServer = await setupTestDatabase('qmx-api-installments-tests');
-  });
-
-  afterEach(async () => {
-    await clearAllCollections();
-    await resetAllSequences();
-  });
-
-  afterAll(async () => {
-    await cleanupTestDatabase(mongoServer);
+    app = await createTestApp();
   });
 
   describe('POST /api/v1/installments', () => {

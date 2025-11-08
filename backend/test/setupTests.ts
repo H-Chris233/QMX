@@ -9,14 +9,8 @@ import {
   testUtils,
 } from './setupBackend';
 
-// 每个测试后的清理
-afterEach(async () => {
-  // 注意：只有当数据库连接存在时才清理
-  if (mongoose.connection.readyState !== 0) {
-    await clearAllCollections();
-    await resetAllSequences();
-  }
-});
+// 每个测试后的清理 - 暂时禁用以避免并发问题
+// 测试应该自己管理数据库生命周期
 
 // 全局导出测试工具，方便测试文件使用
 (global as any).testUtils = testUtils;

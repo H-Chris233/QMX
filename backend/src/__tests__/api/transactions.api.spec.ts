@@ -1,31 +1,13 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
-import app from '@/app';
-import {
-  setupTestDatabase,
-  cleanupTestDatabase,
-  clearAllCollections,
-  resetAllSequences,
-  createTestStudent,
-  createTestCashTransaction,
-} from '../helpers/testSetup';
+import { createTestApp, TestDataFactory } from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Transaction API Integration Tests', () => {
-  let mongoServer: any;
+  let app: any;
 
   beforeAll(async () => {
-    mongoServer = await setupTestDatabase('qmx-api-transactions-tests');
-  });
-
-  afterEach(async () => {
-    await clearAllCollections();
-    await resetAllSequences();
-  });
-
-  afterAll(async () => {
-    await cleanupTestDatabase(mongoServer);
+    app = await createTestApp();
   });
 
   describe('POST /api/v1/transactions', () => {
