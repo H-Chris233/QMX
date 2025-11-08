@@ -20,20 +20,18 @@ const config: Config = {
     '!src/types/**',
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'html', 'json'],
   testMatch: [
     '**/__tests__/**/*.spec.ts',
     '**/?(*.)+(spec|test).ts',
   ],
   testTimeout: 30000,
   
-  // 移除全局设置，每个测试文件自己管理数据库
-  
   // 测试环境设置
   setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts'],
   
   // 并行测试配置
-  maxWorkers: '50%', // 限制并发数避免资源冲突
+  maxWorkers: '50%',
   
   // 详细输出
   verbose: true,

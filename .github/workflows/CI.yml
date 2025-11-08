@@ -6,35 +6,120 @@ on:
   pull_request:
     branches: [release]
 
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '10'
+
 jobs:
-  frontend:
+  # 第一阶段：安装依赖（共享）
+  setup:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 18.x
-        uses: actions/setup-node@v3
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: ${{ env.NODE_VERSION }}
+        timeout-minutes: 10
+        continue-on-error: true
+        # 自动重试，通过setup-node的内置重试机制
 
-      - name: Setup pnpm
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
         uses: pnpm/action-setup@v2
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
+      # 多层缓存策略
       - name: Setup pnpm cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
+
+      - name: Setup Vite cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            node_modules/.vitest
+          key: ${{ runner.os }}-vite-vitest-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-vitest-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -e
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if pnpm install --frozen-lockfile; then
+              echo "✓ Dependencies installed successfully"
+              exit 0
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⚠️ Install failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+              sleep 5
+            fi
+          done
+          echo "❌ Install failed after $MAX_RETRIES attempts"
+          exit 1
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+  # 第二阶段：前端单测
+  frontend-test:
+    runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Restore Vite cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            node_modules/.vitest
+          key: ${{ runner.os }}-vite-vitest-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-vitest-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -43,42 +128,45 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
       - name: Run frontend tests
-        run: pnpm test
+        run: pnpm test:frontend
+        timeout-minutes: 7
 
-      - name: Build Vue Frontend
-        run: pnpm build:frontend
-        env:
-          CI: true
-
-      - name: Upload frontend artifacts
+      - name: Upload Vitest coverage
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
-          path: dist/
+          name: frontend-coverage
+          path: |
+            coverage/
+            test-results/
+          retention-days: 7
 
-  backend:
+  # 第二阶段：后端单测
+  backend-test:
     runs-on: ubuntu-latest
+    needs: setup
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 18.x
-        uses: actions/setup-node@v3
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Setup pnpm
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
         uses: pnpm/action-setup@v2
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -91,8 +179,95 @@ jobs:
           CYPRESS_INSTALL_BINARY: 0
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
-      - name: Build Express Backend
+      - name: Build backend
         run: pnpm build:backend
+        timeout-minutes: 5
 
-      - name: Test Express Backend
+      - name: Test backend
         run: pnpm test:backend
+        timeout-minutes: 7
+        env:
+          NODE_ENV: test
+          TZ: UTC
+
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/coverage/
+          retention-days: 7
+
+  # 第三阶段：构建
+  build:
+    runs-on: ubuntu-latest
+    needs: [frontend-test, backend-test]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Build frontend
+        run: pnpm build:frontend
+        timeout-minutes: 5
+        env:
+          CI: true
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 7
+
+  # 测试结果汇总
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [frontend-test, backend-test, build]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.frontend-test.result }}" == "failure" ]; then
+            echo "❌ Frontend tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.backend-test.result }}" == "failure" ]; then
+            echo "❌ Backend tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "❌ Build failed"
+            exit 1
+          fi
+          echo "✅ All checks passed"
