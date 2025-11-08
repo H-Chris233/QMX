@@ -1,5 +1,12 @@
 import request from 'supertest';
-import { createTestApp, TestDataFactory } from '../../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  createTestApp, 
+  TestDataFactory 
+} from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
@@ -7,12 +14,22 @@ describe('Transaction API Integration Tests', () => {
   let app: any;
 
   beforeAll(async () => {
+    await setupTestDatabase();
     app = await createTestApp();
+  });
+
+  afterEach(async () => {
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   describe('POST /api/v1/transactions', () => {
     it('creates income transaction with student', async () => {
-      const student = await createTestStudent({ name: 'John Doe' });
+      const student = await TestDataFactory.createStudent({ name: 'John Doe' });
 
       const response = await request(app)
         .post('/api/v1/transactions')
@@ -98,14 +115,14 @@ describe('Transaction API Integration Tests', () => {
 
   describe('GET /api/v1/transactions', () => {
     beforeEach(async () => {
-      const student1 = await createTestStudent({ name: 'Student 1' });
-      const student2 = await createTestStudent({ name: 'Student 2' });
+      const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
+      const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
 
-      await createTestCashTransaction(100, student1.uid, 'Payment 1');
-      await createTestCashTransaction(200, student1.uid, 'Payment 2');
-      await createTestCashTransaction(150, student2.uid, 'Payment 3');
-      await createTestCashTransaction(-50, null, 'Expense 1');
-      await createTestCashTransaction(-75, null, 'Expense 2');
+      await TestDataFactory.createCashTransaction(100, { studentId: student1.uid, note: 'Payment 1' });
+      await TestDataFactory.createCashTransaction(200, { studentId: student1.uid, note: 'Payment 2' });
+      await TestDataFactory.createCashTransaction(150, { studentId: student2.uid, note: 'Payment 3' });
+      await TestDataFactory.createCashTransaction(-50, { studentId: null, note: 'Expense 1' });
+      await TestDataFactory.createCashTransaction(-75, { studentId: null, note: 'Expense 2' });
     });
 
     it('retrieves all transactions with pagination', async () => {
@@ -119,7 +136,7 @@ describe('Transaction API Integration Tests', () => {
     });
 
     it('filters transactions by student', async () => {
-      const student = await createTestStudent({ name: 'Student 1' });
+      const student = await TestDataFactory.createStudent({ name: 'Student 1' });
 
       const response = await request(app)
         .get('/api/v1/transactions')
@@ -160,10 +177,10 @@ describe('Transaction API Integration Tests', () => {
 
   describe('GET /api/v1/transactions/search', () => {
     beforeEach(async () => {
-      await createTestCashTransaction(100, null, 'Income 1');
-      await createTestCashTransaction(200, null, 'Income 2');
-      await createTestCashTransaction(-50, null, 'Expense 1');
-      await createTestCashTransaction(-100, null, 'Expense 2');
+      await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Income 1' });
+      await TestDataFactory.createCashTransaction(200, { studentId: null, note: 'Income 2' });
+      await TestDataFactory.createCashTransaction(-50, { studentId: null, note: 'Expense 1' });
+      await TestDataFactory.createCashTransaction(-100, { studentId: null, note: 'Expense 2' });
     });
 
     it('filters income transactions', async () => {
@@ -211,7 +228,7 @@ describe('Transaction API Integration Tests', () => {
 
   describe('GET /api/v1/transactions/:id', () => {
     it('retrieves transaction by id', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'Test Transaction');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Test Transaction' });
 
       const response = await request(app)
         .get(`/api/v1/transactions/${transaction.uid}`)
@@ -233,7 +250,7 @@ describe('Transaction API Integration Tests', () => {
 
   describe('DELETE /api/v1/transactions/:id', () => {
     it('deletes transaction', async () => {
-      const transaction = await createTestCashTransaction(100, null, 'To Delete');
+      const transaction = await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'To Delete' });
 
       const response = await request(app)
         .delete(`/api/v1/transactions/${transaction.uid}`)
@@ -259,8 +276,8 @@ describe('Transaction API Integration Tests', () => {
 
   describe('Transaction Response Format', () => {
     it('includes all required fields in response', async () => {
-      const student = await createTestStudent({ name: 'Test' });
-      const transaction = await createTestCashTransaction(123.45, student.uid, 'Test Note');
+      const student = await TestDataFactory.createStudent({ name: 'Test' });
+      const transaction = await TestDataFactory.createCashTransaction(123.45, { studentId: student.uid, note: 'Test Note' });
 
       const response = await request(app)
         .get(`/api/v1/transactions/${transaction.uid}`)

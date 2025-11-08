@@ -1,20 +1,33 @@
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Student, studentModel } from '@/models/mongo';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { StudentQuery } from '@/services/studentQuery';
 import { presentStudent } from '@/services/studentPresenter';
 import { ClassType, SubjectType } from '@/types';
-import { TestDataFactory } from '../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  TestDataFactory 
+} from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Student services integration', () => {
   beforeAll(async () => {
-    // 数据库设置由全局测试环境处理
+    await setupTestDatabase();
   });
 
   afterEach(async () => {
-    // 清理由全局测试环境处理
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   it('automatically assigns lesson defaults for TenTry class', async () => {

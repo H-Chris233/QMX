@@ -1,19 +1,33 @@
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { InstallmentPlan, InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
 import { Installment, InstallmentModel } from '@/models/InstallmentMongo';
 import { Cash } from '@/models/CashMongo';
 import { PaymentFrequency, InstallmentStatus } from '@/types';
 import { AppError } from '@/utils/errors';
-import { TestDataFactory, dateUtils } from '../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  TestDataFactory, 
+  dateUtils 
+} from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Installment Service', () => {
   beforeAll(async () => {
-    // 数据库设置由全局测试环境处理
+    await setupTestDatabase();
   });
 
   afterEach(async () => {
-    // 清理由全局测试环境处理
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   describe('Installment Plan Creation', () => {
@@ -55,13 +69,12 @@ describe('Installment Service', () => {
 
     it('creates custom frequency installment plan', async () => {
       const startDate = new Date();
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         2000,
         5,
         PaymentFrequency.CUSTOM,
         startDate,
-        null,
-        15
+        { studentId: null, customDays: 15 }
       );
 
       expect(plan.frequency).toBe(PaymentFrequency.CUSTOM);
@@ -69,12 +82,12 @@ describe('Installment Service', () => {
     });
 
     it('calculates installment amount evenly', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1000,
         4,
         PaymentFrequency.MONTHLY,
         new Date(),
-        null
+        { studentId: null }
       );
 
       const installmentAmount = plan.getInstallmentAmount();
@@ -106,17 +119,17 @@ describe('Installment Service', () => {
 
   describe('Installment Generation', () => {
     it('generates installments for plan', async () => {
-      const student = await createTestStudent();
+      const student = await TestDataFactory.createStudent();
       const startDate = new Date();
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         3,
         PaymentFrequency.MONTHLY,
         startDate,
-        student.uid
+        { studentId: student.uid }
       );
 
-      const installment1 = await createTestInstallment(
+      const installment1 = await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         1,
@@ -126,23 +139,23 @@ describe('Installment Service', () => {
         InstallmentStatus.PENDING
       );
 
-      const installment2 = await createTestInstallment(
+      const installment2 = await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         2,
         3,
         400,
-        addMonths(startDate, 1),
+        dateUtils.addMonths(startDate, 1),
         InstallmentStatus.PENDING
       );
 
-      const installment3 = await createTestInstallment(
+      const installment3 = await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         3,
         3,
         400,
-        addMonths(startDate, 2),
+        dateUtils.addMonths(startDate, 2),
         InstallmentStatus.PENDING
       );
 
@@ -156,16 +169,16 @@ describe('Installment Service', () => {
 
     it('finds installments by plan', async () => {
       const startDate = new Date();
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
         startDate,
-        null
+        { studentId: null }
       );
 
-      await createTestInstallment(plan.uid, null, 1, 2, 300, startDate);
-      await createTestInstallment(plan.uid, null, 2, 2, 300, addMonths(startDate, 1));
+      await TestDataFactory.createInstallment(plan.uid, null, 1, 2, 300, startDate, InstallmentStatus.PENDING);
+      await TestDataFactory.createInstallment(plan.uid, null, 2, 2, 300, dateUtils.addMonths(startDate, 1), InstallmentStatus.PENDING);
 
       const installments = await Installment.findByPlanId(plan.uid);
 
@@ -177,8 +190,8 @@ describe('Installment Service', () => {
 
   describe('Overdue Detection', () => {
     it('detects overdue installment', async () => {
-      const overdueDueDate = addDays(new Date(), -10);
-      const installment = await createTestInstallment(
+      const overdueDueDate = dateUtils.addDays(new Date(), -10);
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -193,8 +206,8 @@ describe('Installment Service', () => {
     });
 
     it('does not mark future installment as overdue', async () => {
-      const futureDueDate = addDays(new Date(), 10);
-      const installment = await createTestInstallment(
+      const futureDueDate = dateUtils.addDays(new Date(), 10);
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -209,8 +222,8 @@ describe('Installment Service', () => {
     });
 
     it('does not mark paid installment as overdue', async () => {
-      const overdueDueDate = addDays(new Date(), -10);
-      const installment = await createTestInstallment(
+      const overdueDueDate = dateUtils.addDays(new Date(), -10);
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -225,12 +238,12 @@ describe('Installment Service', () => {
 
     it('finds all overdue installments', async () => {
       const today = new Date();
-      const pastDate = addDays(today, -5);
-      const futureDate = addDays(today, 5);
+      const pastDate = dateUtils.addDays(today, -5);
+      const futureDate = dateUtils.addDays(today, 5);
 
-      await createTestInstallment(1, null, 1, 3, 100, pastDate, InstallmentStatus.PENDING);
-      await createTestInstallment(1, null, 2, 3, 100, pastDate, InstallmentStatus.PENDING);
-      await createTestInstallment(1, null, 3, 3, 100, futureDate, InstallmentStatus.PENDING);
+      await TestDataFactory.createInstallment(1, null, 1, 3, 100, pastDate, InstallmentStatus.PENDING);
+      await TestDataFactory.createInstallment(1, null, 2, 3, 100, pastDate, InstallmentStatus.PENDING);
+      await TestDataFactory.createInstallment(1, null, 3, 3, 100, futureDate, InstallmentStatus.PENDING);
 
       const overdue = await Installment.findOverdue();
 
@@ -243,7 +256,7 @@ describe('Installment Service', () => {
 
   describe('Payment Processing', () => {
     it('marks installment as paid and records amount', async () => {
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -269,7 +282,7 @@ describe('Installment Service', () => {
     });
 
     it('tracks paid amount', async () => {
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -288,7 +301,7 @@ describe('Installment Service', () => {
     });
 
     it('calculates remaining amount correctly', async () => {
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -310,12 +323,12 @@ describe('Installment Service', () => {
 
   describe('Installment Plan Status', () => {
     it('updates plan status to completed', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
         new Date(),
-        null
+        { studentId: null }
       );
 
       expect(plan.status).toBe(InstallmentPlanStatus.ACTIVE);
@@ -330,12 +343,12 @@ describe('Installment Service', () => {
     });
 
     it('updates plan status to cancelled', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
         new Date(),
-        null
+        { studentId: null }
       );
 
       plan.status = InstallmentPlanStatus.CANCELLED;
@@ -349,12 +362,12 @@ describe('Installment Service', () => {
 
   describe('Installment Plan Deletion', () => {
     it('deletes installment plan', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequency.MONTHLY,
         new Date(),
-        null
+        { studentId: null }
       );
 
       const deleted = await InstallmentPlan.deleteByUid(plan.uid);
@@ -372,7 +385,7 @@ describe('Installment Service', () => {
 
   describe('Installment Deletion', () => {
     it('deletes installment', async () => {
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
@@ -392,15 +405,15 @@ describe('Installment Service', () => {
 
   describe('Installment Pagination', () => {
     it('paginates installment plans', async () => {
-      const student = await createTestStudent();
+      const student = await TestDataFactory.createStudent();
 
       for (let i = 0; i < 5; i++) {
-        await createTestInstallmentPlan(
+        await TestDataFactory.createInstallmentPlan(
           100 * (i + 1),
           3,
           PaymentFrequency.MONTHLY,
           new Date(),
-          student.uid
+          { studentId: student.uid }
         );
       }
 
@@ -413,12 +426,12 @@ describe('Installment Service', () => {
     });
 
     it('filters plans by student', async () => {
-      const student1 = await createTestStudent({ name: 'Student 1' });
-      const student2 = await createTestStudent({ name: 'Student 2' });
+      const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
+      const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
 
-      await createTestInstallmentPlan(1000, 3, PaymentFrequency.MONTHLY, new Date(), student1.uid);
-      await createTestInstallmentPlan(2000, 3, PaymentFrequency.MONTHLY, new Date(), student1.uid);
-      await createTestInstallmentPlan(3000, 3, PaymentFrequency.MONTHLY, new Date(), student2.uid);
+      await TestDataFactory.createInstallmentPlan(1000, 3, PaymentFrequency.MONTHLY, new Date(), { studentId: student1.uid });
+      await TestDataFactory.createInstallmentPlan(2000, 3, PaymentFrequency.MONTHLY, new Date(), { studentId: student1.uid });
+      await TestDataFactory.createInstallmentPlan(3000, 3, PaymentFrequency.MONTHLY, new Date(), { studentId: student2.uid });
 
       const result = await InstallmentPlan.findWithPagination({ student_id: student1.uid });
 
@@ -431,8 +444,8 @@ describe('Installment Service', () => {
     it('filters plans by status', async () => {
       const startDate = new Date();
 
-      const plan1 = await createTestInstallmentPlan(1000, 3, PaymentFrequency.MONTHLY, startDate, null);
-      const plan2 = await createTestInstallmentPlan(2000, 3, PaymentFrequency.MONTHLY, startDate, null);
+      const plan1 = await TestDataFactory.createInstallmentPlan(1000, 3, PaymentFrequency.MONTHLY, startDate, { studentId: null });
+      const plan2 = await TestDataFactory.createInstallmentPlan(2000, 3, PaymentFrequency.MONTHLY, startDate, { studentId: null });
 
       plan2.status = InstallmentPlanStatus.COMPLETED;
       await plan2.save();
@@ -446,18 +459,18 @@ describe('Installment Service', () => {
 
   describe('Installment Statistics', () => {
     it('aggregates total pending amount', async () => {
-      const student = await createTestStudent();
-      const plan = await createTestInstallmentPlan(
+      const student = await TestDataFactory.createStudent();
+      const plan = await TestDataFactory.createInstallmentPlan(
         900,
         3,
         PaymentFrequency.MONTHLY,
         new Date(),
-        student.uid
+        { studentId: student.uid }
       );
 
-      await createTestInstallment(plan.uid, student.uid, 1, 3, 300, new Date(), InstallmentStatus.PENDING);
-      await createTestInstallment(plan.uid, student.uid, 2, 3, 300, addMonths(new Date(), 1), InstallmentStatus.PENDING);
-      await createTestInstallment(plan.uid, student.uid, 3, 3, 300, addMonths(new Date(), 2), InstallmentStatus.PAID);
+      await TestDataFactory.createInstallment(plan.uid, student.uid, 1, 3, 300, new Date(), InstallmentStatus.PENDING);
+      await TestDataFactory.createInstallment(plan.uid, student.uid, 2, 3, 300, dateUtils.addMonths(new Date(), 1), InstallmentStatus.PENDING);
+      await TestDataFactory.createInstallment(plan.uid, student.uid, 3, 3, 300, dateUtils.addMonths(new Date(), 2), InstallmentStatus.PAID);
 
       const pendingInstallments = await InstallmentModel.find({ status: InstallmentStatus.PENDING }).exec();
       const totalPending = pendingInstallments.reduce((sum: number, inst: any) => sum + inst.installment_amount, 0);
@@ -469,12 +482,12 @@ describe('Installment Service', () => {
 
   describe('JSON Serialization', () => {
     it('serializes installment plan correctly', async () => {
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1000,
         4,
         PaymentFrequency.MONTHLY,
         new Date(),
-        null
+        { studentId: null }
       );
 
       const json = plan.toJSON();
@@ -491,7 +504,7 @@ describe('Installment Service', () => {
     });
 
     it('serializes installment correctly', async () => {
-      const installment = await createTestInstallment(
+      const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,

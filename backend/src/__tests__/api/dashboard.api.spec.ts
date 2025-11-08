@@ -1,7 +1,15 @@
 import request from 'supertest';
 import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
 import { StudentUpdater } from '@/services/studentUpdater';
-import { createTestApp, TestDataFactory, dateUtils } from '../../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  createTestApp, 
+  TestDataFactory, 
+  dateUtils 
+} from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
@@ -9,47 +17,57 @@ describe('Dashboard/Stats API Integration Tests', () => {
   let app: any;
 
   beforeAll(async () => {
+    await setupTestDatabase();
     app = await createTestApp();
+  });
+
+  afterEach(async () => {
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   describe('GET /api/v1/stats/dashboard', () => {
     beforeEach(async () => {
       const membershipStart = new Date();
-      const membershipEnd = addDays(new Date(), 30);
+      const membershipEnd = dateUtils.addDays(new Date(), 30);
 
-      const activeStudent = await createTestStudent({
+      const activeStudent = await TestDataFactory.createStudent({
         name: 'Active Student',
         class: ClassType.MONTH,
         rings: [8.5, 9.0],
         membership: { startDate: membershipStart, endDate: membershipEnd },
       });
 
-      const trialStudent = await createTestStudent({
+      const trialStudent = await TestDataFactory.createStudent({
         name: 'Trial Student',
         class: ClassType.TEN_TRY,
         rings: [7.0],
       });
 
-      const inactiveStudent = await createTestStudent({
+      const inactiveStudent = await TestDataFactory.createStudent({
         name: 'Inactive Student',
         class: ClassType.OTHERS,
       });
 
-      await createTestCashTransaction(500, activeStudent.uid, 'Tuition');
-      await createTestCashTransaction(300, trialStudent.uid, 'Trial Fee');
-      await createTestCashTransaction(-100, null, 'Rent');
-      await createTestCashTransaction(-50, null, 'Utilities');
+      await TestDataFactory.createCashTransaction(500, { studentId: activeStudent.uid, note: 'Tuition' });
+      await TestDataFactory.createCashTransaction(300, { studentId: trialStudent.uid, note: 'Trial Fee' });
+      await TestDataFactory.createCashTransaction(-100, { studentId: null, note: 'Rent' });
+      await TestDataFactory.createCashTransaction(-50, { studentId: null, note: 'Utilities' });
 
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
         PaymentFrequency.MONTHLY,
         new Date(),
-        activeStudent.uid
+        { studentId: activeStudent.uid }
       );
 
-      const overdueDueDate = addDays(new Date(), -10);
-      await createTestInstallment(
+      const overdueDueDate = dateUtils.addDays(new Date(), -10);
+      await TestDataFactory.createInstallment(
         plan.uid,
         activeStudent.uid,
         1,
@@ -59,7 +77,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         InstallmentStatus.PENDING
       );
 
-      await createTestInstallment(
+      await TestDataFactory.createInstallment(
         plan.uid,
         activeStudent.uid,
         2,
@@ -119,23 +137,23 @@ describe('Dashboard/Stats API Integration Tests', () => {
 
   describe('GET /api/v1/stats/student/:id', () => {
     it('returns detailed student statistics', async () => {
-      const student = await createTestStudent({
+      const student = await TestDataFactory.createStudent({
         name: 'Test Student',
         rings: [8.0, 9.0, 8.5],
       });
 
-      await createTestCashTransaction(500, student.uid, 'Payment 1');
-      await createTestCashTransaction(300, student.uid, 'Payment 2');
+      await TestDataFactory.createCashTransaction(500, { studentId: student.uid, note: 'Payment 1' });
+      await TestDataFactory.createCashTransaction(300, { studentId: student.uid, note: 'Payment 2' });
 
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
         PaymentFrequency.MONTHLY,
         new Date(),
-        student.uid
+        { studentId: student.uid }
       );
 
-      await createTestInstallment(
+      await TestDataFactory.createInstallment(
         plan.uid,
         student.uid,
         1,
@@ -163,9 +181,9 @@ describe('Dashboard/Stats API Integration Tests', () => {
 
     it('returns membership information', async () => {
       const membershipStart = new Date();
-      const membershipEnd = addDays(new Date(), 30);
+      const membershipEnd = dateUtils.addDays(new Date(), 30);
 
-      const student = await createTestStudent({
+      const student = await TestDataFactory.createStudent({
         name: 'Member Student',
         membership: { startDate: membershipStart, endDate: membershipEnd },
       });
@@ -190,22 +208,22 @@ describe('Dashboard/Stats API Integration Tests', () => {
 
   describe('GET /api/v1/stats/financial', () => {
     beforeEach(async () => {
-      const student1 = await createTestStudent({ name: 'Student 1' });
-      const student2 = await createTestStudent({ name: 'Student 2' });
+      const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
+      const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
 
-      await createTestCashTransaction(1000, student1.uid, 'Payment 1');
-      await createTestCashTransaction(500, student2.uid, 'Payment 2');
-      await createTestCashTransaction(-200, null, 'Expense 1');
+      await TestDataFactory.createCashTransaction(1000, { studentId: student1.uid, note: 'Payment 1' });
+      await TestDataFactory.createCashTransaction(500, { studentId: student2.uid, note: 'Payment 2' });
+      await TestDataFactory.createCashTransaction(-200, { studentId: null, note: 'Expense 1' });
 
-      const plan = await createTestInstallmentPlan(
+      const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         3,
         PaymentFrequency.MONTHLY,
         new Date(),
-        student1.uid
+        { studentId: student1.uid }
       );
 
-      await createTestInstallment(
+      await TestDataFactory.createInstallment(
         plan.uid,
         student1.uid,
         1,
@@ -215,13 +233,13 @@ describe('Dashboard/Stats API Integration Tests', () => {
         InstallmentStatus.PAID
       );
 
-      await createTestInstallment(
+      await TestDataFactory.createInstallment(
         plan.uid,
         student1.uid,
         2,
         3,
         400,
-        addDays(new Date(), 30),
+        dateUtils.addDays(new Date(), 30),
         InstallmentStatus.PENDING
       );
     });
@@ -324,7 +342,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
     });
 
     it('handles student with no transactions', async () => {
-      const student = await createTestStudent({ name: 'No Transactions' });
+      const student = await TestDataFactory.createStudent({ name: 'No Transactions' });
 
       const response = await request(app)
         .get(`/api/v1/stats/student/${student.uid}`)
@@ -338,8 +356,8 @@ describe('Dashboard/Stats API Integration Tests', () => {
 
   describe('Stats Calculations', () => {
     it('calculates net income correctly', async () => {
-      await createTestCashTransaction(1000, null, 'Income');
-      await createTestCashTransaction(-300, null, 'Expense');
+      await TestDataFactory.createCashTransaction(1000, { studentId: null, note: 'Income' });
+      await TestDataFactory.createCashTransaction(-300, { studentId: null, note: 'Expense' });
 
       const response = await request(app)
         .get('/api/v1/stats/dashboard')
@@ -352,8 +370,8 @@ describe('Dashboard/Stats API Integration Tests', () => {
     });
 
     it('identifies profitable periods', async () => {
-      await createTestCashTransaction(1000, null, 'Income');
-      await createTestCashTransaction(-300, null, 'Expense');
+      await TestDataFactory.createCashTransaction(1000, { studentId: null, note: 'Income' });
+      await TestDataFactory.createCashTransaction(-300, { studentId: null, note: 'Expense' });
 
       const response = await request(app)
         .get('/api/v1/stats/financial')
@@ -365,8 +383,8 @@ describe('Dashboard/Stats API Integration Tests', () => {
     });
 
     it('identifies unprofitable periods', async () => {
-      await createTestCashTransaction(100, null, 'Income');
-      await createTestCashTransaction(-500, null, 'Expense');
+      await TestDataFactory.createCashTransaction(100, { studentId: null, note: 'Income' });
+      await TestDataFactory.createCashTransaction(-500, { studentId: null, note: 'Expense' });
 
       const response = await request(app)
         .get('/api/v1/stats/financial')

@@ -1,6 +1,13 @@
 import request from 'supertest';
 import { ClassType, SubjectType } from '@/types';
-import { createTestApp, TestDataFactory } from '../../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  createTestApp, 
+  TestDataFactory 
+} from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
@@ -8,7 +15,17 @@ describe('Student API Integration Tests', () => {
   let app: any;
 
   beforeAll(async () => {
+    await setupTestDatabase();
     app = await createTestApp();
+  });
+
+  afterEach(async () => {
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   describe('POST /api/v1/students', () => {
@@ -167,7 +184,7 @@ describe('Student API Integration Tests', () => {
 
   describe('PUT /api/v1/students/:id', () => {
     it('updates student information', async () => {
-      const student = await createTestStudent({ name: 'Original Name' });
+      const student = await TestDataFactory.createStudent({ name: 'Original Name' });
 
       const response = await request(app)
         .put(`/api/v1/students/${student.uid}`)
@@ -180,7 +197,7 @@ describe('Student API Integration Tests', () => {
     });
 
     it('updates student membership', async () => {
-      const student = await createTestStudent({ name: 'Test' });
+      const student = await TestDataFactory.createStudent({ name: 'Test' });
 
       const startDate = new Date();
       const endDate = new Date();
@@ -210,7 +227,7 @@ describe('Student API Integration Tests', () => {
 
   describe('DELETE /api/v1/students/:id', () => {
     it('deletes student', async () => {
-      const student = await createTestStudent({ name: 'To Delete' });
+      const student = await TestDataFactory.createStudent({ name: 'To Delete' });
 
       const response = await request(app)
         .delete(`/api/v1/students/${student.uid}`)
@@ -240,18 +257,18 @@ describe('Student API Integration Tests', () => {
       const membershipEnd = new Date();
       membershipEnd.setDate(membershipEnd.getDate() + 30);
 
-      await createTestStudent({
+      await TestDataFactory.createStudent({
         name: 'High Scorer',
         rings: [9.5, 9.8, 9.2],
         membership: { startDate: membershipStart, endDate: membershipEnd },
       });
 
-      await createTestStudent({
+      await TestDataFactory.createStudent({
         name: 'Low Scorer',
         rings: [5.5, 6.0],
       });
 
-      await createTestStudent({
+      await TestDataFactory.createStudent({
         name: 'No Scores',
       });
     });

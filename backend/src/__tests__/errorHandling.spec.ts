@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { CashBuilder } from '@/services/cashBuilder';
 import { AppError, ErrorType } from '@/utils/errors';
 import { Cash } from '@/models/CashMongo';
@@ -5,15 +7,28 @@ import { Student, studentModel } from '@/models/mongo';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { ClassType, SubjectType } from '@/types';
-import { TestDataFactory } from '../../test/setupBackend';
+import { 
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  resetAllSequences,
+  TestDataFactory 
+} from '../../test/setupBackend';
+
+jest.setTimeout(30000);
 
 describe('Domain error handling alignment', () => {
   beforeAll(async () => {
-    // 数据库设置由全局测试环境处理
+    await setupTestDatabase();
   });
 
   afterEach(async () => {
-    // 清理由全局测试环境处理
+    await clearAllCollections();
+    await resetAllSequences();
+  });
+
+  afterAll(async () => {
+    await cleanupTestDatabase();
   });
 
   it('throws InvalidInput when cash amount is zero', () => {
