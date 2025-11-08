@@ -6,13 +6,13 @@ import { test, expect } from '../fixtures';
  */
 test.describe('基础连接测试', () => {
   test('前端服务响应正常', async ({ page }) => {
-    const response = await page.goto('/');
+    const response = await page.goto('/', { waitUntil: 'networkidle', timeout: 30000 });
     
     expect(response?.status()).toBe(200);
     expect(response?.ok()).toBeTruthy();
     
-    // 等待页面基本加载
-    await page.waitForLoadState('domcontentloaded');
+    // 等待页面网络空闲
+    await page.waitForLoadState('networkidle', { timeout: 10000 });
     
     // 检查页面内容
     const title = await page.title();
@@ -22,6 +22,13 @@ test.describe('基础连接测试', () => {
     const bodyContent = await page.textContent('body');
     expect(bodyContent).toBeTruthy();
     expect(bodyContent!.length).toBeGreaterThan(0);
+    
+    // 验证应用没有严重错误
+    const hasError = await page.evaluate(() => {
+      return (document.body.textContent || '').includes('Error') && 
+             !(document.body.textContent || '').includes('error');
+    });
+    expect(hasError).toBeFalsy();
   });
 
   test('后端API健康检查', async ({ api }) => {

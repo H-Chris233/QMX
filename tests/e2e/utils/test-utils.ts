@@ -177,6 +177,59 @@ export class TestUtils {
   }
 
   /**
+   * 验证日期格式 (YYYY-MM-DD)
+   */
+  verifyDateFormat(date: string): boolean {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date.trim())) return false;
+
+    try {
+      const d = new Date(date.trim());
+      return d instanceof Date && !isNaN(d.getTime());
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 格式化日期为 YYYY-MM-DD
+   */
+  formatDateYYYYMMDD(date: Date | string): string {
+    let d: Date;
+
+    if (typeof date === 'string') {
+      d = new Date(date);
+    } else {
+      d = date;
+    }
+
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * 获取当前UTC日期 (YYYY-MM-DD)
+   */
+  getTodayYYYYMMDD(): string {
+    return this.formatDateYYYYMMDD(new Date());
+  }
+
+  /**
+   * 验证页面中的日期显示格式
+   */
+  async verifyDateDisplayFormat(selector: string): Promise<boolean> {
+    try {
+      const dateText = await this.safeGetText(selector);
+      return this.verifyDateFormat(dateText.trim());
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * 将金额字符串转换为分
    */
   parseCurrencyToCents(amount: string): number {

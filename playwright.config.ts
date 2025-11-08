@@ -29,8 +29,8 @@ export default defineConfig({
   ],
   
   // 全局配置
-  // globalSetup: join(__dirname, 'tests/e2e/global-setup.ts'),
-  // globalTeardown: join(__dirname, 'tests/e2e/global-teardown.ts'),
+  globalSetup: join(__dirname, 'tests/e2e/global-setup.ts'),
+  globalTeardown: join(__dirname, 'tests/e2e/global-teardown.ts'),
   
   // 超时配置
   timeout: 30 * 1000, // 30秒
@@ -42,72 +42,121 @@ export default defineConfig({
   outputDir: 'test-results/',
   
   // WebServer 配置 - 自动启动前后端
-  webServer: [],
-  
-  // 项目配置 - 支持多浏览器测试
-  projects: [
+  webServer: process.env.CI ? [] : [
+    // 后端服务
     {
-      name: 'chromium',
-      use: { 
-        ...devices['Desktop Chrome'],
-        // 截图和视频配置
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
-        // 测试数据隔离
-        contextOptions: {
-          ignoreHTTPSErrors: true,
-        },
+      command: 'pnpm run backend',
+      port: 3001,
+      timeout: 120 * 1000, // 120秒启动超时
+      reuseExistingServer: !process.env.CI,
+      env: {
+        NODE_ENV: 'test',
+        MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/qmx_test',
+        TEST_DATA_CLEANUP: 'true',
       },
     },
-    
+    // 前端服务
     {
-      name: 'firefox',
-      use: { 
-        ...devices['Desktop Firefox'],
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
-        contextOptions: {
-          ignoreHTTPSErrors: true,
-        },
-      },
-    },
-    
-    {
-      name: 'webkit',
-      use: { 
-        ...devices['Desktop Safari'],
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
-        contextOptions: {
-          ignoreHTTPSErrors: true,
-        },
-      },
-    },
-    
-    // 移动端测试
-    {
-      name: 'Mobile Chrome',
-      use: { 
-        ...devices['Pixel 5'],
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
-      },
-    },
-    
-    {
-      name: 'Mobile Safari',
-      use: { 
-        ...devices['iPhone 12'],
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
+      command: 'pnpm run dev',
+      port: 1420,
+      timeout: 120 * 1000, // 120秒启动超时
+      reuseExistingServer: !process.env.CI,
+      env: {
+        NODE_ENV: 'test',
+        VITE_API_BASE_URL: 'http://localhost:3001/api/v1',
       },
     },
   ],
+  
+  // 项目配置 - 支持多浏览器测试
+  projects: process.env.CI 
+    ? [
+        {
+          name: 'chromium',
+          use: { 
+            ...devices['Desktop Chrome'],
+            // 截图和视频配置 - CI环境启用所有诊断
+            screenshot: 'on',
+            video: 'on',
+            trace: 'on',
+            // 禁用动画以提高稳定性
+            reducedMotion: 'reduce',
+            // 测试数据隔离
+            contextOptions: {
+              ignoreHTTPSErrors: true,
+            },
+          },
+        },
+      ]
+    : [
+        {
+          name: 'chromium',
+          use: { 
+            ...devices['Desktop Chrome'],
+            // 截图和视频配置
+            screenshot: 'only-on-failure',
+            video: 'retain-on-failure',
+            trace: 'retain-on-failure',
+            // 禁用动画以提高稳定性
+            reducedMotion: 'reduce',
+            // 测试数据隔离
+            contextOptions: {
+              ignoreHTTPSErrors: true,
+            },
+          },
+        },
+        
+        {
+          name: 'firefox',
+          use: { 
+            ...devices['Desktop Firefox'],
+            screenshot: 'only-on-failure',
+            video: 'retain-on-failure',
+            trace: 'retain-on-failure',
+            reducedMotion: 'reduce',
+            contextOptions: {
+              ignoreHTTPSErrors: true,
+            },
+          },
+        },
+        
+        {
+          name: 'webkit',
+          use: { 
+            ...devices['Desktop Safari'],
+            screenshot: 'only-on-failure',
+            video: 'retain-on-failure',
+            trace: 'retain-on-failure',
+            reducedMotion: 'reduce',
+            contextOptions: {
+              ignoreHTTPSErrors: true,
+            },
+          },
+        },
+        
+        // 移动端测试
+        {
+          name: 'Mobile Chrome',
+          use: { 
+            ...devices['Pixel 5'],
+            screenshot: 'only-on-failure',
+            video: 'retain-on-failure',
+            trace: 'retain-on-failure',
+            reducedMotion: 'reduce',
+          },
+        },
+        
+        {
+          name: 'Mobile Safari',
+          use: { 
+            ...devices['iPhone 12'],
+            screenshot: 'only-on-failure',
+            video: 'retain-on-failure',
+            trace: 'retain-on-failure',
+            reducedMotion: 'reduce',
+          },
+        },
+      ],
   
   // 开发服务器配置
   use: {

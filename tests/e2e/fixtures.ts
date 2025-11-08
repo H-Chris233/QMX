@@ -9,20 +9,43 @@ export const test = base.extend({
   page: async ({ page }, use) => {
     // 设置页面默认超时
     page.setDefaultTimeout(30000);
+    page.setDefaultNavigationTimeout(30000);
     
-    // 监听页面错误
+    // 禁用动画和过渡以提高稳定性
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    
+    // 监听页面错误并记录
+    const pageErrors: string[] = [];
     page.on('pageerror', (error) => {
       console.error('页面错误:', error);
+      pageErrors.push(error.message);
     });
     
     // 监听控制台错误
+    const consoleErrors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         console.error('控制台错误:', msg.text());
+        consoleErrors.push(msg.text());
+      }
+    });
+    
+    // 监听响应错误
+    page.on('response', (response) => {
+      if (response.status() >= 500) {
+        console.warn(`服务器错误: ${response.url()} (${response.status()})`);
       }
     });
     
     await use(page);
+    
+    // 清理：输出错误汇总
+    if (pageErrors.length > 0) {
+      console.log(`测试期间发现 ${pageErrors.length} 个页面错误`);
+    }
+    if (consoleErrors.length > 0) {
+      console.log(`测试期间发现 ${consoleErrors.length} 个控制台错误`);
+    }
   },
   
   // 测试数据 fixture
