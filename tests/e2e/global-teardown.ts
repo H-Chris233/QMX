@@ -26,33 +26,50 @@ async function globalTeardown(config: FullConfig) {
 
 /**
  * 清理测试数据
+ * 包含重试机制和超时处理
  */
 async function cleanupTestData() {
   console.log('🗑️  清理测试数据...');
   
-  try {
-    // 调用后端清理接口
-    const response = await fetch('http://localhost:3001/api/v1/test/cleanup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action: 'cleanup',
-        environment: 'test',
-      }),
-    });
-    
-    if (response.ok) {
-      const result = await response.json();
-      console.log('  ✅ 测试数据清理完成:', result.message);
-    } else if (response.status === 404) {
-      console.log('  ⚠️  未找到测试清理接口，跳过数据清理');
-    } else {
-      console.log('  ⚠️  测试数据清理失败');
+  const maxRetries = 2;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // 调用后端清理接口
+      const response = await fetch('http://localhost:3001/api/v1/test/cleanup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'cleanup',
+          environment: 'test',
+        }),
+        signal: AbortSignal.timeout(15000), // 15秒超时
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('  ✅ 测试数据清理完成:', result.message);
+        return;
+      } else if (response.status === 404) {
+        console.log('  ℹ️  未找到测试清理接口，跳过数据清理');
+        return;
+      } else if (response.status === 403) {
+        console.log('  ℹ️  测试接口在非测试环境不可用，跳过');
+        return;
+      } else if (attempt < maxRetries) {
+        console.log(`  ⚠️  清理失败，重试中... (尝试 ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      if (attempt < maxRetries) {
+        console.log(`  ⚠️  重试中... (尝试 ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        console.log('  ⚠️  无法清理测试数据，但不影响测试完成');
+      }
     }
-  } catch (error) {
-    console.log('  ⚠️  无法连接到测试清理接口');
   }
 }
 

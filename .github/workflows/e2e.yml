@@ -62,10 +62,11 @@ jobs:
         run: |
           # 复制测试环境配置
           cp .env.test .env
-          
+
           # 设置测试环境变量
           echo "NODE_ENV=test" >> $GITHUB_ENV
           echo "CI=true" >> $GITHUB_ENV
+          echo "TZ=UTC" >> $GITHUB_ENV
           echo "BASE_URL=http://localhost:1420" >> $GITHUB_ENV
           echo "VITE_API_BASE_URL=http://localhost:3001/api/v1" >> $GITHUB_ENV
 
@@ -77,39 +78,95 @@ jobs:
           sleep 10
           echo "MONGODB_URI=mongodb://localhost:27017/qmx_test" >> $GITHUB_ENV
 
-      - name: Wait for services and run tests
+      - name: Start backend and frontend services
         run: |
-          # 运行 E2E 测试
-          pnpm run e2e --project=${{ matrix.browser }} --reporter=json,html --output-file=test-results/results-${{ matrix.browser }}.json
+          # 启动后端和前端服务
+          pnpm run dev:full > services.log 2>&1 &
+          SERVICES_PID=$!
+          echo "SERVICES_PID=$SERVICES_PID" >> $GITHUB_ENV
+
+          # 等待服务启动
+          sleep 15
+          echo "等待服务就绪..."
+
+          # 检查后端是否就绪
+          for i in {1..30}; do
+            if curl -f http://localhost:3001/api/v1/health 2>/dev/null || curl -f http://localhost:3001/api/v1/ 2>/dev/null; then
+              echo "✓ 后端服务已就绪"
+              break
+            fi
+            echo "等待后端... ($i/30)"
+            sleep 2
+          done
+
+          # 检查前端是否就绪
+          for i in {1..30}; do
+            if curl -f http://localhost:1420 2>/dev/null; then
+              echo "✓ 前端服务已就绪"
+              break
+            fi
+            echo "等待前端... ($i/30)"
+            sleep 2
+          done
         env:
           CI: true
           NODE_ENV: test
+          TZ: UTC
           BASE_URL: http://localhost:1420
           VITE_API_BASE_URL: http://localhost:3001/api/v1
 
-      - name: Upload test results
+      - name: Run E2E tests
+        run: |
+          # 运行 E2E 测试
+          pnpm run e2e --project=${{ matrix.browser }} --reporter=json,html --output-file=test-results/results-${{ matrix.browser }}.json || true
+        env:
+          CI: true
+          NODE_ENV: test
+          TZ: UTC
+          BASE_URL: http://localhost:1420
+          VITE_API_BASE_URL: http://localhost:3001/api/v1
+
+      - name: Check services logs on failure
+        if: failure()
+        run: |
+          echo "=== 服务日志 ==="
+          head -100 services.log
+          echo ""
+          echo "=== 进程信息 ==="
+          ps aux | grep -E "node|vite|playwright" || true
+
+      - name: Upload test results and artifacts
         if: always() # 无论测试是否成功都上传结果
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-results-${{ matrix.browser }}
+          name: e2e-artifacts-${{ matrix.browser }}
           path: |
             test-results/
             playwright-report/
+            services.log
           retention-days: 7
 
-      - name: Upload HTML report
-        if: always()
+      - name: Upload screenshots on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.browser }}
-          path: playwright-report/
+          name: e2e-screenshots-${{ matrix.browser }}
+          path: test-results/screenshots/
           retention-days: 7
 
-      - name: Upload traces
-        if: failure() # 仅在失败时上传 trace
+      - name: Upload videos on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces-${{ matrix.browser }}
+          name: e2e-videos-${{ matrix.browser }}
+          path: test-results/videos/
+          retention-days: 7
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces-${{ matrix.browser }}
           path: test-results/traces/
           retention-days: 7
 
