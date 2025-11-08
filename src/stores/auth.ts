@@ -26,19 +26,31 @@ export const useAuthStore = defineStore('auth', () => {
     REMEMBER_ME: 'qmx_remember_me'
   };
 
-  // Getters
+  // Getters - 临时禁用认证检查，开发阶段直接返回true
   const isAuthenticated = computed(() => {
+    // 临时禁用：开发阶段直接返回true，避免后端认证API未实现的问题
+    if (import.meta.env.DEV) {
+      return true;
+    }
     return !!token.value && !!user.value;
   });
 
   const hasRole = computed(() => {
     return (role: string) => {
+      // 开发阶段默认返回true，避免权限检查问题
+      if (import.meta.env.DEV) {
+        return true;
+      }
       return user.value?.role === role || user.value?.permissions.includes(role);
     };
   });
 
   const hasPermission = computed(() => {
     return (permission: string): boolean => {
+      // 开发阶段默认返回true，避免权限检查问题
+      if (import.meta.env.DEV) {
+        return true;
+      }
       return user.value?.permissions.includes(permission) || false;
     };
   });

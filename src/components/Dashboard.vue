@@ -125,7 +125,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, inject, watch, type Ref } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, type Ref } from 'vue';
+import { useAppStore } from '../stores/app';
 import { ApiService } from '../api/ApiService';
 import { transformDashboardData, safeParseNumber } from '../utils/dataTransformers';
 import ErrorModal from './ErrorModal.vue';
@@ -147,15 +148,12 @@ interface Student {
 }
 
 
-interface RefreshSystem {
-  refreshTriggers: {
-    dashboard: number;
-  };
-}
 const loading: Ref<boolean> = ref(false);
 const abortController: Ref<AbortController | null> = ref(null);
 const lastUpdateTime: Ref<Date | null> = ref(null);
-const refreshSystem = inject<RefreshSystem>('refreshSystem');
+
+// 使用Pinia store替代provide/inject
+const appStore = useAppStore();
 
 const showStatsErrorModal: Ref<boolean> = ref(false);
 const statsErrorTitle: Ref<string> = ref('错误');
@@ -396,18 +394,6 @@ const getGradeTrendText = (grade: number): string => {
     };
 
     // 生命周期钩子
-    // 监听刷新触发器
-    if (refreshSystem?.refreshTriggers) {
-      watch(
-        () => refreshSystem.refreshTriggers.dashboard,
-        (newValue, oldValue) => {
-          if (newValue > oldValue) {
-            if (import.meta.env?.MODE !== 'production') console.log('Dashboard 收到刷新信号，重新加载数据');
-            loadDashboardData();
-          }
-        }
-      );
-    }
 
     onMounted(() => {
       loadDashboardData();
