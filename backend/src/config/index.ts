@@ -3,7 +3,42 @@ import dotenv from 'dotenv';
 // 加载环境变量
 dotenv.config();
 
-export const config = {
+export interface Config {
+  server: {
+    port: number;
+    nodeEnv: string;
+    corsOrigin: string;
+  };
+  mongodb: {
+    uri?: string;
+    options: {
+      maxPoolSize: number;
+      serverSelectionTimeoutMS: number;
+      socketTimeoutMS: number;
+      retryWrites: boolean;
+      w: string;
+    };
+  };
+  security: {
+    jwtSecret: string;
+    jwtExpiresIn: string;
+    bcryptSaltRounds: number;
+  };
+  logging: {
+    level: string;
+    file: string;
+  };
+  rateLimit: {
+    windowMs: number;
+    maxRequests: number;
+  };
+  upload: {
+    maxFileSize: number;
+    uploadPath: string;
+  };
+}
+
+export const config: Config = {
   // 服务器配置
   server: {
     port: parseInt(process.env.PORT || '3001', 10),

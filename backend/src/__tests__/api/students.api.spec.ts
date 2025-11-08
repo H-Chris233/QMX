@@ -1,31 +1,14 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
-import app from '@/app';
 import { ClassType, SubjectType } from '@/types';
-import {
-  setupTestDatabase,
-  cleanupTestDatabase,
-  clearAllCollections,
-  resetAllSequences,
-  createTestStudent,
-} from '../helpers/testSetup';
+import { createTestApp, TestDataFactory } from '../../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('Student API Integration Tests', () => {
-  let mongoServer: any;
+  let app: any;
 
   beforeAll(async () => {
-    mongoServer = await setupTestDatabase('qmx-api-students-tests');
-  });
-
-  afterEach(async () => {
-    await clearAllCollections();
-    await resetAllSequences();
-  });
-
-  afterAll(async () => {
-    await cleanupTestDatabase(mongoServer);
+    app = await createTestApp();
   });
 
   describe('POST /api/v1/students', () => {
@@ -101,9 +84,9 @@ describe('Student API Integration Tests', () => {
 
   describe('GET /api/v1/students', () => {
     beforeEach(async () => {
-      await createTestStudent({ name: 'Alice', class: ClassType.MONTH });
-      await createTestStudent({ name: 'Bob', class: ClassType.TEN_TRY });
-      await createTestStudent({ name: 'Charlie', class: ClassType.MONTH });
+      await TestDataFactory.createStudent({ name: 'Alice', class: ClassType.MONTH });
+      await TestDataFactory.createStudent({ name: 'Bob', class: ClassType.TEN_TRY });
+      await TestDataFactory.createStudent({ name: 'Charlie', class: ClassType.MONTH });
     });
 
     it('retrieves all students with pagination', async () => {
@@ -153,7 +136,7 @@ describe('Student API Integration Tests', () => {
 
   describe('GET /api/v1/students/:id', () => {
     it('retrieves student by id', async () => {
-      const student = await createTestStudent({ name: 'Test Student' });
+      const student = await TestDataFactory.createStudent({ name: 'Test Student' });
 
       const response = await request(app)
         .get(`/api/v1/students/${student.uid}`)

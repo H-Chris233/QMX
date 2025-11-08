@@ -45,26 +45,33 @@ const buildCounterError = (sequence: string, error: unknown): Error => {
 
 export const getNextSequence = async (sequence: string): Promise<number> => {
   try {
-    const counter = await CounterModel.findOneAndUpdate(
+    // 使用 findOneAndUpdate 的原子操作
+    // 先尝试增加现有的计数器
+    let counter = await CounterModel.findOneAndUpdate(
       { _id: sequence },
-      {
-        $inc: { sequence_value: 1 },
-        $setOnInsert: {
-          sequence_name: sequence,
-          sequence_value: 0
-        }
-      },
-      {
-        new: true,
-        upsert: true
-      }
+      { $inc: { sequence_value: 1 } },
+      { new: true, lean: true }
     ).exec();
+
+    // 如果不存在，创建新的计数器
+    if (!counter) {
+      counter = await CounterModel.findOneAndUpdate(
+        { _id: sequence },
+        {
+          $set: {
+            sequence_name: sequence,
+            sequence_value: 1
+          }
+        },
+        { new: true, upsert: true, lean: true }
+      ).exec();
+    }
 
     if (!counter) {
       throw new Error('计数器返回值为空');
     }
 
-    return counter.sequence_value;
+    return counter.sequence_value as number;
   } catch (error) {
     throw buildCounterError(sequence, error);
   }
@@ -72,17 +79,18 @@ export const getNextSequence = async (sequence: string): Promise<number> => {
 
 export const resetSequence = async (sequence: string, value = 0): Promise<number> => {
   try {
+    // 直接使用 findOneAndUpdate 重置序列值
     const counter = await CounterModel.findOneAndUpdate(
       { _id: sequence },
-      {
-        $set: {
+      { 
+        $set: { 
           sequence_name: sequence,
-          sequence_value: value
+          sequence_value: value 
         }
       },
-      {
-        new: true,
-        upsert: true
+      { 
+        new: true, 
+        upsert: true 
       }
     ).exec();
 

@@ -1,7 +1,4 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import StatsService from '@/services/statsService';
-import { StudentBuilder } from '@/services/studentBuilder';
 import { CashClass, Cash } from '@/models/CashMongo';
 import { Installment, InstallmentModel } from '@/models/InstallmentMongo';
 import { InstallmentPlan, InstallmentPlanModel } from '@/models/InstallmentPlanMongo';
@@ -13,43 +10,17 @@ import {
   InstallmentStatus,
   MembershipStatus,
 } from '@/types';
-import {
-  resetSequence,
-  STUDENT_SEQUENCE_NAME,
-  CASH_SEQUENCE_NAME,
-  INSTALLMENT_SEQUENCE_NAME,
-  INSTALLMENT_PLAN_SEQUENCE_NAME,
-} from '@/models/counter';
+import { TestDataFactory, dateUtils } from '../../test/setupBackend';
 
 jest.setTimeout(30000);
 
 describe('StatsService', () => {
-  let mongoServer: MongoMemoryServer;
-
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri(), {
-      dbName: 'stats-service-tests',
-    });
+    // 数据库设置由全局测试环境处理
   });
 
   afterEach(async () => {
-    await Cash.deleteMany({});
-    await InstallmentModel.deleteMany({});
-    await InstallmentPlanModel.deleteMany({});
-    await studentModel.deleteMany({});
-
-    await Promise.all([
-      resetSequence(STUDENT_SEQUENCE_NAME),
-      resetSequence(CASH_SEQUENCE_NAME),
-      resetSequence(INSTALLMENT_SEQUENCE_NAME),
-      resetSequence(INSTALLMENT_PLAN_SEQUENCE_NAME),
-    ]);
-  });
-
-  afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+    // 清理由全局测试环境处理
   });
 
   const createTestDataset = async () => {
