@@ -11,33 +11,6 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,ts}', 'tests/**/*.{test,spec}.{js,ts}'],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', 'tests/e2e/**'],
     
-    // 覆盖率配置 - 暂时禁用以解决版本兼容性问题
-    // coverage: {
-    //   provider: 'v8',
-    //   reporter: ['text', 'json', 'html'],
-    //   reportsDirectory: 'coverage',
-    //   exclude: [
-    //     'node_modules/',
-    //     'tests/',
-    //     '**/*.d.ts',
-    //     '**/*.config.{js,ts}',
-    //     'coverage/',
-    //     'dist/',
-    //     '.idea/',
-    //     '.git/',
-    //     '.cache/',
-    //   ],
-    //   thresholds: {
-    //     global: {
-    //       branches: 80,
-    //       functions: 80,
-    //       lines: 80,
-    //       statements: 80,
-    //     },
-    //   },
-    //   enabled: true,
-    // },
-    
     // 测试配置
     testTimeout: 10000,
     hookTimeout: 10000,
@@ -56,10 +29,11 @@ export default defineConfig({
     // 监视模式配置
     watch: false,
     
-    // 报告器配置
-    reporter: ['verbose'],
+    // 报告器配置 - 支持多格式输出
+    reporter: process.env.CI ? ['verbose', 'json', 'junit'] : ['verbose'],
     outputFile: {
-      'junit': 'test-results/junit.xml',
+      'json': 'test-results/vitest-results.json',
+      'junit': 'test-results/vitest-junit.xml',
     },
   },
   resolve: {

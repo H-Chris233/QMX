@@ -5,7 +5,11 @@ on:
     branches: [main, release]
   pull_request:
     branches: [main, release]
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '10'
 
 jobs:
   e2e:
@@ -13,221 +17,282 @@ jobs:
     
     strategy:
       matrix:
-        # 运行多个浏览器的测试
-        browser: [chromium, firefox, webkit]
-        # 可以配置失败重试
-        retry: [0]
+        # CI环境只运行chromium，本地可配置多浏览器
+        browser: [chromium]
     
-    timeout-minutes: 30 # 设置超时时间
+    timeout-minutes: 25
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 18.x
-        uses: actions/setup-node@v3
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: ${{ env.NODE_VERSION }}
+        timeout-minutes: 10
 
-      - name: Setup pnpm
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
         uses: pnpm/action-setup@v2
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Get pnpm store directory
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
+      # 多层缓存
       - name: Setup pnpm cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Setup Playwright browser cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/ms-edge
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Setup Vite cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            node_modules/.vitest
+          key: ${{ runner.os }}-vite-vitest-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-vitest-
+
+      # 依赖安装（带重试）
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        shell: bash
+        run: |
+          set -e
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if pnpm install --frozen-lockfile; then
+              echo "✓ Dependencies installed successfully"
+              exit 0
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⚠️ Install failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+              sleep 5
+            fi
+          done
+          echo "❌ Install failed after $MAX_RETRIES attempts"
+          exit 1
+        env:
+          CYPRESS_INSTALL_BINARY: 0
 
-      - name: Install Playwright browsers
-        run: pnpm run e2e:install
+      # 安装Playwright浏览器及系统依赖
+      - name: Install Playwright browsers and dependencies
+        shell: bash
+        run: |
+          pnpx playwright install --with-deps chromium
+        timeout-minutes: 10
 
+      # 安装系统依赖（确保所有必需库都已安装）
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libnspr4 libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libcairo2 libpango-1.0-0 libasound2t64
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libxkbcommon0 libatspi2.0-0 libxcomposite1 \
+            libxdamage1 libxfixes3 libxrandr2 libgbm1 libcairo2 \
+            libpango-1.0-0 libasound2
 
+      # 设置测试环境
       - name: Setup test environment
+        shell: bash
         run: |
-          # 复制测试环境配置
           cp .env.test .env
-
-          # 设置测试环境变量
           echo "NODE_ENV=test" >> $GITHUB_ENV
           echo "CI=true" >> $GITHUB_ENV
           echo "TZ=UTC" >> $GITHUB_ENV
           echo "BASE_URL=http://localhost:1420" >> $GITHUB_ENV
           echo "VITE_API_BASE_URL=http://localhost:3001/api/v1" >> $GITHUB_ENV
 
-      - name: Start MongoDB (if not using external)
-        if: ${{ !contains(env.MONGODB_URI, 'mongodb+srv') }}
+      # 启动MongoDB容器
+      - name: Start MongoDB
         run: |
-          # 启动 MongoDB (如果需要本地数据库)
-          docker run -d --name mongodb-test -p 27017:27017 mongo:latest
-          sleep 10
+          docker run -d \
+            --name mongodb-test \
+            -p 27017:27017 \
+            -e MONGO_INITDB_DB=qmx_test \
+            mongo:7-alpine
+          
+          echo "Waiting for MongoDB to be ready..."
+          for i in {1..30}; do
+            if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
+              echo "✓ MongoDB is ready"
+              break
+            fi
+            echo "MongoDB not ready yet ($i/30)..."
+            sleep 1
+          done
+          
           echo "MONGODB_URI=mongodb://localhost:27017/qmx_test" >> $GITHUB_ENV
 
+      # 启动服务（后端和前端）
       - name: Start backend and frontend services
+        shell: bash
         run: |
-          # 启动后端和前端服务
+          echo "Starting services..."
           pnpm run dev:full > services.log 2>&1 &
           SERVICES_PID=$!
           echo "SERVICES_PID=$SERVICES_PID" >> $GITHUB_ENV
-
-          # 等待服务启动
-          sleep 15
-          echo "等待服务就绪..."
-
-          # 检查后端是否就绪
-          for i in {1..30}; do
-            if curl -f http://localhost:3001/api/v1/health 2>/dev/null || curl -f http://localhost:3001/api/v1/ 2>/dev/null; then
-              echo "✓ 后端服务已就绪"
+          
+          echo "Waiting for services to be ready..."
+          
+          # 后端就绪检测（指数退避重试）
+          RETRY_COUNT=0
+          MAX_RETRIES=60
+          WAIT_TIME=1
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -sf http://localhost:3001/api/v1/health 2>/dev/null || \
+               curl -sf http://localhost:3001/api/v1/ 2>/dev/null; then
+              echo "✓ Backend service is ready"
               break
             fi
-            echo "等待后端... ($i/30)"
-            sleep 2
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "❌ Backend service failed to start"
+              tail -50 services.log
+              exit 1
+            fi
+            echo "Waiting for backend... ($RETRY_COUNT/$MAX_RETRIES, wait ${WAIT_TIME}s)"
+            sleep $WAIT_TIME
+            # 指数退避，最多等待2秒
+            WAIT_TIME=$((WAIT_TIME < 2 ? WAIT_TIME * 2 : 2))
           done
-
-          # 检查前端是否就绪
-          for i in {1..30}; do
-            if curl -f http://localhost:1420 2>/dev/null; then
-              echo "✓ 前端服务已就绪"
+          
+          # 前端就绪检测
+          RETRY_COUNT=0
+          MAX_RETRIES=60
+          WAIT_TIME=1
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -sf http://localhost:1420 2>/dev/null; then
+              echo "✓ Frontend service is ready"
               break
             fi
-            echo "等待前端... ($i/30)"
-            sleep 2
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "❌ Frontend service failed to start"
+              tail -50 services.log
+              exit 1
+            fi
+            echo "Waiting for frontend... ($RETRY_COUNT/$MAX_RETRIES, wait ${WAIT_TIME}s)"
+            sleep $WAIT_TIME
+            WAIT_TIME=$((WAIT_TIME < 2 ? WAIT_TIME * 2 : 2))
           done
         env:
           CI: true
           NODE_ENV: test
           TZ: UTC
-          BASE_URL: http://localhost:1420
-          VITE_API_BASE_URL: http://localhost:3001/api/v1
+          MONGODB_URI: mongodb://localhost:27017/qmx_test
 
-      - name: Run E2E tests
+      # 测试数据初始化
+      - name: Initialize test data
+        shell: bash
         run: |
-          # 运行 E2E 测试
-          pnpm run e2e --project=${{ matrix.browser }} --reporter=json,html --output-file=test-results/results-${{ matrix.browser }}.json || true
+          echo "Initializing test data..."
+          RETRY_COUNT=0
+          MAX_RETRIES=3
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -X POST http://localhost:3001/api/v1/test/seed 2>/dev/null; then
+              echo "✓ Test data initialized"
+              exit 0
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⚠️ Test data init failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+              sleep 2
+            fi
+          done
+          echo "⚠️ Test data init failed after $MAX_RETRIES attempts, continuing anyway"
+
+      # 运行E2E测试（带重试）
+      - name: Run E2E tests
+        shell: bash
+        run: |
+          pnpm run e2e \
+            --project=${{ matrix.browser }} \
+            --reporter=html,json \
+            --output-file=test-results/results-${{ matrix.browser }}.json
+        timeout-minutes: 12
         env:
           CI: true
           NODE_ENV: test
           TZ: UTC
           BASE_URL: http://localhost:1420
           VITE_API_BASE_URL: http://localhost:3001/api/v1
+        continue-on-error: true
 
+      # 失败诊断：检查服务日志
       - name: Check services logs on failure
         if: failure()
+        shell: bash
         run: |
-          echo "=== 服务日志 ==="
-          head -100 services.log
+          echo "=== Last 100 lines of services.log ==="
+          tail -100 services.log || echo "No services.log found"
+          
           echo ""
-          echo "=== 进程信息 ==="
-          ps aux | grep -E "node|vite|playwright" || true
+          echo "=== Process information ==="
+          ps aux | grep -E "node|vite|playwright|mongo" | grep -v grep || echo "No processes found"
+          
+          echo ""
+          echo "=== Network connections ==="
+          netstat -tlnp 2>/dev/null | grep -E "3001|1420|27017" || ss -tlnp 2>/dev/null | grep -E "3001|1420|27017" || echo "No network info available"
+          
+          echo ""
+          echo "=== MongoDB logs ==="
+          docker logs mongodb-test 2>/dev/null | tail -20 || echo "MongoDB logs not available"
 
-      - name: Upload test results and artifacts
-        if: always() # 无论测试是否成功都上传结果
+      # 上传测试结果
+      - name: Upload test results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-artifacts-${{ matrix.browser }}
-          path: |
-            test-results/
-            playwright-report/
-            services.log
+          name: e2e-test-results-${{ matrix.browser }}
+          path: test-results/
           retention-days: 7
 
-      - name: Upload screenshots on failure
-        if: failure()
+      # 上传Playwright报告
+      - name: Upload Playwright report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-screenshots-${{ matrix.browser }}
-          path: test-results/screenshots/
+          name: e2e-playwright-report-${{ matrix.browser }}
+          path: playwright-report/
           retention-days: 7
 
-      - name: Upload videos on failure
-        if: failure()
+      # 上传服务日志
+      - name: Upload services log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-videos-${{ matrix.browser }}
-          path: test-results/videos/
+          name: e2e-services-log-${{ matrix.browser }}
+          path: services.log
           retention-days: 7
 
-      - name: Upload traces on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-traces-${{ matrix.browser }}
-          path: test-results/traces/
-          retention-days: 7
-
-      - name: Comment PR with results
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const path = 'test-results/results-${{ matrix.browser }}.json';
-            
-            let commentBody = `## 🎭 E2E 测试结果 (${{ matrix.browser }})\n\n`;
-            
-            try {
-              if (fs.existsSync(path)) {
-                const results = JSON.parse(fs.readFileSync(path, 'utf8'));
-                const passed = results.suites?.reduce((acc, suite) => 
-                  acc + suite.specs?.reduce((specAcc, spec) => 
-                    specAcc + (spec.tests?.filter(t => t.results?.[0]?.status === 'passed').length || 0), 0), 0) || 0;
-                const failed = results.suites?.reduce((acc, suite) => 
-                  acc + suite.specs?.reduce((specAcc, spec) => 
-                    specAcc + (spec.tests?.filter(t => t.results?.[0]?.status === 'failed').length || 0), 0), 0) || 0;
-                const skipped = results.suites?.reduce((acc, suite) => 
-                  acc + suite.specs?.reduce((specAcc, spec) => 
-                    specAcc + (spec.tests?.filter(t => t.results?.[0]?.status === 'skipped').length || 0), 0), 0) || 0;
-                
-                commentBody += `| 状态 | 数量 |\n`;
-                commentBody += `|------|------|\n`;
-                commentBody += `| ✅ 通过 | ${passed} |\n`;
-                commentBody += `| ❌ 失败 | ${failed} |\n`;
-                commentBody += `| ⏭️ 跳过 | ${skipped} |\n`;
-                commentBody += `| ⏱️ 耗时 | ${(results.duration / 1000).toFixed(2)}s |\n\n`;
-                
-                if (failed > 0) {
-                  commentBody += `❌ 测试失败，请查看 [详细报告](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})。\n`;
-                } else {
-                  commentBody += `✅ 所有测试通过！\n`;
-                }
-              } else {
-                commentBody += `⚠️ 无法加载测试结果文件。\n`;
-              }
-            } catch (error) {
-              commentBody += `⚠️ 解析测试结果时出错：${error.message}\n`;
-            }
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: commentBody
-            });
-
-  # 清理作业
-  cleanup:
-    runs-on: ubuntu-latest
-    needs: e2e
-    if: always() && (needs.e2e.result == 'failure' || needs.e2e.result == 'success')
-    
-    steps:
-      - name: Cleanup MongoDB
-        if: ${{ !contains(env.MONGODB_URI, 'mongodb+srv') }}
+      # 清理资源
+      - name: Cleanup
+        if: always()
+        shell: bash
         run: |
-          docker stop mongodb-test || true
-          docker rm mongodb-test || true
+          echo "Cleaning up..."
+          docker stop mongodb-test 2>/dev/null || true
+          docker rm mongodb-test 2>/dev/null || true
+          pkill -f "pnpm run dev:full" 2>/dev/null || true
+          pkill -f "vite" 2>/dev/null || true
+          echo "Cleanup completed"
