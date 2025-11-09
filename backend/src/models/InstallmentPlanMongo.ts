@@ -156,6 +156,8 @@ InstallmentPlanSchema.methods.isActive = function isActive(this: IInstallmentPla
 };
 
 InstallmentPlanSchema.methods.toJSON = function toJSON(this: IInstallmentPlanDoc) {
+  const active = this.isActive();
+  
   return {
     uid: this.uid,
     student_id: this.student_id,
@@ -170,6 +172,8 @@ InstallmentPlanSchema.methods.toJSON = function toJSON(this: IInstallmentPlanDoc
     start_date: this.start_date,
     startDate: this.start_date,
     status: this.status,
+    is_active: active,
+    isActive: active,
     note: this.note,
     created_at: this.created_at,
     createdAt: this.created_at,

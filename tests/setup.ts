@@ -13,6 +13,9 @@ import { defaultHandlers, allHandlers } from './mocks/msw/handlers';
  * - 抑制控制台噪音
  */
 
+// 确保测试环境使用 UTC 时区
+process.env.TZ = 'UTC';
+
 // MSW 服务器设置 - 使用所有处理器包括错误场景
 const mswServer = setupServer(...allHandlers);
 
