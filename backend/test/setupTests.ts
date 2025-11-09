@@ -9,6 +9,9 @@ import {
   testUtils,
 } from './setupBackend';
 
+// 确保测试环境使用 UTC 时区
+process.env.TZ = 'UTC';
+
 // 每个测试后的清理 - 暂时禁用以避免并发问题
 // 测试应该自己管理数据库生命周期
 

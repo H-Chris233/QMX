@@ -504,13 +504,15 @@ describe('Installment Service', () => {
     });
 
     it('serializes installment correctly', async () => {
+      const futureDate = dateUtils.addDays(new Date(), 7); // 7天后，确保不会过期
+      
       const installment = await TestDataFactory.createInstallment(
         1,
         null,
         1,
         3,
         100,
-        new Date(),
+        futureDate,
         InstallmentStatus.PENDING
       );
 

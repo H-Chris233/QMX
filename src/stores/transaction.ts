@@ -128,21 +128,21 @@ export const useTransactionStore = defineStore('transaction', () => {
       const response = await ApiService.getAllTransactions(mergedParams as CashSearchOptions);
 
       // 处理响应数据格式
-      // API返回: { success: true, data: { data: [], pagination: {} } }
+      // API返回: { items: [], pagination: {} }
       let transactionItems = [];
-      if (response && response.data && response.data.data) {
-        transactionItems = response.data.data;
+      if (response && response.items) {
+        transactionItems = response.items;
       } else if (Array.isArray(response)) {
         transactionItems = response;
-      } else if (response && (response as any).items) {
-        transactionItems = (response as any).items;
+      } else if (response && (response as any).data) {
+        transactionItems = (response as any).data;
       } else if (response && (response as any).transactions) {
         transactionItems = (response as any).transactions;
       }
       transactions.value = transactionItems;
 
       // 转换分页格式
-      const paginationData = response.data?.pagination || response.pagination;
+      const paginationData = response.pagination;
       if (paginationData) {
         pagination.value = {
           currentPage: paginationData.page,
