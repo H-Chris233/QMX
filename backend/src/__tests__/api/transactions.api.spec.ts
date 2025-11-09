@@ -131,8 +131,8 @@ describe('Transaction API Integration Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.data).toHaveLength(5);
-      expect(response.body.data.pagination.total).toBe(5);
+      expect(response.body.data).toHaveLength(5);
+      expect(response.body.pagination.total).toBe(5);
     });
 
     it('filters transactions by student', async () => {
@@ -143,8 +143,8 @@ describe('Transaction API Integration Tests', () => {
         .query({ student_id: student.uid })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(2);
-      response.body.data.data.forEach((tx: any) => {
+      expect(response.body.data).toHaveLength(2);
+      response.body.data.forEach((tx: any) => {
         expect(tx.student_id).toBe(student.uid);
       });
     });
@@ -155,9 +155,9 @@ describe('Transaction API Integration Tests', () => {
         .query({ page: 1, limit: 3 })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(3);
-      expect(response.body.data.pagination.page).toBe(1);
-      expect(response.body.data.pagination.limit).toBe(3);
+      expect(response.body.data).toHaveLength(3);
+      expect(response.body.pagination.page).toBe(1);
+      expect(response.body.pagination.limit).toBe(3);
     });
 
     it('sorts by created_at descending', async () => {
@@ -166,7 +166,7 @@ describe('Transaction API Integration Tests', () => {
         .query({ sort_by: 'created_at', sort_order: 'DESC' })
         .expect(200);
 
-      const transactions = response.body.data.data;
+      const transactions = response.body.data;
       for (let i = 1; i < transactions.length; i++) {
         const prev = new Date(transactions[i - 1].created_at);
         const curr = new Date(transactions[i].created_at);
@@ -189,8 +189,8 @@ describe('Transaction API Integration Tests', () => {
         .query({ min_amount: 0 })
         .expect(200);
 
-      expect(response.body.data.data.length).toBeGreaterThan(0);
-      response.body.data.data.forEach((tx: any) => {
+      expect(response.body.data.length).toBeGreaterThan(0);
+      response.body.data.forEach((tx: any) => {
         expect(tx.isIncome).toBe(true);
       });
     });
@@ -201,7 +201,7 @@ describe('Transaction API Integration Tests', () => {
         .query({ min_amount: 100, max_amount: 200 })
         .expect(200);
 
-      response.body.data.data.forEach((tx: any) => {
+      response.body.data.forEach((tx: any) => {
         expect(tx.amount).toBeGreaterThanOrEqual(100);
         expect(tx.amount).toBeLessThanOrEqual(200);
       });
@@ -222,7 +222,7 @@ describe('Transaction API Integration Tests', () => {
         })
         .expect(200);
 
-      expect(response.body.data.data.length).toBeGreaterThan(0);
+      expect(response.body.data.length).toBeGreaterThan(0);
     });
   });
 

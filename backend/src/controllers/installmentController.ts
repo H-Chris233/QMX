@@ -56,14 +56,12 @@ export class InstallmentController {
 
     const response = {
       success: true,
-      data: {
-        data: planResponses,
-        pagination: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          total_pages: Math.ceil(result.total / result.limit),
-        },
+      data: planResponses,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / result.limit),
       },
     };
 

@@ -39,6 +39,7 @@ router.use('/transactions', cashRoutes);
 router.use('/installments', installmentRoutes);
 router.use('/membership', membershipRoutes);
 router.use('/dashboard', statsRoutes);
+router.use('/stats', statsRoutes); // 统计API别名
 router.use('/adapter', adapterRoutes); // 数据库适配器路由
 router.use('/health', healthRoutes); // 健康检查路由
 

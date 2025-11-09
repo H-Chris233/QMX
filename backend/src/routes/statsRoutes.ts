@@ -47,7 +47,17 @@ router.get('/stats', statsController.getDashboardStats);
  * @desc 获取财务统计（支持周期选择）
  * @access Public
  */
-router.get('/financial-stats', 
+router.get('/financial-stats',
+  validateQuery(financialStatsSchema),
+  statsController.getFinancialStats
+);
+
+/**
+ * @route GET /api/v1/stats/financial
+ * @desc 获取财务统计（支持周期选择）- 别名路由
+ * @access Public
+ */
+router.get('/financial',
   validateQuery(financialStatsSchema),
   statsController.getFinancialStats
 );

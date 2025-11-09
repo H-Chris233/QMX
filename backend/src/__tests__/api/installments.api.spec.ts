@@ -149,8 +149,8 @@ describe('Installment API Integration Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.data).toHaveLength(3);
-      expect(response.body.data.pagination.total).toBe(3);
+      expect(response.body.data).toHaveLength(3);
+      expect(response.body.pagination.total).toBe(3);
     });
 
     it('filters plans by student', async () => {
@@ -161,8 +161,8 @@ describe('Installment API Integration Tests', () => {
         .query({ student_id: student.uid })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(2);
-      response.body.data.data.forEach((plan: any) => {
+      expect(response.body.data).toHaveLength(2);
+      response.body.data.forEach((plan: any) => {
         expect(plan.student_id).toBe(student.uid);
       });
     });
@@ -173,9 +173,9 @@ describe('Installment API Integration Tests', () => {
         .query({ page: 1, limit: 2 })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(2);
-      expect(response.body.data.pagination.page).toBe(1);
-      expect(response.body.data.pagination.limit).toBe(2);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.pagination.page).toBe(1);
+      expect(response.body.pagination.limit).toBe(2);
     });
   });
 

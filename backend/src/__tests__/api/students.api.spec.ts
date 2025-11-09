@@ -113,8 +113,8 @@ describe('Student API Integration Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.data).toHaveLength(3);
-      expect(response.body.data.pagination.total).toBe(3);
+      expect(response.body.data).toHaveLength(3);
+      expect(response.body.pagination.total).toBe(3);
     });
 
     it('filters students by class type', async () => {
@@ -123,9 +123,9 @@ describe('Student API Integration Tests', () => {
         .query({ class_type: ClassType.TEN_TRY })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(1);
-      expect(response.body.data.data[0].class).toBe(ClassType.TEN_TRY);
-      expect(response.body.data.data[0].name).toBe('Bob');
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].class).toBe(ClassType.TEN_TRY);
+      expect(response.body.data[0].name).toBe('Bob');
     });
 
     it('searches students by name', async () => {
@@ -134,8 +134,8 @@ describe('Student API Integration Tests', () => {
         .query({ name_contains: 'Ali' })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(1);
-      expect(response.body.data.data[0].name).toBe('Alice');
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].name).toBe('Alice');
     });
 
     it('paginates results correctly', async () => {
@@ -144,10 +144,10 @@ describe('Student API Integration Tests', () => {
         .query({ page: 1, limit: 2 })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(2);
-      expect(response.body.data.pagination.page).toBe(1);
-      expect(response.body.data.pagination.limit).toBe(2);
-      expect(response.body.data.pagination.total).toBe(3);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.pagination.page).toBe(1);
+      expect(response.body.pagination.limit).toBe(2);
+      expect(response.body.pagination.total).toBe(3);
     });
   });
 
@@ -279,8 +279,8 @@ describe('Student API Integration Tests', () => {
         .query({ min_score: 9, max_score: 10 })
         .expect(200);
 
-      expect(response.body.data.data.length).toBeGreaterThan(0);
-      const student = response.body.data.data[0];
+      expect(response.body.data.length).toBeGreaterThan(0);
+      const student = response.body.data[0];
       expect(student.name).toBe('High Scorer');
     });
 
@@ -290,8 +290,8 @@ describe('Student API Integration Tests', () => {
         .query({ has_membership: true })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(1);
-      expect(response.body.data.data[0].name).toBe('High Scorer');
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].name).toBe('High Scorer');
     });
 
     it('filters by active membership', async () => {
@@ -300,8 +300,8 @@ describe('Student API Integration Tests', () => {
         .query({ membership_active_at: new Date().toISOString() })
         .expect(200);
 
-      expect(response.body.data.data).toHaveLength(1);
-      expect(response.body.data.data[0].is_membership_active).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].is_membership_active).toBe(true);
     });
   });
 });

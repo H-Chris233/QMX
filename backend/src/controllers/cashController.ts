@@ -86,19 +86,15 @@ export class CashController {
 
     const responseData = result.data.map(transaction => this.presentTransaction(transaction));
 
-    const paginationResponse: IPaginatedResponse<any> = {
+    const response: IApiResponse<any> = {
+      success: true,
       data: responseData,
       pagination: {
         page: result.page,
         limit: result.limit,
         total: result.total,
-        total_pages: Math.ceil(result.total / result.limit),
+        totalPages: Math.ceil(result.total / result.limit),
       },
-    };
-
-    const response: IApiResponse<typeof paginationResponse> = {
-      success: true,
-      data: paginationResponse,
     };
 
     logger.info(`获取交易记录成功，共 ${result.total} 条记录`);
@@ -324,19 +320,15 @@ export class CashController {
 
     const responseData = result.data.map(transaction => this.presentTransaction(transaction));
 
-    const paginationResponse: IPaginatedResponse<any> = {
+    const response: IApiResponse<any> = {
+      success: true,
       data: responseData,
       pagination: {
         page: result.page,
         limit: result.limit,
         total: result.total,
-        total_pages: Math.ceil(result.total / result.limit),
+        totalPages: Math.ceil(result.total / result.limit),
       },
-    };
-
-    const response: IApiResponse<typeof paginationResponse> = {
-      success: true,
-      data: paginationResponse,
     };
 
     logger.info(`搜索现金记录完成，找到 ${result.total} 条记录`);
@@ -729,19 +721,15 @@ export class CashController {
       });
     }
 
-    const paginationResponse: IPaginatedResponse<any> = {
+    const response: IApiResponse<any> = {
+      success: true,
       data: responseData,
       pagination: {
         page: result.page,
         limit: result.limit,
         total: result.total,
-        total_pages: Math.ceil(result.total / result.limit),
+        totalPages: Math.ceil(result.total / result.limit),
       },
-    };
-
-    const response: IApiResponse<typeof paginationResponse> = {
-      success: true,
-      data: paginationResponse,
     };
 
     logger.info(`获取分期付款列表成功，共 ${result.total} 条记录`);
