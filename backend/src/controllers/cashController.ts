@@ -5,29 +5,11 @@ import { Installment } from '@/models/InstallmentMongo';
 import { InstallmentPlan, InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
 import { catchAsync } from '@/middleware/errorHandler';
 import { CashBuilder, convertAmountToCents, normalizeNote } from '@/services/cashBuilder';
-import { InstallmentStatus, PaymentFrequency } from '@/types';
+import { InstallmentStatus, PaymentFrequency, IApiResponse, IPaginatedResponse } from '@/types';
 import type { ICashSearchOptions } from '@/types';
 import type { PipelineStage } from 'mongoose';
 import logger from '@/utils/logger';
 import { AppError } from '@/utils/errors';
-
-// 类型定义
-interface IApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
-interface IPaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    total_pages: number;
-  };
-}
 
 interface CashStatsAggregate {
   _id: null;

@@ -291,6 +291,12 @@ export interface IApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages?: number;
+  };
 }
 
 // 分页响应接口
