@@ -29,12 +29,15 @@ src-tauri/data/*
 
 commit.sh
 
-# E2E Test results
+# Test results and coverage
 test-results/
 playwright-report/
 .playwright/
 test-results.xml
 test-results.json
+coverage/
+.nyc_output/
+*.lcov
 
 # Environment files
 .env
