@@ -1,0 +1,68 @@
+# Codecov Configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        if_ci_failed: error
+    
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        if_ci_failed: error
+
+  # 精确度设置
+  precision: 2
+  round: down
+  range: 70..100
+
+# 覆盖率变更注释
+comment:
+  layout: "header, diff, flags, components, footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  show_carryforward_flags: true
+
+# 忽略路径
+ignore:
+  - "tests/**/*"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/__tests__/**"
+  - "**/types/**"
+  - "**/*.d.ts"
+  - "**/mocks/**"
+  - "dist/**"
+  - "node_modules/**"
+  - "scripts/**"
+
+# Flag 管理
+flags:
+  frontend:
+    paths:
+      - src/
+    carryforward: true
+  
+  backend:
+    paths:
+      - backend/src/
+    carryforward: true
+
+# 组件覆盖率
+component_management:
+  individual_components:
+    - component_id: frontend
+      name: Frontend
+      paths:
+        - src/**
+    
+    - component_id: backend
+      name: Backend
+      paths:
+        - backend/src/**

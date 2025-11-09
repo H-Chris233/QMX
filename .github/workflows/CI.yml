@@ -127,11 +127,13 @@ jobs:
           CYPRESS_INSTALL_BINARY: 0
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
-      - name: Run frontend tests
-        run: pnpm test:frontend
+      - name: Run frontend tests with coverage
+        run: pnpm test:frontend:coverage
         timeout-minutes: 7
+        env:
+          CI: true
 
-      - name: Upload Vitest coverage
+      - name: Upload frontend coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -140,6 +142,17 @@ jobs:
             coverage/
             test-results/
           retention-days: 7
+
+      - name: Upload frontend coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # 第二阶段：后端单测
   backend-test:
@@ -183,14 +196,14 @@ jobs:
         run: pnpm build:backend
         timeout-minutes: 5
 
-      - name: Test backend
-        run: pnpm test:backend
+      - name: Test backend with coverage
+        run: pnpm test:backend:coverage
         timeout-minutes: 7
         env:
           NODE_ENV: test
           TZ: UTC
 
-      - name: Upload backend coverage
+      - name: Upload backend coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -198,6 +211,17 @@ jobs:
           path: |
             backend/coverage/
           retention-days: 7
+
+      - name: Upload backend coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # 第三阶段：构建
   build:
@@ -256,6 +280,39 @@ jobs:
     needs: [frontend-test, backend-test, build]
     if: always()
     steps:
+      - name: Download frontend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: ./frontend-coverage
+        continue-on-error: true
+
+      - name: Download backend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: ./backend-coverage
+        continue-on-error: true
+
+      - name: Display coverage summary
+        run: |
+          echo "## 📊 Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "./frontend-coverage/coverage/coverage-summary.json" ]; then
+            echo "### Frontend Coverage" >> $GITHUB_STEP_SUMMARY
+            cat ./frontend-coverage/coverage/coverage-summary.json | \
+              jq -r '.total | "- Statements: \(.statements.pct)%\n- Branches: \(.branches.pct)%\n- Functions: \(.functions.pct)%\n- Lines: \(.lines.pct)%"' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -f "./backend-coverage/coverage/coverage-summary.json" ]; then
+            echo "### Backend Coverage" >> $GITHUB_STEP_SUMMARY
+            cat ./backend-coverage/coverage/coverage-summary.json | \
+              jq -r '.total | "- Statements: \(.statements.pct)%\n- Branches: \(.branches.pct)%\n- Functions: \(.functions.pct)%\n- Lines: \(.lines.pct)%"' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Check test results
         run: |
           if [ "${{ needs.frontend-test.result }}" == "failure" ]; then
