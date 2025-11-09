@@ -87,7 +87,25 @@ export function addDays(date: Date | string, days: number): Date {
 export function addMonths(date: Date | string, months: number): Date {
   const d = toUTCDate(date);
   const result = new Date(d);
-  result.setUTCMonth(result.getUTCMonth() + months);
+
+  // 获取原始日期和月份信息
+  const originalDay = result.getUTCDate();
+  const originalMonth = result.getUTCMonth();
+  const originalYear = result.getUTCFullYear();
+
+  // 设置目标月份
+  result.setUTCMonth(originalMonth + months);
+
+  // 处理月末日期溢出（例如1月31日 + 1个月 = 2月28/29日）
+  const newMonth = result.getUTCMonth();
+  const expectedMonth = (originalMonth + months) % 12;
+
+  // 如果月份发生了溢出，说明日期超过了该月的最后一天
+  if (newMonth !== expectedMonth && (newMonth - expectedMonth + 12) % 12 === 1) {
+    // 设置为该月的最后一天
+    result.setUTCDate(0); // 设置为上个月的最后一天
+  }
+
   return result;
 }
 

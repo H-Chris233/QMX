@@ -192,25 +192,38 @@ describe('日期/时区/金额一致性回归测试', () => {
         .studentId(student.uid)
         .build();
 
-      // 手动更新日期（用于测试）
-      tx1.created_at = jan15;
-      await tx1.save();
-      
-      tx2.created_at = jan31;
-      await tx2.save();
-      
-      tx3.created_at = feb1;
-      await tx3.save();
+      // 手动更新日期（用于测试）- 使用原生MongoDB方法绕过Mongoose中间件
+      const { Cash } = await import('../models/CashMongo');
+
+      await Cash.collection.updateOne(
+        { uid: tx1.uid },
+        { $set: { created_at: jan15 } }
+      );
+      await Cash.collection.updateOne(
+        { uid: tx2.uid },
+        { $set: { created_at: jan31 } }
+      );
+      await Cash.collection.updateOne(
+        { uid: tx3.uid },
+        { $set: { created_at: feb1 } }
+      );
+
+      // 重新加载文档以获取更新后的日期
+      const [reloadTx1, reloadTx2, reloadTx3] = await Promise.all([
+        Cash.findOne({ uid: tx1.uid }),
+        Cash.findOne({ uid: tx2.uid }),
+        Cash.findOne({ uid: tx3.uid })
+      ]);
 
       // 验证金额单位一致（字段名是 cash）
-      expect(tx1.cash).toBe(10000);
-      expect(tx2.cash).toBe(20000);
-      expect(tx3.cash).toBe(30000);
+      expect(reloadTx1!.cash).toBe(10000);
+      expect(reloadTx2!.cash).toBe(20000);
+      expect(reloadTx3!.cash).toBe(30000);
 
       // 验证日期格式一致
-      expect(formatDateYYYYMMDD(tx1.created_at)).toBe('2024-01-15');
-      expect(formatDateYYYYMMDD(tx2.created_at)).toBe('2024-01-31');
-      expect(formatDateYYYYMMDD(tx3.created_at)).toBe('2024-02-01');
+      expect(formatDateYYYYMMDD(reloadTx1!.created_at)).toBe('2024-01-15');
+      expect(formatDateYYYYMMDD(reloadTx2!.created_at)).toBe('2024-01-31');
+      expect(formatDateYYYYMMDD(reloadTx3!.created_at)).toBe('2024-02-01');
     });
   });
 

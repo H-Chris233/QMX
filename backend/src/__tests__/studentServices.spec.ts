@@ -104,7 +104,7 @@ describe('Student services integration', () => {
     const afterRemove = await Student.findByUid(student.uid);
     expect(afterRemove?.rings).toEqual([8.5]);
 
-    expect(() => StudentUpdater.fromDocument(afterRemove!).updateRingAt(5, 9)).toThrow(/InvalidInput/);
+    expect(() => StudentUpdater.fromDocument(afterRemove!).updateRingAt(5, 9)).toThrow(/成绩索引超出范围/);
   });
 
   it('builds search pipelines with score and membership filters', async () => {

@@ -188,12 +188,17 @@ describe('Cash Transaction Service', () => {
     });
 
     it('filters transactions by student', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Student A' });
-      const result = await CashClass.search({ student_id: student.uid });
+      // 使用beforeEach中创建的Student A，他有2笔交易
+      // 我们需要先找到这个学生
+      const { Student } = await import('../models/mongo');
+      const students = await Student.search({ name: 'Student A' });
+      const student = students[0];
+
+      const result = await CashClass.search({ student_id: student!.uid });
 
       expect(result.data.length).toBe(2);
       result.data.forEach(tx => {
-        expect(tx.student_id).toBe(student.uid);
+        expect(tx.student_id).toBe(student!.uid);
       });
     });
 
