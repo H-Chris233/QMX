@@ -22,7 +22,21 @@ const OPTIONAL_AMOUNT_MESSAGES = {
 
 const createAmountSchema = (options?: { required?: boolean; allowNull?: boolean; disallowZero?: boolean }) => {
   const { required = true, allowNull = false, disallowZero = true } = options ?? {};
-  let schema = Joi.number().precision(2);
+  let schema = Joi.number()
+    .precision(2)
+    .custom((value: number, helpers) => {
+      // 检查是否最多2位小数
+      const decimalPart = value.toString().split('.')[1];
+      if (decimalPart && decimalPart.length > 2) {
+        return helpers.error('amount.precision');
+      }
+      return value;
+    }, '小数位验证')
+    .messages({
+      'number.base': '金额必须是数字',
+      'number.precision': '金额最多保留两位小数',
+      'amount.precision': '金额最多保留两位小数'
+    });
 
   if (disallowZero) {
     schema = schema.invalid(0);
@@ -35,6 +49,7 @@ const createAmountSchema = (options?: { required?: boolean; allowNull?: boolean;
   const messages = disallowZero ? (required ? AMOUNT_MESSAGES : OPTIONAL_AMOUNT_MESSAGES) : {
     'number.base': '金额必须是数字',
     'number.precision': '金额最多保留两位小数',
+    'amount.precision': '金额最多保留两位小数',
     ...(required ? { 'any.required': '金额不能为空' } : {}),
   };
 
