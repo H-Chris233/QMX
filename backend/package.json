@@ -38,7 +38,6 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.4",
     "rate-limiter-flexible": "^5.0.5",
-    "tsconfig-paths": "^4.2.0",
     "uuid": "^9.0.0",
     "winston": "^3.17.0"
   },

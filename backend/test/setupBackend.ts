@@ -133,19 +133,36 @@ export async function createTestApp() {
     res.json({ status: 'ok', message: '测试应用正常运行' });
   });
 
-  // 延迟加载实际的路由，避免初始化时的循环依赖
-  setTimeout(async () => {
-    try {
-      console.log('=== createTestApp: 开始加载实际路由 ===');
-      const routes = await import('../src/routes');
-      app.use('/api/v1', routes.default);
-      console.log('=== createTestApp: 路由加载完成 ===');
-    } catch (error) {
-      console.error('=== createTestApp: 路由加载失败:', error);
-    }
-  }, 100);
+  // 创建Promise来跟踪路由加载完成
+  const routesLoaded = new Promise<void>((resolve, reject) => {
+    setTimeout(async () => {
+      try {
+        console.log('=== createTestApp: 开始加载实际路由 ===');
+
+        // 加载错误处理中间件
+        const { errorHandler } = await import('../src/middleware/errorHandler');
+
+        // 加载路由
+        const routes = await import('../src/routes');
+        app.use('/api/v1', routes.default);
+
+        // 注册错误处理中间件（必须在所有路由之后）
+        app.use(errorHandler);
+
+        console.log('=== createTestApp: 路由加载完成 ===');
+        resolve();
+      } catch (error) {
+        console.error('=== createTestApp: 路由加载失败:', error);
+        reject(error);
+      }
+    }, 200); // 增加到200ms确保完全加载
+  });
 
   console.log('=== createTestApp: 最小化应用创建完成 ===');
+
+  // 等待路由加载完成
+  await routesLoaded;
+
   return app;
 }
 

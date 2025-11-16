@@ -95,18 +95,68 @@ const applyUpdaterFromPayload = (updater: StudentUpdater, payload: Record<string
 
 export class StudentController {
   public getAllStudents = catchAsync(async (req: Request, res: Response) => {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const {
+      page = 1,
+      limit = 20,
+      name_contains,
+      min_age,
+      max_age,
+      min_score,
+      max_score,
+      class_type,
+      subject,
+      has_membership,
+      membership_active_at,
+      sort_by,
+      sort_order = 'DESC',
+    } = req.query;
 
-    // 使用新的分页方法
-    const result = await Student.findWithPagination(page, limit);
+    // 检测是否有过滤参数（除了分页参数）
+    const hasFilters = Boolean(
+      name_contains || min_age || max_age || min_score || max_score ||
+      class_type || subject || has_membership || membership_active_at || sort_by
+    );
+
+    if (hasFilters) {
+      // 使用复杂查询构建器
+      const queryBuilder = StudentQuery.create()
+        .nameContains(name_contains as string | undefined)
+        .ageRange(parseNumber(min_age as string | undefined), parseNumber(max_age as string | undefined))
+        .class(class_type as ClassType | undefined)
+        .subject(subject as SubjectType | undefined)
+        .hasMembership(parseBoolean(has_membership))
+        .membershipActiveAt(membership_active_at as string | undefined)
+        .scoreRange(parseNumber(min_score as string | undefined), parseNumber(max_score as string | undefined))
+        .paginate(Number(page), Number(limit))
+        .sort(sort_by as string | undefined, (sort_order as 'ASC' | 'DESC') ?? 'DESC');
+
+      const { pipeline, countPipeline, page: currentPage, limit: currentLimit } = queryBuilder.build();
+
+      const rawStudents = await Student.aggregate(pipeline).exec();
+      const countResult = await Student.aggregate(countPipeline).exec();
+      const total = countResult[0]?.count ?? 0;
+
+      return res.json({
+        success: true,
+        data: rawStudents.map(presentStudent),
+        pagination: {
+          page: currentPage,
+          limit: currentLimit,
+          total,
+          total_pages: currentLimit > 0 ? Math.ceil(total / currentLimit) : 0,
+        },
+      });
+    }
+
+    // 简单分页查询（无过滤条件）
+    const result = await Student.findWithPagination(Number(page), Number(limit));
 
     res.json({
       success: true,
       data: result.students.map(presentStudent),
       pagination: {
-        page,
-        limit,
+        page: Number(page),
+        limit: Number(limit),
         total: result.total,
         totalPages: result.totalPages,
         hasNext: result.hasNext,

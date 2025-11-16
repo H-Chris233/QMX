@@ -43,6 +43,13 @@ const membershipExpiringSchema = Joi.object({
 router.get('/stats', statsController.getDashboardStats);
 
 /**
+ * @route GET /api/v1/stats/dashboard
+ * @desc 获取仪表板统计数据（别名路由）
+ * @access Public
+ */
+router.get('/dashboard', statsController.getDashboardStats);
+
+/**
  * @route GET /api/v1/dashboard/financial-stats
  * @desc 获取财务统计（支持周期选择）
  * @access Public
@@ -91,7 +98,17 @@ router.get('/membership-expiring',
  * @desc 获取特定学员的统计信息
  * @access Public
  */
-router.get('/students/:id/stats', 
+router.get('/students/:id/stats',
+  validateParams(Joi.object({ id: commonValidations.id })),
+  statsController.getStudentStats
+);
+
+/**
+ * @route GET /api/v1/stats/student/:id
+ * @desc 获取特定学员的统计信息（别名路由）
+ * @access Public
+ */
+router.get('/student/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
   statsController.getStudentStats
 );
