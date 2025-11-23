@@ -165,6 +165,19 @@ LOG_LEVEL=info
 LOG_FILE=./logs/app.log
 ```
 
+## 📊 代码质量与审计
+
+### 硬编码值审计（2024-11-23）
+- 🆕 [硬编码值审计总结](./HARDCODED_VALUES_SUMMARY.md) - 全面审计总结报告
+- 🆕 [前端硬编码值报告](./FRONTEND_HARDCODED_VALUES.md) - 前端47处硬编码详细分析
+- 🆕 [后端硬编码值报告](./BACKEND_HARDCODED_VALUES.md) - 后端52处硬编码详细分析
+
+**审计发现**：
+- 总共发现 **99处** 硬编码问题
+- Critical级别: 8处（需立即处理）
+- High级别: 27处
+- 包含完整的改进方案和实施路线图
+
 ## 🎯 主要功能
 
 ### 学员管理
