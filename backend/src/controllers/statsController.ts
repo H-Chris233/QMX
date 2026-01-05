@@ -1,12 +1,12 @@
-import { Request, Response } from 'express';
-import { Student } from '@/models/mongo';
-import { CashClass } from '@/models/CashMongo';
-import { Installment } from '@/models/InstallmentMongo';
-import { InstallmentPlan } from '@/models/InstallmentPlanMongo';
-import StatsService from '@/services/statsService';
-import { catchAsync } from '@/middleware/errorHandler';
-import logger from '@/utils/logger';
-import { PaymentFrequency } from '@/types';
+import { Request, Response } from "express";
+import { Student } from "@/models/mongo";
+import { CashClass } from "@/models/CashMongo";
+import { Installment } from "@/models/InstallmentMongo";
+import { InstallmentPlan } from "@/models/InstallmentPlanMongo";
+import StatsService from "@/services/statsService";
+import { catchAsync } from "@/middleware/errorHandler";
+import logger from "@/utils/logger";
+import { PaymentFrequency } from "@/types";
 
 const formatCurrency = (cents: number): number => {
   if (!Number.isFinite(cents)) {
@@ -18,625 +18,781 @@ const formatCurrency = (cents: number): number => {
 // 统计控制器 - 统一使用MongoDB数据源
 export class StatsController {
   // 获取仪表板统计数据
-  public getDashboardStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const stats = await StatsService.buildDashboardStats();
+  public getDashboardStats = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const stats = await StatsService.buildDashboardStats();
 
-    const responseData = {
-      total_students: stats.totalStudents,
-      total_revenue: formatCurrency(stats.totalRevenueCents),
-      total_expense: formatCurrency(stats.totalExpenseCents),
-      net_income: formatCurrency(stats.netIncomeCents),
-      average_score: stats.averageScore,
-      max_score: stats.maxScore,
-      active_courses: stats.activeCourses,
-      active_members: stats.activeMembers,
-      active_installments: stats.activeInstallmentPlans,
-      overdue_installments: stats.overdueInstallmentCount,
-    };
+      // 返回 camelCase 格式（与测试期望一致）
+      const responseData = {
+        totalStudents: stats.totalStudents,
+        totalRevenueCents: stats.totalRevenueCents,
+        totalExpenseCents: stats.totalExpenseCents,
+        netIncomeCents: stats.netIncomeCents,
+        averageScore: stats.averageScore,
+        maxScore: stats.maxScore,
+        activeCourses: stats.activeCourses,
+        activeMembers: stats.activeMembers,
+        activeInstallmentPlans: stats.activeInstallmentPlans,
+        overdueInstallmentCount: stats.overdueInstallmentCount,
+      };
 
-    const response = {
-      success: true,
-      data: responseData,
-    };
+      const response = {
+        success: true,
+        data: responseData,
+      };
 
-    logger.info('获取仪表板统计数据成功');
-    res.json(response);
-  });
+      logger.info("获取仪表板统计数据成功");
+      res.json(response);
+    }
+  );
 
   // 获取特定学员的统计信息
-  public getStudentStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const studentUid = Number(req.params.id);
+  public getStudentStats = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const studentUid = Number(req.params.id);
 
-    const stats = await StatsService.buildStudentStats(studentUid);
+      const stats = await StatsService.buildStudentStats(studentUid);
 
-    const responseData = {
-      total_payments: formatCurrency(stats.payments.totalAmountCents),
-      payment_count: stats.payments.count,
-      average_score: stats.scores.average,
-      max_score: stats.scores.max,
-      min_score: stats.scores.min,
-      score_count: stats.scores.count,
-      membership_status: stats.membership.label,
-      membership_status_code: stats.membership.status,
-      membership_is_active: stats.membership.isActive,
-      membership_days_remaining: stats.membership.daysRemaining,
-      membership_days_until_start: stats.membership.daysUntilStart,
-      installment_stats: {
-        total_amount: formatCurrency(stats.installments.totalAmountCents),
-        paid_amount: formatCurrency(stats.installments.paidAmountCents),
-        pending_amount: formatCurrency(stats.installments.pendingAmountCents),
-        pending_count: stats.installments.pendingCount,
-        remaining_amount: formatCurrency(stats.installments.remainingAmountCents),
-      },
-    };
+      // 返回 camelCase 格式（与测试期望一致）
+      const responseData = {
+        studentUid: stats.studentUid,
+        payments: {
+          totalAmountCents: stats.payments.totalAmountCents,
+          count: stats.payments.count,
+        },
+        scores: {
+          average: stats.scores.average,
+          max: stats.scores.max,
+          min: stats.scores.min,
+          count: stats.scores.count,
+        },
+        membership: {
+          status: stats.membership.label,
+          statusCode: stats.membership.status,
+          isActive: stats.membership.isActive,
+          daysRemaining: stats.membership.daysRemaining,
+          daysUntilStart: stats.membership.daysUntilStart,
+        },
+        installments: {
+          totalAmountCents: stats.installments.totalAmountCents,
+          paidAmountCents: stats.installments.paidAmountCents,
+          pendingAmountCents: stats.installments.pendingAmountCents,
+          pendingCount: stats.installments.pendingCount,
+          remainingAmountCents: stats.installments.remainingAmountCents,
+        },
+      };
 
-    const response = {
-      success: true,
-      data: responseData,
-    };
+      const response = {
+        success: true,
+        data: responseData,
+      };
 
-    logger.info(`获取学员统计信息成功，UID: ${stats.studentUid}`);
-    res.json(response);
-  });
+      logger.info(`获取学员统计信息成功，UID: ${stats.studentUid}`);
+      res.json(response);
+    }
+  );
 
   // 获取财务统计
-  public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const rawPeriod = typeof req.query.period === 'string' ? req.query.period : undefined;
+  public getFinancialStats = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const rawPeriod =
+        typeof req.query.period === "string" ? req.query.period : undefined;
 
-    const stats = await StatsService.buildFinancialStats(rawPeriod);
+      const stats = await StatsService.buildFinancialStats(rawPeriod);
 
-    const responseData = {
-      period: stats.period,
-      date_from: stats.dateRange.start,
-      date_to: stats.dateRange.end,
-      total_income: formatCurrency(stats.totals.incomeCents),
-      total_expense: formatCurrency(stats.totals.expenseCents),
-      net_income: formatCurrency(stats.totals.netIncomeCents),
-      net_profit: formatCurrency(stats.totals.netIncomeCents),
-      is_profitable: stats.totals.isProfitable,
-      installment_total: formatCurrency(stats.installments.totalCents),
-      installment_paid: formatCurrency(stats.installments.paidCents),
-      installment_pending: formatCurrency(stats.installments.pendingCents),
-      installment_remaining: formatCurrency(stats.installments.remainingCents),
-      transaction_count: stats.transactionCount,
-      student_income: stats.studentIncome.map(entry => ({
-        student_id: entry.studentId,
-        student_name: entry.studentName,
-        amount: formatCurrency(entry.amountCents),
-      })),
-    };
+      // 返回 camelCase 格式（与测试期望一致）
+      const responseData = {
+        period: stats.period,
+        dateRange: {
+          start: stats.dateRange.start,
+          end: stats.dateRange.end,
+        },
+        totals: {
+          incomeCents: stats.totals.incomeCents,
+          expenseCents: stats.totals.expenseCents,
+          netIncomeCents: stats.totals.netIncomeCents,
+          isProfitable: stats.totals.isProfitable,
+        },
+        installments: {
+          totalCents: stats.installments.totalCents,
+          paidCents: stats.installments.paidCents,
+          pendingCents: stats.installments.pendingCents,
+          remainingCents: stats.installments.remainingCents,
+        },
+        transactionCount: stats.transactionCount,
+        studentIncome: stats.studentIncome.map((entry) => ({
+          studentId: entry.studentId,
+          studentName: entry.studentName,
+          amountCents: entry.amountCents,
+        })),
+      };
 
-    const response = {
-      success: true,
-      data: responseData,
-    };
+      const response = {
+        success: true,
+        data: responseData,
+      };
 
-    logger.info(`获取财务统计成功，周期: ${stats.period}`);
-    res.json(response);
-  });
+      logger.info(`获取财务统计成功，周期: ${stats.period}`);
+      res.json(response);
+    }
+  );
 
   // 获取全局学员统计
-  public getGlobalStudentStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const allStudents = await Student.findAll();
+  public getGlobalStudentStats = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const allStudents = await Student.findAll();
 
-    // 计算成绩统计
-    let totalScore = 0;
-    let scoreCount = 0;
-    let maxScore = 0;
-    const studentsWithScores = allStudents.filter(student => student.rings && student.rings.length > 0);
+      // 计算成绩统计
+      let totalScore = 0;
+      let scoreCount = 0;
+      let maxScore = 0;
+      const studentsWithScores = allStudents.filter(
+        (student) => student.rings && student.rings.length > 0
+      );
 
-    studentsWithScores.forEach(student => {
-      student.rings.forEach((score: number) => {
-        totalScore += score;
-        scoreCount++;
-        maxScore = Math.max(maxScore, score);
+      studentsWithScores.forEach((student) => {
+        student.rings.forEach((score: number) => {
+          totalScore += score;
+          scoreCount++;
+          maxScore = Math.max(maxScore, score);
+        });
       });
-    });
 
-    const averageScore = scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
+      const averageScore =
+        scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
 
-    // 计算活跃课程数
-    const activeCourses = allStudents.filter(student =>
-      student.lessonLeft && student.lessonLeft > 0
-    ).length;
+      // 计算活跃课程数
+      const activeCourses = allStudents.filter(
+        (student) => student.lessonLeft && student.lessonLeft > 0
+      ).length;
 
-    // 计算活跃会员数
-    const now = new Date();
-    const activeMembers = allStudents.filter(student =>
-      student.membershipStartDate && student.membershipEndDate &&
-      student.membershipStartDate <= now && student.membershipEndDate >= now
-    ).length;
+      // 计算活跃会员数
+      const now = new Date();
+      const activeMembers = allStudents.filter(
+        (student) =>
+          student.membershipStartDate &&
+          student.membershipEndDate &&
+          student.membershipStartDate <= now &&
+          student.membershipEndDate >= now
+      ).length;
 
-    const responseData = {
-      total_students: allStudents.length,
-      students_with_scores: studentsWithScores.length,
-      average_score: averageScore,
-      max_score: maxScore,
-      active_courses: activeCourses,
-      active_members: activeMembers,
-    };
+      const responseData = {
+        total_students: allStudents.length,
+        students_with_scores: studentsWithScores.length,
+        average_score: averageScore,
+        max_score: maxScore,
+        active_courses: activeCourses,
+        active_members: activeMembers,
+      };
 
-    const response = {
-      success: true,
-      data: responseData,
-    };
+      const response = {
+        success: true,
+        data: responseData,
+      };
 
-    res.json(response);
-  });
+      res.json(response);
+    }
+  );
 
   // 获取全局财务统计
-  public getGlobalFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const transactions = await CashClass.findAll();
+  public getGlobalFinancialStats = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const transactions = await CashClass.findAll();
 
-    const totalRevenue = transactions
-      .filter(t => t.isIncome())
-      .reduce((sum, t) => sum + t.getAmount(), 0);
+      const totalRevenue = transactions
+        .filter((t) => t.isIncome())
+        .reduce((sum, t) => sum + t.getAmount(), 0);
 
-    const totalExpense = Math.abs(
-      transactions
-        .filter(t => !t.isIncome())
-        .reduce((sum, t) => sum + t.getAmount(), 0)
-    );
+      const totalExpense = Math.abs(
+        transactions
+          .filter((t) => !t.isIncome())
+          .reduce((sum, t) => sum + t.getAmount(), 0)
+      );
 
-    const netIncome = totalRevenue - totalExpense;
+      const netIncome = totalRevenue - totalExpense;
 
-    // 分期付款统计
-    const installmentPlans = await InstallmentPlan.findAll();
-    const overdueInstallments = await Installment.findOverdue();
+      // 分期付款统计
+      const installmentPlans = await InstallmentPlan.findAll();
+      const overdueInstallments = await Installment.findOverdue();
 
-    let totalInstallmentAmount = 0;
-    let paidInstallmentAmount = 0;
+      let totalInstallmentAmount = 0;
+      let paidInstallmentAmount = 0;
 
-    for (const plan of installmentPlans) {
-      totalInstallmentAmount += plan.total_amount / 100;
-      const installments = await Installment.findByPlanId(plan.uid);
-      for (const installment of installments) {
-        if (installment.status === 'Paid') {
-          paidInstallmentAmount += (installment.paid_amount || installment.installment_amount) / 100;
+      for (const plan of installmentPlans) {
+        totalInstallmentAmount += plan.total_amount / 100;
+        const installments = await Installment.findByPlanId(plan.uid);
+        for (const installment of installments) {
+          if (installment.status === "Paid") {
+            paidInstallmentAmount +=
+              (installment.paid_amount || installment.installment_amount) / 100;
+          }
         }
       }
+
+      const responseData = {
+        total_income: Number(totalRevenue.toFixed(2)),
+        total_expense: Number(totalExpense.toFixed(2)),
+        net_income: Number(netIncome.toFixed(2)),
+        net_profit: Number(netIncome.toFixed(2)),
+        is_profitable: netIncome > 0,
+        transaction_count: transactions.length,
+        installment_total: Number(totalInstallmentAmount.toFixed(2)),
+        installment_paid: Number(paidInstallmentAmount.toFixed(2)),
+        installment_pending: Number(
+          (totalInstallmentAmount - paidInstallmentAmount).toFixed(2)
+        ),
+        overdue_count: overdueInstallments.length,
+      };
+
+      const response = {
+        success: true,
+        data: responseData,
+      };
+
+      res.json(response);
     }
-
-    const responseData = {
-      total_income: Number(totalRevenue.toFixed(2)),
-      total_expense: Number(totalExpense.toFixed(2)),
-      net_income: Number(netIncome.toFixed(2)),
-      net_profit: Number(netIncome.toFixed(2)),
-      is_profitable: netIncome > 0,
-      transaction_count: transactions.length,
-      installment_total: Number(totalInstallmentAmount.toFixed(2)),
-      installment_paid: Number(paidInstallmentAmount.toFixed(2)),
-      installment_pending: Number((totalInstallmentAmount - paidInstallmentAmount).toFixed(2)),
-      overdue_count: overdueInstallments.length,
-    };
-
-    const response = {
-      success: true,
-      data: responseData,
-    };
-
-    res.json(response);
-  });
+  );
 
   // 获取即将到期的会员
-  public getMembershipExpiringSoon = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { days = 30 } = req.query;
+  public getMembershipExpiringSoon = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { days = 30 } = req.query;
 
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + Number(days));
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + Number(days));
 
-    const allStudents = await Student.findAll();
-    const expiringStudents = allStudents.filter(student => {
-      if (!student.membershipEndDate) return false;
-      const endDate = new Date(student.membershipEndDate);
-      return endDate >= new Date() && endDate <= targetDate;
-    }).sort((a, b) => {
-      const dateA = new Date(a.membershipEndDate!);
-      const dateB = new Date(b.membershipEndDate!);
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    const responseData = expiringStudents.map(student => {
-      const daysRemaining = student.getMembershipDaysRemaining();
-      return {
-        uid: student.uid,
-        name: student.name,
-        phone: student.phone,
-        class: student.class,
-        subject: student.subject,
-        membership_end_date: student.membershipEndDate,
-        days_remaining: daysRemaining,
-        is_membership_active: student.hasMembership(),
-        membership_status: daysRemaining && daysRemaining <= 7 ? '即将到期' : '正常',
-      };
-    });
-
-    const response = {
-      success: true,
-      data: responseData,
-    };
-
-    logger.info(`获取即将到期会员成功，天数: ${days}, 数量: ${responseData.length}`);
-    res.json(response);
-  });
-
-  // 获取趋势分析数据
-  public getTrendsData = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    type TrendPeriod = 'week' | 'month' | 'quarter' | 'year';
-    type TrendMetric = 'revenue' | 'expense' | 'students' | 'installments';
-
-    interface TrendTimePoint {
-      label: string;
-      rangeStart: Date;
-      rangeEnd: Date;
-      referenceDate: Date;
-    }
-
-    interface TrendDataPoint {
-      period: string;
-      value: number;
-      date: Date;
-    }
-
-    const normalizePeriod = (raw: unknown): TrendPeriod => {
-      const value = typeof raw === 'string' ? raw.toLowerCase() : 'month';
-      if (value === 'week' || value === 'quarter' || value === 'year') {
-        return value;
-      }
-      return 'month';
-    };
-
-    const normalizeMetric = (raw: unknown): TrendMetric => {
-      const value = typeof raw === 'string' ? raw.toLowerCase() : 'revenue';
-      if (value === 'expense' || value === 'students' || value === 'installments') {
-        return value;
-      }
-      return 'revenue';
-    };
-
-    const startOfDay = (date: Date): Date => {
-      const start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      return start;
-    };
-
-    const endOfDay = (date: Date): Date => {
-      const end = new Date(date);
-      end.setHours(23, 59, 59, 999);
-      return end;
-    };
-
-    const createTimePoints = (period: TrendPeriod, referenceDate: Date): TrendTimePoint[] => {
-      const points: TrendTimePoint[] = [];
-      const baseDate = startOfDay(referenceDate);
-
-      switch (period) {
-        case 'week': {
-          const iterations = 12;
-          for (let offset = iterations - 1; offset >= 0; offset--) {
-            const weekEnd = endOfDay(new Date(baseDate));
-            weekEnd.setDate(weekEnd.getDate() - offset * 7);
-
-            const weekStartSeed = new Date(weekEnd);
-            weekStartSeed.setDate(weekStartSeed.getDate() - 6);
-            const weekStart = startOfDay(weekStartSeed);
-
-            points.push({
-              label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
-              rangeStart: weekStart,
-              rangeEnd: weekEnd,
-              referenceDate: new Date(weekStart),
-            });
-          }
-          break;
-        }
-        case 'month': {
-          const iterations = 12;
-          for (let offset = iterations - 1; offset >= 0; offset--) {
-            const monthStart = startOfDay(new Date(baseDate));
-            monthStart.setMonth(monthStart.getMonth() - offset, 1);
-
-            const monthEndSeed = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-
-            points.push({
-              label: `${monthStart.getFullYear()}/${(monthStart.getMonth() + 1).toString().padStart(2, '0')}`,
-              rangeStart: monthStart,
-              rangeEnd: endOfDay(monthEndSeed),
-              referenceDate: new Date(monthStart),
-            });
-          }
-          break;
-        }
-        case 'quarter': {
-          const iterations = 8;
-          const currentQuarter = Math.floor(baseDate.getMonth() / 3);
-          for (let offset = iterations - 1; offset >= 0; offset--) {
-            const quarterIndex = currentQuarter - offset;
-            const yearOffset = Math.floor(quarterIndex / 4);
-            const normalizedQuarter = ((quarterIndex % 4) + 4) % 4;
-            const year = baseDate.getFullYear() + yearOffset;
-            const quarterStart = startOfDay(new Date(year, normalizedQuarter * 3, 1));
-            const quarterEndSeed = new Date(year, normalizedQuarter * 3 + 3, 0);
-
-            points.push({
-              label: `${year}Q${normalizedQuarter + 1}`,
-              rangeStart: quarterStart,
-              rangeEnd: endOfDay(quarterEndSeed),
-              referenceDate: new Date(quarterStart),
-            });
-          }
-          break;
-        }
-        case 'year': {
-          const iterations = 5;
-          for (let offset = iterations - 1; offset >= 0; offset--) {
-            const year = baseDate.getFullYear() - offset;
-            const yearStart = startOfDay(new Date(year, 0, 1));
-            const yearEndSeed = new Date(year, 11, 31);
-
-            points.push({
-              label: `${year}`,
-              rangeStart: yearStart,
-              rangeEnd: endOfDay(yearEndSeed),
-              referenceDate: new Date(yearStart),
-            });
-          }
-          break;
-        }
-      }
-
-      return points;
-    };
-
-    const trendPeriod = normalizePeriod(req.query.period);
-    const trendMetric = normalizeMetric(req.query.type);
-    const now = new Date();
-    const timePoints = createTimePoints(trendPeriod, now);
-    const dataPoints: TrendDataPoint[] = [];
-
-    for (const point of timePoints) {
-      let rawValue = 0;
-
-      switch (trendMetric) {
-        case 'revenue': {
-          const { data: revenueTransactions } = await CashClass.search({
-            dateFrom: point.rangeStart,
-            dateTo: point.rangeEnd,
-            isIncome: true,
-            limit: 200,
-            page: 1,
-          });
-          const totalRevenue = revenueTransactions.reduce<number>((sum, transaction) => sum + transaction.getAmount(), 0);
-          rawValue = totalRevenue;
-          break;
-        }
-        case 'expense': {
-          const { data: expenseTransactions } = await CashClass.search({
-            dateFrom: point.rangeStart,
-            dateTo: point.rangeEnd,
-            isIncome: false,
-            limit: 200,
-            page: 1,
-          });
-          const totalExpense = expenseTransactions.reduce<number>((sum, transaction) => sum + transaction.getAmount(), 0);
-          rawValue = totalExpense;
-          break;
-        }
-        case 'students': {
-          const count = await Student.count({
-            createdAt: { $gte: point.rangeStart, $lte: point.rangeEnd },
-          });
-          rawValue = count;
-          break;
-        }
-        case 'installments': {
-          const installmentPlans = await InstallmentPlan.search({
-            created_at: { $gte: point.rangeStart, $lte: point.rangeEnd },
-          });
-          rawValue = installmentPlans.length;
-          break;
-        }
-      }
-
-      const isCurrencyMetric = trendMetric === 'revenue' || trendMetric === 'expense';
-      const normalizedValue = isCurrencyMetric
-        ? Number(rawValue.toFixed(2))
-        : rawValue;
-
-      dataPoints.push({
-        period: point.label,
-        value: normalizedValue,
-        date: point.referenceDate,
-      });
-    }
-
-    const aggregate = (values: number[], formatter: (value: number) => number): number => {
-      if (values.length === 0) {
-        return 0;
-      }
-      const sum = values.reduce((total, value) => total + value, 0);
-      return formatter(sum);
-    };
-
-    const metricsFormatter = (value: number): number => Number(value.toFixed(2));
-
-    const total = aggregate(dataPoints.map(point => point.value), metricsFormatter);
-    const average = dataPoints.length > 0
-      ? metricsFormatter(dataPoints.reduce((sum, point) => sum + point.value, 0) / dataPoints.length)
-      : 0;
-    const max = dataPoints.length > 0 ? metricsFormatter(Math.max(...dataPoints.map(point => point.value))) : 0;
-    const min = dataPoints.length > 0 ? metricsFormatter(Math.min(...dataPoints.map(point => point.value))) : 0;
-
-    const response = {
-      success: true,
-      data: {
-        type: trendMetric,
-        period: trendPeriod,
-        data_points: dataPoints,
-        total,
-        average,
-        max,
-        min,
-      },
-    };
-
-    logger.info(`获取趋势分析数据成功，类型: ${trendMetric}, 周期: ${trendPeriod}`);
-    res.json(response);
-  });
-
-  // 获取课程分布统计
-  public getCourseDistribution = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const allStudents = await Student.findAll();
-
-    // 按班级统计
-    const classDistribution = new Map<string, number>();
-    // 按科目统计
-    const subjectDistribution = new Map<string, number>();
-
-    allStudents.forEach(student => {
-      const className = student.class || 'Others';
-      const subjectName = student.subject || 'Others';
-
-      classDistribution.set(className, (classDistribution.get(className) || 0) + 1);
-      subjectDistribution.set(subjectName, (subjectDistribution.get(subjectName) || 0) + 1);
-    });
-
-    const response = {
-      success: true,
-      data: {
-        class_distribution: Array.from(classDistribution.entries()).map(([name, count]) => ({
-          name,
-          count,
-          percentage: Number(((count / allStudents.length) * 100).toFixed(1))
-        })),
-        subject_distribution: Array.from(subjectDistribution.entries()).map(([name, count]) => ({
-          name,
-          count,
-          percentage: Number(((count / allStudents.length) * 100).toFixed(1))
-        })),
-        total_students: allStudents.length,
-      },
-    };
-
-    logger.info('获取课程分布统计成功');
-    res.json(response);
-  });
-
-  // 获取成绩分布统计
-  public getScoreDistribution = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const allStudents = await Student.findAll();
-
-    const scoreRanges = [
-      { label: '0-4分', min: 0, max: 4, count: 0 },
-      { label: '4-6分', min: 4, max: 6, count: 0 },
-      { label: '6-8分', min: 6, max: 8, count: 0 },
-      { label: '8-9分', min: 8, max: 9, count: 0 },
-      { label: '9-10分', min: 9, max: 10, count: 0 },
-    ];
-
-    let totalScores = 0;
-    let scoreCount = 0;
-
-    allStudents.forEach(student => {
-      if (student.rings && student.rings.length > 0) {
-        student.rings.forEach((score: number) => {
-          totalScores += score;
-          scoreCount++;
-
-          // 分类统计
-          for (const range of scoreRanges) {
-            if (score >= range.min && (score < range.max || (range.max === 10 && score === range.max))) {
-              range.count++;
-              break;
-            }
-          }
+      const allStudents = await Student.findAll();
+      const expiringStudents = allStudents
+        .filter((student) => {
+          if (!student.membershipEndDate) return false;
+          const endDate = new Date(student.membershipEndDate);
+          return endDate >= new Date() && endDate <= targetDate;
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.membershipEndDate!);
+          const dateB = new Date(b.membershipEndDate!);
+          return dateA.getTime() - dateB.getTime();
         });
-      }
-    });
 
-    const averageScore = scoreCount > 0 ? totalScores / scoreCount : 0;
-
-    const response = {
-      success: true,
-      data: {
-        score_ranges: scoreRanges.map(range => ({
-          ...range,
-          percentage: scoreCount > 0 ? Number(((range.count / scoreCount) * 100).toFixed(1)) : 0
-        })),
-        average_score: Number(averageScore.toFixed(2)),
-        total_scores: scoreCount,
-        students_with_scores: allStudents.filter(s => s.rings && s.rings.length > 0).length,
-      },
-    };
-
-    logger.info('获取成绩分布统计成功');
-    res.json(response);
-  });
-
-  // 获取逾期分期付款统计
-  public getOverdueInstallments = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const overdueInstallments = await Installment.findOverdue();
-
-    const responseData = await Promise.all(overdueInstallments.map(async (installment) => {
-      const plan = await InstallmentPlan.findByUid(installment.plan_id);
-      const student = plan?.student_id ? await Student.findByUid(plan.student_id) : null;
-
-      return {
-        uid: installment.uid,
-        plan_id: installment.plan_id,
-        current_installment: installment.current_installment,
-        total_installments: installment.total_installments,
-        installment_amount: installment.installment_amount / 100,
-        due_date: installment.due_date,
-        days_overdue: installment.getDaysOverdue(),
-        overdue_amount: (installment.installment_amount / 100) * (1 + installment.getDaysOverdue() * 0.01),
-        plan: plan ? {
-          frequency: plan.frequency,
-          frequency_text: this.getFrequencyText(plan.frequency, plan.custom_days),
-          total_amount: plan.total_amount / 100,
-        } : null,
-        student: student ? {
+      const responseData = expiringStudents.map((student) => {
+        const daysRemaining = student.getMembershipDaysRemaining();
+        return {
           uid: student.uid,
           name: student.name,
           phone: student.phone,
-        } : null,
+          class: student.class,
+          subject: student.subject,
+          membership_end_date: student.membershipEndDate,
+          days_remaining: daysRemaining,
+          is_membership_active: student.hasMembership(),
+          membership_status:
+            daysRemaining && daysRemaining <= 7 ? "即将到期" : "正常",
+        };
+      });
+
+      const response = {
+        success: true,
+        data: responseData,
       };
-    }));
 
-    const totalOverdueAmount = responseData.reduce((sum, item) => sum + item.overdue_amount, 0);
+      logger.info(
+        `获取即将到期会员成功，天数: ${days}, 数量: ${responseData.length}`
+      );
+      res.json(response);
+    }
+  );
 
-    const response = {
-      success: true,
-      data: {
-        overdue_installments: responseData,
-        total_overdue_count: responseData.length,
-        total_overdue_amount: Number(totalOverdueAmount.toFixed(2)),
-        average_days_overdue: responseData.length > 0 ?
-          Math.round(responseData.reduce((sum, item) => sum + item.days_overdue, 0) / responseData.length) : 0,
-      },
-    };
+  // 获取趋势分析数据
+  public getTrendsData = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      type TrendPeriod = "week" | "month" | "quarter" | "year";
+      type TrendMetric = "revenue" | "expense" | "students" | "installments";
 
-    logger.info(`获取逾期分期付款统计成功，逾期数量: ${responseData.length}, 逾期金额: ¥${totalOverdueAmount.toFixed(2)}`);
-    res.json(response);
-  });
+      interface TrendTimePoint {
+        label: string;
+        rangeStart: Date;
+        rangeEnd: Date;
+        referenceDate: Date;
+      }
+
+      interface TrendDataPoint {
+        period: string;
+        value: number;
+        date: Date;
+      }
+
+      const normalizePeriod = (raw: unknown): TrendPeriod => {
+        const value = typeof raw === "string" ? raw.toLowerCase() : "month";
+        if (value === "week" || value === "quarter" || value === "year") {
+          return value;
+        }
+        return "month";
+      };
+
+      const normalizeMetric = (raw: unknown): TrendMetric => {
+        const value = typeof raw === "string" ? raw.toLowerCase() : "revenue";
+        if (
+          value === "expense" ||
+          value === "students" ||
+          value === "installments"
+        ) {
+          return value;
+        }
+        return "revenue";
+      };
+
+      const startOfDay = (date: Date): Date => {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        return start;
+      };
+
+      const endOfDay = (date: Date): Date => {
+        const end = new Date(date);
+        end.setHours(23, 59, 59, 999);
+        return end;
+      };
+
+      const createTimePoints = (
+        period: TrendPeriod,
+        referenceDate: Date
+      ): TrendTimePoint[] => {
+        const points: TrendTimePoint[] = [];
+        const baseDate = startOfDay(referenceDate);
+
+        switch (period) {
+          case "week": {
+            const iterations = 12;
+            for (let offset = iterations - 1; offset >= 0; offset--) {
+              const weekEnd = endOfDay(new Date(baseDate));
+              weekEnd.setDate(weekEnd.getDate() - offset * 7);
+
+              const weekStartSeed = new Date(weekEnd);
+              weekStartSeed.setDate(weekStartSeed.getDate() - 6);
+              const weekStart = startOfDay(weekStartSeed);
+
+              points.push({
+                label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+                rangeStart: weekStart,
+                rangeEnd: weekEnd,
+                referenceDate: new Date(weekStart),
+              });
+            }
+            break;
+          }
+          case "month": {
+            const iterations = 12;
+            for (let offset = iterations - 1; offset >= 0; offset--) {
+              const monthStart = startOfDay(new Date(baseDate));
+              monthStart.setMonth(monthStart.getMonth() - offset, 1);
+
+              const monthEndSeed = new Date(
+                monthStart.getFullYear(),
+                monthStart.getMonth() + 1,
+                0
+              );
+
+              points.push({
+                label: `${monthStart.getFullYear()}/${(
+                  monthStart.getMonth() + 1
+                )
+                  .toString()
+                  .padStart(2, "0")}`,
+                rangeStart: monthStart,
+                rangeEnd: endOfDay(monthEndSeed),
+                referenceDate: new Date(monthStart),
+              });
+            }
+            break;
+          }
+          case "quarter": {
+            const iterations = 8;
+            const currentQuarter = Math.floor(baseDate.getMonth() / 3);
+            for (let offset = iterations - 1; offset >= 0; offset--) {
+              const quarterIndex = currentQuarter - offset;
+              const yearOffset = Math.floor(quarterIndex / 4);
+              const normalizedQuarter = ((quarterIndex % 4) + 4) % 4;
+              const year = baseDate.getFullYear() + yearOffset;
+              const quarterStart = startOfDay(
+                new Date(year, normalizedQuarter * 3, 1)
+              );
+              const quarterEndSeed = new Date(
+                year,
+                normalizedQuarter * 3 + 3,
+                0
+              );
+
+              points.push({
+                label: `${year}Q${normalizedQuarter + 1}`,
+                rangeStart: quarterStart,
+                rangeEnd: endOfDay(quarterEndSeed),
+                referenceDate: new Date(quarterStart),
+              });
+            }
+            break;
+          }
+          case "year": {
+            const iterations = 5;
+            for (let offset = iterations - 1; offset >= 0; offset--) {
+              const year = baseDate.getFullYear() - offset;
+              const yearStart = startOfDay(new Date(year, 0, 1));
+              const yearEndSeed = new Date(year, 11, 31);
+
+              points.push({
+                label: `${year}`,
+                rangeStart: yearStart,
+                rangeEnd: endOfDay(yearEndSeed),
+                referenceDate: new Date(yearStart),
+              });
+            }
+            break;
+          }
+        }
+
+        return points;
+      };
+
+      const trendPeriod = normalizePeriod(req.query.period);
+      const trendMetric = normalizeMetric(req.query.type);
+      const now = new Date();
+      const timePoints = createTimePoints(trendPeriod, now);
+      const dataPoints: TrendDataPoint[] = [];
+
+      for (const point of timePoints) {
+        let rawValue = 0;
+
+        switch (trendMetric) {
+          case "revenue": {
+            const { data: revenueTransactions } = await CashClass.search({
+              dateFrom: point.rangeStart,
+              dateTo: point.rangeEnd,
+              isIncome: true,
+              limit: 200,
+              page: 1,
+            });
+            const totalRevenue = revenueTransactions.reduce<number>(
+              (sum, transaction) => sum + transaction.getAmount(),
+              0
+            );
+            rawValue = totalRevenue;
+            break;
+          }
+          case "expense": {
+            const { data: expenseTransactions } = await CashClass.search({
+              dateFrom: point.rangeStart,
+              dateTo: point.rangeEnd,
+              isIncome: false,
+              limit: 200,
+              page: 1,
+            });
+            const totalExpense = expenseTransactions.reduce<number>(
+              (sum, transaction) => sum + transaction.getAmount(),
+              0
+            );
+            rawValue = totalExpense;
+            break;
+          }
+          case "students": {
+            const count = await Student.count({
+              createdAt: { $gte: point.rangeStart, $lte: point.rangeEnd },
+            });
+            rawValue = count;
+            break;
+          }
+          case "installments": {
+            const installmentPlans = await InstallmentPlan.search({
+              created_at: { $gte: point.rangeStart, $lte: point.rangeEnd },
+            });
+            rawValue = installmentPlans.length;
+            break;
+          }
+        }
+
+        const isCurrencyMetric =
+          trendMetric === "revenue" || trendMetric === "expense";
+        const normalizedValue = isCurrencyMetric
+          ? Number(rawValue.toFixed(2))
+          : rawValue;
+
+        dataPoints.push({
+          period: point.label,
+          value: normalizedValue,
+          date: point.referenceDate,
+        });
+      }
+
+      const aggregate = (
+        values: number[],
+        formatter: (value: number) => number
+      ): number => {
+        if (values.length === 0) {
+          return 0;
+        }
+        const sum = values.reduce((total, value) => total + value, 0);
+        return formatter(sum);
+      };
+
+      const metricsFormatter = (value: number): number =>
+        Number(value.toFixed(2));
+
+      const total = aggregate(
+        dataPoints.map((point) => point.value),
+        metricsFormatter
+      );
+      const average =
+        dataPoints.length > 0
+          ? metricsFormatter(
+              dataPoints.reduce((sum, point) => sum + point.value, 0) /
+                dataPoints.length
+            )
+          : 0;
+      const max =
+        dataPoints.length > 0
+          ? metricsFormatter(
+              Math.max(...dataPoints.map((point) => point.value))
+            )
+          : 0;
+      const min =
+        dataPoints.length > 0
+          ? metricsFormatter(
+              Math.min(...dataPoints.map((point) => point.value))
+            )
+          : 0;
+
+      const response = {
+        success: true,
+        data: {
+          type: trendMetric,
+          period: trendPeriod,
+          data_points: dataPoints,
+          total,
+          average,
+          max,
+          min,
+        },
+      };
+
+      logger.info(
+        `获取趋势分析数据成功，类型: ${trendMetric}, 周期: ${trendPeriod}`
+      );
+      res.json(response);
+    }
+  );
+
+  // 获取课程分布统计
+  public getCourseDistribution = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const allStudents = await Student.findAll();
+
+      // 按班级统计
+      const classDistribution = new Map<string, number>();
+      // 按科目统计
+      const subjectDistribution = new Map<string, number>();
+
+      allStudents.forEach((student) => {
+        const className = student.class || "Others";
+        const subjectName = student.subject || "Others";
+
+        classDistribution.set(
+          className,
+          (classDistribution.get(className) || 0) + 1
+        );
+        subjectDistribution.set(
+          subjectName,
+          (subjectDistribution.get(subjectName) || 0) + 1
+        );
+      });
+
+      const response = {
+        success: true,
+        data: {
+          class_distribution: Array.from(classDistribution.entries()).map(
+            ([name, count]) => ({
+              name,
+              count,
+              percentage: Number(
+                ((count / allStudents.length) * 100).toFixed(1)
+              ),
+            })
+          ),
+          subject_distribution: Array.from(subjectDistribution.entries()).map(
+            ([name, count]) => ({
+              name,
+              count,
+              percentage: Number(
+                ((count / allStudents.length) * 100).toFixed(1)
+              ),
+            })
+          ),
+          total_students: allStudents.length,
+        },
+      };
+
+      logger.info("获取课程分布统计成功");
+      res.json(response);
+    }
+  );
+
+  // 获取成绩分布统计
+  public getScoreDistribution = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const allStudents = await Student.findAll();
+
+      const scoreRanges = [
+        { label: "0-4分", min: 0, max: 4, count: 0 },
+        { label: "4-6分", min: 4, max: 6, count: 0 },
+        { label: "6-8分", min: 6, max: 8, count: 0 },
+        { label: "8-9分", min: 8, max: 9, count: 0 },
+        { label: "9-10分", min: 9, max: 10, count: 0 },
+      ];
+
+      let totalScores = 0;
+      let scoreCount = 0;
+
+      allStudents.forEach((student) => {
+        if (student.rings && student.rings.length > 0) {
+          student.rings.forEach((score: number) => {
+            totalScores += score;
+            scoreCount++;
+
+            // 分类统计
+            for (const range of scoreRanges) {
+              if (
+                score >= range.min &&
+                (score < range.max || (range.max === 10 && score === range.max))
+              ) {
+                range.count++;
+                break;
+              }
+            }
+          });
+        }
+      });
+
+      const averageScore = scoreCount > 0 ? totalScores / scoreCount : 0;
+
+      const response = {
+        success: true,
+        data: {
+          score_ranges: scoreRanges.map((range) => ({
+            ...range,
+            percentage:
+              scoreCount > 0
+                ? Number(((range.count / scoreCount) * 100).toFixed(1))
+                : 0,
+          })),
+          average_score: Number(averageScore.toFixed(2)),
+          total_scores: scoreCount,
+          students_with_scores: allStudents.filter(
+            (s) => s.rings && s.rings.length > 0
+          ).length,
+        },
+      };
+
+      logger.info("获取成绩分布统计成功");
+      res.json(response);
+    }
+  );
+
+  // 获取逾期分期付款统计
+  public getOverdueInstallments = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const overdueInstallments = await Installment.findOverdue();
+
+      const responseData = await Promise.all(
+        overdueInstallments.map(async (installment) => {
+          const plan = await InstallmentPlan.findByUid(installment.plan_id);
+          const student = plan?.student_id
+            ? await Student.findByUid(plan.student_id)
+            : null;
+
+          return {
+            uid: installment.uid,
+            plan_id: installment.plan_id,
+            current_installment: installment.current_installment,
+            total_installments: installment.total_installments,
+            installment_amount: installment.installment_amount / 100,
+            due_date: installment.due_date,
+            days_overdue: installment.getDaysOverdue(),
+            overdue_amount:
+              (installment.installment_amount / 100) *
+              (1 + installment.getDaysOverdue() * 0.01),
+            plan: plan
+              ? {
+                  frequency: plan.frequency,
+                  frequency_text: this.getFrequencyText(
+                    plan.frequency,
+                    plan.custom_days
+                  ),
+                  total_amount: plan.total_amount / 100,
+                }
+              : null,
+            student: student
+              ? {
+                  uid: student.uid,
+                  name: student.name,
+                  phone: student.phone,
+                }
+              : null,
+          };
+        })
+      );
+
+      const totalOverdueAmount = responseData.reduce(
+        (sum, item) => sum + item.overdue_amount,
+        0
+      );
+
+      const response = {
+        success: true,
+        data: {
+          overdue_installments: responseData,
+          total_overdue_count: responseData.length,
+          total_overdue_amount: Number(totalOverdueAmount.toFixed(2)),
+          average_days_overdue:
+            responseData.length > 0
+              ? Math.round(
+                  responseData.reduce(
+                    (sum, item) => sum + item.days_overdue,
+                    0
+                  ) / responseData.length
+                )
+              : 0,
+        },
+      };
+
+      logger.info(
+        `获取逾期分期付款统计成功，逾期数量: ${
+          responseData.length
+        }, 逾期金额: ¥${totalOverdueAmount.toFixed(2)}`
+      );
+      res.json(response);
+    }
+  );
 
   // 私有辅助方法：获取频率文本
-  private getFrequencyText(frequency: PaymentFrequency | string, customDays?: number | null): string {
-    const safeCustomDays = typeof customDays === 'number' && Number.isFinite(customDays) && customDays > 0
-      ? customDays
-      : null;
+  private getFrequencyText(
+    frequency: PaymentFrequency | string,
+    customDays?: number | null
+  ): string {
+    const safeCustomDays =
+      typeof customDays === "number" &&
+      Number.isFinite(customDays) &&
+      customDays > 0
+        ? customDays
+        : null;
 
     switch (frequency) {
       case PaymentFrequency.WEEKLY:
-        return '周付';
+        return "周付";
       case PaymentFrequency.MONTHLY:
-        return '月付';
+        return "月付";
       case PaymentFrequency.QUARTERLY:
-        return '季付';
+        return "季付";
       case PaymentFrequency.CUSTOM:
-        return safeCustomDays ? `${safeCustomDays}天一次` : '自定义';
+        return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
       default:
-        return typeof frequency === 'string' ? frequency : String(frequency);
+        return typeof frequency === "string" ? frequency : String(frequency);
     }
   }
 }
