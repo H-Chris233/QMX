@@ -1,8 +1,8 @@
 /**
  * 会员管理 API 服务
  */
-import { baseClient, apiCall } from './baseClient';
-import type { Student, MembershipData, MembershipType } from '../types/api';
+import { baseClient, apiCall } from "./baseClient";
+import type { Student, MembershipData, MembershipType } from "../types/api";
 
 /**
  * 会员统计数据类型
@@ -27,12 +27,12 @@ export class MembershipApiService {
     membership: MembershipData
   ): Promise<Student> {
     const payload = {
-      membership_start_date: membership.startDate,
-      membership_end_date: membership.endDate,
+      startDate: membership.startDate,
+      endDate: membership.endDate,
     };
 
     return apiCall<Student>(
-      baseClient.patch(`/membership/students/${studentId}/membership`, payload)
+      baseClient.post(`/membership/students/${studentId}/membership`, payload)
     );
   }
 
@@ -54,13 +54,16 @@ export class MembershipApiService {
     startDate?: string
   ): Promise<Student> {
     const payload: Record<string, any> = { type };
-    
+
     if (startDate) {
       payload.start_date = startDate;
     }
 
     return apiCall<Student>(
-      baseClient.post(`/membership/students/${studentId}/membership/type`, payload)
+      baseClient.post(
+        `/membership/students/${studentId}/membership/type`,
+        payload
+      )
     );
   }
 
@@ -74,7 +77,10 @@ export class MembershipApiService {
     const payload = { type };
 
     return apiCall<Student>(
-      baseClient.post(`/membership/students/${studentId}/membership/renew`, payload)
+      baseClient.post(
+        `/membership/students/${studentId}/membership/renew`,
+        payload
+      )
     );
   }
 
@@ -82,9 +88,7 @@ export class MembershipApiService {
    * 获取会员统计数据
    */
   static async getMembershipStats(): Promise<MembershipStats> {
-    return apiCall<MembershipStats>(
-      baseClient.get('/membership/stats')
-    );
+    return apiCall<MembershipStats>(baseClient.get("/membership/stats"));
   }
 
   /**
@@ -100,8 +104,6 @@ export class MembershipApiService {
       membership_end_date: membership.endDate,
     };
 
-    return apiCall(
-      baseClient.post('/membership/batch', payload)
-    );
+    return apiCall(baseClient.post("/membership/batch", payload));
   }
 }
