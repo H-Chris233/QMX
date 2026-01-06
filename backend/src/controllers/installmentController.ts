@@ -4,9 +4,9 @@ import { CashClass } from "@/models/CashMongo";
 import { Installment, IInstallmentDoc } from "@/models/InstallmentMongo";
 import {
   InstallmentPlan,
-  InstallmentPlanStatus,
   IInstallmentPlanDoc,
 } from "@/models/InstallmentPlanMongo";
+import { InstallmentPlanStatus } from "@/types";
 import { catchAsync } from "@/middleware/errorHandler";
 import {
   CashBuilder,
