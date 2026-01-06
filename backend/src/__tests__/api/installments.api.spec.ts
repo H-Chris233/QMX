@@ -1,19 +1,19 @@
-import request from 'supertest';
-import { PaymentFrequency, InstallmentStatus } from '@/types';
-import { InstallmentPlanStatus } from '@/models/InstallmentPlanMongo';
-import { 
+import request from "supertest";
+import { PaymentFrequency, InstallmentStatus } from "@/types";
+import { InstallmentPlanStatus } from "@/types";
+import {
   setupTestDatabase,
   cleanupTestDatabase,
   clearAllCollections,
   resetAllSequences,
-  createTestApp, 
-  TestDataFactory, 
-  dateUtils 
-} from '../../../test/setupBackend';
+  createTestApp,
+  TestDataFactory,
+  dateUtils,
+} from "../../../test/setupBackend";
 
 jest.setTimeout(30000);
 
-describe('Installment API Integration Tests', () => {
+describe("Installment API Integration Tests", () => {
   let app: any;
 
   beforeAll(async () => {
@@ -30,20 +30,20 @@ describe('Installment API Integration Tests', () => {
     await cleanupTestDatabase();
   });
 
-  describe('POST /api/v1/installments', () => {
-    it('creates monthly installment plan', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'John Doe' });
+  describe("POST /api/v1/installments", () => {
+    it("creates monthly installment plan", async () => {
+      const student = await TestDataFactory.createStudent({ name: "John Doe" });
       const startDate = new Date();
 
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           student_id: student.uid,
           total_amount: 1200,
           total_installments: 4,
           frequency: PaymentFrequency.MONTHLY,
           start_date: startDate.toISOString(),
-          note: 'Annual course',
+          note: "Annual course",
         })
         .expect(201);
 
@@ -56,11 +56,11 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.data.installments).toHaveLength(4);
     });
 
-    it('creates weekly installment plan', async () => {
+    it("creates weekly installment plan", async () => {
       const startDate = new Date();
 
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           total_amount: 400,
           total_installments: 4,
@@ -71,17 +71,17 @@ describe('Installment API Integration Tests', () => {
 
       expect(response.body.data.plan.frequency).toBe(PaymentFrequency.WEEKLY);
       expect(response.body.data.installments).toHaveLength(4);
-      
+
       const installments = response.body.data.installments;
       expect(installments[0].installment_amount).toBe(10000);
       expect(installments[1].current_installment).toBe(2);
     });
 
-    it('creates custom frequency installment plan', async () => {
+    it("creates custom frequency installment plan", async () => {
       const startDate = new Date();
 
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           total_amount: 600,
           total_installments: 3,
@@ -95,22 +95,22 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.data.plan.custom_days).toBe(15);
     });
 
-    it('rejects plan without required fields', async () => {
+    it("rejects plan without required fields", async () => {
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({})
         .expect(400);
 
       expect(response.body.success).toBe(false);
     });
 
-    it('rejects plan with invalid frequency', async () => {
+    it("rejects plan with invalid frequency", async () => {
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           total_amount: 1000,
           total_installments: 4,
-          frequency: 'INVALID',
+          frequency: "INVALID",
           start_date: new Date().toISOString(),
         })
         .expect(400);
@@ -118,9 +118,9 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.success).toBe(false);
     });
 
-    it('rejects custom frequency without custom_days', async () => {
+    it("rejects custom frequency without custom_days", async () => {
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           total_amount: 1000,
           total_installments: 4,
@@ -133,19 +133,41 @@ describe('Installment API Integration Tests', () => {
     });
   });
 
-  describe('GET /api/v1/installments', () => {
+  describe("GET /api/v1/installments", () => {
     beforeEach(async () => {
-      const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
-      const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
+      const student1 = await TestDataFactory.createStudent({
+        name: "Student 1",
+      });
+      const student2 = await TestDataFactory.createStudent({
+        name: "Student 2",
+      });
 
-      await TestDataFactory.createInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date(), student1.uid);
-      await TestDataFactory.createInstallmentPlan(2000, 3, PaymentFrequency.WEEKLY, new Date(), student1.uid);
-      await TestDataFactory.createInstallmentPlan(1500, 5, PaymentFrequency.MONTHLY, new Date(), student2.uid);
+      await TestDataFactory.createInstallmentPlan(
+        1000,
+        4,
+        PaymentFrequency.MONTHLY,
+        new Date(),
+        student1.uid
+      );
+      await TestDataFactory.createInstallmentPlan(
+        2000,
+        3,
+        PaymentFrequency.WEEKLY,
+        new Date(),
+        student1.uid
+      );
+      await TestDataFactory.createInstallmentPlan(
+        1500,
+        5,
+        PaymentFrequency.MONTHLY,
+        new Date(),
+        student2.uid
+      );
     });
 
-    it('retrieves all installment plans with pagination', async () => {
+    it("retrieves all installment plans with pagination", async () => {
       const response = await request(app)
-        .get('/api/v1/installments')
+        .get("/api/v1/installments")
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -153,11 +175,13 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.pagination.total).toBe(3);
     });
 
-    it('filters plans by student', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Student 1' });
+    it("filters plans by student", async () => {
+      const student = await TestDataFactory.createStudent({
+        name: "Student 1",
+      });
 
       const response = await request(app)
-        .get('/api/v1/installments')
+        .get("/api/v1/installments")
         .query({ student_id: student.uid })
         .expect(200);
 
@@ -167,9 +191,9 @@ describe('Installment API Integration Tests', () => {
       });
     });
 
-    it('paginates results', async () => {
+    it("paginates results", async () => {
       const response = await request(app)
-        .get('/api/v1/installments')
+        .get("/api/v1/installments")
         .query({ page: 1, limit: 2 })
         .expect(200);
 
@@ -179,9 +203,9 @@ describe('Installment API Integration Tests', () => {
     });
   });
 
-  describe('GET /api/v1/installments/:id', () => {
-    it('retrieves installment plan with details', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Test' });
+  describe("GET /api/v1/installments/:id", () => {
+    it("retrieves installment plan with details", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Test" });
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         3,
@@ -199,18 +223,18 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.data.student_id).toBe(student.uid);
     });
 
-    it('returns 404 for non-existent plan', async () => {
+    it("returns 404 for non-existent plan", async () => {
       const response = await request(app)
-        .get('/api/v1/installments/99999')
+        .get("/api/v1/installments/99999")
         .expect(404);
 
       expect(response.body.success).toBe(false);
     });
   });
 
-  describe('GET /api/v1/installments/overdue', () => {
-    it('retrieves overdue installments', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Test' });
+  describe("GET /api/v1/installments/overdue", () => {
+    it("retrieves overdue installments", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Test" });
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
@@ -242,7 +266,7 @@ describe('Installment API Integration Tests', () => {
       );
 
       const response = await request(app)
-        .get('/api/v1/installments/overdue')
+        .get("/api/v1/installments/overdue")
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -252,7 +276,7 @@ describe('Installment API Integration Tests', () => {
       });
     });
 
-    it('excludes paid installments from overdue list', async () => {
+    it("excludes paid installments from overdue list", async () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
@@ -273,16 +297,16 @@ describe('Installment API Integration Tests', () => {
       );
 
       const response = await request(app)
-        .get('/api/v1/installments/overdue')
+        .get("/api/v1/installments/overdue")
         .expect(200);
 
       expect(response.body.data.length).toBe(0);
     });
   });
 
-  describe('PUT /api/v1/installments/:id/payment', () => {
-    it('marks installment as paid', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Test' });
+  describe("PUT /api/v1/installments/:id/payment", () => {
+    it("marks installment as paid", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Test" });
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
@@ -310,13 +334,15 @@ describe('Installment API Integration Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.installment.status).toBe(InstallmentStatus.PAID);
+      expect(response.body.data.installment.status).toBe(
+        InstallmentStatus.PAID
+      );
       expect(response.body.data.installment.paid_amount).toBe(30000);
       expect(response.body.data.cashTransaction).toBeDefined();
     });
 
-    it('creates cash transaction when payment is made', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Test' });
+    it("creates cash transaction when payment is made", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Test" });
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
@@ -351,9 +377,9 @@ describe('Installment API Integration Tests', () => {
       expect(cashTx.installment.plan_uid).toBe(plan.uid);
     });
 
-    it('returns 404 for non-existent installment', async () => {
+    it("returns 404 for non-existent installment", async () => {
       const response = await request(app)
-        .put('/api/v1/installments/99999/payment')
+        .put("/api/v1/installments/99999/payment")
         .send({
           status: InstallmentStatus.PAID,
           amount: 100,
@@ -363,7 +389,7 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.success).toBe(false);
     });
 
-    it('rejects invalid payment status', async () => {
+    it("rejects invalid payment status", async () => {
       const installment = await TestDataFactory.createInstallment(
         1,
         null,
@@ -377,7 +403,7 @@ describe('Installment API Integration Tests', () => {
       const response = await request(app)
         .put(`/api/v1/installments/${installment.uid}/payment`)
         .send({
-          status: 'INVALID_STATUS',
+          status: "INVALID_STATUS",
           amount: 300,
         })
         .expect(400);
@@ -386,8 +412,8 @@ describe('Installment API Integration Tests', () => {
     });
   });
 
-  describe('DELETE /api/v1/installments/:id', () => {
-    it('deletes installment plan', async () => {
+  describe("DELETE /api/v1/installments/:id", () => {
+    it("deletes installment plan", async () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
@@ -409,17 +435,17 @@ describe('Installment API Integration Tests', () => {
       expect(getResponse.body.success).toBe(false);
     });
 
-    it('returns 404 for non-existent plan', async () => {
+    it("returns 404 for non-existent plan", async () => {
       const response = await request(app)
-        .delete('/api/v1/installments/99999')
+        .delete("/api/v1/installments/99999")
         .expect(404);
 
       expect(response.body.success).toBe(false);
     });
   });
 
-  describe('Installment Plan Response Format', () => {
-    it('includes all required fields', async () => {
+  describe("Installment Plan Response Format", () => {
+    it("includes all required fields", async () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
@@ -433,24 +459,24 @@ describe('Installment API Integration Tests', () => {
         .expect(200);
 
       const data = response.body.data;
-      expect(data).toHaveProperty('uid');
-      expect(data).toHaveProperty('total_amount');
-      expect(data).toHaveProperty('totalAmount');
-      expect(data).toHaveProperty('total_installments');
-      expect(data).toHaveProperty('totalInstallments');
-      expect(data).toHaveProperty('frequency');
-      expect(data).toHaveProperty('start_date');
-      expect(data).toHaveProperty('startDate');
-      expect(data).toHaveProperty('status');
-      expect(data).toHaveProperty('is_active');
-      expect(data).toHaveProperty('isActive');
+      expect(data).toHaveProperty("uid");
+      expect(data).toHaveProperty("total_amount");
+      expect(data).toHaveProperty("totalAmount");
+      expect(data).toHaveProperty("total_installments");
+      expect(data).toHaveProperty("totalInstallments");
+      expect(data).toHaveProperty("frequency");
+      expect(data).toHaveProperty("start_date");
+      expect(data).toHaveProperty("startDate");
+      expect(data).toHaveProperty("status");
+      expect(data).toHaveProperty("is_active");
+      expect(data).toHaveProperty("isActive");
     });
   });
 
-  describe('Edge Cases', () => {
-    it('handles single installment plan', async () => {
+  describe("Edge Cases", () => {
+    it("handles single installment plan", async () => {
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           total_amount: 500,
           total_installments: 1,
@@ -463,9 +489,9 @@ describe('Installment API Integration Tests', () => {
       expect(response.body.data.installments).toHaveLength(1);
     });
 
-    it('handles large number of installments', async () => {
+    it("handles large number of installments", async () => {
       const response = await request(app)
-        .post('/api/v1/installments')
+        .post("/api/v1/installments")
         .send({
           total_amount: 12000,
           total_installments: 12,

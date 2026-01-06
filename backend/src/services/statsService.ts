@@ -1,17 +1,22 @@
-import { AppError } from '@/utils/errors';
-import { CashClass } from '@/models/CashMongo';
-import { Installment, type IInstallmentDoc } from '@/models/InstallmentMongo';
+import { AppError } from "@/utils/errors";
+import { CashClass } from "@/models/CashMongo";
+import { Installment, type IInstallmentDoc } from "@/models/InstallmentMongo";
 import {
   InstallmentPlan,
   InstallmentPlanModel,
-  InstallmentPlanStatus,
-} from '@/models/InstallmentPlanMongo';
-import { Student, type IStudentDoc } from '@/models/mongo';
-import { ClassType, InstallmentStatus, MembershipStatus } from '@/types';
-import type { Aggregate, PipelineStage } from 'mongoose';
+} from "@/models/InstallmentPlanMongo";
+import { InstallmentPlanStatus } from "@/types";
+import { Student, type IStudentDoc } from "@/models/mongo";
+import { ClassType, InstallmentStatus, MembershipStatus } from "@/types";
+import type { Aggregate, PipelineStage } from "mongoose";
 
-const FINANCIAL_PERIODS = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
-export type FinancialPeriod = typeof FINANCIAL_PERIODS[number];
+const FINANCIAL_PERIODS = [
+  "Today",
+  "ThisWeek",
+  "ThisMonth",
+  "ThisYear",
+] as const;
+export type FinancialPeriod = (typeof FINANCIAL_PERIODS)[number];
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -119,7 +124,7 @@ export class StatsService {
     if (period && FINANCIAL_PERIODS.includes(period as FinancialPeriod)) {
       return period as FinancialPeriod;
     }
-    return 'ThisMonth';
+    return "ThisMonth";
   }
 
   static async buildDashboardStats(): Promise<DashboardStatsData> {
@@ -129,21 +134,22 @@ export class StatsService {
           _id: null,
           revenue: {
             $sum: {
-              $cond: [{ $gt: ['$cash', 0] }, '$cash', 0],
+              $cond: [{ $gt: ["$cash", 0] }, "$cash", 0],
             },
           },
           expense: {
             $sum: {
-              $cond: [{ $lt: ['$cash', 0] }, '$cash', 0],
+              $cond: [{ $lt: ["$cash", 0] }, "$cash", 0],
             },
           },
         },
       },
     ];
 
-    const [cashAggregate] = await this.executeCashAggregate<CashRevenueExpenseAggregateRow>(
-      revenueExpensePipeline,
-    );
+    const [cashAggregate] =
+      await this.executeCashAggregate<CashRevenueExpenseAggregateRow>(
+        revenueExpensePipeline
+      );
 
     const totalRevenueCents = Number(cashAggregate?.revenue ?? 0);
     const totalExpenseCents = Math.abs(Number(cashAggregate?.expense ?? 0));
@@ -180,9 +186,8 @@ export class StatsService {
       }
     }
 
-    const averageScore = scoreCount > 0
-      ? Number((totalScore / scoreCount).toFixed(1))
-      : 0;
+    const averageScore =
+      scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
 
     const activeInstallmentPlans = await InstallmentPlanModel.countDocuments({
       status: InstallmentPlanStatus.ACTIVE,
@@ -204,10 +209,12 @@ export class StatsService {
     };
   }
 
-  static async buildStudentStats(studentUid: number): Promise<StudentStatsData> {
+  static async buildStudentStats(
+    studentUid: number
+  ): Promise<StudentStatsData> {
     const student = await Student.findByUid(studentUid);
     if (!student) {
-      throw AppError.notFound('学员不存在');
+      throw AppError.notFound("学员不存在");
     }
 
     const studentIncomePipeline: PipelineStage[] = [
@@ -221,33 +228,38 @@ export class StatsService {
           _id: null,
           totalIncome: {
             $sum: {
-              $cond: [{ $gt: ['$cash', 0] }, '$cash', 0],
+              $cond: [{ $gt: ["$cash", 0] }, "$cash", 0],
             },
           },
           incomeCount: {
             $sum: {
-              $cond: [{ $gt: ['$cash', 0] }, 1, 0],
+              $cond: [{ $gt: ["$cash", 0] }, 1, 0],
             },
           },
         },
       },
     ];
 
-    const [cashAggregate] = await this.executeCashAggregate<StudentIncomeSummaryAggregateRow>(
-      studentIncomePipeline,
-    );
+    const [cashAggregate] =
+      await this.executeCashAggregate<StudentIncomeSummaryAggregateRow>(
+        studentIncomePipeline
+      );
 
     const totalIncomeCents = Number(cashAggregate?.totalIncome ?? 0);
     const incomeCount = Number(cashAggregate?.incomeCount ?? 0);
 
     const plans = await InstallmentPlan.findAll({ student_id: studentUid });
-    const planIds = plans.map(plan => plan.uid);
+    const planIds = plans.map((plan) => plan.uid);
 
-    const installments = planIds.length > 0
-      ? await Installment.findAll({ plan_id: { $in: planIds } })
-      : await Installment.findAll({ student_id: studentUid });
+    const installments =
+      planIds.length > 0
+        ? await Installment.findAll({ plan_id: { $in: planIds } })
+        : await Installment.findAll({ student_id: studentUid });
 
-    const totalInstallmentCents = plans.reduce((sum, plan) => sum + Number(plan.total_amount ?? 0), 0);
+    const totalInstallmentCents = plans.reduce(
+      (sum, plan) => sum + Number(plan.total_amount ?? 0),
+      0
+    );
 
     let paidInstallmentCents = 0;
     let pendingAmountCents = 0;
@@ -256,7 +268,10 @@ export class StatsService {
     for (const installment of installments) {
       if (installment.status === InstallmentStatus.PAID) {
         const paidAmount = Number(installment.paid_amount ?? 0);
-        paidInstallmentCents += paidAmount > 0 ? paidAmount : Number(installment.installment_amount ?? 0);
+        paidInstallmentCents +=
+          paidAmount > 0
+            ? paidAmount
+            : Number(installment.installment_amount ?? 0);
       } else if (
         installment.status === InstallmentStatus.PENDING ||
         installment.status === InstallmentStatus.OVERDUE
@@ -273,14 +288,16 @@ export class StatsService {
       : 0;
     const scoreCount = Array.isArray(student.rings) ? student.rings.length : 0;
 
-    const averageScore = scoreCount > 0
-      ? Number((totalScore / scoreCount).toFixed(1))
-      : 0;
+    const averageScore =
+      scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
 
     const maxScore = scoreCount > 0 ? Math.max(...student.rings) : 0;
     const minScore = scoreCount > 0 ? Math.min(...student.rings) : 0;
 
-    const remainingAmountCents = Math.max(totalInstallmentCents - paidInstallmentCents, 0);
+    const remainingAmountCents = Math.max(
+      totalInstallmentCents - paidInstallmentCents,
+      0
+    );
     const totalAmountCents = totalInstallmentCents;
     const paidAmountCents = paidInstallmentCents;
 
@@ -307,7 +324,9 @@ export class StatsService {
     };
   }
 
-  static async buildFinancialStats(period: FinancialPeriod | string = 'ThisMonth'): Promise<FinancialStatsData> {
+  static async buildFinancialStats(
+    period: FinancialPeriod | string = "ThisMonth"
+  ): Promise<FinancialStatsData> {
     const normalizedPeriod = StatsService.normalizeFinancialPeriod(period);
     const dateRange = StatsService.resolveDateRange(normalizedPeriod);
 
@@ -322,12 +341,12 @@ export class StatsService {
           _id: null,
           incomeCents: {
             $sum: {
-              $cond: [{ $gt: ['$cash', 0] }, '$cash', 0],
+              $cond: [{ $gt: ["$cash", 0] }, "$cash", 0],
             },
           },
           expenseCents: {
             $sum: {
-              $cond: [{ $lt: ['$cash', 0] }, '$cash', 0],
+              $cond: [{ $lt: ["$cash", 0] }, "$cash", 0],
             },
           },
           transactionCount: {
@@ -337,9 +356,10 @@ export class StatsService {
       },
     ];
 
-    const [cashAggregate] = await this.executeCashAggregate<CashIncomeSummaryAggregateRow>(
-      cashPipeline,
-    );
+    const [cashAggregate] =
+      await this.executeCashAggregate<CashIncomeSummaryAggregateRow>(
+        cashPipeline
+      );
 
     const incomeCents = Number(cashAggregate?.incomeCents ?? 0);
     const expenseCents = Math.abs(Number(cashAggregate?.expenseCents ?? 0));
@@ -355,19 +375,20 @@ export class StatsService {
       },
       {
         $group: {
-          _id: '$student_id',
-          amountCents: { $sum: '$cash' },
+          _id: "$student_id",
+          amountCents: { $sum: "$cash" },
         },
       },
       { $sort: { amountCents: -1 } },
       { $limit: 10 },
     ];
 
-    const studentIncomeAggregate = await this.executeCashAggregate<CashStudentIncomeAggregateRow>(
-      studentIncomeAggregatePipeline,
-    );
+    const studentIncomeAggregate =
+      await this.executeCashAggregate<CashStudentIncomeAggregateRow>(
+        studentIncomeAggregatePipeline
+      );
 
-    const studentIds = studentIncomeAggregate.map(entry => entry._id);
+    const studentIds = studentIncomeAggregate.map((entry) => entry._id);
     const studentNameMap = new Map<number, string>();
 
     if (studentIds.length > 0) {
@@ -375,29 +396,38 @@ export class StatsService {
         { $match: { uid: { $in: studentIds } } },
         { $project: { uid: 1, name: 1 } },
       ];
-      const studentDocs = await this.executeStudentAggregate<StudentNameProjection>(studentNamePipeline);
+      const studentDocs =
+        await this.executeStudentAggregate<StudentNameProjection>(
+          studentNamePipeline
+        );
 
       for (const doc of studentDocs) {
         studentNameMap.set(doc.uid, doc.name);
       }
     }
 
-    const studentIncome: StudentIncomeEntry[] = studentIncomeAggregate.map(entry => ({
-      studentId: entry._id,
-      studentName: studentNameMap.get(entry._id) ?? `学员${entry._id}`,
-      amountCents: Number(entry.amountCents ?? 0),
-    }));
+    const studentIncome: StudentIncomeEntry[] = studentIncomeAggregate.map(
+      (entry) => ({
+        studentId: entry._id,
+        studentName: studentNameMap.get(entry._id) ?? `学员${entry._id}`,
+        amountCents: Number(entry.amountCents ?? 0),
+      })
+    );
 
     const plans = await InstallmentPlan.findAll({
       created_at: { $gte: dateRange.start, $lt: dateRange.end },
     });
 
-    const planIds = plans.map(plan => plan.uid);
-    const installments = planIds.length > 0
-      ? await Installment.findAll({ plan_id: { $in: planIds } })
-      : [];
+    const planIds = plans.map((plan) => plan.uid);
+    const installments =
+      planIds.length > 0
+        ? await Installment.findAll({ plan_id: { $in: planIds } })
+        : [];
 
-    const totalInstallmentCents = plans.reduce((sum, plan) => sum + Number(plan.total_amount ?? 0), 0);
+    const totalInstallmentCents = plans.reduce(
+      (sum, plan) => sum + Number(plan.total_amount ?? 0),
+      0
+    );
 
     let paidInstallmentCents = 0;
     let pendingInstallmentCents = 0;
@@ -405,16 +435,23 @@ export class StatsService {
     for (const installment of installments) {
       if (installment.status === InstallmentStatus.PAID) {
         const paidAmount = Number(installment.paid_amount ?? 0);
-        paidInstallmentCents += paidAmount > 0 ? paidAmount : Number(installment.installment_amount ?? 0);
+        paidInstallmentCents +=
+          paidAmount > 0
+            ? paidAmount
+            : Number(installment.installment_amount ?? 0);
       } else if (
         installment.status === InstallmentStatus.PENDING ||
         installment.status === InstallmentStatus.OVERDUE
       ) {
-        pendingInstallmentCents += StatsService.getInstallmentRemaining(installment);
+        pendingInstallmentCents +=
+          StatsService.getInstallmentRemaining(installment);
       }
     }
 
-    const remainingInstallmentCents = Math.max(totalInstallmentCents - paidInstallmentCents, 0);
+    const remainingInstallmentCents = Math.max(
+      totalInstallmentCents - paidInstallmentCents,
+      0
+    );
 
     return {
       period: normalizedPeriod,
@@ -436,19 +473,26 @@ export class StatsService {
     };
   }
 
-  private static async executeCashAggregate<T>(pipeline: PipelineStage[]): Promise<T[]> {
+  private static async executeCashAggregate<T>(
+    pipeline: PipelineStage[]
+  ): Promise<T[]> {
     const aggregate = CashClass.aggregate(pipeline) as Aggregate<unknown[]>;
     const result = await aggregate.exec();
     return result as T[];
   }
 
-  private static async executeStudentAggregate<T>(pipeline: PipelineStage[]): Promise<T[]> {
+  private static async executeStudentAggregate<T>(
+    pipeline: PipelineStage[]
+  ): Promise<T[]> {
     const aggregate = Student.aggregate(pipeline) as Aggregate<unknown[]>;
     const result = await aggregate.exec();
     return result as T[];
   }
 
-  private static resolveDateRange(period: FinancialPeriod, reference = new Date()): DateRange {
+  private static resolveDateRange(
+    period: FinancialPeriod,
+    reference = new Date()
+  ): DateRange {
     const now = new Date(reference);
     now.setHours(0, 0, 0, 0);
 
@@ -456,13 +500,13 @@ export class StatsService {
     let end: Date;
 
     switch (period) {
-      case 'Today': {
+      case "Today": {
         start = new Date(now);
         end = new Date(start);
         end.setDate(end.getDate() + 1);
         break;
       }
-      case 'ThisWeek': {
+      case "ThisWeek": {
         start = new Date(now);
         const dayOfWeek = start.getDay();
         start.setDate(start.getDate() - dayOfWeek);
@@ -470,12 +514,12 @@ export class StatsService {
         end.setDate(end.getDate() + 7);
         break;
       }
-      case 'ThisYear': {
+      case "ThisYear": {
         start = new Date(now.getFullYear(), 0, 1);
         end = new Date(now.getFullYear() + 1, 0, 1);
         break;
       }
-      case 'ThisMonth':
+      case "ThisMonth":
       default: {
         start = new Date(now.getFullYear(), now.getMonth(), 1);
         end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -489,11 +533,14 @@ export class StatsService {
     };
   }
 
-  private static summarizeMembership(student: IStudentDoc, reference = new Date()): MembershipSummary {
+  private static summarizeMembership(
+    student: IStudentDoc,
+    reference = new Date()
+  ): MembershipSummary {
     if (!student.membershipStartDate || !student.membershipEndDate) {
       return {
         status: MembershipStatus.NONE,
-        label: '无会员',
+        label: "无会员",
         daysRemaining: null,
         daysUntilStart: null,
         isActive: false,
@@ -517,7 +564,7 @@ export class StatsService {
 
       return {
         status: MembershipStatus.ACTIVE,
-        label: '会员有效',
+        label: "会员有效",
         daysRemaining,
         daysUntilStart: 0,
         isActive: true,
@@ -525,7 +572,10 @@ export class StatsService {
     }
 
     if (student.membershipStartDate > now) {
-      const daysUntilStart = StatsService.calculateDaysBetween(now, student.membershipStartDate);
+      const daysUntilStart = StatsService.calculateDaysBetween(
+        now,
+        student.membershipStartDate
+      );
       return {
         status: MembershipStatus.UPCOMING,
         label: `会员未开始 (${daysUntilStart}天后)`,
@@ -537,7 +587,7 @@ export class StatsService {
 
     return {
       status: MembershipStatus.EXPIRED,
-      label: '会员已过期',
+      label: "会员已过期",
       daysRemaining: 0,
       daysUntilStart: null,
       isActive: false,
@@ -553,7 +603,7 @@ export class StatsService {
   }
 
   private static getInstallmentRemaining(installment: IInstallmentDoc): number {
-    if (typeof installment.getRemainingAmount === 'function') {
+    if (typeof installment.getRemainingAmount === "function") {
       return Number(installment.getRemainingAmount() ?? 0);
     }
     const paidAmount = Number(installment.paid_amount ?? 0);
