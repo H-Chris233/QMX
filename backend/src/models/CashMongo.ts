@@ -1,10 +1,20 @@
-import mongoose, { Schema, Document, FilterQuery, Model, PipelineStage, Aggregate } from 'mongoose';
-import { AppError } from '@/utils/errors';
-import { getNextSequence, CASH_SEQUENCE_NAME } from './counter';
-import type { ICashInstallmentSnapshot, ICashSearchOptions } from '@/types';
+import mongoose, {
+  Schema,
+  Document,
+  FilterQuery,
+  Model,
+  PipelineStage,
+  Aggregate,
+} from "mongoose";
+import { AppError } from "@/utils/errors";
+import { getNextSequence, CASH_SEQUENCE_NAME } from "./counter";
+import { normalizePositiveInteger } from "@/utils/numberUtils";
+import type { ICashInstallmentSnapshot, ICashSearchOptions } from "@/types";
 
 // Custom type for MongoDB filter operators since mongoose doesn't export FilterOperators
-type FilterOperators<T> = Partial<Record<'$gt' | '$gte' | '$lt' | '$lte' | '$eq' | '$ne' | '$in' | '$nin', T>>;
+type FilterOperators<T> = Partial<
+  Record<"$gt" | "$gte" | "$lt" | "$lte" | "$eq" | "$ne" | "$in" | "$nin", T>
+>;
 
 export interface ICashCreatePayload {
   student_id?: number | null;
@@ -35,89 +45,101 @@ export interface ICashPaginatedResult {
   limit: number;
 }
 
-const ALLOWED_SORT_FIELDS = new Set(['uid', 'student_id', 'cash', 'created_at', 'updated_at']);
+const ALLOWED_SORT_FIELDS = new Set([
+  "uid",
+  "student_id",
+  "cash",
+  "created_at",
+  "updated_at",
+]);
 
-const InstallmentSnapshotSchema = new Schema<ICashInstallmentSnapshot>({
-  plan_uid: {
-    type: Number,
-    required: true,
-    comment: '分期计划UID'
+const InstallmentSnapshotSchema = new Schema<ICashInstallmentSnapshot>(
+  {
+    plan_uid: {
+      type: Number,
+      required: true,
+      comment: "分期计划UID",
+    },
+    installment_uid: {
+      type: Number,
+      default: null,
+      comment: "分期记录UID",
+    },
+    installment_number: {
+      type: Number,
+      default: null,
+      comment: "当前期号",
+    },
+    total_installments: {
+      type: Number,
+      default: null,
+      comment: "总期数快照",
+    },
+    due_date: {
+      type: Date,
+      default: null,
+      comment: "应付款日期",
+    },
+    status: {
+      type: String,
+      default: null,
+      comment: "分期状态快照",
+    },
+    note: {
+      type: String,
+      default: null,
+      comment: "分期备注快照",
+    },
   },
-  installment_uid: {
-    type: Number,
-    default: null,
-    comment: '分期记录UID'
-  },
-  installment_number: {
-    type: Number,
-    default: null,
-    comment: '当前期号'
-  },
-  total_installments: {
-    type: Number,
-    default: null,
-    comment: '总期数快照'
-  },
-  due_date: {
-    type: Date,
-    default: null,
-    comment: '应付款日期'
-  },
-  status: {
-    type: String,
-    default: null,
-    comment: '分期状态快照'
-  },
-  note: {
-    type: String,
-    default: null,
-    comment: '分期备注快照'
-  }
-}, { _id: false });
+  { _id: false }
+);
 
-const CashSchema = new Schema<ICashDoc>({
-  uid: {
-    type: Number,
-    required: true,
-    unique: true,
-    index: true,
-    comment: '交易唯一ID'
+const CashSchema = new Schema<ICashDoc>(
+  {
+    uid: {
+      type: Number,
+      required: true,
+      unique: true,
+      index: true,
+      comment: "交易唯一ID",
+    },
+    student_id: {
+      type: Number,
+      default: null,
+      index: true,
+      comment: "关联学员UID",
+    },
+    cash: {
+      type: Number,
+      required: true,
+      comment: "金额（分为单位，正数收入负数支出）",
+    },
+    note: {
+      type: String,
+      default: null,
+      trim: true,
+      comment: "备注信息",
+    },
+    installment: {
+      type: InstallmentSnapshotSchema,
+      default: null,
+      comment: "关联分期快照",
+    },
   },
-  student_id: {
-    type: Number,
-    default: null,
-    index: true,
-    comment: '关联学员UID'
-  },
-  cash: {
-    type: Number,
-    required: true,
-    comment: '金额（分为单位，正数收入负数支出）'
-  },
-  note: {
-    type: String,
-    default: null,
-    trim: true,
-    comment: '备注信息'
-  },
-  installment: {
-    type: InstallmentSnapshotSchema,
-    default: null,
-    comment: '关联分期快照'
+  {
+    timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+    collection: "cash_transactions",
+    versionKey: false,
   }
-}, {
-  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
-  collection: 'cash_transactions',
-  versionKey: false
-});
+);
 
 CashSchema.index({ created_at: -1 });
 CashSchema.index({ student_id: 1, created_at: -1 });
-CashSchema.index({ 'installment.plan_uid': 1 });
+CashSchema.index({ "installment.plan_uid": 1 });
 
-CashSchema.pre('validate', function ensureNonZeroAmount(this: ICashDoc, next) {
+CashSchema.pre("validate", function ensureNonZeroAmount(this: ICashDoc, next) {
   if (this.cash === 0) {
-    next(AppError.invalidInput('交易金额不能为0'));
+    next(AppError.invalidInput("交易金额不能为0"));
     return;
   }
   next();
@@ -128,9 +150,11 @@ CashSchema.methods.getAmount = function getAmount(this: ICashDoc): number {
   return Number(amount.toFixed(2));
 };
 
-CashSchema.methods.getFormattedAmount = function getFormattedAmount(this: ICashDoc): string {
+CashSchema.methods.getFormattedAmount = function getFormattedAmount(
+  this: ICashDoc
+): string {
   const amount = this.getAmount().toFixed(2);
-  const sign = this.cash >= 0 ? '+' : '-';
+  const sign = this.cash >= 0 ? "+" : "-";
   return `${sign}¥${amount}`;
 };
 
@@ -138,10 +162,11 @@ CashSchema.methods.isIncome = function isIncome(this: ICashDoc): boolean {
   return this.cash > 0;
 };
 
-CashSchema.methods.getTransactionDescription = function getTransactionDescription(this: ICashDoc): string {
-  const prefix = this.isIncome() ? '收入' : '支出';
-  return `${prefix} ¥${this.getAmount().toFixed(2)}`;
-};
+CashSchema.methods.getTransactionDescription =
+  function getTransactionDescription(this: ICashDoc): string {
+    const prefix = this.isIncome() ? "收入" : "支出";
+    return `${prefix} ¥${this.getAmount().toFixed(2)}`;
+  };
 
 CashSchema.methods.toJSON = function toJSON(this: ICashDoc) {
   const isIncome = this.isIncome();
@@ -168,12 +193,13 @@ CashSchema.methods.toJSON = function toJSON(this: ICashDoc) {
     created_at: this.created_at,
     createdAt: this.created_at,
     updated_at: this.updated_at,
-    updatedAt: this.updated_at
+    updatedAt: this.updated_at,
   };
 };
 
-const CashModel: Model<ICashDoc> = (mongoose.models.CashTransaction as Model<ICashDoc> | undefined)
-  ?? mongoose.model<ICashDoc>('CashTransaction', CashSchema);
+const CashModel: Model<ICashDoc> =
+  (mongoose.models.CashTransaction as Model<ICashDoc> | undefined) ??
+  mongoose.model<ICashDoc>("CashTransaction", CashSchema);
 
 export class CashClass {
   static async create(payload: ICashCreatePayload): Promise<ICashDoc> {
@@ -185,7 +211,7 @@ export class CashClass {
       student_id: payload.student_id ?? null,
       cash,
       note: payload.note?.trim() ? payload.note.trim() : null,
-      installment: payload.installment ?? null
+      installment: payload.installment ?? null,
     });
 
     return doc;
@@ -204,7 +230,9 @@ export class CashClass {
     return await CashModel.find().sort({ created_at: -1 }).exec();
   }
 
-  static aggregate<TResult = unknown>(pipeline: PipelineStage[]): Aggregate<TResult[]> {
+  static aggregate<TResult = unknown>(
+    pipeline: PipelineStage[]
+  ): Aggregate<TResult[]> {
     return CashModel.aggregate<TResult>(pipeline);
   }
 
@@ -214,8 +242,8 @@ export class CashClass {
     limit = 20,
     sort: Record<string, 1 | -1> = { created_at: -1 }
   ): Promise<ICashPaginatedResult> {
-    const safePage = this.normalizePositiveInteger(page, 1);
-    const safeLimit = this.normalizePositiveInteger(limit, 1, 200);
+    const safePage = normalizePositiveInteger(page, 1);
+    const safeLimit = normalizePositiveInteger(limit, 1, 200);
     const skip = (safePage - 1) * safeLimit;
 
     const [data, total] = await Promise.all([
@@ -226,7 +254,9 @@ export class CashClass {
     return { data, total, page: safePage, limit: safeLimit };
   }
 
-  static async search(options: ICashSearchOptions = {}): Promise<ICashPaginatedResult> {
+  static async search(
+    options: ICashSearchOptions = {}
+  ): Promise<ICashPaginatedResult> {
     const { filter, page, limit, sort } = this.buildSearchQuery(options);
     const skip = (page - 1) * limit;
 
@@ -250,11 +280,15 @@ export class CashClass {
     }
 
     const cashRange: FilterOperators<number> = {};
-    const minAmount = this.normalizeAmountFilter(options.minAmount ?? options.min_amount);
+    const minAmount = this.normalizeAmountFilter(
+      options.minAmount ?? options.min_amount
+    );
     if (minAmount !== undefined) {
       cashRange.$gte = minAmount;
     }
-    const maxAmount = this.normalizeAmountFilter(options.maxAmount ?? options.max_amount);
+    const maxAmount = this.normalizeAmountFilter(
+      options.maxAmount ?? options.max_amount
+    );
     if (maxAmount !== undefined) {
       cashRange.$lte = maxAmount;
     }
@@ -279,33 +313,42 @@ export class CashClass {
       dateRange.$lte = this.normalizeDate(to);
     }
     if (Object.keys(dateRange).length > 0) {
-      filter.created_at = this.mergeFilterOperators<Date>(filter.created_at, dateRange);
+      filter.created_at = this.mergeFilterOperators<Date>(
+        filter.created_at,
+        dateRange
+      );
     }
 
     if (this.isFilterOperatorObject<Date>(options.created_at)) {
-      filter.created_at = this.mergeFilterOperators<Date>(filter.created_at, options.created_at);
+      filter.created_at = this.mergeFilterOperators<Date>(
+        filter.created_at,
+        options.created_at
+      );
     }
 
     const hasInstallment = options.hasInstallment ?? options.has_installment;
     if (hasInstallment === true) {
-      const notNullInstallment: FilterOperators<ICashInstallmentSnapshot | null> = { $ne: null };
+      const notNullInstallment: FilterOperators<ICashInstallmentSnapshot | null> =
+        { $ne: null };
       filter.installment = notNullInstallment;
     } else if (hasInstallment === false) {
       const noInstallmentFilter: FilterQuery<ICashDoc>[] = [
         { installment: { $exists: false } },
-        { installment: null }
+        { installment: null },
       ];
       filter.$or = noInstallmentFilter;
     }
 
-    const page = this.normalizePositiveInteger(options.page ?? 1, 1);
-    const limit = this.normalizePositiveInteger(options.limit ?? 20, 1, 200);
+    const page = normalizePositiveInteger(options.page ?? 1, 1);
+    const limit = normalizePositiveInteger(options.limit ?? 20, 1, 200);
 
-    const rawSortBy = options.sortBy ?? options.sort_by ?? 'created_at';
-    const normalizedSortBy = ALLOWED_SORT_FIELDS.has(rawSortBy) ? rawSortBy : 'created_at';
-    const rawSortOrder = options.sortOrder ?? options.sort_order ?? 'DESC';
+    const rawSortBy = options.sortBy ?? options.sort_by ?? "created_at";
+    const normalizedSortBy = ALLOWED_SORT_FIELDS.has(rawSortBy)
+      ? rawSortBy
+      : "created_at";
+    const rawSortOrder = options.sortOrder ?? options.sort_order ?? "DESC";
     const sort: Record<string, 1 | -1> = {
-      [normalizedSortBy]: rawSortOrder === 'ASC' ? 1 : -1
+      [normalizedSortBy]: rawSortOrder === "ASC" ? 1 : -1,
     };
 
     return { filter, page, limit, sort };
@@ -321,39 +364,30 @@ export class CashClass {
     return update;
   }
 
-  private static isFilterOperatorObject<T>(value: unknown): value is FilterOperators<T> {
-    return typeof value === 'object'
-      && value !== null
-      && !Array.isArray(value)
-      && !(value instanceof Date);
+  private static isFilterOperatorObject<T>(
+    value: unknown
+  ): value is FilterOperators<T> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      !(value instanceof Date)
+    );
   }
 
-  private static normalizePositiveInteger(value: unknown, min = 1, max = Number.MAX_SAFE_INTEGER): number {
-    const num = Number(value);
-    if (!Number.isFinite(num)) {
-      return min;
-    }
-    const normalized = Math.floor(num);
-    if (normalized < min) {
-      return min;
-    }
-    if (normalized > max) {
-      return max;
-    }
-    return normalized;
-  }
-
-  private static normalizeAmountFilter(value?: number | string | null): number | undefined {
+  private static normalizeAmountFilter(
+    value?: number | string | null
+  ): number | undefined {
     if (value === null || value === undefined) {
       return undefined;
     }
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw AppError.invalidInput('金额必须是数字');
+      throw AppError.invalidInput("金额必须是数字");
     }
     const normalized = Number(numeric.toFixed(2));
     if (Math.abs(numeric - normalized) > 1e-8) {
-      throw AppError.invalidInput('金额最多保留两位小数');
+      throw AppError.invalidInput("金额最多保留两位小数");
     }
     return Math.round(normalized * 100);
   }
@@ -361,26 +395,26 @@ export class CashClass {
   private static normalizeDate(value: Date | string): Date {
     if (value instanceof Date) {
       if (Number.isNaN(value.getTime())) {
-        throw AppError.invalidInput('日期格式不正确');
+        throw AppError.invalidInput("日期格式不正确");
       }
       return value;
     }
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
-      throw AppError.invalidInput('日期格式不正确');
+      throw AppError.invalidInput("日期格式不正确");
     }
     return parsed;
   }
 
   private static ensureValidCash(cash: number): number {
     if (!Number.isFinite(cash)) {
-      throw AppError.invalidInput('金额无效');
+      throw AppError.invalidInput("金额无效");
     }
     if (!Number.isInteger(cash)) {
-      throw AppError.invalidInput('金额必须以分为单位存储');
+      throw AppError.invalidInput("金额必须以分为单位存储");
     }
     if (cash === 0) {
-      throw AppError.invalidInput('交易金额不能为0');
+      throw AppError.invalidInput("交易金额不能为0");
     }
     return cash;
   }
