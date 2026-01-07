@@ -108,28 +108,56 @@
         <div class="card-body-scroll">
           <template v-if="!loading">
             <div v-if="expiringMemberships.length > 0" class="member-list">
-              <div 
-                v-for="student in expiringMemberships" 
+              <div
+                v-for="student in expiringMemberships"
                 :key="student.uid"
                 class="member-item"
               >
                 <div class="member-info">
-                  <span class="member-name">{{ student.name }}</span>
+                  <div class="member-top-row">
+                    <span class="member-name">{{ student.name }}</span>
+                    <button
+                      v-if="student.phone"
+                      class="phone-btn"
+                      @click="contactStudent(student)"
+                      :title="student.phone"
+                    >
+                      <Phone :size="12" />
+                      {{ student.phone }}
+                    </button>
+                  </div>
                   <span class="expiry-date">
                     <Calendar :size="12" />
                     剩余 {{ student.membership_days_remaining }} 天
                   </span>
                 </div>
-                <button class="action-link">续费</button>
+                <div class="renew-action">
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="天数"
+                    v-model.number="extendDaysMap[student.uid]"
+                    :disabled="loading"
+                    class="renew-input"
+                  />
+                  <button
+                    class="renew-btn"
+                    @click="extendMembership(student)"
+                    :disabled="loading || !(Number(extendDaysMap[student.uid] || 0) > 0)"
+                  >
+                    <CreditCard :size="12" />
+                    续费
+                  </button>
+                </div>
               </div>
             </div>
-            
+
             <div v-else class="empty-state">
               <CheckCircle2 :size="48" class="empty-icon" />
               <p>近期无即将过期会员</p>
             </div>
           </template>
-          
+
           <!-- 骨架屏 -->
           <template v-else>
             <div class="member-list">
@@ -170,16 +198,18 @@ import { transformDashboardData, safeParseNumber } from '../utils/dataTransforme
 import ErrorModal from './ErrorModal.vue';
 
 // 引入图标
-import { 
-  RefreshCw, 
-  Wallet, 
-  Users, 
-  Award, 
-  TrendingUp, 
-  Activity, 
-  Clock, 
+import {
+  RefreshCw,
+  Wallet,
+  Users,
+  Award,
+  TrendingUp,
+  Activity,
+  Clock,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  Phone,
+  CreditCard
 } from 'lucide-vue-next';
 
 // === 以下保持原有的业务逻辑不变 ===
@@ -193,6 +223,7 @@ interface DashboardData {
 interface Student {
   uid: number;
   name: string;
+  phone?: string;
   membership_days_remaining: number | null;
   is_membership_active: boolean;
   membership_start_date?: string;
@@ -204,6 +235,10 @@ const abortController: Ref<AbortController | null> = ref(null);
 const lastUpdateTime: Ref<Date | null> = ref(null);
 
 const appStore = useAppStore();
+const { showError, showSuccess } = appStore.errorHandler;
+
+// 续费天数映射
+const extendDaysMap: Record<number, number> = reactive({});
 
 const showStatsErrorModal: Ref<boolean> = ref(false);
 const statsErrorTitle: Ref<string> = ref('错误');
@@ -309,6 +344,60 @@ const closeStatsError = () => showStatsErrorModal.value = false;
 const closeMembershipError = () => showMembershipErrorModal.value = false;
 const retryLoadStats = () => { closeStatsError(); loadDashboardData(); };
 const retryLoadMembership = () => { closeMembershipError(); loadDashboardData(); };
+
+// 续费逻辑
+const extendMembership = async (student: Student): Promise<void> => {
+  if (!student?.uid) return;
+  const days = extendDaysMap[student.uid] || 0;
+  if (days <= 0) {
+    showError('请输入有效天数');
+    return;
+  }
+
+  loading.value = true;
+  try {
+    const baseDate = student.is_membership_active && student.membership_end_date
+      ? new Date(student.membership_end_date)
+      : new Date();
+
+    const newEndDate = new Date(baseDate);
+    newEndDate.setDate(newEndDate.getDate() + days);
+
+    const startDate = student.membership_start_date
+      ? student.membership_start_date
+      : baseDate.toISOString();
+
+    await ApiService.setStudentMembership(student.uid, {
+      startDate: startDate,
+      endDate: newEndDate.toISOString()
+    });
+
+    showSuccess(`已为 ${student.name} 续费 ${days} 天`);
+    extendDaysMap[student.uid] = 0;
+    await loadDashboardData(); // 刷新列表
+  } catch (error) {
+    showError('续费失败', (error as Error).message);
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 联系学员
+const contactStudent = (student: Student): void => {
+  if (!student.phone) {
+    showError('无电话号码');
+    return;
+  }
+
+  try {
+    window.location.href = `tel:${student.phone}`;
+  } catch {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(student.phone);
+      showSuccess('号码已复制');
+    }
+  }
+};
 
 onMounted(loadDashboardData);
 onUnmounted(() => abortController.value?.abort());
@@ -498,11 +587,37 @@ onUnmounted(() => abortController.value?.abort());
 .member-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+}
+
+.member-top-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .member-name {
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.phone-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.phone-btn:hover {
+  color: var(--primary-color);
+  background-color: rgba(99, 102, 241, 0.1);
 }
 
 .expiry-date {
@@ -512,6 +627,52 @@ onUnmounted(() => abortController.value?.abort());
   align-items: center;
   gap: 0.25rem;
   margin-top: 0.1rem;
+}
+
+.renew-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.renew-input {
+  width: 60px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+.renew-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+.renew-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.renew-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.renew-btn:hover:not(:disabled) {
+  background-color: #4f46e5;
+}
+.renew-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .action-link {
