@@ -185,6 +185,19 @@ export class StudentRepository {
       );
     }
 
+    // support membershipActiveAt filter - check if membership is active at given date
+    if (options.membershipActiveAt) {
+      const activeAtDate = options.membershipActiveAt;
+      conditions.push(
+        and(
+          isNotNull(students.membershipStartDate),
+          isNotNull(students.membershipEndDate),
+          gte(students.membershipStartDate, activeAtDate),
+          lte(students.membershipEndDate, activeAtDate)
+        )
+      );
+    }
+
     return conditions;
   }
 

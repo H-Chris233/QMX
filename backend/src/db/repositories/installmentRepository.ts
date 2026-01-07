@@ -7,8 +7,34 @@ import {
   NewInstallmentPlan,
   NewInstallment,
   PlanStatus,
+  InstallmentStatus,
 } from '../schema/installments';
-import { eq, and, lt, isNull, count, desc, asc } from 'drizzle-orm';
+import { eq, and, lt, lte, isNull, count, desc, asc, gte } from 'drizzle-orm';
+import { PaginationResult } from './studentRepository';
+
+export interface InstallmentSearchOptions {
+  planId?: number;
+  studentId?: number;
+  status?: InstallmentStatus;
+  minDueDate?: string;
+  maxDueDate?: string;
+  isOverdue?: boolean;
+  page?: number;
+  limit?: number;
+  sort_by?: string;
+  sort_order?: 'ASC' | 'DESC';
+}
+
+export interface InstallmentPlanSearchOptions {
+  studentId?: number;
+  status?: PlanStatus;
+  minTotalAmount?: number;
+  maxTotalAmount?: number;
+  page?: number;
+  limit?: number;
+  sort_by?: string;
+  sort_order?: 'ASC' | 'DESC';
+}
 
 export class InstallmentPlanRepository {
   // 根据 UID 查找
@@ -83,6 +109,102 @@ export class InstallmentPlanRepository {
     return result?.count || 0;
   }
 
+  // 计数
+  static async count(filter?: Partial<InstallmentPlanSearchOptions>): Promise<number> {
+    const conditions = this.buildConditions(filter || {});
+    const [result] = await db
+      .select({ count: count() })
+      .from(installmentPlans)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return result?.count || 0;
+  }
+
+  // 分页查询
+  static async findWithPagination(options: InstallmentPlanSearchOptions): Promise<PaginationResult<InstallmentPlan>> {
+    const page = options.page || 1;
+    const limit = Math.min(options.limit || 20, 100);
+    const offset = (page - 1) * limit;
+
+    const conditions = this.buildConditions(options);
+    const orderBy = this.buildOrderBy(options.sort_by, options.sort_order);
+
+    // 查询数据
+    let dataQuery = db.select().from(installmentPlans);
+    if (conditions.length > 0) {
+      dataQuery = dataQuery.where(and(...conditions));
+    }
+    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset);
+
+    // 查询总数
+    let countQuery = db.select({ count: count() }).from(installmentPlans);
+    if (conditions.length > 0) {
+      countQuery = countQuery.where(and(...conditions));
+    }
+    const [countResult] = await countQuery;
+    const total = countResult?.count || 0;
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        total_pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // 查找指定学员和状态的计划
+  static async findByStudentIdAndStatus(studentId: number, status?: PlanStatus): Promise<InstallmentPlan[]> {
+    const conditions = [eq(installmentPlans.studentId, studentId)];
+    if (status) {
+      conditions.push(eq(installmentPlans.status, status));
+    }
+
+    return await db
+      .select()
+      .from(installmentPlans)
+      .where(and(...conditions))
+      .orderBy(desc(installmentPlans.createdAt));
+  }
+
+  // 构建查询条件
+  private static buildConditions(options: InstallmentPlanSearchOptions) {
+    const conditions = [];
+
+    if (options.studentId !== undefined) {
+      conditions.push(eq(installmentPlans.studentId, options.studentId));
+    }
+
+    if (options.status !== undefined) {
+      conditions.push(eq(installmentPlans.status, options.status));
+    }
+
+    if (options.minTotalAmount !== undefined) {
+      conditions.push(gte(installmentPlans.totalAmount, options.minTotalAmount));
+    }
+
+    if (options.maxTotalAmount !== undefined) {
+      conditions.push(lte(installmentPlans.totalAmount, options.maxTotalAmount));
+    }
+
+    return conditions;
+  }
+
+  // 构建排序
+  private static buildOrderBy(sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
+    const column =
+      sortBy === 'total_amount'
+        ? installmentPlans.totalAmount
+        : sortBy === 'student_id'
+        ? installmentPlans.studentId
+        : sortBy === 'created_at' || sortBy === 'startDate'
+        ? installmentPlans.createdAt
+        : installmentPlans.uid;
+
+    return sortOrder === 'ASC' ? asc(column) : desc(column);
+  }
+
   // 计算分期金额
   static calculateInstallmentAmount(
     totalAmount: number,
@@ -102,7 +224,7 @@ export class InstallmentPlanRepository {
     }
 
     // 如果指定期数，计算该期的金额
-    const index = Math.trunc(instmentNumber);
+    const index = Math.trunc(installmentNumber);
     if (index <= 0 || index > installments) {
       return baseAmount;
     }
@@ -224,6 +346,129 @@ export class InstallmentRepository {
         )
       )
       .orderBy(asc(installments.dueDate));
+  }
+
+  // 根据状态查找分期
+  static async findByStatus(status: InstallmentStatus): Promise<Installment[]> {
+    return await db
+      .select()
+      .from(installments)
+      .where(eq(installments.status, status))
+      .orderBy(asc(installments.dueDate));
+  }
+
+  // 查找指定学员的待付分期
+  static async findPendingByStudentId(studentId: number): Promise<Installment[]> {
+    return await db
+      .select()
+      .from(installments)
+      .where(
+        and(
+          eq(installments.studentId, studentId),
+          eq(installments.status, 'PENDING' as InstallmentStatus)
+        )
+      )
+      .orderBy(asc(installments.dueDate));
+  }
+
+  // 计数
+  static async count(filter?: Partial<InstallmentSearchOptions>): Promise<number> {
+    const conditions = this.buildConditions(filter || {});
+    const [result] = await db
+      .select({ count: count() })
+      .from(installments)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return result?.count || 0;
+  }
+
+  // 分页查询
+  static async findWithPagination(options: InstallmentSearchOptions): Promise<PaginationResult<Installment>> {
+    const page = options.page || 1;
+    const limit = Math.min(options.limit || 20, 100);
+    const offset = (page - 1) * limit;
+
+    const conditions = this.buildConditions(options);
+    const orderBy = this.buildOrderBy(options.sort_by, options.sort_order);
+
+    // 查询数据
+    let dataQuery = db.select().from(installments);
+    if (conditions.length > 0) {
+      dataQuery = dataQuery.where(and(...conditions));
+    }
+    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset);
+
+    // 查询总数
+    let countQuery = db.select({ count: count() }).from(installments);
+    if (conditions.length > 0) {
+      countQuery = countQuery.where(and(...conditions));
+    }
+    const [countResult] = await countQuery;
+    const total = countResult?.count || 0;
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        total_pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // 构建查询条件
+  private static buildConditions(options: InstallmentSearchOptions) {
+    const conditions = [];
+
+    if (options.planId !== undefined) {
+      conditions.push(eq(installments.planId, options.planId));
+    }
+
+    if (options.studentId !== undefined) {
+      conditions.push(eq(installments.studentId, options.studentId));
+    }
+
+    if (options.status !== undefined) {
+      conditions.push(eq(installments.status, options.status));
+    }
+
+    if (options.minDueDate) {
+      conditions.push(gte(installments.dueDate, options.minDueDate));
+    }
+
+    if (options.maxDueDate) {
+      conditions.push(lte(installments.dueDate, options.maxDueDate));
+    }
+
+    if (options.isOverdue === true) {
+      const today = new Date().toISOString().split('T')[0];
+      conditions.push(
+        and(
+          eq(installments.status, 'PENDING' as InstallmentStatus),
+          lt(installments.dueDate, today)
+        )
+      );
+    }
+
+    return conditions;
+  }
+
+  // 构建排序
+  private static buildOrderBy(sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
+    const column =
+      sortBy === 'due_date'
+        ? installments.dueDate
+        : sortBy === 'amount' || sortBy === 'installment_amount'
+        ? installments.installmentAmount
+        : sortBy === 'plan_id'
+        ? installments.planId
+        : sortBy === 'student_id'
+        ? installments.studentId
+        : sortBy === 'created_at'
+        ? installments.createdAt
+        : installments.uid;
+
+    return sortOrder === 'ASC' ? asc(column) : desc(column);
   }
 
   // 刷新计划状态

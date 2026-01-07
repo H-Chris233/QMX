@@ -6,6 +6,7 @@ import {
   InstallmentSnapshot,
 } from '../schema/cash';
 import { eq, and, gte, lte, gt, lt, isNull, isNotNull, desc, asc, count, sum } from 'drizzle-orm';
+import { PaginationResult } from './studentRepository';
 
 export interface CashSearchOptions {
   student_id?: number;
@@ -89,6 +90,51 @@ export class CashRepository {
     const offset = ((options.page || 1) - 1) * limit;
 
     return await query.orderBy(orderBy).limit(limit).offset(offset);
+  }
+
+  // 计数
+  static async count(filter?: Partial<CashSearchOptions>): Promise<number> {
+    const conditions = this.buildConditions(filter || {});
+    const [result] = await db
+      .select({ count: count() })
+      .from(cashTransactions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    return result?.count || 0;
+  }
+
+  // 分页查询
+  static async findWithPagination(options: CashSearchOptions) {
+    const page = options.page || 1;
+    const limit = Math.min(options.limit || 20, 100);
+    const offset = (page - 1) * limit;
+
+    const conditions = this.buildConditions(options);
+    const orderBy = this.buildOrderBy(options.sort_by, options.sort_order);
+
+    // 查询数据
+    let dataQuery = db.select().from(cashTransactions);
+    if (conditions.length > 0) {
+      dataQuery = dataQuery.where(and(...conditions));
+    }
+    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset);
+
+    // 查询总数
+    let countQuery = db.select({ count: count() }).from(cashTransactions);
+    if (conditions.length > 0) {
+      countQuery = countQuery.where(and(...conditions));
+    }
+    const [countResult] = await countQuery;
+    const total = countResult?.count || 0;
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        total_pages: Math.ceil(total / limit),
+      },
+    };
   }
 
   // 财务统计
@@ -216,7 +262,7 @@ export class CashRepository {
         ? cashTransactions.amount
         : sortBy === 'student_id'
         ? cashTransactions.studentId
-        : sortBy === 'created_at'
+        : sortBy === 'created_at' || sortBy === 'date'
         ? cashTransactions.createdAt
         : cashTransactions.uid;
 
