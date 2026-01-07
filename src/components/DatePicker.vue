@@ -1,30 +1,52 @@
 <template>
-  <div class="date-picker-wrapper">
-    <label v-if="label" :for="inputId" class="date-picker-label">
+  <div class="input-wrapper" :class="{ 'is-disabled': disabled, 'has-error': hasError }">
+    <!-- Label -->
+    <label v-if="label" :for="inputId" class="input-label">
       {{ label }}
-      <span v-if="required" class="required-asterisk">*</span>
+      <span v-if="required" class="required-mark">*</span>
     </label>
     
-    <div class="date-picker-container" :class="{ 'has-error': hasError, 'disabled': disabled }">
+    <!-- Input Container -->
+    <div class="input-container">
+      <!-- Icon (Visual Only) -->
+      <div class="icon-slot">
+        <CalendarDays :size="18" class="text-icon" />
+      </div>
+
+      <!-- Native Date Input -->
       <input
+        :id="inputId"
+        ref="inputRef"
+        type="date"
         v-model="internalValue"
-        v-bind="inputAttrs"
+        class="native-input"
+        :min="minDate"
+        :max="maxDate"
+        :disabled="disabled"
+        :aria-label="ariaLabel || label"
+        :aria-invalid="hasError"
+        :aria-describedby="hasError ? `${inputId}-error` : undefined"
         @input="handleInput"
         @change="handleChange"
         @blur="handleBlur"
         @focus="handleFocus"
       />
       
-      <div v-if="showCalendarIcon" class="date-picker-icon">
-        📅
+      <!-- Validation Status Icon -->
+      <div v-if="hasError" class="status-icon error">
+        <AlertCircle :size="16" />
       </div>
     </div>
     
-    <div v-if="hasError && liveError" :id="`${inputId}-error`" class="date-picker-error">
-      {{ errorMessage }}
-    </div>
+    <!-- Error Message -->
+    <Transition name="slide-down">
+      <div v-if="hasError && liveError" :id="`${inputId}-error`" class="error-msg">
+        {{ liveError }}
+      </div>
+    </Transition>
     
-    <div v-if="helpText && !hasError" class="date-picker-help">
+    <!-- Help Text -->
+    <div v-if="helpText && !hasError" class="help-text">
       {{ helpText }}
     </div>
   </div>
@@ -32,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue';
+import { CalendarDays, AlertCircle } from 'lucide-vue-next';
 
 interface Props {
   modelValue?: string;
@@ -43,7 +66,6 @@ interface Props {
   maxDate?: string;
   errorMessage?: string;
   helpText?: string;
-  showCalendarIcon?: boolean;
   ariaLabel?: string;
   validateOnBlur?: boolean;
   preset?: string; // 'today', 'tomorrow', 'nextWeek', 'nextMonth'
@@ -67,460 +89,222 @@ const props = withDefaults(defineProps<Props>(), {
   maxDate: '',
   errorMessage: '',
   helpText: '',
-  showCalendarIcon: true,
   ariaLabel: '',
   validateOnBlur: true,
   preset: '',
 });
 
 const emit = defineEmits<Emits>();
-const inputId: Ref<string> = ref(`date-picker-${Math.random().toString(36).substr(2, 9)}`);
+
+const inputId = `date-input-${Math.random().toString(36).slice(2, 9)}`;
 const internalValue: Ref<string> = ref(props.modelValue);
-const isFocused: Ref<boolean> = ref(false);
-    
-// 计算属性
+const inputRef = ref<HTMLInputElement | null>(null);
+
+// Error Handling
 const liveError: Ref<string> = ref(props.errorMessage);
 const hasError: ComputedRef<boolean> = computed(() => Boolean(liveError.value));
 
-// 输入框属性计算
-const inputAttrs = computed(() => {
-  const attrs: Record<string, any> = {
-    id: inputId.value,
-    type: 'date',
-    class: 'date-picker-input',
-    disabled: props.disabled || false,
-  };
-  
-  if (props.minDate) attrs.min = props.minDate;
-  if (props.maxDate) attrs.max = props.maxDate;
-  if (props.placeholder) attrs.placeholder = props.placeholder;
-  if (props.ariaLabel || props.label) attrs['aria-label'] = props.ariaLabel || props.label;
-  if (hasError.value) attrs['aria-describedby'] = `${inputId.value}-error`;
-  
-  return attrs;
-});
-    
-// 日期格式化函数
-const formatDate = (date: Date): string => {
-  const isoString = date.toISOString();
-  const datePart = isoString.split('T')[0];
-  return datePart || '';
-};
+// Date Helpers
+const formatDate = (date: Date): string => date.toISOString().split('T')[0];
 
-// 预设日期计算
 const getPresetDate = (preset: string): string => {
-      const today = new Date();
-      
-      switch (preset) {
-        case 'today':
-          return formatDate(today);
-        case 'tomorrow':
-          const tomorrow = new Date(today);
-          tomorrow.setDate(today.getDate() + 1);
-          return formatDate(tomorrow);
-        case 'nextWeek':
-          const nextWeek = new Date(today);
-          nextWeek.setDate(today.getDate() + 7);
-          return formatDate(nextWeek);
-        case 'nextMonth':
-          const nextMonth = new Date(today);
-          nextMonth.setMonth(today.getMonth() + 1);
-          return formatDate(nextMonth);
-        default:
-          return '';
-      }
-    };
-    
-// 日期验证
+  const d = new Date();
+  switch (preset) {
+    case 'today': return formatDate(d);
+    case 'tomorrow': d.setDate(d.getDate() + 1); return formatDate(d);
+    case 'nextWeek': d.setDate(d.getDate() + 7); return formatDate(d);
+    case 'nextMonth': d.setMonth(d.getMonth() + 1); return formatDate(d);
+    default: return '';
+  }
+};
+
 const validateDate = (value: string): string => {
-      if (!value) {
-        return props.required ? '请选择日期' : '';
-      }
-      
-      const date = new Date(value);
-      if (isNaN(date.getTime())) {
-        return '请输入有效的日期';
-      }
-      
-      if (props.minDate) {
-        const v = new Date(value);
-        const min = new Date(props.minDate);
-        if (!isNaN(v.getTime()) && !isNaN(min.getTime()) && v < min) {
-          return `日期不能早于 ${formatDateForDisplay(props.minDate!)}`;
-        }
-      }
-      
-      if (props.maxDate) {
-        const v = new Date(value);
-        const max = new Date(props.maxDate);
-        if (!isNaN(v.getTime()) && !isNaN(max.getTime()) && v > max) {
-          return `日期不能晚于 ${formatDateForDisplay(props.maxDate!)}`;
-        }
-      }
-      
-      return '';
-    };
-    
-// 格式化日期用于显示
-const formatDateForDisplay = (dateStr: string | undefined): string => {
-      if (!dateStr) return '';
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('zh-CN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    };
-    
-// 获取今天的日期字符串
-
-    
-// 事件处理
-const handleInput = (event: Event): void => {
-  const target = event.target as HTMLInputElement;
-  const value = target.value;
-  internalValue.value = value || '';
-  emit('update:modelValue', value || '');
-};
-    
-const handleChange = (event: Event): void => {
-  const target = event.target as HTMLInputElement;
-  const value = target.value;
-  const error = validateDate(value);
-  if (error) {
-    liveError.value = error;
-    emit('error', error);
-  }
-  emit('change', value);
-};
-    
-const handleBlur = (event: Event): void => {
-  isFocused.value = false;
-  const target = event.target as HTMLInputElement;
-  const value = target.value;
+  if (!value) return props.required ? '此项为必填项' : '';
   
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return '日期格式无效';
+  
+  if (props.minDate && date < new Date(props.minDate)) return `不能早于 ${props.minDate}`;
+  if (props.maxDate && date > new Date(props.maxDate)) return `不能晚于 ${props.maxDate}`;
+  
+  return '';
+};
+
+// Handlers
+const handleInput = (e: Event) => {
+  const val = (e.target as HTMLInputElement).value;
+  internalValue.value = val;
+  emit('update:modelValue', val);
+  if (hasError.value) liveError.value = validateDate(val);
+};
+
+const handleChange = (e: Event) => {
+  const val = (e.target as HTMLInputElement).value;
+  emit('change', val);
+};
+
+const handleBlur = (e: Event) => {
+  const val = (e.target as HTMLInputElement).value;
   if (props.validateOnBlur) {
-    const error = validateDate(value);
-    if (error) {
-      liveError.value = error;
-      emit('error', error);
-    } else {
-      liveError.value = '';
-    }
+    const err = validateDate(val);
+    liveError.value = err;
+    if (err) emit('error', err);
   }
-  
-  emit('blur', value);
+  emit('blur', val);
 };
-    
-const handleFocus = (event: Event): void => {
-  isFocused.value = true;
-  const target = event.target as HTMLInputElement;
-  emit('focus', target.value);
-};
-    
-// 监听外部值变化
-watch(() => props.modelValue, (newValue: string) => {
-  internalValue.value = newValue;
-});
 
-watch(() => props.errorMessage, (msg: string) => {
-  liveError.value = msg || '';
-});
-    
-// 监听预设值变化
-watch(() => props.preset, (newPreset: string) => {
-  if (newPreset && !internalValue.value) {
-    const presetDate = getPresetDate(newPreset);
+const handleFocus = (e: Event) => {
+  emit('focus', (e.target as HTMLInputElement).value);
+};
+
+// Watchers
+watch(() => props.modelValue, (val) => internalValue.value = val);
+watch(() => props.errorMessage, (val) => liveError.value = val);
+watch(() => props.preset, (val) => {
+  if (val && !internalValue.value) {
+    const presetDate = getPresetDate(val);
     if (presetDate) {
       internalValue.value = presetDate;
       emit('update:modelValue', presetDate);
     }
   }
 }, { immediate: true });
-    
-
 </script>
 
 <style scoped>
-.date-picker-wrapper {
+.input-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
   width: 100%;
+  position: relative;
 }
 
-.date-picker-label {
-  font-size: 0.875rem;
+/* Label */
+.input-label {
+  font-size: 0.85rem;
   font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
+  color: var(--text-secondary);
+  margin-left: 0.1rem;
 }
-
-.required-asterisk {
-  color: var(--accent-danger);
+.required-mark {
+  color: #ef4444; /* Red-500 */
   margin-left: 0.25rem;
 }
 
-.date-picker-container {
+/* Container */
+.input-container {
   position: relative;
   display: flex;
   align-items: center;
-}
-
-.date-picker-input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-app); /* Darker background */
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
   transition: all 0.2s ease;
-  outline: none;
 }
 
-.date-picker-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-  outline: none;
+.input-container:hover {
+  border-color: var(--text-secondary);
 }
 
-/* 移动端焦点样式 */
-@media (max-width: 768px) {
-  .date-picker-input:focus {
-    box-shadow: 0 0 0 2px var(--accent-primary);
-    transform: scale(1.02);
-    transition: all 0.2s ease;
-  }
+.input-container:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); /* Indigo Glow */
 }
 
-.date-picker-input:disabled {
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.date-picker-container.has-error .date-picker-input {
-  border-color: var(--accent-danger);
-}
-
-.date-picker-container.has-error .date-picker-input:focus {
-  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1);
-}
-
-.date-picker-container.disabled {
-  opacity: 0.6;
+/* Icons */
+.icon-slot {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
   pointer-events: none;
+  z-index: 2;
+  display: flex;
 }
+.text-icon { color: var(--text-secondary); }
 
-.date-picker-icon {
+.status-icon {
   position: absolute;
   right: 0.75rem;
-  font-size: 1rem;
-  color: var(--text-secondary);
+  top: 50%;
+  transform: translateY(-50%);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
+.error { color: #ef4444; }
 
-.date-picker-input::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  position: absolute;
-  right: 0;
-  width: 2rem;
-  height: 100%;
+/* Native Input Styling */
+.native-input {
+  width: 100%;
+  padding: 0.65rem 1rem 0.65rem 2.5rem; /* Left padding for icon */
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  outline: none;
+  /* Make standard calendar icon invisible but clickable over the whole input */
   cursor: pointer;
 }
 
-.date-picker-error {
+/* Webkit specific hacking to style the calendar icon */
+.native-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  color: transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Error State */
+.has-error .input-container {
+  border-color: #ef4444;
+}
+.has-error .input-container:focus-within {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.error-msg {
   font-size: 0.75rem;
-  color: var(--accent-danger);
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  color: #ef4444;
+  margin-left: 0.1rem;
 }
 
-.date-picker-error::before {
-  content: '⚠️';
-  font-size: 0.875rem;
-}
-
-.date-picker-help {
+/* Help Text */
+.help-text {
   font-size: 0.75rem;
   color: var(--text-secondary);
-  margin-top: 0.25rem;
+  opacity: 0.8;
+  margin-left: 0.1rem;
 }
 
-/* 主题适配 */
-.light-theme .date-picker-input {
-  background-color: #ffffff;
+/* Disabled State */
+.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.is-disabled .input-container {
+  background-color: var(--bg-surface);
 }
 
-.dark-theme .date-picker-input {
-  background-color: var(--bg-secondary);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .date-picker-wrapper {
-    width: 100%;
-  }
-  
-  .date-picker-input {
-    padding: 0.875rem 1rem;
-    font-size: 1rem; /* 防止iOS缩放 */
-    min-height: 44px; /* iOS推荐的最小触摸目标 */
-    border-radius: 8px;
-  }
-  
-  .date-picker-icon {
-    right: 0.875rem;
-    font-size: 1.25rem;
-  }
-  
-  .date-picker-label {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .date-picker-error,
-  .date-picker-help {
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .date-picker-input {
-    padding: 1rem;
-    font-size: 1.125rem;
-    min-height: 48px;
-    border-radius: 10px;
-  }
-  
-  .date-picker-icon {
-    right: 1rem;
-    font-size: 1.5rem;
-  }
-  
-  .date-picker-label {
-    font-size: 1.125rem;
-    font-weight: 600;
-  }
-  
-  .date-picker-error::before {
-    font-size: 1rem;
-  }
-}
-
-/* 自定义日期选择器样式 */
-.date-picker-input::-webkit-datetime-edit {
-  color: var(--text-primary);
-}
-
-.date-picker-input::-webkit-datetime-edit-fields-wrapper {
-  padding: 0;
-}
-
-.date-picker-input::-webkit-datetime-edit-text {
-  color: var(--text-secondary);
-  padding: 0 0.25rem;
-}
-
-.date-picker-input::-webkit-datetime-edit-month-field,
-.date-picker-input::-webkit-datetime-edit-day-field,
-.date-picker-input::-webkit-datetime-edit-year-field {
-  color: var(--text-primary);
-}
-
-.date-picker-input::-webkit-inner-spin-button {
-  display: none;
-}
-
-.date-picker-input::-webkit-clear-button {
-  display: none;
-}
-
-/* Firefox 样式 */
-.date-picker-input::-moz-focus-inner {
-  border: 0;
-  padding: 0;
-}
-
-/* 占位符样式 */
-.date-picker-input::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.7;
-}
-
-.date-picker-input::-webkit-input-placeholder {
-  color: var(--text-secondary);
-  opacity: 0.7;
-}
-
-.date-picker-input::-moz-placeholder {
-  color: var(--text-secondary);
-  opacity: 0.7;
-}
-
-.date-picker-input:-ms-input-placeholder {
-  color: var(--text-secondary);
-  opacity: 0.7;
-}
-
-/* 动画效果 */
-.date-picker-container {
+/* Transitions */
+.slide-down-enter-active,
+.slide-down-leave-active {
   transition: all 0.2s ease;
+  max-height: 20px;
+  opacity: 1;
 }
-
-.date-picker-error,
-.date-picker-help {
-  animation: fadeIn 0.2s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 触摸反馈 */
-@media (hover: none) and (pointer: coarse) {
-  .date-picker-input:active {
-    background-color: var(--bg-secondary);
-    transform: scale(0.98);
-  }
-  
-  .date-picker-container:active {
-    transform: scale(0.98);
-  }
-}
-
-/* 高对比度模式支持 */
-@media (prefers-contrast: high) {
-  .date-picker-input {
-    border-width: 2px;
-  }
-  
-  .date-picker-input:focus {
-    border-width: 3px;
-  }
-}
-
-/* 减少动画模式支持 */
-@media (prefers-reduced-motion: reduce) {
-  .date-picker-input,
-  .date-picker-container,
-  .date-picker-error,
-  .date-picker-help {
-    transition: none;
-    animation: none;
-  }
+.slide-down-enter-from,
+.slide-down-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-5px);
 }
 </style>

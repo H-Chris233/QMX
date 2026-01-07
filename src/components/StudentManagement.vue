@@ -1,67 +1,75 @@
 <template>
   <div class="student-management" data-testid="student-management">
-    <!-- 顶部操作栏 -->
-    <div class="top-bar" data-testid="student-top-bar">
-      <div class="search-section">
-        <div class="search-input-group">
+    
+    <!-- 顶部工具栏 -->
+    <header class="management-toolbar" data-testid="student-top-bar">
+      
+      <!-- 左侧：搜索与筛选 -->
+      <div class="toolbar-left">
+        <div class="search-wrapper">
+          <Search :size="16" class="search-icon-deco" />
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="搜索学员姓名、电话、科目等..."
+            placeholder="搜索学员 / 电话 / ID..."
             class="search-input"
             data-testid="student-search-input"
             @keyup.enter="performSearch"
           />
-          <button @click="performSearch" class="search-button" data-testid="student-search-button">
-            <span class="search-icon">🔍</span>
-          </button>
         </div>
-        
-        <div class="search-filters">
-          <select v-model="searchFilters.subject" @change="performSearch" data-testid="filter-subject">
-            <option value="">所有科目</option>
-            <option value="Shooting">射击</option>
-            <option value="Archery">射箭</option>
-            <option value="Others">其他</option>
-          </select>
-          
-          <select v-model="searchFilters.classType" @change="performSearch" data-testid="filter-class-type">
-            <option value="">所有课程</option>
-            <option value="TenTry">体验课</option>
-            <option value="Month">月卡</option>
-            <option value="Year">年卡</option>
-            <option value="Others">其他</option>
-          </select>
 
-          <select v-model="searchFilters.hasMembership" @change="performSearch" data-testid="filter-has-membership">
-            <option value="">所有会员状态</option>
-            <option value="true">有会员</option>
-            <option value="false">无会员</option>
-          </select>
+        <div class="filters-group">
+          <!-- 科目筛选 -->
+          <div class="select-wrapper">
+            <select v-model="searchFilters.subject" @change="performSearch" data-testid="filter-subject">
+              <option value="">📚 所有科目</option>
+              <option value="Shooting">🎯 射击</option>
+              <option value="Archery">🏹 射箭</option>
+              <option value="Others">🧩 其他</option>
+            </select>
+            <ChevronDown :size="14" class="select-arrow" />
+          </div>
 
-          <select v-model="searchFilters.membershipStatus" @change="performSearch" data-testid="filter-membership-status">
-            <option value="">会员筛选</option>
-            <option value="Active">激活中</option>
-            <option value="Expired">已过期</option>
-            <option value="Upcoming">即将开始</option>
-          </select>
+          <!-- 课程类型 -->
+          <div class="select-wrapper">
+            <select v-model="searchFilters.classType" @change="performSearch" data-testid="filter-class-type">
+              <option value="">🎓 所有课程</option>
+              <option value="TenTry">🎟️ 体验课</option>
+              <option value="Month">📅 月卡</option>
+              <option value="Year">🗓️ 年卡</option>
+              <option value="Others">📦 其他</option>
+            </select>
+            <ChevronDown :size="14" class="select-arrow" />
+          </div>
+
+          <!-- 会员状态 -->
+          <div class="select-wrapper">
+            <select v-model="searchFilters.membershipStatus" @change="performSearch" data-testid="filter-membership-status">
+              <option value="">👑 会员状态</option>
+              <option value="Active">✅ 激活中</option>
+              <option value="Expired">⚠️ 已过期</option>
+              <option value="Upcoming">⏳ 即将开始</option>
+            </select>
+            <ChevronDown :size="14" class="select-arrow" />
+          </div>
         </div>
       </div>
       
-      <div class="action-buttons">
-        <button @click="showAddStudentForm = true" class="add-student-btn" data-testid="add-student-btn">
-          <span class="btn-icon">➕</span>
-          添加学员
+      <!-- 右侧：操作按钮 -->
+      <div class="toolbar-right">
+        <button @click="exportStudents" class="btn btn-secondary" data-testid="export-students-btn" title="导出 CSV">
+          <Download :size="18" />
+          <span class="btn-text">导出</span>
         </button>
-        <button @click="exportStudents" class="export-btn" data-testid="export-students-btn">
-          <span class="btn-icon">📤</span>
-          导出数据
+        <button @click="showAddStudentForm = true" class="btn btn-primary" data-testid="add-student-btn">
+          <UserPlus :size="18" />
+          <span>添加学员</span>
         </button>
       </div>
-    </div>
+    </header>
 
-    <!-- 学员列表 -->
-    <div class="student-list" data-testid="student-list">
+    <!-- 学员列表网格 -->
+    <div class="student-grid" data-testid="student-list">
       <div 
         v-for="student in students" 
         :key="student.uid" 
@@ -69,98 +77,113 @@
         @click="selectStudent(student)"
         :data-testid="`student-card-${student.uid}`"
       >
-        <div class="student-header">
-          <h3>{{ student.name }}</h3>
-          <div class="student-id">ID: {{ student.uid }}</div>
+        <!-- 卡片头部：基本信息 -->
+        <div class="card-header">
+          <div class="header-main">
+            <div class="student-avatar-placeholder">
+              {{ student.name.charAt(0) }}
+            </div>
+            <div class="student-identity">
+              <h3 class="student-name">{{ student.name }}</h3>
+              <span class="student-uid">UID: {{ student.uid }}</span>
+            </div>
+          </div>
+          <!-- 状态徽章 -->
+          <div class="status-badge" :class="getMembershipStatusClass(student)">
+            {{ getMembershipStatusText(student) }}
+          </div>
         </div>
         
-        <div class="student-info">
-          <div class="info-item">
-            <span class="info-label">科目:</span>
-            <span class="info-value">{{ getSubjectName(student.subject) }}</span>
+        <!-- 卡片主体：详细属性 -->
+        <div class="card-body">
+          <div class="info-row">
+            <Target :size="14" class="info-icon" />
+            <span class="info-label">科目</span>
+            <span class="info-val">{{ getSubjectName(student.subject) }}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">年龄:</span>
-            <span class="info-value">{{ student.age || '未设置' }}</span>
+          <div class="info-row">
+            <Phone :size="14" class="info-icon" />
+            <span class="info-label">电话</span>
+            <span class="info-val font-mono">{{ student.phone }}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">电话:</span>
-            <span class="info-value">{{ student.phone }}</span>
+          <div class="info-row">
+            <BookOpen :size="14" class="info-icon" />
+            <span class="info-label">课程</span>
+            <span class="info-val">{{ student.class }}</span>
           </div>
-          <div class="info-item">
-            <span class="info-label">课程:</span>
-            <span class="info-value">{{ student.class }}</span>
-          </div>
-          <div class="info-item membership-info" :class="{ 'active': student.is_membership_active }">
-            <span class="info-label">会员:</span>
-            <span class="info-value">
-              <span v-if="student.membership_start_date && student.membership_end_date">
-                至 {{ formatDate(student.membership_end_date) }}
-                <span v-if="student.membership_days_remaining !== null">
-                  (剩余{{ student.membership_days_remaining }}天)
-                </span>
-              </span>
-              <span v-else>无会员</span>
+          <div class="info-row" v-if="student.is_membership_active">
+            <Clock :size="14" class="info-icon" />
+            <span class="info-label">有效期</span>
+            <span class="info-val highlight-val">
+              剩余 {{ student.membership_days_remaining }} 天
             </span>
           </div>
         </div>
         
-        <div class="student-actions">
-          <button @click.stop="editStudent(student)" class="edit-btn" :data-testid="`edit-student-${student.uid}`">
-            <span class="btn-icon">✏️</span>
+        <!-- 卡片底部：操作栏 -->
+        <div class="card-footer">
+          <button @click.stop="editStudent(student)" class="card-btn edit" :data-testid="`edit-student-${student.uid}`">
+            <Edit3 :size="16" />
             编辑
           </button>
-          <button @click.stop="deleteStudent(student.uid)" class="delete-btn" :data-testid="`delete-student-${student.uid}`">
-            <span class="btn-icon">🗑️</span>
+          <div class="divider-vertical"></div>
+          <button @click.stop="deleteStudent(student.uid)" class="card-btn delete" :data-testid="`delete-student-${student.uid}`">
+            <Trash2 :size="16" />
             删除
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 分页 -->
-    <div class="pagination" v-if="totalPages > 1" data-testid="student-pagination">
+    <!-- 分页控件 -->
+    <div class="pagination-wrapper" v-if="totalPages > 1" data-testid="student-pagination">
       <button 
         @click="changePage(currentPage - 1)" 
         :disabled="currentPage === 1"
-        class="page-btn"
+        class="page-nav-btn"
         data-testid="prev-page-btn"
       >
+        <ChevronLeft :size="18" />
         上一页
       </button>
       
-      <span class="page-info" data-testid="page-info">
-        {{ currentPage }} / {{ totalPages }} (共 {{ totalStudents }} 人)
+      <span class="page-indicator" data-testid="page-info">
+        Page <b>{{ currentPage }}</b> of {{ totalPages }}
       </span>
       
       <button 
         @click="changePage(currentPage + 1)" 
         :disabled="currentPage === totalPages"
-        class="page-btn"
+        class="page-nav-btn"
         data-testid="next-page-btn"
       >
         下一页
+        <ChevronRight :size="18" />
       </button>
     </div>
   </div>
 
-  <!-- 添加/编辑学员表单模态框 -->
-  <div v-if="showAddStudentForm || showEditForm" class="modal-overlay" @click="closeForm">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
-        <h2>{{ showAddStudentForm ? '添加学员' : '编辑学员' }}</h2>
-        <button @click="closeForm" class="close-btn">✕</button>
-      </div>
-      
-      <div class="modal-body">
-        <StudentForm 
-          :model-value="currentStudent"
-          @save="saveStudent"
-          @cancel="closeForm"
-        />
+  <!-- 模态框 (保持逻辑，优化样式) -->
+  <Transition name="modal-fade">
+    <div v-if="showAddStudentForm || showEditForm" class="modal-overlay" @click="closeForm">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>{{ showAddStudentForm ? '添加新学员' : '编辑学员信息' }}</h2>
+          <button @click="closeForm" class="modal-close-btn">
+            <X :size="24" />
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <StudentForm 
+            :model-value="currentStudent"
+            @save="saveStudent"
+            @cancel="closeForm"
+          />
+        </div>
       </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -169,6 +192,23 @@ import { useAppStore } from '../stores/app';
 import StudentForm from './StudentForm.vue';
 import { ApiService } from '../api/ApiService';
 import type { Student, CurrentStudentInput } from '../types/api';
+
+// 引入图标
+import { 
+  Search, 
+  Download, 
+  UserPlus, 
+  ChevronDown, 
+  Target, 
+  Phone, 
+  BookOpen, 
+  Clock, 
+  Edit3, 
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X
+} from 'lucide-vue-next';
 
 const appStore = useAppStore();
 
@@ -191,10 +231,9 @@ const showAddStudentForm = ref(false);
 const showEditForm = ref(false);
 const currentStudent = ref<Student | null>(null);
 
-// 搜索学员
+// 搜索逻辑
 const performSearch = async (): Promise<void> => {
   try {
-    // 重置到第一页并执行搜索
     currentPage.value = 1;
     await fetchStudents(1);
   } catch (error) {
@@ -203,529 +242,503 @@ const performSearch = async (): Promise<void> => {
   }
 };
 
-// 获取所有学员
 const fetchStudents = async (page: number = 1): Promise<void> => {
   try {
-    // 构建查询参数
-    const params: any = {
-      page,
-      limit: 20,
-    };
-
-    // 添加搜索条件
-    if (searchQuery.value) {
-      params.name_contains = searchQuery.value;
-    }
-    if (searchFilters.value.subject) {
-      params.subject = searchFilters.value.subject;
-    }
-    if (searchFilters.value.classType) {
-      params.class_type = searchFilters.value.classType;
-    }
-    if (searchFilters.value.hasMembership) {
-      params.has_membership = searchFilters.value.hasMembership === 'true';
-    }
-    if (searchFilters.value.membershipStatus) {
-      params.membership_status = searchFilters.value.membershipStatus;
-    }
+    const params: any = { page, limit: 20 };
+    if (searchQuery.value) params.name_contains = searchQuery.value;
+    if (searchFilters.value.subject) params.subject = searchFilters.value.subject;
+    if (searchFilters.value.classType) params.class_type = searchFilters.value.classType;
+    if (searchFilters.value.hasMembership) params.has_membership = searchFilters.value.hasMembership === 'true';
+    if (searchFilters.value.membershipStatus) params.membership_status = searchFilters.value.membershipStatus;
 
     const response = await ApiService.getAllStudents(params);
-    
     students.value = response.students;
     currentPage.value = response.pagination.page;
     totalPages.value = response.pagination.total_pages;
     totalStudents.value = response.pagination.total;
   } catch (error) {
-    console.error('获取学员列表失败:', error);
-    appStore.errorHandler.showError('无法获取学员列表，请稍后重试');
+    appStore.errorHandler.showError('无法获取学员列表');
   }
 };
 
-// 选择学员
-const selectStudent = (student: Student): void => {
-  selectedStudent.value = student;
-};
+const selectStudent = (student: Student) => selectedStudent.value = student;
 
-// 编辑学员
-const editStudent = (student: Student): void => {
+const editStudent = (student: Student) => {
   currentStudent.value = student;
   showEditForm.value = true;
 };
 
-// 保存学员
 const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
   try {
     if (showAddStudentForm.value) {
-      // 新增学员
       await ApiService.addStudent(data);
       appStore.errorHandler.showSuccess('学员添加成功');
     } else if (currentStudent.value) {
-      // 更新学员
       await ApiService.updateStudentInfo(currentStudent.value.uid, data);
       appStore.errorHandler.showSuccess('学员信息更新成功');
     }
-    
-    // 关闭表单并刷新数据
     closeForm();
     fetchStudents(currentPage.value);
   } catch (error) {
-    console.error('保存学员失败:', error);
-    const errorMessage = (error as any)?.response?.data?.error || (error as Error).message;
-    appStore.errorHandler.showError('无法保存学员信息：' + errorMessage);
+    const msg = (error as any)?.response?.data?.error || (error as Error).message;
+    appStore.errorHandler.showError('操作失败：' + msg);
   }
 };
 
-// 删除学员
 const deleteStudent = async (uid: number): Promise<void> => {
   appStore.showConfirm({
     title: '确认删除',
-    message: '您确定要删除这个学员吗？此操作无法撤销。',
-    confirmText: '删除',
+    message: '删除后无法恢复，是否继续？',
+    confirmText: '确认删除',
     confirmType: 'danger',
     onConfirm: async () => {
       try {
         await ApiService.deleteStudent(uid);
-        appStore.errorHandler.showSuccess('学员删除成功');
-        // 如果当前页没有数据了，回到上一页
+        appStore.errorHandler.showSuccess('学员已删除');
         if (students.value.length === 1 && currentPage.value > 1) {
           await fetchStudents(currentPage.value - 1);
         } else {
           await fetchStudents(currentPage.value);
         }
       } catch (error) {
-        console.error('删除学员失败:', error);
-        const errorMessage = (error as any)?.response?.data?.error ||
-                            (error as any)?.response?.data?.message ||
-                            (error as Error).message;
-        appStore.errorHandler.showError(errorMessage || '无法删除学员，请稍后重试');
+        appStore.errorHandler.showError('删除失败');
       }
     }
   });
 };
 
-// 导出学员数据
 const exportStudents = async (): Promise<void> => {
   try {
-    // 创建CSV表头
-    const headers = [
-      'ID',
-      '姓名',
-      '年龄',
-      '电话',
-      '课程',
-      '科目',
-      '剩余课时',
-      '会员开始日期',
-      '会员结束日期',
-      '会员状态',
-      '备注'
-    ];
-
-    // 创建CSV行数据
+    const headers = ['ID', '姓名', '年龄', '电话', '课程', '科目', '剩余课时', '会员开始', '会员结束', '状态', '备注'];
     const rows = students.value.map(s => {
-      const membershipStart = s.membership_start_date 
-        ? new Date(s.membership_start_date).toLocaleDateString('zh-CN')
-        : '';
-      const membershipEnd = s.membership_end_date 
-        ? new Date(s.membership_end_date).toLocaleDateString('zh-CN')
-        : '';
-      const membershipStatus = s.is_membership_active ? '激活' : '未激活';
-      
+      const start = s.membership_start_date ? new Date(s.membership_start_date).toLocaleDateString() : '';
+      const end = s.membership_end_date ? new Date(s.membership_end_date).toLocaleDateString() : '';
+      const status = s.is_membership_active ? '激活' : '未激活';
       return [
-        s.uid,
-        `"${s.name}"`,
-        s.age || '',
-        `"${s.phone}"`,
-        `"${s.class}"`,
-        `"${getSubjectName(s.subject)}"`,
-        s.lesson_left || '',
-        `"${membershipStart}"`,
-        `"${membershipEnd}"`,
-        `"${membershipStatus}"`,
-        `"${s.note || ''}"`
+        s.uid, `"${s.name}"`, s.age || '', `"${s.phone}"`, `"${s.class}"`,
+        `"${getSubjectName(s.subject)}"`, s.lesson_left || '',
+        `"${start}"`, `"${end}"`, `"${status}"`, `"${s.note || ''}"`
       ].join(',');
     });
-
-    // 合并CSV内容
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + 
-      headers.join(',') + '\n' +
-      rows.join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `学员数据-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
+    link.href = encodeURI(csvContent);
+    link.download = `学员数据-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
-    
-    appStore.errorHandler.showSuccess('学员数据已导出为CSV文件');
+    appStore.errorHandler.showSuccess('导出成功');
   } catch (error) {
-    console.error('导出学员数据失败:', error);
-    appStore.errorHandler.showError('无法导出学员数据：' + (error as Error).message);
+    appStore.errorHandler.showError('导出失败');
   }
 };
 
-// 分页
-const changePage = async (page: number): Promise<void> => {
+const changePage = (page: number) => {
   if (page < 1 || page > totalPages.value) return;
-  await fetchStudents(page);
+  fetchStudents(page);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// 工具函数
-const getSubjectName = (subject: string): string => {
-  const subjectMap: Record<string, string> = {
-    'Shooting': '射击',
-    'Archery': '射箭',
-    'Others': '其他'
-  };
-  return subjectMap[subject] || subject;
+// 辅助函数
+const getSubjectName = (subject: string) => {
+  const map: Record<string, string> = { 'Shooting': '射击', 'Archery': '射箭', 'Others': '其他' };
+  return map[subject] || subject;
 };
 
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('zh-CN');
+const getMembershipStatusClass = (s: Student) => {
+  if (s.is_membership_active) return 'badge-active';
+  if (s.membership_end_date && new Date(s.membership_end_date) < new Date()) return 'badge-expired';
+  return 'badge-none';
 };
 
-// 关闭表单
-const closeForm = (): void => {
+const getMembershipStatusText = (s: Student) => {
+  if (s.is_membership_active) return '会员';
+  if (s.membership_end_date && new Date(s.membership_end_date) < new Date()) return '已过期';
+  return '非会员';
+};
+
+const closeForm = () => {
   showAddStudentForm.value = false;
   showEditForm.value = false;
   currentStudent.value = null;
 };
 
-// 组件挂载时加载数据
-onMounted(async () => {
-  await fetchStudents();
-});
+onMounted(() => fetchStudents());
 </script>
 
 <style scoped>
 .student-management {
-  padding: 1.5rem;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fade-in 0.4s ease;
 }
 
-.top-bar {
+/* === Toolbar 工具栏 === */
+.management-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  background: var(--bg-surface);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.toolbar-left {
+  display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-}
-
-.search-section {
   flex: 1;
-  min-width: 300px;
 }
 
-.search-input-group {
-  display: flex;
-  margin-bottom: 0.5rem;
+.search-wrapper {
+  position: relative;
+  min-width: 240px;
 }
-
 .search-input {
-  flex: 1;
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px 0 0 6px;
-  background-color: var(--bg-secondary);
+  width: 100%;
+  padding: 0.6rem 1rem 0.6rem 2.4rem;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
 }
-
-.search-button {
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color);
-  border-left: none;
-  border-radius: 0 6px 6px 0;
-  background-color: var(--accent-primary);
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+.search-input:focus {
+  border-color: var(--primary-color);
+  outline: none;
 }
-
-.search-button:hover {
-  background-color: #1976d2;
-}
-
-.search-filters {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.search-filters select {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.action-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.add-student-btn, .export-btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 6px;
-  background-color: var(--accent-primary);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  transition: background-color 0.3s ease;
-}
-
-.add-student-btn:hover, .export-btn:hover {
-  background-color: #1976d2;
-}
-
-.student-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.student-card {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.5rem;
-  background-color: var(--bg-secondary);
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.student-card:hover {
-  box-shadow: 0 4px 16px var(--shadow-color);
-  transform: translateY(-2px);
-  border-color: var(--accent-primary);
-}
-
-.student-card.selected {
-  border-color: var(--accent-primary);
-  background-color: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary));
-}
-
-.student-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.student-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: var(--text-primary);
-}
-
-.student-id {
-  font-size: 0.875rem;
+.search-icon-deco {
+  position: absolute;
+  left: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-secondary);
 }
 
-.student-info {
-  margin-bottom: 1.5rem;
+.filters-group {
+  display: flex;
+  gap: 0.75rem;
+}
+.select-wrapper {
+  position: relative;
+}
+.select-wrapper select {
+  appearance: none;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 0.6rem 2rem 0.6rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.select-wrapper select:hover {
+  border-color: var(--text-secondary);
+}
+.select-arrow {
+  position: absolute;
+  right: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
 }
 
-.info-item {
+.toolbar-right {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* 按钮样式 */
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 0.9rem;
+}
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+.btn-primary:hover {
+  background-color: #5558e6; /* slightly darker primary */
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+.btn-secondary:hover {
+  background-color: var(--border-subtle);
+}
+
+/* === Grid List 列表 === */
+.student-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.student-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.student-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -10px rgba(0,0,0,0.3);
+  border-color: rgba(255,255,255,0.1);
+}
+
+/* Card Header */
+.card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
+  align-items: flex-start;
+  background-color: rgba(255,255,255,0.02);
+}
+
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.student-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--bg-hover), var(--border-subtle));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+}
+
+.student-identity {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.student-uid {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 99px;
+  font-weight: 500;
+}
+.badge-active { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+.badge-expired { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+.badge-none { background: rgba(107, 114, 128, 0.1); color: #9ca3af; }
+
+/* Card Body */
+.card-body {
+  padding: 1.25rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  gap: 0.75rem;
+}
+
+.info-icon {
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 
 .info-label {
   color: var(--text-secondary);
-  font-weight: 500;
-  min-width: 60px;
+  width: 3.5rem; /* fixed width for alignment */
 }
 
-.info-value {
+.info-val {
   color: var(--text-primary);
-  text-align: right;
-  flex: 1;
-}
-
-.membership-info.active {
-  color: var(--accent-secondary);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.font-mono { font-family: monospace; }
+.highlight-val { color: var(--accent-warning); }
 
-.student-actions {
+/* Card Footer */
+.card-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(0,0,0,0.2);
 }
 
-.edit-btn, .delete-btn {
-  padding: 0.5rem 1rem;
+.card-btn {
+  background: transparent;
   border: none;
-  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  transition: all 0.3s ease;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  flex: 1;
+  justify-content: center;
 }
 
-.edit-btn {
-  background-color: var(--accent-primary);
-  color: white;
+.card-btn.edit { color: var(--text-secondary); }
+.card-btn.edit:hover { background-color: var(--bg-hover); color: var(--text-primary); }
+
+.card-btn.delete { color: #ef4444; opacity: 0.8; }
+.card-btn.delete:hover { background-color: rgba(239, 68, 68, 0.1); opacity: 1; }
+
+.divider-vertical {
+  width: 1px;
+  height: 1.5rem;
+  background-color: var(--border-subtle);
 }
 
-.edit-btn:hover {
-  background-color: #1976d2;
-}
-
-.delete-btn {
-  background-color: var(--accent-danger);
-  color: white;
-}
-
-.delete-btn:hover {
-  background-color: #d32f2f;
-}
-
-.pagination {
+/* Pagination */
+.pagination-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
   margin-top: 2rem;
+  padding-bottom: 2rem;
 }
 
-.page-btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-secondary);
+.page-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
-
-.page-btn:hover:not(:disabled) {
-  background-color: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+.page-nav-btn:hover:not(:disabled) {
+  background-color: var(--bg-hover);
 }
-
-.page-btn:disabled {
+.page-nav-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.page-info {
+.page-indicator {
   color: var(--text-secondary);
-  font-weight: 500;
+  font-size: 0.9rem;
 }
+.page-indicator b { color: var(--text-primary); }
 
+/* Modal */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
 }
 
 .modal-content {
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
+  background-color: var(--bg-surface);
+  border-radius: 16px;
   width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
+  max-width: 550px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  animation: modal-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
 }
+.modal-header h2 { margin: 0; font-size: 1.25rem; color: var(--text-primary); }
 
-.modal-header h2 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.close-btn {
-  background: none;
+.modal-close-btn {
+  background: transparent;
   border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
   color: var(--text-secondary);
+  cursor: pointer;
   padding: 0.25rem;
-  border-radius: 4px;
-  transition: all 0.3s ease;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+.modal-close-btn:hover { background-color: var(--bg-hover); color: var(--text-primary); }
+
+.modal-body { padding: 1.5rem; }
+
+/* Transitions */
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+
+@keyframes modal-pop {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
-.close-btn:hover {
-  color: var(--text-primary);
-  background-color: var(--bg-tertiary);
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.modal-body {
-  padding: 1.5rem;
-}
-
-/* 响应式设计 */
+/* Mobile Responsive */
 @media (max-width: 768px) {
-  .student-management {
-    padding: 1rem;
-  }
-  
-  .top-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .search-section {
-    min-width: 100%;
-  }
-  
-  .action-buttons {
-    justify-content: center;
-  }
-  
-  .student-list {
-    grid-template-columns: 1fr;
-  }
-  
-  .student-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  
-  .info-item {
-    justify-content: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .student-actions {
-    justify-content: center;
-  }
+  .management-toolbar { flex-direction: column; align-items: stretch; }
+  .filters-group { flex-wrap: wrap; }
+  .select-wrapper { flex: 1; min-width: 120px; }
+  .select-wrapper select { width: 100%; }
+  .toolbar-right { justify-content: stretch; }
+  .btn { flex: 1; justify-content: center; }
+  .btn-text { display: none; } /* Hide export text on mobile */
 }
 </style>

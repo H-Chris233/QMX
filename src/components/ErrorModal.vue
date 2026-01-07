@@ -1,41 +1,85 @@
 <template>
-  <div
-    v-if="show"
-    class="error-modal-overlay"
-    @click="closeOnOverlayClick ? closeModal() : null"
-  >
-    <div class="error-modal" @click.stop>
-      <div class="error-header">
-        <div class="error-icon" :class="priorityClass">❌</div>
-        <h3>{{ title }}</h3>
-      </div>
+  <!-- Teleport 确保弹窗挂载到 body，不受父组件 overflow/z-index 限制 -->
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div
+        v-if="show"
+        class="modal-overlay"
+        :class="{ 'is-critical': resolvedPriority === 'critical' }"
+        @click="closeOnOverlayClick ? closeModal() : null"
+        role="alertdialog"
+        aria-modal="true"
+        :style="{ zIndex: 9999 }" 
+      >
+        <div 
+          class="error-card" 
+          :class="[priorityClass, { 'shake-anim': resolvedPriority === 'critical' }]" 
+          @click.stop
+        >
+          <!-- 头部：图标与标题 -->
+          <div class="card-header">
+            <div class="icon-wrapper">
+              <component :is="priorityIcon" :size="24" />
+            </div>
+            <div class="header-text">
+              <h3>{{ title }}</h3>
+              <span v-if="priorityText" class="priority-badge">
+                {{ priorityText }}
+              </span>
+            </div>
+          </div>
 
-      <div class="error-content">
-        <p>{{ message }}</p>
-        <div v-if="priorityText" class="error-priority">
-          优先级: {{ priorityText }}
-        </div>
-        <div v-if="details" class="error-details">
-          <details>
-            <summary>详细信息</summary>
-            <pre>{{ details }}</pre>
-          </details>
-        </div>
-      </div>
+          <!-- 内容区域 -->
+          <div class="card-body">
+            <p class="error-message">{{ message }}</p>
 
-      <div class="error-actions">
-        <button class="error-btn primary" @click="closeModal">确定</button>
-        <button v-if="showRetry" class="error-btn secondary" @click="retry">
-          重试
-        </button>
+            <!-- 技术细节 (仿终端样式) -->
+            <div v-if="details" class="technical-details">
+              <details>
+                <summary>
+                  <Terminal :size="14" />
+                  <span>调试信息 (Debug Info)</span>
+                  <ChevronDown :size="14" class="arrow-icon" />
+                </summary>
+                <div class="code-block">
+                  <pre>{{ details }}</pre>
+                  <button class="copy-btn" @click="copyDetails" title="复制">
+                    <Copy :size="14" />
+                  </button>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- 底部操作栏 -->
+          <div class="card-footer">
+            <button v-if="showRetry" class="btn btn-secondary" @click="retry">
+              <RefreshCcw :size="16" />
+              重试
+            </button>
+            <button class="btn btn-primary" @click="closeModal">
+              确定
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { watch, onUnmounted, ref, computed } from 'vue';
 import { getPriorityDescription, getPriorityClass, ErrorPriority, type ErrorPriorityLevel } from '../utils/errorHandler';
+import { 
+  AlertTriangle, 
+  XCircle, 
+  AlertOctagon, 
+  Info, 
+  Terminal, 
+  ChevronDown, 
+  Copy,
+  RefreshCcw 
+} from 'lucide-vue-next';
 
 interface Props {
   show?: boolean;
@@ -54,60 +98,67 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   show: false,
-  title: '错误',
+  title: '系统提示',
   details: undefined,
   closeOnOverlayClick: true,
   showRetry: false,
   priority: 'medium' as ErrorPriorityLevel,
 });
 
-// 计算属性：优先级描述和样式类
+const emit = defineEmits<Emits>();
+
+// === 优先级逻辑处理 ===
 const normalizePriority = (priority?: ErrorPriorityLevel): ErrorPriority => {
   switch (priority) {
-    case 'critical':
-      return ErrorPriority.CRITICAL;
-    case 'high':
-      return ErrorPriority.HIGH;
-    case 'low':
-      return ErrorPriority.LOW;
-    case 'medium':
-    default:
-      return ErrorPriority.MEDIUM;
+    case 'critical': return ErrorPriority.CRITICAL;
+    case 'high': return ErrorPriority.HIGH;
+    case 'low': return ErrorPriority.LOW;
+    default: return ErrorPriority.MEDIUM;
   }
 };
 
 const resolvedPriority = computed(() => normalizePriority(props.priority));
-
 const priorityText = computed(() => getPriorityDescription(resolvedPriority.value));
-
 const priorityClass = computed(() => getPriorityClass(resolvedPriority.value));
 
-const emit = defineEmits<Emits>();
-const closeModal = (): void => {
-  emit('close');
+// 图标映射
+const priorityIcon = computed(() => {
+  switch (resolvedPriority.value) {
+    case ErrorPriority.CRITICAL: return AlertOctagon;
+    case ErrorPriority.HIGH: return XCircle;
+    case ErrorPriority.MEDIUM: return AlertTriangle;
+    case ErrorPriority.LOW: return Info;
+    default: return AlertTriangle;
+  }
+});
+
+// === 交互逻辑 ===
+const closeModal = () => emit('close');
+const retry = () => emit('retry');
+
+const copyDetails = async () => {
+  if (props.details) {
+    try {
+      await navigator.clipboard.writeText(props.details);
+    } catch (err) {
+      console.error('复制失败', err);
+    }
+  }
 };
 
-const retry = (): void => {
-  emit('retry');
-};
-
-// 修复内存泄漏：使用ref跟踪监听器状态
+// 键盘事件管理 (Escape 关闭)
 const escapeHandler = ref<((e: KeyboardEvent) => void) | null>(null);
 
 watch(
   () => props.show,
-  (newVal: boolean) => {
-    // 清理之前的监听器
+  (newVal) => {
     if (escapeHandler.value) {
       document.removeEventListener('keydown', escapeHandler.value);
       escapeHandler.value = null;
     }
-    
     if (newVal) {
-      const handler = (e: KeyboardEvent): void => {
-        if (e.key === 'Escape') {
-          closeModal();
-        }
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') closeModal();
       };
       document.addEventListener('keydown', handler);
       escapeHandler.value = handler;
@@ -116,195 +167,220 @@ watch(
   { immediate: true }
 );
 
-// 组件卸载时清理
 onUnmounted(() => {
-  if (escapeHandler.value) {
-    document.removeEventListener('keydown', escapeHandler.value);
-    escapeHandler.value = null;
-  }
+  if (escapeHandler.value) document.removeEventListener('keydown', escapeHandler.value);
 });
-
-
 </script>
 
 <style scoped>
-.error-modal-overlay {
+/* 核心修复：确保样式变量有默认值，防止因变量缺失导致透明背景 */
+.error-card {
+  --bg-fallback: #1e1e1e;
+  --border-fallback: #333;
+  --text-fallback: #fff;
+}
+
+/* Overlay */
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
-  backdrop-filter: blur(4px);
+  /* z-index 通过内联样式强制设为 9999 */
 }
 
-.error-modal {
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 1.5rem;
-  max-width: 500px;
+/* Critical Overlay */
+.modal-overlay.is-critical {
+  background-color: rgba(69, 10, 10, 0.8);
+}
+
+/* Card Container */
+.error-card {
+  background-color: var(--bg-surface, var(--bg-fallback));
+  border: 1px solid var(--border-subtle, var(--border-fallback));
+  border-radius: 16px;
   width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
-  animation: modalSlideIn 0.3s ease-out;
+  max-width: 480px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text-primary, var(--text-fallback));
 }
 
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* 优先级主题色 */
+.error-critical { border-color: #ef4444; }
+.error-critical .icon-wrapper { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.error-critical .priority-badge { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+.error-critical .btn-primary { background-color: #ef4444; color: white; }
+.error-critical .btn-primary:hover { background-color: #dc2626; }
+
+.error-high { border-color: #f97316; }
+.error-high .icon-wrapper { color: #f97316; background: rgba(249, 115, 22, 0.1); }
+.error-high .priority-badge { background: rgba(249, 115, 22, 0.1); color: #f97316; }
+.error-high .btn-primary { background-color: #f97316; color: white; }
+
+.error-medium { border-color: #eab308; }
+.error-medium .icon-wrapper { color: #eab308; background: rgba(234, 179, 8, 0.1); }
+.error-medium .priority-badge { background: rgba(234, 179, 8, 0.1); color: #eab308; }
+.error-medium .btn-primary { background-color: #eab308; color: #000; }
+
+.error-low { border-color: #3b82f6; }
+.error-low .icon-wrapper { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+.error-low .btn-primary { background-color: #3b82f6; color: white; }
+
+/* Header */
+.card-header {
+  padding: 1.5rem 1.5rem 1rem 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
-.error-header {
+.icon-wrapper {
+  padding: 0.75rem;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.error-icon {
-  font-size: 2rem;
-  color: var(--accent-danger);
-}
-
-.error-header h3 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 1.25rem;
+.header-text h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
   font-weight: 600;
+  color: var(--text-primary, #fff);
 }
 
-.error-content {
-  margin-bottom: 1.5rem;
-}
-
-.error-content p {
-  margin: 0 0 1rem 0;
-  color: var(--text-primary);
-  line-height: 1.5;
-}
-
-.error-priority {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0.5rem 0;
-  padding: 0.5rem;
-  background-color: var(--bg-tertiary);
+.priority-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 4px;
   font-weight: 500;
+  display: inline-block;
 }
 
-/* 优先级样式 */
-.error-critical {
-  color: #ff0000;
+/* Body */
+.card-body {
+  padding: 0 1.5rem 1.5rem 1.5rem;
 }
 
-.error-high {
-  color: #ff9800;
+.error-message {
+  color: var(--text-secondary, #ccc);
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
 }
 
-.error-medium {
-  color: #ffc107;
+/* Technical Details */
+.technical-details details {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle, #333);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.error-low {
-  color: #4caf50;
-}
-
-.error-details summary {
+.technical-details summary {
+  padding: 0.75rem 1rem;
   cursor: pointer;
-  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  margin-bottom: 0.5rem;
+  color: var(--text-secondary, #aaa);
+  list-style: none; /* Hide default triangle */
+  user-select: none;
+}
+.technical-details summary::-webkit-details-marker { display: none; }
+
+.technical-details summary:hover { background-color: rgba(255,255,255,0.05); }
+
+.arrow-icon { margin-left: auto; transition: transform 0.2s; }
+.technical-details details[open] .arrow-icon { transform: rotate(180deg); }
+
+.code-block {
+  position: relative;
+  background-color: #0d0d0d;
+  padding: 1rem;
+  border-top: 1px solid var(--border-subtle, #333);
 }
 
-.error-details summary:hover {
-  text-decoration: underline;
-}
-
-.error-details pre {
+.code-block pre {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #ef4444;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-.error-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-}
-
-.error-btn {
-  padding: 0.625rem 1.25rem;
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255,255,255,0.1);
   border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
+  color: #ccc;
+  padding: 4px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 80px;
 }
 
-.error-btn.primary {
-  background-color: var(--accent-danger);
-  color: white;
+/* Footer */
+.card-footer {
+  padding: 1rem 1.5rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--border-subtle, #333);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
-.error-btn.primary:hover {
-  background-color: #d32f2f;
-  transform: translateY(-1px);
+.btn {
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.error-btn.secondary {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+.btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--border-subtle, #555);
+  color: var(--text-primary, #fff);
+}
+.btn-secondary:hover { background-color: rgba(255,255,255,0.1); }
+
+/* Animation */
+.shake-anim {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
-.error-btn.secondary:hover {
-  background-color: var(--border-color);
-  transform: translateY(-1px);
-}
-
-/* 主题适配 */
-.light-theme .error-modal {
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-/* 响应式设计 */
-@media (max-width: 640px) {
-  .error-modal {
-    padding: 1rem;
-    margin: 1rem;
-  }
-
-  .error-header {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.5rem;
-  }
-
-  .error-actions {
-    flex-direction: column;
-  }
-
-  .error-btn {
-    width: 100%;
-  }
-}
+/* Transitions */
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+.modal-fade-enter-active .error-card, .modal-fade-leave-active .error-card { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.modal-fade-enter-from .error-card { transform: scale(0.95) translateY(10px); }
 </style>

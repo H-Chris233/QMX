@@ -1,42 +1,72 @@
 <template>
-  <div
-    v-if="show"
-    class="confirm-modal-overlay"
-    role="dialog"
-    aria-modal="true"
-    :aria-label="title || '确认操作'"
-    @click="closeOnOverlayClick ? cancelAction() : null"
-  >
-    <div class="confirm-modal" tabindex="-1" @click.stop>
-      <div class="confirm-header">
-        <div class="confirm-icon" aria-hidden="true">❓</div>
-        <h3>{{ title }}</h3>
-      </div>
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div
+        v-if="show"
+        class="confirm-overlay"
+        :class="typeClass"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="title"
+        @click="closeOnOverlayClick ? cancelAction() : null"
+        :style="{ zIndex: 9999 }"
+      >
+        <div class="confirm-card" @click.stop>
+          <!-- 头部 -->
+          <div class="card-header">
+            <div class="icon-wrapper">
+              <component :is="typeIcon" :size="24" />
+            </div>
+            <h3 class="title">{{ title }}</h3>
+          </div>
 
-      <div class="confirm-content">
-        <p>{{ message }}</p>
-        <div v-if="details" class="confirm-details">
-          <details>
-            <summary>详细信息</summary>
-            <pre>{{ details }}</pre>
-          </details>
+          <!-- 内容 -->
+          <div class="card-body">
+            <p class="message">{{ message }}</p>
+
+            <!-- 详细信息 (可选) -->
+            <div v-if="details" class="details-section">
+              <details>
+                <summary>
+                  <Terminal :size="14" />
+                  <span>详细信息</span>
+                  <ChevronDown :size="14" class="arrow" />
+                </summary>
+                <div class="code-block">
+                  <pre>{{ details }}</pre>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- 底部操作 -->
+          <div class="card-footer">
+            <button class="btn btn-secondary" @click="cancelAction">
+              {{ cancelText }}
+            </button>
+            <button 
+              class="btn btn-primary" 
+              ref="confirmBtnRef"
+              @click="confirmAction"
+            >
+              {{ confirmText }}
+            </button>
+          </div>
         </div>
       </div>
-
-      <div class="confirm-actions">
-        <button class="confirm-btn secondary" @click="cancelAction">
-          {{ cancelText }}
-        </button>
-        <button class="confirm-btn primary" :data-type="props.confirmType" @click="confirmAction">
-          {{ confirmText }}
-        </button>
-      </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { watch, onUnmounted, ref } from 'vue';
+import { watch, onUnmounted, ref, computed, nextTick } from 'vue';
+import { 
+  HelpCircle, 
+  AlertTriangle, 
+  AlertOctagon, 
+  Terminal, 
+  ChevronDown 
+} from 'lucide-vue-next';
 
 type ConfirmType = 'primary' | 'danger' | 'warning';
 
@@ -63,321 +93,234 @@ const props = withDefaults(defineProps<Props>(), {
   closeOnOverlayClick: true,
   confirmText: '确定',
   cancelText: '取消',
-  confirmType: 'primary' as ConfirmType,
+  confirmType: 'primary',
 });
 
 const emit = defineEmits<Emits>();
-const confirmAction = (): void => {
-  emit('confirm');
-};
+const confirmBtnRef = ref<HTMLButtonElement | null>(null);
 
-const cancelAction = (): void => {
-  emit('cancel');
-};
+// === 视觉逻辑 ===
+const typeClass = computed(() => `type-${props.confirmType}`);
 
-// 修复内存泄漏：使用ref跟踪监听器状态
-const escapeHandler = ref<((e: KeyboardEvent) => void) | null>(null);
+const typeIcon = computed(() => {
+  switch (props.confirmType) {
+    case 'danger': return AlertOctagon;
+    case 'warning': return AlertTriangle;
+    case 'primary': 
+    default: return HelpCircle;
+  }
+});
+
+// === 交互逻辑 ===
+const confirmAction = () => emit('confirm');
+const cancelAction = () => emit('cancel');
+
+// 键盘事件 (Escape 关闭, Enter 确认)
+const keyHandler = ref<((e: KeyboardEvent) => void) | null>(null);
 
 watch(
   () => props.show,
-  (newVal: boolean) => {
-    // 清理之前的监听器
-    if (escapeHandler.value) {
-      document.removeEventListener('keydown', escapeHandler.value);
-      escapeHandler.value = null;
+  (newVal) => {
+    // 清理旧监听
+    if (keyHandler.value) {
+      document.removeEventListener('keydown', keyHandler.value);
+      keyHandler.value = null;
     }
     
     if (newVal) {
-      const handler = (e: KeyboardEvent): void => {
-        if (e.key === 'Escape') {
-          cancelAction();
+      // 自动聚焦确认按钮 (提升体验)
+      nextTick(() => {
+        if (confirmBtnRef.value) confirmBtnRef.value.focus();
+      });
+
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') cancelAction();
+        // 只有当没有焦点在按钮上时，Enter 才触发确认，避免重复触发
+        if (e.key === 'Enter' && document.activeElement !== confirmBtnRef.value) {
+           e.preventDefault();
+           // 可选：在这里决定是否允许回车直接提交，通常为了安全，Delete 操作不建议回车直接提交
+           if (props.confirmType !== 'danger') confirmAction();
         }
       };
       document.addEventListener('keydown', handler);
-      escapeHandler.value = handler;
+      keyHandler.value = handler;
     }
   },
   { immediate: true }
 );
 
-// 组件卸载时清理
 onUnmounted(() => {
-  if (escapeHandler.value) {
-    document.removeEventListener('keydown', escapeHandler.value);
-    escapeHandler.value = null;
-  }
+  if (keyHandler.value) document.removeEventListener('keydown', keyHandler.value);
 });
-
-
 </script>
 
 <style scoped>
-.confirm-modal-overlay {
+/* 确保变量回退，防止透明 */
+.confirm-overlay {
+  --bg-fallback: #1e1e1e;
+  --text-fallback: #fff;
+}
+
+/* Overlay */
+.confirm-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
-  backdrop-filter: blur(4px);
+  padding: 1rem;
 }
 
-.confirm-modal {
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 1.5rem;
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
-  animation: modalSlideIn 0.3s ease-out;
+/* Themes */
+.type-primary { --theme-color: #6366f1; --theme-bg: rgba(99, 102, 241, 0.1); }
+.type-warning { --theme-color: #f59e0b; --theme-bg: rgba(245, 158, 11, 0.1); }
+.type-danger  { --theme-color: #ef4444; --theme-bg: rgba(239, 68, 68, 0.1); }
+
+/* Card */
+.confirm-card {
+  background-color: var(--bg-surface, var(--bg-fallback));
+  border: 1px solid var(--border-subtle, #333);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text-primary, var(--text-fallback));
+  /* 顶部带颜色的装饰条 */
+  border-top: 4px solid var(--theme-color);
 }
 
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.confirm-header {
+/* Header */
+.card-header {
+  padding: 1.5rem 1.5rem 0.5rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  gap: 1rem;
 }
 
-.confirm-icon {
-  font-size: 2rem;
-  color: var(--accent-warning);
+.icon-wrapper {
+  color: var(--theme-color);
+  background-color: var(--theme-bg);
+  padding: 0.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.confirm-header h3 {
+.title {
   margin: 0;
-  color: var(--text-primary);
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 600;
 }
 
-.confirm-content {
-  margin-bottom: 1.5rem;
+/* Body */
+.card-body {
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
 }
 
-.confirm-content p {
-  margin: 0 0 1rem 0;
-  color: var(--text-primary);
-  line-height: 1.5;
+.message {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--text-secondary, #ccc);
+  font-size: 0.95rem;
 }
 
-.confirm-details {
+/* Details Section */
+.details-section {
   margin-top: 1rem;
 }
 
-.confirm-details details {
-  background-color: var(--bg-tertiary);
-  border-radius: 6px;
-  padding: 0.75rem;
+.details-section details {
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle, #333);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.confirm-details summary {
+.details-section summary {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
   cursor: pointer;
-  color: var(--accent-primary);
-  font-weight: 500;
-  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+  transition: background 0.2s;
+}
+.details-section summary:hover { background-color: rgba(255,255,255,0.05); }
+.details-section summary::-webkit-details-marker { display: none; }
+
+.details-section details[open] .arrow { transform: rotate(180deg); }
+.arrow { margin-left: auto; transition: transform 0.2s; }
+
+.code-block {
+  background-color: #0d0d0d;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border-subtle, #333);
 }
 
-.confirm-details summary:hover {
-  text-decoration: underline;
-}
-
-.confirm-details pre {
+.code-block pre {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #a3a3a3;
+  max-height: 150px;
+  overflow-y: auto;
 }
 
-.confirm-actions {
+/* Footer */
+.card-footer {
+  padding: 1rem 1.5rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--border-subtle, #333);
   display: flex;
-  gap: 0.75rem;
   justify-content: flex-end;
+  gap: 0.75rem;
 }
 
-.confirm-btn {
-  padding: 0.625rem 1.25rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
+.btn {
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
   font-weight: 500;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 80px;
+  border: none;
+  transition: all 0.2s;
 }
 
-.confirm-btn.primary {
-  background-color: var(--accent-primary);
-  color: white;
+.btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--border-subtle, #555);
+  color: var(--text-primary, #fff);
 }
+.btn-secondary:hover { background-color: rgba(255,255,255,0.1); }
 
-.confirm-btn.primary:hover {
-  background-color: #1976d2;
+.btn-primary {
+  background-color: var(--theme-color);
+  color: #fff; /* Most theme colors work with white text, warning might need check */
+}
+/* Warning 情况下文字颜色可能需要深色，视具体配色而定，这里统一用白色 */
+.btn-primary:hover {
+  filter: brightness(1.1);
   transform: translateY(-1px);
 }
+.btn-primary:active { transform: translateY(0); }
 
-.confirm-btn.secondary {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+/* Animation */
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+
+.modal-fade-enter-active .confirm-card, .modal-fade-leave-active .confirm-card { 
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
 }
-
-.confirm-btn.secondary:hover {
-  background-color: var(--border-color);
-  transform: translateY(-1px);
-}
-
-/* 危险操作样式 */
-.confirm-btn.danger {
-  background-color: var(--accent-danger);
-  color: white;
-}
-
-.confirm-btn.danger:hover {
-  background-color: #d32f2f;
-  transform: translateY(-1px);
-}
-
-/* 警告操作样式 */
-.confirm-btn.warning {
-  background-color: var(--accent-warning);
-  color: white;
-}
-
-.confirm-btn.warning:hover {
-  background-color: #f57c00;
-  transform: translateY(-1px);
-}
-
-/* 根据confirmType动态应用样式 */
-.confirm-btn.primary[data-type="danger"] {
-  background-color: var(--accent-danger);
-}
-
-.confirm-btn.primary[data-type="danger"]:hover {
-  background-color: #d32f2f;
-}
-
-.confirm-btn.primary[data-type="warning"] {
-  background-color: var(--accent-warning);
-}
-
-.confirm-btn.primary[data-type="warning"]:hover {
-  background-color: #f57c00;
-}
-
-/* 主题适配 */
-.light-theme .confirm-modal {
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .confirm-modal {
-    padding: 1.5rem;
-    margin: 1rem;
-    max-width: calc(100vw - 2rem);
-    border-radius: 16px;
-  }
-
-  .confirm-header {
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-  }
-
-  .confirm-icon {
-    font-size: 2.5rem;
-  }
-
-  .confirm-header h3 {
-    font-size: 1.375rem;
-  }
-
-  .confirm-content {
-    margin-bottom: 2rem;
-  }
-
-  .confirm-content p {
-    font-size: 1rem;
-    line-height: 1.6;
-  }
-
-  .confirm-actions {
-    flex-direction: column-reverse;
-    gap: 1rem;
-  }
-
-  .confirm-btn {
-    width: 100%;
-    padding: 1rem 1.5rem;
-    font-size: 1rem;
-    min-height: 48px;
-    border-radius: 12px;
-    font-weight: 600;
-  }
-}
-
-@media (max-width: 480px) {
-  .confirm-modal {
-    padding: 1rem;
-    margin: 0.5rem;
-    max-width: calc(100vw - 1rem);
-    border-radius: 20px;
-  }
-
-  .confirm-header {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.75rem;
-  }
-
-  .confirm-icon {
-    font-size: 3rem;
-  }
-
-  .confirm-header h3 {
-    font-size: 1.5rem;
-  }
-
-  .confirm-btn {
-    padding: 1.25rem 1.5rem;
-    font-size: 1.125rem;
-    min-height: 52px;
-    border-radius: 16px;
-  }
-}
-
-/* 触摸设备优化 */
-@media (hover: none) and (pointer: coarse) {
-  .confirm-btn:active {
-    transform: scale(0.95);
-    transition: transform 0.1s ease;
-  }
-  
-  .confirm-modal-overlay {
-    -webkit-tap-highlight-color: transparent;
-  }
-}
+.modal-fade-enter-from .confirm-card { transform: scale(0.95) translateY(10px); }
+.modal-fade-leave-to .confirm-card { transform: scale(0.95) translateY(10px); }
 </style>

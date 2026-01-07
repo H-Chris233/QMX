@@ -1,97 +1,133 @@
 <template>
-  <div 
-    class="membership-alerts" 
-    v-if="showAlerts"
-    :class="{ 'fade-out': isFadingOut }"
-  >
-    <!-- 加载进度条 -->
-    <div v-if="loading" class="loading-progress"></div>
-    
-    <div class="alerts-header">
-      <h3>会员提醒</h3>
-      <div class="header-actions">
-        <button 
-          class="refresh-btn" 
-          @click="loadExpiringMemberships"
-          :disabled="loading"
-        >
-          🔄 刷新
-        </button>
-        <button 
-          class="close-btn" 
-          @click="startFadeOut"
-        >
-          ✖️
-        </button>
+  <Transition name="slide-fade">
+    <div 
+      class="membership-widget" 
+      v-if="showAlerts"
+      role="alertdialog"
+    >
+      <!-- 顶部 Header -->
+      <div class="widget-header">
+        <div class="header-title">
+          <BellRing :size="18" class="text-warning" />
+          <h3>会员预警</h3>
+        </div>
+        <div class="header-actions">
+          <button 
+            class="icon-btn" 
+            @click="loadExpiringMemberships"
+            :disabled="loading"
+            title="刷新列表"
+          >
+            <RefreshCw :size="16" :class="{ 'spin-anim': loading }" />
+          </button>
+          <button 
+            class="icon-btn close" 
+            @click="startFadeOut"
+            title="关闭"
+          >
+            <X :size="16" />
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- 即将过期的会员 -->
-    <div v-if="expiringMemberships.length > 0" class="alert-section expiring">
-      <div class="alert-title">
-        <span class="alert-icon">⚠️</span>
-        <span>即将过期的会员 ({{ expiringMemberships.length }})</span>
-      </div>
-      <div class="alert-list">
-        <div 
-          v-for="student in expiringMemberships" 
-          :key="student.uid"
-          class="alert-item"
-        >
-          <div class="student-info">
-            <span class="student-name">{{ student.name }}</span>
-            <span class="student-phone">{{ student.phone }}</span>
+      <!-- 列表内容区域 -->
+      <div class="widget-body">
+        
+        <!-- Loading State -->
+        <div v-if="loading && expiringMemberships.length === 0" class="state-loading">
+          <Loader2 :size="24" class="spin-anim text-muted" />
+          <span>正在同步数据...</span>
+        </div>
+
+        <!-- 列表有数据 -->
+        <div v-else-if="expiringMemberships.length > 0" class="alert-list custom-scrollbar">
+          <div class="list-summary">
+            <span>发现 {{ expiringMemberships.length }} 名学员需关注</span>
           </div>
-          <div class="expiry-info">
-            <span class="days-remaining">
-              剩余 {{ student.membership_days_remaining }} 天
-            </span>
-            <span class="expiry-date">
-              {{ formatDate(student.membership_end_date) }}到期
-            </span>
-          </div>
-          <div class="alert-actions">
-            <div class="extend-controls">
-              <input
-                class="extend-input"
-                type="number"
-                min="1"
-                placeholder="天数"
-                v-model.number="extendDaysMap[student.uid]"
-                :disabled="loading"
-              />
-              <button 
-                class="extend-btn" 
-                @click="extendMembership(student)"
-                :disabled="loading || !(Number(extendDaysMap[student.uid] || 0) > 0)"
-              >
-                续费
+
+          <div 
+            v-for="student in expiringMemberships" 
+            :key="student.uid"
+            class="alert-card"
+          >
+            <!-- 学员信息行 -->
+            <div class="student-row">
+              <div class="student-meta">
+                <span class="name">{{ student.name }}</span>
+                <div class="expiry-tag">
+                  剩余 {{ student.membership_days_remaining }} 天
+                </div>
+              </div>
+              <button class="btn-icon-text" @click="contactStudent(student)">
+                <Phone :size="14" />
+                <span>{{ student.phone }}</span>
               </button>
             </div>
-            <button 
-              class="contact-btn" 
-              @click="contactStudent(student)"
-            >
-              联系
-            </button>
+
+            <!-- 到期时间 -->
+            <div class="date-row">
+              <CalendarX2 :size="14" class="text-muted" />
+              <span class="date-text">
+                到期日: {{ formatDate(student.membership_end_date) }}
+              </span>
+            </div>
+
+            <!-- 操作行 (续费) -->
+            <div class="action-row">
+              <div class="input-group">
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="天数"
+                  v-model.number="extendDaysMap[student.uid]"
+                  :disabled="loading"
+                  class="compact-input"
+                />
+                <button 
+                  class="btn-compact primary" 
+                  @click="extendMembership(student)"
+                  :disabled="loading || !(Number(extendDaysMap[student.uid] || 0) > 0)"
+                >
+                  <CreditCard :size="14" />
+                  续费
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 (无过期会员) -->
+        <div v-else-if="!loading" class="state-empty">
+          <div class="icon-circle">
+            <CheckCircle2 :size="32" />
+          </div>
+          <h4>暂无过期风险</h4>
+          <p>所有会员状态良好</p>
+          
+          <!-- 自动关闭倒计时条 -->
+          <div class="auto-close-bar">
+            <div class="progress-fill"></div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- 无即将过期的会员 -->
-    <div v-else-if="!loading" class="no-alerts">
-      <div class="no-alerts-icon">✅</div>
-      <div class="no-alerts-text">暂无即将过期的会员</div>
-      <div class="no-alerts-subtitle">窗口将在2.5秒后自动关闭</div>
-    </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, inject, type Ref } from 'vue';
+import { ref, reactive, onMounted, type Ref } from 'vue';
 import { ApiService } from '../api/ApiService';
 import { useAppStore } from '../stores/app';
+import { 
+  BellRing, 
+  RefreshCw, 
+  X, 
+  Phone, 
+  CalendarX2, 
+  CreditCard, 
+  CheckCircle2,
+  Loader2 
+} from 'lucide-vue-next';
 
 const appStore = useAppStore();
 
@@ -105,429 +141,355 @@ interface Student {
   is_membership_active: boolean;
 }
 
-interface ErrorHandler {
-  showError: (title: string, message: string, details?: string) => void;
-  showSuccess: (title: string, message: string) => void;
-}
 const loading: Ref<boolean> = ref(false);
 const showAlerts: Ref<boolean> = ref(true);
-const isFadingOut: Ref<boolean> = ref(false);
 const expiringMemberships: Ref<Student[]> = ref([]);
 const extendDaysMap: Record<number, number> = reactive({});
 
 // 直接使用 appStore 的统一错误处理
 const { showError, showSuccess } = appStore.errorHandler;
 
-// 加载即将过期的会员
+// 加载逻辑
 const loadExpiringMemberships = async (): Promise<void> => {
-      if (loading.value) {
-        console.warn('正在加载中，跳过重复请求');
-        return;
-      }
+  if (loading.value) return;
 
-      // 重置状态，重新显示组件
-      isFadingOut.value = false;
-      showAlerts.value = true;
+  showAlerts.value = true;
+  loading.value = true;
 
-      loading.value = true;
-      try {
-        // 使用 API 方法获取7天内即将过期的会员
-        const expiring = await ApiService.getMembershipExpiringSoon(7);
-        
-        // 验证返回的数据格式
-        if (!Array.isArray(expiring)) {
-          throw new Error('返回的数据格式不正确，期望数组格式');
-        }
+  try {
+    const expiring = await ApiService.getMembershipExpiringSoon(7);
+    
+    if (!Array.isArray(expiring)) throw new Error('数据格式错误');
 
-        // 过滤并验证学员数据的完整性
-        expiringMemberships.value = expiring.filter((student: any): student is Student => 
-          student && 
-          student.uid && 
-          student.name &&
-          typeof student.uid === 'number'
-        ) as Student[];
-
-        if (import.meta.env?.MODE !== 'production') {
-          console.log(`找到 ${expiringMemberships.value.length} 个即将过期的会员`);
-        }
-        
-        // 如果没有即将过期的会员，2.5秒后自动隐藏
-        if (expiringMemberships.value.length === 0) {
-          setTimeout(() => {
-            if (expiringMemberships.value.length === 0) {
-              startFadeOut();
-            }
-          }, 2500);
-        }
-      } catch (error) {
-        console.error('加载即将过期会员失败:', error);
-        expiringMemberships.value = [];
-        const errorMessage = (error as any)?.message || (error as Error).message || '未知错误';
-        showError('无法获取即将过期的会员信息，请检查网络连接或稍后重试');
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    // 续费会员
-    const extendMembership = async (student: Student): Promise<void> => {
-      if (!student || !student.uid) {
-        showError('学员信息无效');
-        return;
-      }
-
-      const days = extendDaysMap[student.uid] || 0;
-      if (!days || days <= 0) {
-        showError('请输入大于0的天数');
-        return;
-      }
-
-      loading.value = true;
-      try {
-        // 计算新的会员结束日期
-        // 如果会员当前是活跃的且有结束日期，从结束日期开始续费；否则从今天开始
-        const baseDate = student.is_membership_active && student.membership_end_date 
-          ? new Date(student.membership_end_date) 
-          : new Date();
-        
-        const newEndDate = new Date(baseDate);
-        newEndDate.setDate(newEndDate.getDate() + days);
-        
-        // 计算新的开始日期
-        // 如果会员有开始日期则保留，否则使用基础日期
-        const startDate = student.membership_start_date 
-          ? student.membership_start_date 
-          : baseDate.toISOString();
-        
-        // 调用 setStudentMembership API
-        await ApiService.setStudentMembership(student.uid, {
-          startDate: startDate,
-          endDate: newEndDate.toISOString()
-        });
-        
-        showSuccess(`已为 ${student.name} 续费 ${days} 天`);
-        extendDaysMap[student.uid] = 0 as any;
-        
-        // 刷新会员列表
-        await loadExpiringMemberships();
-      } catch (error) {
-        console.error('续费失败:', error);
-        const errorMessage = (error as any)?.message || (error as Error).message || '未知错误';
-        showError('续费时发生错误，请稍后重试');
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    // 联系学员（打开电话应用）
-    const contactStudent = (student: Student): void => {
-      if (!student || !student.phone) {
-        showError('学员电话信息无效');
-        return;
-      }
-
-      try {
-        // 尝试打开电话应用
-        window.location.href = `tel:${student.phone}`;
-      } catch (error) {
-        console.error('打开电话应用失败:', error);
-        // 降级方案：复制到剪贴板
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(student.phone).then(() => {
-            showSuccess(`电话号码 ${student.phone} 已复制到剪贴板`);
-          });
-        } else {
-          showError(`无法复制电话号码，请手动复制: ${student.phone}`);
-        }
-      }
-    };
-
-    // 格式化日期
-    const formatDate = (dateString: string | null | undefined): string => {
-      if (!dateString) return '';
-      try {
-        return new Date(dateString).toLocaleDateString('zh-CN', {
-          month: 'long',
-          day: 'numeric'
-        });
-      } catch (error) {
-        console.warn('日期格式化失败:', error);
-        return dateString;
-      }
-    };
-
-    // 开始渐隐动画
-    const startFadeOut = (): void => {
-      isFadingOut.value = true;
+    expiringMemberships.value = expiring.filter((s: any): s is Student => 
+      s && s.uid && s.name && typeof s.uid === 'number'
+    ) as Student[];
+    
+    // 如果无数据，2.5秒后自动关闭
+    if (expiringMemberships.value.length === 0) {
       setTimeout(() => {
-        showAlerts.value = false;
-      }, 500); // 渐隐动画持续500ms
-    };
+        // Double check in case data changed during timeout
+        if (expiringMemberships.value.length === 0) {
+          startFadeOut();
+        }
+      }, 2500);
+    }
+  } catch (error) {
+    showError('无法加载会员提醒', (error as Error).message);
+    expiringMemberships.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
 
-    // 组件挂载时自动加载数据
-    onMounted(() => {
-      loadExpiringMemberships();
+// 续费逻辑
+const extendMembership = async (student: Student): Promise<void> => {
+  if (!student?.uid) return;
+  const days = extendDaysMap[student.uid] || 0;
+  if (days <= 0) return showError('请输入有效天数');
+
+  loading.value = true;
+  try {
+    const baseDate = student.is_membership_active && student.membership_end_date 
+      ? new Date(student.membership_end_date) 
+      : new Date();
+    
+    const newEndDate = new Date(baseDate);
+    newEndDate.setDate(newEndDate.getDate() + days);
+    
+    const startDate = student.membership_start_date 
+      ? student.membership_start_date 
+      : baseDate.toISOString();
+    
+    await ApiService.setStudentMembership(student.uid, {
+      startDate: startDate,
+      endDate: newEndDate.toISOString()
     });
+    
+    showSuccess(`已为 ${student.name} 续费 ${days} 天`);
+    extendDaysMap[student.uid] = 0 as any; // Reset input
+    await loadExpiringMemberships(); // Refresh list
+  } catch (error) {
+    showError('续费失败', (error as Error).message);
+  } finally {
+    loading.value = false;
+  }
+};
 
+// 联系学员
+const contactStudent = (student: Student): void => {
+  if (!student.phone) return showError('无电话号码');
+  
+  try {
+    window.location.href = `tel:${student.phone}`;
+  } catch {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(student.phone);
+      showSuccess('号码已复制');
+    }
+  }
+};
 
+// 辅助函数
+const formatDate = (dateString: any) => {
+  if (!dateString) return '--';
+  try {
+    return new Date(dateString).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  } catch { return dateString; }
+};
+
+const startFadeOut = () => {
+  showAlerts.value = false;
+};
+
+onMounted(() => loadExpiringMemberships());
 </script>
 
 <style scoped>
-.membership-alerts {
+/* Widget Container */
+.membership-widget {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 350px;
-  max-height: 500px;
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--border-color);
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  background-color: rgba(30, 30, 30, 0.95); /* Deep dark background */
+  backdrop-filter: blur(12px); /* Glassmorphism */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+    0 10px 15px -3px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0,0,0,0.2);
   z-index: 1000;
   overflow: hidden;
-  opacity: 1;
-  transform: translateY(0) translateX(0);
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
-  animation: slideInFromRight 0.6s ease-out;
+  display: flex;
+  flex-direction: column;
+  color: #e2e8f0;
 }
 
-.membership-alerts.fade-out {
-  opacity: 0;
-  transform: translateY(20px) translateX(20px);
-}
-
-@keyframes slideInFromRight {
-  from {
-    opacity: 0;
-    transform: translateX(100%) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) translateY(0);
-  }
-}
-
-/* 加载进度条 */
-.loading-progress {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 3px;
-  width: 100%;
-  background: var(--accent-primary);
-  transform: scaleX(0);
-  transform-origin: left;
-  animation: loading 1.5s ease-in-out forwards;
-  z-index: 10;
-}
-
-@keyframes loading {
-  to {
-    transform: scaleX(1);
-    transform-origin: right;
-  }
-}
-
-.alerts-header {
+/* Header */
+.widget-header {
+  padding: 12px 16px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
 }
 
-.alerts-header h3 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 1.1rem;
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.header-title h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.text-warning { color: #f59e0b; }
 
 .header-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 4px;
 }
 
-.refresh-btn,
-.close-btn {
-  background: none;
+.icon-btn {
+  background: transparent;
   border: none;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  transition: all 0.3s ease;
-}
-
-.refresh-btn:hover,
-.close-btn:hover {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.alert-section {
-  padding: 1rem;
-}
-
-.alert-title {
+  transition: all 0.2s;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
 }
+.icon-btn:hover { background-color: rgba(255, 255, 255, 0.1); color: #fff; }
+.icon-btn.close:hover { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
-.alert-icon {
-  font-size: 1.2rem;
-}
-
-.expiring .alert-icon {
-  color: #ff9800;
-}
-
-.alert-list {
-  max-height: 300px;
+/* Body Content */
+.widget-body {
+  max-height: 400px;
   overflow-y: auto;
+  position: relative;
 }
 
-.alert-item {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background-color: var(--bg-primary);
+/* List Items */
+.alert-list {
+  padding: 0 16px 16px 16px;
+}
+.list-summary {
+  padding: 12px 0 8px 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.alert-card {
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;
-  border-left: 4px solid #ff9800;
-  gap: 1rem;
-}
-
-.student-info {
-  flex: 1;
+  padding: 12px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 8px;
+  transition: border-color 0.2s;
 }
+.alert-card:hover { border-color: rgba(255, 255, 255, 0.15); }
 
-.student-name {
-  font-weight: 600;
-  color: var(--text-primary);
+/* Card Rows */
+.student-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
 }
-
-.student-phone {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.expiry-info {
+.student-meta {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+}
+.name { font-weight: 600; font-size: 0.95rem; }
+.expiry-tag { 
+  font-size: 0.75rem; 
+  color: #f59e0b; 
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+
+.btn-icon-text {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
+  cursor: pointer;
 }
+.btn-icon-text:hover { color: #6366f1; text-decoration: underline; }
 
-.days-remaining {
-  font-weight: 600;
-  color: #ff9800;
-  font-size: 0.875rem;
-}
-
-.expiry-date {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.alert-actions {
+.date-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #64748b;
 }
 
-.extend-btn,
-.contact-btn {
-  padding: 0.25rem 0.5rem;
+/* Action Input Group */
+.action-row {
+  margin-top: 4px;
+}
+.input-group {
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.compact-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  width: 60px;
+}
+.compact-input:focus { outline: none; }
+.btn-compact {
   border: none;
   border-radius: 4px;
-  font-size: 0.75rem;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
 }
-
-.extend-btn {
-  background-color: var(--accent-primary);
+.btn-compact.primary {
+  background-color: #6366f1;
   color: white;
 }
+.btn-compact.primary:hover:not(:disabled) { background-color: #4f46e5; }
+.btn-compact:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.extend-btn:hover:not(:disabled) {
-  background-color: #1976d2;
-}
-
-.extend-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.contact-btn {
-  background-color: transparent;
-  color: var(--accent-primary);
-  border: 1px solid var(--accent-primary);
-}
-
-.contact-btn:hover {
-  background-color: var(--accent-primary);
-  color: white;
-}
-
-.no-alerts {
+/* Empty State */
+.state-empty {
+  padding: 32px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem;
   text-align: center;
 }
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.state-empty h4 { margin: 0 0 4px 0; font-size: 1rem; color: #fff; }
+.state-empty p { margin: 0; font-size: 0.85rem; color: #94a3b8; }
 
-.no-alerts-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
+/* Loading State */
+.state-loading {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #94a3b8;
+  font-size: 0.9rem;
 }
 
-.no-alerts-text {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  margin-bottom: 0.5rem;
+/* Auto Close Bar Animation */
+.auto-close-bar {
+  margin-top: 16px;
+  width: 120px;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background-color: #10b981;
+  width: 100%;
+  animation: shrink-bar 2.5s linear forwards;
 }
 
-.no-alerts-subtitle {
-  color: var(--text-secondary);
-  opacity: 0.7;
-  font-size: 0.75rem;
-  font-style: italic;
+/* Animations */
+@keyframes shrink-bar {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+.spin-anim { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Vue Transition */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(20px) scale(0.95);
+  opacity: 0;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .membership-alerts {
-    position: fixed;
-    bottom: 10px;
-    right: 10px;
-    left: 10px;
-    width: auto;
-    max-width: none;
-  }
-  
-  .alert-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .alert-actions {
-    flex-direction: row;
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-.extend-controls { display: flex; gap: 0.5rem; align-items: center; }
-.extend-input { width: 80px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); }
-
+/* Custom Scrollbar for list */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 </style>

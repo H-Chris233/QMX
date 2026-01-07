@@ -1,98 +1,160 @@
 <template>
   <div class="settings-container">
     <!-- 页面标题 -->
-    <div class="section-header">
-      <h2>设置</h2>
-    </div>
+    <header class="settings-header">
+      <h2 class="page-title">系统设置</h2>
+      <p class="page-subtitle">管理应用程序的外观、行为与系统信息</p>
+    </header>
 
-    <!-- 设置内容 -->
+    <!-- 设置网格 -->
     <div class="settings-grid">
+      
       <!-- 外观设置 -->
-      <div class="settings-card">
+      <section class="setting-card">
         <div class="card-header">
-          <h3>外观</h3>
+          <div class="header-icon">
+            <Palette :size="20" />
+          </div>
+          <h3>外观偏好</h3>
         </div>
+        
         <div class="card-content">
-          <div class="setting-item">
-            <div class="setting-info">
-              <label>主题模式</label>
-              <p class="setting-description">选择应用程序的主题外观</p>
+          <div class="setting-row">
+            <div class="setting-meta">
+              <label>界面主题</label>
+              <p class="desc">切换深色或浅色模式以适应环境光线</p>
             </div>
-            <div class="setting-control">
-              <button
-                class="theme-toggle-btn"
-                @click="toggleTheme"
-                :title="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'"
+            
+            <!-- 主题切换器 (Segmented Control 风格) -->
+            <div class="theme-switcher">
+              <button 
+                class="theme-option" 
+                :class="{ active: theme === 'light' }"
+                @click="setTheme('light')"
               >
-                <span v-if="theme === 'dark'">🌑 深色</span>
-                <span v-else>🌕 浅色</span>
+                <Sun :size="16" />
+                <span>浅色</span>
+              </button>
+              <button 
+                class="theme-option" 
+                :class="{ active: theme === 'dark' }"
+                @click="setTheme('dark')"
+              >
+                <Moon :size="16" />
+                <span>深色</span>
               </button>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- 通用设置 -->
-      <div class="settings-card">
+      <section class="setting-card">
         <div class="card-header">
-          <h3>通用</h3>
+          <div class="header-icon">
+            <Sliders :size="20" />
+          </div>
+          <h3>通用行为</h3>
         </div>
+        
         <div class="card-content">
-          <div class="setting-item">
-            <div class="setting-info">
-              <label>自动保存</label>
-              <p class="setting-description">
-                为了防止忘记保存的悲剧发生，本开关无法关闭。
+          <div class="setting-row">
+            <div class="setting-meta">
+              <div class="label-with-icon">
+                <label>实时数据保护</label>
+                <Lock :size="14" class="lock-icon" title="系统强制开启" />
+              </div>
+              <p class="desc">
+                防止数据意外丢失，所有操作将自动写入数据库。
+                <span class="highlight-text">此策略由系统管理员强制开启。</span>
               </p>
             </div>
+            
             <div class="setting-control">
-              <label class="switch">
+              <!-- 样式化的 Switch -->
+              <label class="switch-wrapper">
                 <input
                   type="checkbox"
                   v-model="autoSave"
                   disabled
-                  @change="saveSettings"
+                  class="switch-input"
                 />
-                <span class="slider"></span>
+                <span class="switch-slider"></span>
               </label>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 关于 -->
-      <div class="settings-card">
+      <!-- 系统信息 (关于) -->
+      <section class="setting-card about-card">
         <div class="card-header">
-          <h3>关于</h3>
+          <div class="header-icon">
+            <Info :size="20" />
+          </div>
+          <h3>关于系统</h3>
         </div>
+        
         <div class="card-content">
-          <div class="about-info">
-            <h4>启明星管理系统</h4>
-            <p class="version">版本: 0.12.1</p>
-            <p class="tech-stack">基于 Tauri + Vue 3 构建</p>
+          <div class="about-hero">
+            <div class="logo-circle">
+              <Sparkles :size="32" />
+            </div>
+            <div class="app-info">
+              <h4>启明星管理系统</h4>
+              <span class="version-badge">v0.12.1 Beta</span>
+            </div>
+          </div>
+          
+          <div class="tech-specs">
+            <div class="spec-item">
+              <span class="spec-label">构建核心</span>
+              <span class="spec-value">Tauri + Vue 3</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">渲染引擎</span>
+              <span class="spec-value">Webview2 / WebKit</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">本地存储</span>
+              <span class="spec-value">SQLite / FS</span>
+            </div>
+          </div>
+          
+          <div class="card-footer">
+            <p class="copyright">© 2024 Morning Star System. All rights reserved.</p>
           </div>
         </div>
-      </div>
+      </section>
+
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, type Ref } from 'vue';
+import { 
+  Palette, 
+  Sun, 
+  Moon, 
+  Sliders, 
+  Lock, 
+  Info, 
+  Sparkles 
+} from 'lucide-vue-next';
 
 const theme: Ref<string> = ref('dark');
 const autoSave: Ref<boolean> = ref(true);
 
-const toggleTheme = (): void => {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('theme', theme.value);
-  document.documentElement.classList.remove('light-theme', 'dark-theme');
-  document.documentElement.classList.add(theme.value + '-theme');
-  document.documentElement.setAttribute('data-theme', theme.value);
-};
-
-const saveSettings = (): void => {
-  localStorage.setItem('autoSave', autoSave.value.toString());
+const setTheme = (mode: string): void => {
+  theme.value = mode;
+  localStorage.setItem('theme', mode);
+  
+  // 更新 DOM
+  const root = document.documentElement;
+  root.classList.remove('light-theme', 'dark-theme');
+  root.classList.add(`${mode}-theme`);
+  root.setAttribute('data-theme', mode);
 };
 
 onMounted(() => {
@@ -105,214 +167,334 @@ onMounted(() => {
       ? 'dark'
       : 'light';
   }
-  document.documentElement.classList.remove('light-theme', 'dark-theme');
-  document.documentElement.classList.add(theme.value + '-theme');
-  document.documentElement.setAttribute('data-theme', theme.value);
+  
+  // 确保 DOM 状态同步
+  setTheme(theme.value);
 
-  // 加载设置
+  // 加载设置 (虽然 autoSave 是强制的，但保持逻辑完整性)
   const savedAutoSave = localStorage.getItem('autoSave');
   if (savedAutoSave) {
     autoSave.value = savedAutoSave === 'true';
   }
 });
-
-
 </script>
 
 <style scoped>
 .settings-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+  animation: fade-in 0.4s ease;
 }
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* Header */
+.settings-header {
+  margin-bottom: 2rem;
 }
-
-.section-header h2 {
-  margin: 0;
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
   color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+}
+.page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
 }
 
+/* Grid */
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 1.5rem;
 }
 
-.settings-card {
-  background-color: var(--bg-secondary);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px var(--shadow-color);
+/* Card Common Styles */
+.setting-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: border-color 0.2s;
+}
+
+.setting-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .card-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.header-icon {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .card-content {
   padding: 1.5rem;
-  flex-grow: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.setting-item {
+/* Setting Rows */
+.setting-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border-color);
+  gap: 1.5rem;
 }
 
-.setting-item:last-child {
-  border-bottom: none;
-}
-
-.setting-info {
-  flex: 1;
-}
-
-.setting-info label {
+.setting-meta label {
   display: block;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
-  color: var(--text-primary);
+  font-size: 0.95rem;
 }
 
-.setting-description {
+.label-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lock-icon {
+  color: var(--accent-warning, #f59e0b);
+  opacity: 0.8;
+}
+
+.desc {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
+  line-height: 1.4;
 }
 
-.setting-control {
-  margin-left: 1rem;
+.highlight-text {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--accent-warning, #f59e0b);
+  opacity: 0.8;
 }
 
-.theme-toggle-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 0.75rem 1.5rem;
+/* Theme Switcher (Segmented Control) */
+.theme-switcher {
+  display: flex;
+  background-color: var(--bg-app); /* Darker background */
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.theme-toggle-btn:hover {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: white;
-  transform: translateY(-1px);
+.theme-option:hover {
+  color: var(--text-primary);
 }
 
-/* 开关样式 */
-.switch {
+.theme-option.active {
+  background-color: var(--bg-surface);
+  color: var(--primary-color, #6366f1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  font-weight: 600;
+}
+
+/* Modern Switch */
+.switch-wrapper {
   position: relative;
   display: inline-block;
-  width: 60px;
-  height: 34px;
+  width: 52px;
+  height: 28px;
 }
 
-.switch input:disabled + .slider {
-  background-color: var(--bg-tertiary);
-  opacity: 0.6;
-  cursor: not-allowed;
+.switch-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
-.switch input:disabled + .slider:before {
-  background-color: #aaa;
-}
-
-.switch input:disabled {
-  -webkit-appearance: none;
-  appearance: none;
-  background-color: transparent;
-  border: none;
-  outline: none;
-  pointer-events: none;
-}
-
-.slider {
+.switch-slider {
   position: absolute;
   cursor: pointer;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--bg-tertiary);
-  transition: 0.4s;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  transition: .3s;
   border-radius: 34px;
 }
 
-.slider:before {
+.switch-slider:before {
   position: absolute;
-  content: '';
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: 0.4s;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text-secondary);
+  transition: .3s;
   border-radius: 50%;
 }
 
-input:checked + .slider {
-  background-color: var(--accent-primary);
+/* Checked State */
+.switch-input:checked + .switch-slider {
+  background-color: var(--primary-color, #6366f1); /* Primary Color */
+  border-color: var(--primary-color, #6366f1);
 }
 
-input:checked + .slider:before {
-  transform: translateX(26px);
+.switch-input:checked + .switch-slider:before {
+  transform: translateX(24px);
+  background-color: white;
 }
 
-.about-info {
+/* Disabled State Styling - Make it look "Locked" not "Broken" */
+.switch-input:disabled + .switch-slider {
+  cursor: not-allowed;
+  opacity: 0.8; /* Keep it relatively visible */
+}
+.switch-input:disabled:checked + .switch-slider {
+  background-color: #2e7d32; /* Success green darker */
+  border-color: #2e7d32;
+}
+.switch-input:disabled + .switch-slider:before {
+  background-color: #e0e0e0;
+}
+
+/* About Card Specifics */
+.about-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.logo-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary-color, #6366f1), #818cf8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.app-info h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.version-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--primary-color, #6366f1);
+  border-radius: 99px;
+  font-weight: 500;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.tech-specs {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: var(--bg-app);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
 }
 
-.about-info h4 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 1.1rem;
+.spec-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
 }
 
-.version,
-.tech-stack {
-  margin: 0;
-  font-size: 0.875rem;
+.spec-label {
   color: var(--text-secondary);
 }
 
-@media (max-width: 768px) {
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
+.spec-value {
+  color: var(--text-primary);
+  font-family: monospace;
+}
 
-  .setting-item {
+.card-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  text-align: center;
+}
+
+.copyright {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  margin: 0;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .setting-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-
+  
+  .theme-switcher {
+    width: 100%;
+  }
+  
+  .theme-option {
+    flex: 1;
+    justify-content: center;
+  }
+  
   .setting-control {
-    align-self: flex-end;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
   }
 }
 </style>
