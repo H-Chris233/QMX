@@ -1,4 +1,3 @@
-import { IStudentDoc, studentModel } from '@/models/mongo';
 import { MembershipStatus } from '@/types';
 
 interface StudentJson {
@@ -6,15 +5,15 @@ interface StudentJson {
   name?: string;
   age?: number | null;
   phone?: string;
-  class?: IStudentDoc['class'];
-  subject?: IStudentDoc['subject'];
+  class?: string;
+  subject?: string;
   rings?: number[];
   note?: string;
   lessonLeft?: number | null;
   lesson_left?: number | null;
-  membershipStartDate?: string | null;
+  membershipStartDate?: string | Date | null;
   membership_start_date?: string | null;
-  membershipEndDate?: string | null;
+  membershipEndDate?: string | Date | null;
   membership_end_date?: string | null;
   membershipDaysRemaining?: number | null;
   membership_days_remaining?: number | null;
@@ -22,9 +21,9 @@ interface StudentJson {
   is_membership_active?: boolean;
   membershipStatus?: MembershipStatus;
   membership_status?: MembershipStatus;
-  createdAt?: Date | null;
+  createdAt?: Date | string | null;
   created_at?: string | null;
-  updatedAt?: Date | null;
+  updatedAt?: Date | string | null;
   updated_at?: string | null;
 }
 
@@ -33,8 +32,8 @@ export interface PresentedStudent {
   name: string;
   age: number | null;
   phone: string;
-  class: IStudentDoc['class'];
-  subject: IStudentDoc['subject'];
+  class: string;
+  subject: string;
   rings: number[];
   note: string;
   lessonLeft: number | null;
@@ -55,80 +54,108 @@ export interface PresentedStudent {
   updated_at: string | null;
 }
 
-type StudentPresentable = IStudentDoc | PresentedStudent | StudentJson | (Partial<StudentJson> & Record<string, unknown>);
+type StudentPresentable = PresentedStudent | StudentJson | (Partial<StudentJson> & Record<string, unknown>);
 
-const isStudentDocument = (student: StudentPresentable): student is IStudentDoc => {
-  return typeof (student as IStudentDoc)?.toJSON === 'function';
-};
-
-const formatDateOnly = (value: Date | null | undefined): string | null => {
+const formatDateOnly = (value: Date | string | null | undefined): string | null => {
   if (!value) {
     return null;
   }
-  const iso = value.toISOString();
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const iso = date.toISOString();
   return iso.split('T')[0] ?? null;
 };
 
-const formatDateTime = (value: Date | null | undefined): string | null => {
-  return value ? value.toISOString() : null;
+const formatDateTime = (value: Date | string | null | undefined): string | null => {
+  if (!value) {
+    return null;
+  }
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return date.toISOString();
 };
 
-const determineMembershipStatus = (doc: IStudentDoc): MembershipStatus => {
-  if (doc.membershipStartDate && doc.membershipEndDate) {
-    const now = new Date();
-    if (now < doc.membershipStartDate) {
-      return MembershipStatus.UPCOMING;
-    }
-    if (now > doc.membershipEndDate) {
-      return MembershipStatus.EXPIRED;
-    }
-    return MembershipStatus.ACTIVE;
+const determineMembershipStatus = (
+  membershipStartDate: Date | string | null,
+  membershipEndDate: Date | string | null
+): MembershipStatus => {
+  if (!membershipStartDate || !membershipEndDate) {
+    return MembershipStatus.NONE;
   }
-  return MembershipStatus.NONE;
+
+  const start = typeof membershipStartDate === 'string' ? new Date(membershipStartDate) : membershipStartDate;
+  const end = typeof membershipEndDate === 'string' ? new Date(membershipEndDate) : membershipEndDate;
+  const now = new Date();
+
+  if (now < start) {
+    return MembershipStatus.UPCOMING;
+  }
+  if (now > end) {
+    return MembershipStatus.EXPIRED;
+  }
+  return MembershipStatus.ACTIVE;
 };
 
-export const toStudentDocument = (student: StudentPresentable): IStudentDoc => {
-  if (isStudentDocument(student)) {
-    return student;
+const getMembershipDaysRemaining = (
+  membershipEndDate: Date | string | null
+): number | null => {
+  if (!membershipEndDate) {
+    return null;
   }
-  return studentModel.hydrate(student);
+
+  const end = typeof membershipEndDate === 'string' ? new Date(membershipEndDate) : membershipEndDate;
+  const now = new Date();
+
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const diffTime = end.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / msPerDay);
+
+  return diffDays >= 0 ? diffDays : 0;
+};
+
+const hasMembership = (
+  membershipStartDate: Date | string | null,
+  membershipEndDate: Date | string | null
+): boolean => {
+  const status = determineMembershipStatus(membershipStartDate, membershipEndDate);
+  return status === MembershipStatus.ACTIVE;
 };
 
 export const presentStudent = (student: StudentPresentable): PresentedStudent => {
-  const doc = toStudentDocument(student);
-  const json = doc.toJSON() as StudentJson;
+  const json = student as StudentJson;
 
-  const lessonLeft = json.lessonLeft ?? json.lesson_left ?? doc.lessonLeft ?? null;
+  const lessonLeft = json.lessonLeft ?? json.lesson_left ?? null;
   const membershipStartDate = json.membershipStartDate
     ?? json.membership_start_date
-    ?? formatDateOnly(doc.membershipStartDate);
+    ?? formatDateOnly(student.membershipStartDate ?? null);
   const membershipEndDate = json.membershipEndDate
     ?? json.membership_end_date
-    ?? formatDateOnly(doc.membershipEndDate);
+    ?? formatDateOnly(student.membershipEndDate ?? null);
   const membershipDaysRemaining = json.membershipDaysRemaining
     ?? json.membership_days_remaining
-    ?? doc.getMembershipDaysRemaining();
-  const isMembershipActive = json.isMembershipActive
-    ?? json.is_membership_active
-    ?? doc.hasMembership();
+    ?? getMembershipDaysRemaining(student.membershipEndDate ?? null);
   const membershipStatus = json.membershipStatus
     ?? json.membership_status
-    ?? determineMembershipStatus(doc);
+    ?? determineMembershipStatus(student.membershipStartDate ?? null, student.membershipEndDate ?? null);
+  const isMembershipActive = json.isMembershipActive
+    ?? json.is_membership_active
+    ?? hasMembership(student.membershipStartDate ?? null, student.membershipEndDate ?? null);
 
-  const createdAt = json.createdAt ?? doc.createdAt ?? null;
-  const updatedAt = json.updatedAt ?? doc.updatedAt ?? null;
+  const createdAt = student.createdAt ?? null;
+  const updatedAt = student.updatedAt ?? null;
   const created_at = json.created_at ?? formatDateTime(createdAt);
   const updated_at = json.updated_at ?? formatDateTime(updatedAt);
 
+  // 处理 rings - 可能是数组或 undefined
+  const rings = Array.isArray(json.rings) ? json.rings : [];
+
   return {
-    uid: json.uid ?? doc.uid,
-    name: json.name ?? doc.name,
-    age: json.age ?? doc.age ?? null,
-    phone: json.phone ?? doc.phone,
-    class: json.class ?? doc.class,
-    subject: json.subject ?? doc.subject,
-    rings: Array.isArray(json.rings) ? json.rings : doc.rings,
-    note: json.note ?? doc.note ?? '',
+    uid: json.uid ?? 0,
+    name: json.name ?? '',
+    age: json.age ?? null,
+    phone: json.phone ?? '',
+    class: json.class ?? '',
+    subject: json.subject ?? '',
+    rings,
+    note: json.note ?? '',
     lessonLeft,
     membershipStartDate,
     membershipEndDate,

@@ -1,150 +1,185 @@
-import { AppError } from '@/utils/errors';
-import { Student, IStudentDoc } from '@/models/mongo';
-import { ClassType, SubjectType } from '@/types';
-import type { MembershipPayload } from '@/services/studentBuilder';
+import { StudentRepository } from '../db/repositories/studentRepository';
+import { Student } from '../db/schema/students';
+import { NewStudent } from '../db/schema/students';
 
-const PHONE_REGEX = /^1[3-9]\d{9}$/;
 const SCORE_MIN = 0;
 const SCORE_MAX = 10;
 
 export class StudentUpdater {
-  private constructor(private readonly student: IStudentDoc) {}
+  private student: Student;
+  private updates: Partial<NewStudent> = {};
 
   static async for(uid: number): Promise<StudentUpdater> {
-    const doc = await Student.findByUid(uid);
-    if (!doc) {
-      throw AppError.notFound('学员不存在');
+    const student = await StudentRepository.findByUid(uid);
+    if (!student) {
+      throw new Error('学员不存在');
     }
-    return new StudentUpdater(doc);
+    return new StudentUpdater(student);
   }
 
-  static fromDocument(doc: IStudentDoc): StudentUpdater {
-    return new StudentUpdater(doc);
+  static fromDocument(student: Student): StudentUpdater {
+    return new StudentUpdater(student);
   }
 
-  get document(): IStudentDoc {
-    return this.student;
+  constructor(student: Student) {
+    this.student = student;
   }
 
   name(name: string): this {
-    const trimmed = name?.trim();
-    if (!trimmed) {
-      throw AppError.invalidInput('学员姓名不能为空');
+    if (name.length > 50) {
+      throw new Error('学员姓名长度不能超过50字符');
     }
-    this.student.name = trimmed;
+    this.updates.name = name;
     return this;
   }
 
   age(age?: number | null): this {
-    if (age === undefined) {
-      return this;
+    if (age !== undefined && age !== null) {
+      if (age < 0 || age > 120) {
+        throw new Error('年龄必须在0-120之间');
+      }
+      this.updates.age = age;
+    } else {
+      this.updates.age = null;
     }
-    if (age === null) {
-      this.student.age = null;
-      return this;
-    }
-    if (!Number.isInteger(age) || age < 0 || age > 120) {
-      throw AppError.invalidInput('年龄必须在0-120之间');
-    }
-    this.student.age = age;
     return this;
   }
 
-  phone(phone?: string | null): this {
-    if (!phone) {
-      this.student.phone = '未填写';
-      return this;
+  phone(phone: string): this {
+    if (phone.length > 20) {
+      throw new Error('手机号长度不能超过20字符');
     }
-    const normalized = phone.trim();
-    if (!PHONE_REGEX.test(normalized)) {
-      throw AppError.invalidInput('手机号格式不正确');
+    const phoneRegex = /^1[3-9]\d{9}$/;
+    if (!phoneRegex.test(phone) && phone !== '未填写') {
+      throw new Error('手机号格式不正确');
     }
-    this.student.phone = normalized;
+    this.updates.phone = phone;
     return this;
   }
 
-  class(classType: ClassType): this {
-    this.student.setClassWithLessonInit(classType);
-    return this;
-  }
-
-  subject(subjectType: SubjectType): this {
-    this.student.subject = subjectType;
-    return this;
-  }
-
-  lessonLeft(lessonLeft?: number | null): this {
-    this.student.setLessonLeft(lessonLeft);
-    return this;
-  }
-
-  note(note?: string | null): this {
-    if (note === undefined || note === null) {
-      this.student.note = '';
-      return this;
+  classType(classType: string): this {
+    if (!['TEN_TRY', 'MONTH', 'YEAR', 'OTHERS'].includes(classType)) {
+      throw new Error(`无效的班级类型: ${classType}`);
     }
-    this.student.note = note.trim();
+    this.updates.classType = classType;
+    return this;
+  }
+
+  subject(subject: string): this {
+    if (!['SHOOTING', 'ARCHERY', 'OTHERS'].includes(subject)) {
+      throw new Error(`无效的科目类型: ${subject}`);
+    }
+    this.updates.subject = subject;
+    return this;
+  }
+
+  rings(rings?: number[]): this {
+    this.updates.rings = rings ?? [];
     return this;
   }
 
   addRing(score: number): this {
-    this.student.addScore(this.ensureValidScore(score));
-    return this;
-  }
-
-  setRings(scores: number[]): this {
-    if (!Array.isArray(scores)) {
-      throw AppError.invalidInput('成绩必须是数组');
-    }
-    const sanitized = scores.map(score => this.ensureValidScore(score));
-    this.student.rings = sanitized;
-    this.student.markModified('rings');
-    return this;
-  }
-
-  updateRingAt(index: number, score: number): this {
-    this.student.updateScore(index, this.ensureValidScore(score));
-    return this;
-  }
-
-  removeRingAt(index: number): this {
-    this.student.removeScore(index);
-    return this;
-  }
-
-  membership(membership: MembershipPayload | null): this {
-    if (!membership) {
-      this.student.membershipStartDate = null;
-      this.student.membershipEndDate = null;
-      return this;
-    }
-
-    const start = membership.startDate ? new Date(membership.startDate) : null;
-    const end = membership.endDate ? new Date(membership.endDate) : null;
-
-    if (!start || !end) {
-      throw AppError.invalidInput('会员开始和结束日期必须同时提供');
-    }
-    if (start > end) {
-      throw AppError.invalidInput('会员开始日期不能晚于结束日期');
-    }
-
-    this.student.membershipStartDate = start;
-    this.student.membershipEndDate = end;
-    return this;
-  }
-
-  async commit(): Promise<IStudentDoc> {
-    return await this.student.save();
-  }
-
-  private ensureValidScore(score: number): number {
     if (typeof score !== 'number' || Number.isNaN(score)) {
-      throw AppError.invalidInput('成绩必须是数字');
+      throw new Error('成绩必须是数字');
     }
     if (score < SCORE_MIN || score > SCORE_MAX) {
-      throw AppError.invalidInput(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
+      throw new Error(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
     }
-    return Number(score);
+    const newRings = [...(this.student.rings || []), score];
+    this.updates.rings = newRings;
+    return this;
+  }
+
+  removeRing(index: number): this {
+    const rings = this.student.rings || [];
+    if (index < 0 || index >= rings.length) {
+      throw new Error('成绩索引超出范围');
+    }
+    const newRings = rings.filter((_, i) => i !== index);
+    this.updates.rings = newRings;
+    return this;
+  }
+
+  ringAt(index: number, score: number): this {
+    if (typeof score !== 'number' || Number.isNaN(score)) {
+      throw new Error('成绩必须是数字');
+    }
+    if (score < SCORE_MIN || score > SCORE_MAX) {
+      throw new Error(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
+    }
+    const rings = this.student.rings || [];
+    if (index < 0 || index >= rings.length) {
+      throw new Error('成绩索引超出范围');
+    }
+    const newRings = [...rings];
+    newRings[index] = score;
+    this.updates.rings = newRings;
+    return this;
+  }
+
+  lessonLeft(lessons?: number): this {
+    if (lessons !== undefined && lessons < 0) {
+      throw new Error('课时数不能为负数');
+    }
+    this.updates.lessonLeft = lessons ?? 0;
+    return this;
+  }
+
+  note(note?: string | null): this {
+    if (note && note.length > 1000) {
+      throw new Error('备注长度不能超过1000字符');
+    }
+    this.updates.note = note || null;
+    return this;
+  }
+
+  membership(startDate?: string | Date | null, endDate?: string | Date | null): this {
+    const formatDate = (d?: string | Date | null): Date | null => {
+      if (d === null || d === undefined) return null;
+      const date = typeof d === 'string' ? new Date(d) : d;
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+
+    const formattedStart = formatDate(startDate);
+    const formattedEnd = formatDate(endDate);
+
+    // 验证：要么都没有，要么都有
+    if ((!formattedStart && formattedEnd) || (formattedStart && !formattedEnd)) {
+      throw new Error('会员开始和结束日期必须同时设置或同时为空');
+    }
+
+    // 验证日期顺序
+    if (formattedStart && formattedEnd && formattedStart > formattedEnd) {
+      throw new Error('会员开始日期不能晚于结束日期');
+    }
+
+    this.updates.membershipStartDate = formattedStart;
+    this.updates.membershipEndDate = formattedEnd;
+
+    return this;
+  }
+
+  async commit(): Promise<Student> {
+    if (Object.keys(this.updates).length === 0) {
+      return this.student;
+    }
+
+    const updated = await StudentRepository.updateByUid(this.student.uid, this.updates);
+    if (!updated) {
+      throw new Error('更新失败');
+    }
+
+    this.student = updated;
+    return updated;
+  }
+
+  // 获取当前学生数据
+  getStudent(): Student {
+    return this.student;
+  }
+
+  // 获取待更新数据
+  getUpdates(): Partial<NewStudent> {
+    return this.updates;
   }
 }

@@ -1,38 +1,66 @@
-import { ClassType, SubjectType } from '@/types';
+import { db } from '../db';
+import { students, Student } from '../db/schema/students';
+import {
+  eq,
+  and,
+  gte,
+  lte,
+  like,
+  isNull,
+  isNotNull,
+  desc,
+  asc,
+  count,
+  sql,
+} from 'drizzle-orm';
+
+export interface StudentQueryResult {
+  data: StudentQueryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface StudentQueryItem {
+  uid: number;
+  name: string;
+  age: number | null;
+  phone: string;
+  classType: string;
+  subject: string;
+  rings: number[];
+  averageScore: number;
+  membershipStatus: 'NONE' | 'ACTIVE' | 'EXPIRED' | 'UPCOMING';
+  membershipStartDate: string | null;
+  membershipEndDate: string | null;
+  lessonLeft: number | null;
+  createdAt: string;
+}
 
 const SORT_FIELD_MAP = {
   uid: 'uid',
   name: 'name',
   age: 'age',
   created_at: 'createdAt',
-  updated_at: 'updatedAt',
+  created_at_ts: 'createdAt',
 } as const;
 
 type SortFieldKey = keyof typeof SORT_FIELD_MAP;
-
 type SortFieldValue = (typeof SORT_FIELD_MAP)[SortFieldKey];
 
-const isSortFieldKey = (value: unknown): value is SortFieldKey => {
-  return typeof value === 'string'
-    && Object.prototype.hasOwnProperty.call(SORT_FIELD_MAP, value);
-};
-
 type MembershipFilterState = 'any' | 'withMembership' | 'withoutMembership';
-
-export interface StudentQueryBuildResult {
-  pipeline: any[];
-  countPipeline: any[];
-  page: number;
-  limit: number;
-}
 
 export class StudentQuery {
   private nameFilter?: string;
   private ageFilter: { min?: number; max?: number } = {};
-  private classFilter?: ClassType;
-  private subjectFilter?: SubjectType;
+  private classFilter?: string;
+  private subjectFilter?: string;
   private membershipFilter: MembershipFilterState = 'any';
   private membershipActiveDate?: Date;
+  private membershipStatusFilter?: 'ACTIVE' | 'EXPIRED' | 'UPCOMING';
   private minAverageScore?: number;
   private maxAverageScore?: number;
   private scoreFilterActive = false;
@@ -62,16 +90,16 @@ export class StudentQuery {
     return this;
   }
 
-  class(classType?: ClassType | null): this {
+  classType(classType?: string | null): this {
     if (classType) {
       this.classFilter = classType;
     }
     return this;
   }
 
-  subject(subjectType?: SubjectType | null): this {
-    if (subjectType) {
-      this.subjectFilter = subjectType;
+  subject(subject?: string | null): this {
+    if (subject) {
+      this.subjectFilter = subject;
     }
     return this;
   }
@@ -83,6 +111,13 @@ export class StudentQuery {
       this.membershipFilter = 'withoutMembership';
     } else {
       this.membershipFilter = 'any';
+    }
+    return this;
+  }
+
+  membershipStatus(status?: 'ACTIVE' | 'EXPIRED' | 'UPCOMING' | null): this {
+    if (status) {
+      this.membershipStatusFilter = status;
     }
     return this;
   }
@@ -115,9 +150,9 @@ export class StudentQuery {
     this.scoreFilterActive = true;
 
     if (
-      this.minAverageScore !== undefined
-      && this.maxAverageScore !== undefined
-      && this.minAverageScore > this.maxAverageScore
+      this.minAverageScore !== undefined &&
+      this.maxAverageScore !== undefined &&
+      this.minAverageScore > this.maxAverageScore
     ) {
       const tmp = this.minAverageScore;
       this.minAverageScore = this.maxAverageScore;
@@ -127,11 +162,10 @@ export class StudentQuery {
   }
 
   sort(sortField?: string, order: 'ASC' | 'DESC' = 'DESC'): this {
-    if (isSortFieldKey(sortField)) {
-      this.sortField = SORT_FIELD_MAP[sortField];
-    } else {
-      this.sortField = SORT_FIELD_MAP.created_at;
-    }
+    const key = Object.keys(SORT_FIELD_MAP).find(
+      (k) => k === sortField
+    ) as SortFieldKey | undefined;
+    this.sortField = key ? SORT_FIELD_MAP[key] : SORT_FIELD_MAP.created_at;
     this.sortOrder = order === 'ASC' ? 1 : -1;
     return this;
   }
@@ -146,114 +180,213 @@ export class StudentQuery {
     return this;
   }
 
-  build(): StudentQueryBuildResult {
-    const matchStage: Record<string, any> = {};
+  /**
+   * 构建查询条件
+   */
+  private buildConditions() {
+    const conditions: ReturnType<typeof eq | typeof gte | typeof lte | typeof like | typeof isNull | typeof isNotNull>[] = [];
 
     if (this.nameFilter) {
-      matchStage.name = { $regex: this.nameFilter, $options: 'i' };
+      conditions.push(like(students.name, `%${this.nameFilter}%`));
     }
 
-    if (this.ageFilter.min !== undefined || this.ageFilter.max !== undefined) {
-      const ageCondition: Record<string, number> = {};
-      if (this.ageFilter.min !== undefined) {
-        ageCondition.$gte = this.ageFilter.min;
-      }
-      if (this.ageFilter.max !== undefined) {
-        ageCondition.$lte = this.ageFilter.max;
-      }
-      matchStage.age = ageCondition;
+    if (this.ageFilter.min !== undefined) {
+      conditions.push(gte(students.age, this.ageFilter.min));
+    }
+
+    if (this.ageFilter.max !== undefined) {
+      conditions.push(lte(students.age, this.ageFilter.max));
     }
 
     if (this.classFilter) {
-      matchStage.class = this.classFilter;
+      conditions.push(eq(students.classType, this.classFilter));
     }
 
     if (this.subjectFilter) {
-      matchStage.subject = this.subjectFilter;
+      conditions.push(eq(students.subject, this.subjectFilter));
     }
 
     if (this.membershipFilter === 'withMembership') {
-      matchStage.membershipStartDate = { $ne: null };
-      matchStage.membershipEndDate = { $ne: null };
+      conditions.push(
+        and(
+          isNotNull(students.membershipStartDate),
+          isNotNull(students.membershipEndDate)
+        ) as unknown as typeof eq
+      );
     } else if (this.membershipFilter === 'withoutMembership') {
-      matchStage.$or = [
-        { membershipStartDate: null },
-        { membershipEndDate: null },
-      ];
+      conditions.push(
+        or(
+          isNull(students.membershipStartDate),
+          isNull(students.membershipEndDate)
+        ) as unknown as typeof eq
+      );
     }
 
-    const exprConditions: any[] = [];
-
-    if (this.membershipActiveDate) {
-      exprConditions.push({ $ne: ['$membershipStartDate', null] });
-      exprConditions.push({ $ne: ['$membershipEndDate', null] });
-      exprConditions.push({ $lte: ['$membershipStartDate', this.membershipActiveDate] });
-      exprConditions.push({ $gte: ['$membershipEndDate', this.membershipActiveDate] });
+    if (this.membershipStatusFilter) {
+      const today = sql`CURRENT_DATE`;
+      if (this.membershipStatusFilter === 'ACTIVE') {
+        conditions.push(
+          sql`(${students.membershipStartDate} <= ${today} AND ${students.membershipEndDate} >= ${today})` as unknown as typeof eq
+        );
+      } else if (this.membershipStatusFilter === 'EXPIRED') {
+        conditions.push(
+          sql`${students.membershipEndDate} < ${today}` as unknown as typeof eq
+        );
+      } else if (this.membershipStatusFilter === 'UPCOMING') {
+        conditions.push(
+          sql`${students.membershipStartDate} > ${today}` as unknown as typeof eq
+        );
+      }
     }
 
-    const stages: any[] = [];
+    return conditions;
+  }
 
-    if (this.scoreFilterActive) {
-      stages.push({
-        $addFields: {
-          avgScore: {
-            $cond: {
-              if: { $gt: [{ $size: { $ifNull: ['$rings', []] } }, 0] },
-              then: { $round: [{ $avg: '$rings' }, 1] },
-              else: 0,
-            },
-          },
-        },
-      });
+  /**
+   * 计算平均分
+   */
+  private calculateAverageScore() {
+    return sql`
+      CASE WHEN array_length(${students.rings}, 1) > 0
+        THEN round((SELECT AVG(r) FROM unnest(${students.rings}) AS r), 1)
+        ELSE 0
+      END
+    `.as('averageScore');
+  }
 
-      const avgCondition: Record<string, number> = {};
+  /**
+   * 计算会员状态
+   */
+  private calculateMembershipStatus() {
+    return sql`
+      CASE
+        WHEN ${students.membershipEndDate} IS NULL THEN 'NONE'
+        WHEN ${students.membershipEndDate} < CURRENT_DATE THEN 'EXPIRED'
+        WHEN ${students.membershipStartDate} > CURRENT_DATE THEN 'UPCOMING'
+        ELSE 'ACTIVE'
+      END
+    `.as('membershipStatus');
+  }
+
+  /**
+   * 执行查询
+   */
+  async execute(): Promise<StudentQueryResult> {
+    const conditions = this.buildConditions();
+    const offset = (this.page - 1) * this.limit;
+
+    // 计算平均分的子查询表达式
+    const avgScoreExpr = this.calculateAverageScore();
+
+    // 查询数据
+    const query = db
+      .select({
+        uid: students.uid,
+        name: students.name,
+        age: students.age,
+        phone: students.phone,
+        classType: students.classType,
+        subject: students.subject,
+        rings: students.rings,
+        lessonLeft: students.lessonLeft,
+        averageScore: avgScoreExpr,
+        membershipStatus: this.calculateMembershipStatus(),
+        membershipStartDate: students.membershipStartDate,
+        membershipEndDate: students.membershipEndDate,
+        createdAt: students.createdAt,
+      })
+      .from(students);
+
+    // 添加条件
+    let finalQuery = conditions.length > 0 ? query.where(and(...conditions)) : query;
+
+    // 添加平均分过滤 - 使用 HAVING 子句
+    if (this.scoreFilterActive && (this.minAverageScore !== undefined || this.maxAverageScore !== undefined)) {
+      const havingConditions: ReturnType<typeof sql>[] = [];
       if (this.minAverageScore !== undefined) {
-        avgCondition.$gte = this.minAverageScore;
+        havingConditions.push(sql`${avgScoreExpr} >= ${this.minAverageScore}`);
       }
       if (this.maxAverageScore !== undefined) {
-        avgCondition.$lte = this.maxAverageScore;
+        havingConditions.push(sql`${avgScoreExpr} <= ${this.maxAverageScore}`);
       }
-      if (Object.keys(avgCondition).length > 0) {
-        matchStage.avgScore = avgCondition;
-      }
+      // Drizzle 的 HAVING 暂不完全支持，需要在结果层面过滤
     }
 
-    if (Object.keys(matchStage).length > 0 || exprConditions.length > 0) {
-      const matchQuery: Record<string, any> = {};
-      if (Object.keys(matchStage).length > 0) {
-        Object.assign(matchQuery, matchStage);
-      }
-      if (exprConditions.length > 0) {
-        matchQuery.$expr = exprConditions.length === 1 ? exprConditions[0] : { $and: exprConditions };
-      }
-      stages.push({ $match: matchQuery });
+    // 排序映射
+    let orderByColumn;
+    switch (this.sortField) {
+      case 'uid':
+        orderByColumn = students.uid;
+        break;
+      case 'name':
+        orderByColumn = students.name;
+        break;
+      case 'age':
+        orderByColumn = students.age ?? sql`0`;
+        break;
+      case 'createdAt':
+      default:
+        orderByColumn = students.createdAt;
+        break;
     }
 
-    const corePipeline = [...stages];
+    const sort = this.sortOrder === 1 ? asc(orderByColumn) : desc(orderByColumn);
+    finalQuery = finalQuery.orderBy(sort);
 
-    const sortDefinition: Record<string, 1 | -1> = { [this.sortField]: this.sortOrder };
-    const sortStage = { $sort: sortDefinition };
-    const paginationStages: any[] = [sortStage];
+    // 分页
+    const rawData = await finalQuery.limit(this.limit).offset(offset);
 
-    const skip = (this.page - 1) * this.limit;
-    if (skip > 0) {
-      paginationStages.push({ $skip: skip });
-    }
-    paginationStages.push({ $limit: this.limit });
-
-    const pipeline = [...corePipeline, ...paginationStages];
-
+    // 结果过滤 - 处理平均分过滤
+    let data = rawData;
     if (this.scoreFilterActive) {
-      pipeline.push({ $project: { avgScore: 0 } });
+      data = rawData.filter((item) => {
+        const avg = Number(item.averageScore || 0);
+        if (this.minAverageScore !== undefined && avg < this.minAverageScore) return false;
+        if (this.maxAverageScore !== undefined && avg > this.maxAverageScore) return false;
+        return true;
+      });
     }
 
-    const countPipeline = [...corePipeline, { $count: 'count' }];
+    // 查询总数
+    let countQuery = db.select({ count: count() }).from(students);
+    if (conditions.length > 0) {
+      countQuery = countQuery.where(and(...conditions));
+    }
+    const [countResult] = await countQuery;
+    const total = countResult?.count || 0;
+
+    // 转换为查询结果格式
+    const resultData: StudentQueryItem[] = data.map((item) => ({
+      uid: item.uid,
+      name: item.name,
+      age: item.age,
+      phone: item.phone,
+      classType: item.classType,
+      subject: item.subject,
+      rings: item.rings || [],
+      averageScore: Number(item.averageScore || 0),
+      membershipStatus: (item.membershipStatus as any) || 'NONE',
+      membershipStartDate: item.membershipStartDate || null,
+      membershipEndDate: item.membershipEndDate || null,
+      lessonLeft: item.lessonLeft,
+      createdAt: item.createdAt?.toISOString() || '',
+    }));
 
     return {
-      pipeline,
-      countPipeline,
-      page: this.page,
-      limit: this.limit,
+      data: resultData,
+      pagination: {
+        page: this.page,
+        limit: this.limit,
+        total,
+        totalPages: Math.ceil(total / this.limit),
+      },
     };
+  }
+
+  /**
+   * 快捷执行
+   */
+  async build(): Promise<StudentQueryResult> {
+    return await this.execute();
   }
 }

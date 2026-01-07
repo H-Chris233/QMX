@@ -1,29 +1,23 @@
-import { AppError } from "@/utils/errors";
-import { CashClass } from "@/models/CashMongo";
-import { Installment, type IInstallmentDoc } from "@/models/InstallmentMongo";
+import { db } from '../db';
 import {
-  InstallmentPlan,
-  InstallmentPlanModel,
-} from "@/models/InstallmentPlanMongo";
-import { InstallmentPlanStatus } from "@/types";
-import { Student, type IStudentDoc } from "@/models/mongo";
-import { ClassType, InstallmentStatus, MembershipStatus } from "@/types";
-import type { Aggregate, PipelineStage } from "mongoose";
-
-const FINANCIAL_PERIODS = [
-  "Today",
-  "ThisWeek",
-  "ThisMonth",
-  "ThisYear",
-] as const;
-export type FinancialPeriod = (typeof FINANCIAL_PERIODS)[number];
-
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-
-interface DateRange {
-  start: Date;
-  end: Date;
-}
+  students,
+  cashTransactions,
+  installmentPlans,
+  installments,
+} from '../db/schema';
+import {
+  sum,
+  count,
+  avg,
+  and,
+  gte,
+  lte,
+  eq,
+  gt,
+  sql,
+  desc,
+  asc,
+} from 'drizzle-orm';
 
 export interface DashboardStatsData {
   totalStudents: number;
@@ -38,45 +32,12 @@ export interface DashboardStatsData {
   overdueInstallmentCount: number;
 }
 
-interface MembershipSummary {
-  status: MembershipStatus;
-  label: string;
-  daysRemaining: number | null;
-  daysUntilStart: number | null;
-  isActive: boolean;
-}
-
-export interface StudentStatsData {
-  studentUid: number;
-  payments: {
-    totalAmountCents: number;
-    count: number;
-  };
-  scores: {
-    average: number;
-    max: number;
-    min: number;
-    count: number;
-  };
-  membership: MembershipSummary;
-  installments: {
-    totalAmountCents: number;
-    paidAmountCents: number;
-    remainingAmountCents: number;
-    pendingAmountCents: number;
-    pendingCount: number;
-  };
-}
-
-export interface StudentIncomeEntry {
-  studentId: number;
-  studentName: string;
-  amountCents: number;
+export interface FinancialPeriod {
+  type: 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear';
 }
 
 export interface FinancialStatsData {
   period: FinancialPeriod;
-  dateRange: DateRange;
   totals: {
     incomeCents: number;
     expenseCents: number;
@@ -93,80 +54,106 @@ export interface FinancialStatsData {
   studentIncome: StudentIncomeEntry[];
 }
 
-interface CashRevenueExpenseAggregateRow {
-  revenue?: number;
-  expense?: number;
+export interface StudentIncomeEntry {
+  studentId: number;
+  studentName: string;
+  amountCents: number;
 }
 
-interface CashIncomeSummaryAggregateRow {
-  incomeCents?: number;
-  expenseCents?: number;
-  transactionCount?: number;
-}
-
-interface CashStudentIncomeAggregateRow {
-  _id: number;
-  amountCents?: number;
-}
-
-interface StudentIncomeSummaryAggregateRow {
-  totalIncome?: number;
-  incomeCount?: number;
-}
-
-interface StudentNameProjection {
-  uid: number;
-  name: string;
+export interface StudentStatsData {
+  studentUid: number;
+  payments: {
+    totalAmountCents: number;
+    count: number;
+  };
+  scores: {
+    average: number;
+    max: number;
+    min: number;
+    count: number;
+  };
+  membership: {
+    status: 'NONE' | 'ACTIVE' | 'EXPIRED' | 'UPCOMING';
+    label: string;
+    daysRemaining: number | null;
+    daysUntilStart: number | null;
+    isActive: boolean;
+  };
+  installments: {
+    totalAmountCents: number;
+    paidAmountCents: number;
+    remainingAmountCents: number;
+    pendingAmountCents: number;
+    pendingCount: number;
+  };
 }
 
 export class StatsService {
-  static normalizeFinancialPeriod(period?: string | null): FinancialPeriod {
-    if (period && FINANCIAL_PERIODS.includes(period as FinancialPeriod)) {
-      return period as FinancialPeriod;
-    }
-    return "ThisMonth";
-  }
-
+  /**
+   * 构建仪表盘统计数据
+   */
   static async buildDashboardStats(): Promise<DashboardStatsData> {
-    const revenueExpensePipeline: PipelineStage[] = [
-      {
-        $group: {
-          _id: null,
-          revenue: {
-            $sum: {
-              $cond: [{ $gt: ["$cash", 0] }, "$cash", 0],
-            },
-          },
-          expense: {
-            $sum: {
-              $cond: [{ $lt: ["$cash", 0] }, "$cash", 0],
-            },
-          },
-        },
-      },
-    ];
+    // 并行查询多个指标
+    const [studentsCountResult, cashAggregateResult, activeInstallmentsResult] =
+      await Promise.all([
+        // 学员数量和统计
+        db.select({
+          count: count(),
+        }).from(students),
 
-    const [cashAggregate] =
-      await this.executeCashAggregate<CashRevenueExpenseAggregateRow>(
-        revenueExpensePipeline
-      );
+        // 收入支出统计
+        db
+          .select({
+            totalRevenue:
+              // @ts-expect-error - 动态 SQL CASE 表达式
+              sql`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+            totalExpense:
+              // @ts-expect-error - 动态 SQL CASE 表达式
+              sql`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+          })
+          .from(cashTransactions),
 
-    const totalRevenueCents = Number(cashAggregate?.revenue ?? 0);
-    const totalExpenseCents = Math.abs(Number(cashAggregate?.expense ?? 0));
+        // 活跃分期计划数
+        db
+          .select({ count: count() })
+          .from(installmentPlans)
+          .where(eq(installmentPlans.status, 'ACTIVE' as const)),
+      ]);
 
-    const students = await Student.findAll();
-    const now = new Date();
-    const activeCourseSet = new Set<string>();
+    // 查询逾期分期
+    const overdueInstallments = await db
+      .select()
+      .from(installments)
+      .where(
+        and(
+          eq(installments.status, 'PENDING' as const),
+          sql`${installments.dueDate} < CURRENT_DATE`
+        )
+      )
+      .orderBy(asc(installments.dueDate));
 
+    // 获取所有学员计算统计数据
+    const allStudents = await db
+      .select({
+        uid: students.uid,
+        rings: students.rings,
+        classType: students.classType,
+        membershipStartDate: students.membershipStartDate,
+        membershipEndDate: students.membershipEndDate,
+      })
+      .from(students);
+
+    // 计算成绩统计
     let totalScore = 0;
     let scoreCount = 0;
     let maxScore = 0;
+    const activeCourses = new Set<string>();
     let activeMembers = 0;
 
-    for (const student of students) {
-      if (Array.isArray(student.rings) && student.rings.length > 0) {
-        for (const rawScore of student.rings) {
-          const score = Number(rawScore);
+    for (const student of allStudents) {
+      const rings = student.rings || [];
+      if (rings.length > 0) {
+        for (const score of rings) {
           if (Number.isFinite(score)) {
             totalScore += score;
             scoreCount += 1;
@@ -177,141 +164,135 @@ export class StatsService {
         }
       }
 
-      if (student.class && student.class !== ClassType.OTHERS) {
-        activeCourseSet.add(student.class);
+      if (student.classType && student.classType !== 'OTHERS') {
+        activeCourses.add(student.classType);
       }
 
-      if (student.hasMembership(now)) {
+      // 检查会员有效性
+      if (
+        student.membershipStartDate &&
+        student.membershipEndDate &&
+        new Date(student.membershipEndDate) >= new Date() &&
+        new Date(student.membershipStartDate) <= new Date()
+      ) {
         activeMembers += 1;
       }
     }
 
-    const averageScore =
-      scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
-
-    const activeInstallmentPlans = await InstallmentPlanModel.countDocuments({
-      status: InstallmentPlanStatus.ACTIVE,
-    }).exec();
-
-    const overdueInstallments = await Installment.findOverdue(now);
+    const averageScore = scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
+    const totalRevenueCents = Number(cashAggregateResult[0]?.totalRevenue || 0);
+    const totalExpenseCents = Math.abs(Number(cashAggregateResult[0]?.totalExpense || 0));
 
     return {
-      totalStudents: students.length,
+      totalStudents: studentsCountResult[0]?.count || 0,
       totalRevenueCents,
       totalExpenseCents,
       netIncomeCents: totalRevenueCents - totalExpenseCents,
       averageScore,
       maxScore,
-      activeCourses: activeCourseSet.size,
+      activeCourses: activeCourses.size,
       activeMembers,
-      activeInstallmentPlans,
+      activeInstallmentPlans: activeInstallmentsResult[0]?.count || 0,
       overdueInstallmentCount: overdueInstallments.length,
     };
   }
 
-  static async buildStudentStats(
-    studentUid: number
-  ): Promise<StudentStatsData> {
-    const student = await Student.findByUid(studentUid);
+  /**
+   * 构建学员统计数据
+   */
+  static async buildStudentStats(studentUid: number): Promise<StudentStatsData> {
+    // 学员信息
+    const [student] = await db
+      .select()
+      .from(students)
+      .where(eq(students.uid, studentUid))
+      .limit(1);
+
     if (!student) {
-      throw AppError.notFound("学员不存在");
+      throw new Error('学员不存在');
     }
 
-    const studentIncomePipeline: PipelineStage[] = [
-      {
-        $match: {
-          student_id: studentUid,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalIncome: {
-            $sum: {
-              $cond: [{ $gt: ["$cash", 0] }, "$cash", 0],
-            },
-          },
-          incomeCount: {
-            $sum: {
-              $cond: [{ $gt: ["$cash", 0] }, 1, 0],
-            },
-          },
-        },
-      },
-    ];
+    // 学员收入统计
+    const [studentIncomeResult] = await db
+      .select({
+        totalIncome:
+          // @ts-expect-error - 动态 SQL CASE 表达式
+          sql`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+        incomeCount:
+          // @ts-expect-error - 动态 SQL CASE 表达式
+          sql`COUNT(CASE WHEN ${cashTransactions.amount} > 0 THEN 1 END)`,
+      })
+      .from(cashTransactions)
+      .where(eq(cashTransactions.studentId, studentUid));
 
-    const [cashAggregate] =
-      await this.executeCashAggregate<StudentIncomeSummaryAggregateRow>(
-        studentIncomePipeline
-      );
+    const totalIncomeCents = Number(studentIncomeResult?.totalIncome || 0);
+    const incomeCount = Number(studentIncomeResult?.incomeCount || 0);
 
-    const totalIncomeCents = Number(cashAggregate?.totalIncome ?? 0);
-    const incomeCount = Number(cashAggregate?.incomeCount ?? 0);
+    // 分期统计
+    const [planTotalResult] = await db
+      .select({
+        totalAmount: sum(installmentPlans.totalAmount),
+      })
+      .from(installmentPlans)
+      .where(eq(installmentPlans.studentId, studentUid));
 
-    const plans = await InstallmentPlan.findAll({ student_id: studentUid });
-    const planIds = plans.map((plan) => plan.uid);
+    const plans = await db
+      .select({ uid: installmentPlans.uid })
+      .from(installmentPlans)
+      .where(eq(installmentPlans.studentId, studentUid));
 
-    const installments =
-      planIds.length > 0
-        ? await Installment.findAll({ plan_id: { $in: planIds } })
-        : await Installment.findAll({ student_id: studentUid });
+    const planIds = plans.map((p) => p.uid);
+    const studentInstallments = planIds.length
+      ? await db
+          .select()
+          .from(installments)
+          .where(
+            sql`${installments.planId} = ANY(${planIds})` // @ts-expect-error - 数组查询
+          )
+      : [];
 
-    const totalInstallmentCents = plans.reduce(
-      (sum, plan) => sum + Number(plan.total_amount ?? 0),
-      0
-    );
+    const totalInstallmentCents = Number(planTotalResult?.totalAmount || 0);
 
+    // 计算分期统计
     let paidInstallmentCents = 0;
     let pendingAmountCents = 0;
     let pendingCount = 0;
 
-    for (const installment of installments) {
-      if (installment.status === InstallmentStatus.PAID) {
-        const paidAmount = Number(installment.paid_amount ?? 0);
+    for (const installment of studentInstallments) {
+      if (installment.status === 'PAID') {
+        const paidAmount = installment.paidAmount ?? 0;
         paidInstallmentCents +=
-          paidAmount > 0
-            ? paidAmount
-            : Number(installment.installment_amount ?? 0);
-      } else if (
-        installment.status === InstallmentStatus.PENDING ||
-        installment.status === InstallmentStatus.OVERDUE
-      ) {
+          paidAmount > 0 ? paidAmount : installment.installmentAmount;
+      } else if (installment.status === 'PENDING' || installment.status === 'OVERDUE') {
         pendingCount += 1;
-        pendingAmountCents += StatsService.getInstallmentRemaining(installment);
+        const remaining = installment.installmentAmount - (installment.paidAmount ?? 0);
+        pendingAmountCents += remaining > 0 ? remaining : 0;
       }
     }
 
-    const membership = StatsService.summarizeMembership(student);
+    // 会员状态
+    const membership = this.summarizeMembership(student);
 
-    const totalScore = Array.isArray(student.rings)
-      ? student.rings.reduce((sum, score) => sum + Number(score), 0)
-      : 0;
-    const scoreCount = Array.isArray(student.rings) ? student.rings.length : 0;
-
+    // 成绩统计
+    const rings = student.rings || [];
     const averageScore =
-      scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
+      rings.length > 0 ? Number((rings.reduce((a, b) => a + b, 0) / rings.length).toFixed(1)) : 0;
+    const maxScore = rings.length > 0 ? Math.max(...rings) : 0;
+    const minScore = rings.length > 0 ? Math.min(...rings) : 0;
 
-    const maxScore = scoreCount > 0 ? Math.max(...student.rings) : 0;
-    const minScore = scoreCount > 0 ? Math.min(...student.rings) : 0;
-
-    const remainingAmountCents = Math.max(
-      totalInstallmentCents - paidInstallmentCents,
-      0
-    );
-    const totalAmountCents = totalInstallmentCents;
-    const paidAmountCents = paidInstallmentCents;
+    const remainingAmountCents = Math.max(totalInstallmentCents - paidInstallmentCents, 0);
 
     return {
       studentUid,
       payments: {
-        totalAmountCents: totalIncomeCents,
+        totalAmountCents,
         count: incomeCount,
       },
       scores: {
         average: averageScore,
         max: maxScore,
         min: minScore,
-        count: scoreCount,
+        count: rings.length,
       },
       membership,
       installments: {
@@ -324,127 +305,115 @@ export class StatsService {
     };
   }
 
-  static async buildFinancialStats(
-    period: FinancialPeriod | string = "ThisMonth"
-  ): Promise<FinancialStatsData> {
-    const normalizedPeriod = StatsService.normalizeFinancialPeriod(period);
-    const dateRange = StatsService.resolveDateRange(normalizedPeriod);
+  /**
+   * 构建财务统计数据
+   */
+  static async buildFinancialStats(period: FinancialPeriod | string = 'ThisMonth') {
+    const normalizedPeriod = this.normalizeFinancialPeriod(period);
+    const dateRange = this.resolveDateRange(normalizedPeriod);
 
-    const cashPipeline: PipelineStage[] = [
-      {
-        $match: {
-          created_at: { $gte: dateRange.start, $lt: dateRange.end },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          incomeCents: {
-            $sum: {
-              $cond: [{ $gt: ["$cash", 0] }, "$cash", 0],
-            },
-          },
-          expenseCents: {
-            $sum: {
-              $cond: [{ $lt: ["$cash", 0] }, "$cash", 0],
-            },
-          },
-          transactionCount: {
-            $sum: 1,
-          },
-        },
-      },
-    ];
-
-    const [cashAggregate] =
-      await this.executeCashAggregate<CashIncomeSummaryAggregateRow>(
-        cashPipeline
+    // 收入支出统计
+    const [incomeExpenseResult] = await db
+      .select({
+        incomeCents:
+          // @ts-expect-error - 动态 SQL CASE 表达式
+          sql`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+        expenseCents:
+          // @ts-expect-error - 动态 SQL CASE 表达式
+          sql`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ABS(${cashTransactions.amount}) ELSE 0 END)`,
+        transactionCount: count(),
+      })
+      .from(cashTransactions)
+      .where(
+        and(
+          gte(cashTransactions.createdAt, dateRange.start),
+          lt(cashTransactions.createdAt, dateRange.end)
+        )
       );
 
-    const incomeCents = Number(cashAggregate?.incomeCents ?? 0);
-    const expenseCents = Math.abs(Number(cashAggregate?.expenseCents ?? 0));
+    const incomeCents = Number(incomeExpenseResult?.incomeCents || 0);
+    const expenseCents = Number(incomeExpenseResult?.expenseCents || 0);
     const netIncomeCents = incomeCents - expenseCents;
 
-    const studentIncomeAggregatePipeline: PipelineStage[] = [
-      {
-        $match: {
-          created_at: { $gte: dateRange.start, $lt: dateRange.end },
-          cash: { $gt: 0 },
-          student_id: { $ne: null },
-        },
-      },
-      {
-        $group: {
-          _id: "$student_id",
-          amountCents: { $sum: "$cash" },
-        },
-      },
-      { $sort: { amountCents: -1 } },
-      { $limit: 10 },
-    ];
+    // 学员收入排名
+    const studentIncomeAggregate = await db
+      .select({
+        studentId: cashTransactions.studentId,
+        amountCents: sum(cashTransactions.amount),
+      })
+      .from(cashTransactions)
+      .where(
+        and(
+          gte(cashTransactions.createdAt, dateRange.start),
+          lt(cashTransactions.createdAt, dateRange.end),
+          gt(cashTransactions.amount, 0),
+          isNotNull(cashTransactions.studentId)
+        )
+      )
+      .groupBy(cashTransactions.studentId)
+      .orderBy(desc(sum(cashTransactions.amount)))
+      .limit(10);
 
-    const studentIncomeAggregate =
-      await this.executeCashAggregate<CashStudentIncomeAggregateRow>(
-        studentIncomeAggregatePipeline
-      );
+    const studentIds = studentIncomeAggregate.map((e) => e.studentId).filter(Boolean) as number[];
 
-    const studentIds = studentIncomeAggregate.map((entry) => entry._id);
-    const studentNameMap = new Map<number, string>();
-
+    // 获取学员姓名
+    const studentMap = new Map<number, string>();
     if (studentIds.length > 0) {
-      const studentNamePipeline: PipelineStage[] = [
-        { $match: { uid: { $in: studentIds } } },
-        { $project: { uid: 1, name: 1 } },
-      ];
-      const studentDocs =
-        await this.executeStudentAggregate<StudentNameProjection>(
-          studentNamePipeline
-        );
+      const studentDocs = await db
+        .select({ uid: students.uid, name: students.name })
+        .from(students)
+        .where(sql`${students.uid} = ANY(${studentIds})`); // @ts-expect-error - 数组查询
 
       for (const doc of studentDocs) {
-        studentNameMap.set(doc.uid, doc.name);
+        studentMap.set(doc.uid, doc.name);
       }
     }
 
-    const studentIncome: StudentIncomeEntry[] = studentIncomeAggregate.map(
-      (entry) => ({
-        studentId: entry._id,
-        studentName: studentNameMap.get(entry._id) ?? `学员${entry._id}`,
+    const studentIncome: StudentIncomeEntry[] = studentIncomeAggregate
+      .filter((e) => e.studentId !== null)
+      .map((entry) => ({
+        studentId: entry.studentId!,
+        studentName: studentMap.get(entry.studentId!) ?? `学员${entry.studentId}`,
         amountCents: Number(entry.amountCents ?? 0),
-      })
-    );
+      }));
 
-    const plans = await InstallmentPlan.findAll({
-      created_at: { $gte: dateRange.start, $lt: dateRange.end },
-    });
+    // 分期统计
+    const plans = await db
+      .select()
+      .from(installmentPlans)
+      .where(
+        and(
+          gte(installmentPlans.createdAt, dateRange.start),
+          lt(installmentPlans.createdAt, dateRange.end)
+        )
+      );
 
-    const planIds = plans.map((plan) => plan.uid);
-    const installments =
-      planIds.length > 0
-        ? await Installment.findAll({ plan_id: { $in: planIds } })
-        : [];
+    const planIds2 = plans.map((p) => p.uid);
+    const installments2 = planIds2.length
+      ? await db
+          .select()
+          .from(installments)
+          .where(
+            sql`${installments.planId} = ANY(${planIds2})` // @ts-expect-error - 数组查询
+          )
+      : [];
 
     const totalInstallmentCents = plans.reduce(
-      (sum, plan) => sum + Number(plan.total_amount ?? 0),
+      (sum, plan) => sum + Number(plan.totalAmount),
       0
     );
 
     let paidInstallmentCents = 0;
     let pendingInstallmentCents = 0;
 
-    for (const installment of installments) {
-      if (installment.status === InstallmentStatus.PAID) {
-        const paidAmount = Number(installment.paid_amount ?? 0);
+    for (const installment of installments2) {
+      if (installment.status === 'PAID') {
+        const paidAmount = installment.paidAmount ?? 0;
         paidInstallmentCents +=
-          paidAmount > 0
-            ? paidAmount
-            : Number(installment.installment_amount ?? 0);
-      } else if (
-        installment.status === InstallmentStatus.PENDING ||
-        installment.status === InstallmentStatus.OVERDUE
-      ) {
-        pendingInstallmentCents +=
-          StatsService.getInstallmentRemaining(installment);
+          paidAmount > 0 ? paidAmount : installment.installmentAmount;
+      } else if (installment.status === 'PENDING' || installment.status === 'OVERDUE') {
+        const remaining = installment.installmentAmount - (installment.paidAmount ?? 0);
+        pendingInstallmentCents += remaining > 0 ? remaining : 0;
       }
     }
 
@@ -455,7 +424,6 @@ export class StatsService {
 
     return {
       period: normalizedPeriod,
-      dateRange,
       totals: {
         incomeCents,
         expenseCents,
@@ -468,148 +436,123 @@ export class StatsService {
         pendingCents: pendingInstallmentCents,
         remainingCents: remainingInstallmentCents,
       },
-      transactionCount: Number(cashAggregate?.transactionCount ?? 0),
+      transactionCount: Number(incomeExpenseResult?.transactionCount || 0),
       studentIncome,
     };
   }
 
-  private static async executeCashAggregate<T>(
-    pipeline: PipelineStage[]
-  ): Promise<T[]> {
-    const aggregate = CashClass.aggregate(pipeline) as Aggregate<unknown[]>;
-    const result = await aggregate.exec();
-    return result as T[];
+  /**
+   * 归一化财务周期
+   */
+  private static normalizeFinancialPeriod(period?: string | null): FinancialPeriod {
+    const validPeriods = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
+    if (period && validPeriods.includes(period as FinancialPeriod)) {
+      return period as FinancialPeriod;
+    }
+    return 'ThisMonth';
   }
 
-  private static async executeStudentAggregate<T>(
-    pipeline: PipelineStage[]
-  ): Promise<T[]> {
-    const aggregate = Student.aggregate(pipeline) as Aggregate<unknown[]>;
-    const result = await aggregate.exec();
-    return result as T[];
-  }
-
-  private static resolveDateRange(
-    period: FinancialPeriod,
-    reference = new Date()
-  ): DateRange {
-    const now = new Date(reference);
-    now.setHours(0, 0, 0, 0);
-
+  /**
+   * 解析日期范围
+   */
+  private static resolveDateRange(period: FinancialPeriod) {
+    const now = new Date();
     let start: Date;
     let end: Date;
 
     switch (period) {
-      case "Today": {
-        start = new Date(now);
+      case 'Today':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         end = new Date(start);
         end.setDate(end.getDate() + 1);
         break;
-      }
-      case "ThisWeek": {
+
+      case 'ThisWeek':
         start = new Date(now);
         const dayOfWeek = start.getDay();
         start.setDate(start.getDate() - dayOfWeek);
         end = new Date(start);
         end.setDate(end.getDate() + 7);
         break;
-      }
-      case "ThisYear": {
+
+      case 'ThisYear':
         start = new Date(now.getFullYear(), 0, 1);
         end = new Date(now.getFullYear() + 1, 0, 1);
         break;
-      }
-      case "ThisMonth":
-      default: {
+
+      case 'ThisMonth':
+      default:
         start = new Date(now.getFullYear(), now.getMonth(), 1);
         end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         break;
-      }
     }
 
-    return {
-      start,
-      end,
-    };
+    return { start, end };
   }
 
-  private static summarizeMembership(
-    student: IStudentDoc,
-    reference = new Date()
-  ): MembershipSummary {
-    if (!student.membershipStartDate || !student.membershipEndDate) {
+  /**
+   * 总结会员状态
+   */
+  private static summarizeMembership(student: {
+    membershipStartDate: Date | string | null;
+    membershipEndDate: Date | string | null;
+  }) {
+    const start = student.membershipStartDate
+      ? new Date(student.membershipStartDate)
+      : null;
+    const end = student.membershipEndDate ? new Date(student.membershipEndDate) : null;
+    const now = new Date();
+
+    if (!start || !end) {
       return {
-        status: MembershipStatus.NONE,
-        label: "无会员",
+        status: 'NONE' as const,
+        label: '无会员',
         daysRemaining: null,
         daysUntilStart: null,
         isActive: false,
       };
     }
 
-    const now = new Date(reference);
-    const isActive = student.hasMembership(now);
-    const daysRemaining = student.getMembershipDaysRemaining(now);
+    const isActive = now >= start && now <= end;
+    const daysRemaining = end >= now ? Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    const daysUntilStart = start > now ? Math.ceil((start.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
     if (isActive) {
-      if (daysRemaining !== null && daysRemaining <= 7) {
+      if (daysRemaining <= 7) {
         return {
-          status: MembershipStatus.ACTIVE,
+          status: 'ACTIVE' as const,
           label: `会员即将到期 (${daysRemaining}天)`,
           daysRemaining,
           daysUntilStart: 0,
           isActive: true,
         };
       }
-
       return {
-        status: MembershipStatus.ACTIVE,
-        label: "会员有效",
+        status: 'ACTIVE' as const,
+        label: '会员有效',
         daysRemaining,
         daysUntilStart: 0,
         isActive: true,
       };
     }
 
-    if (student.membershipStartDate > now) {
-      const daysUntilStart = StatsService.calculateDaysBetween(
-        now,
-        student.membershipStartDate
-      );
+    if (start > now) {
       return {
-        status: MembershipStatus.UPCOMING,
+        status: 'UPCOMING' as const,
         label: `会员未开始 (${daysUntilStart}天后)`,
-        daysRemaining,
+        daysRemaining: daysRemaining,
         daysUntilStart,
         isActive: false,
       };
     }
 
     return {
-      status: MembershipStatus.EXPIRED,
-      label: "会员已过期",
+      status: 'EXPIRED' as const,
+      label: '会员已过期',
       daysRemaining: 0,
       daysUntilStart: null,
       isActive: false,
     };
-  }
-
-  private static calculateDaysBetween(from: Date, to: Date): number {
-    const diff = to.getTime() - from.getTime();
-    if (diff <= 0) {
-      return 0;
-    }
-    return Math.ceil(diff / MS_PER_DAY);
-  }
-
-  private static getInstallmentRemaining(installment: IInstallmentDoc): number {
-    if (typeof installment.getRemainingAmount === "function") {
-      return Number(installment.getRemainingAmount() ?? 0);
-    }
-    const paidAmount = Number(installment.paid_amount ?? 0);
-    const installmentAmount = Number(installment.installment_amount ?? 0);
-    const remaining = installmentAmount - paidAmount;
-    return remaining > 0 ? remaining : 0;
   }
 }
 
