@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <div :class="['container', theme]">
+    <div :class="['container', themeClass]">
       <!-- 协议同意按钮 -->
       <button
         v-if="showAgreeButton"
@@ -13,7 +13,7 @@
 
       <!-- 主题切换按钮 -->
       <button class="theme-toggle" @click="toggleTheme">
-        <span v-if="theme === 'dark'">☀️ 切换明亮</span>
+        <span v-if="appStore.theme === 'dark'">☀️ 切换明亮</span>
         <span v-else>🌙 切换暗色</span>
       </button>
 
@@ -52,19 +52,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, computed, type Ref } from 'vue';
+import { useAppStore } from '../stores/app';
 
 interface Section {
   title: string;
   content: string;
 }
 
-const theme: Ref<string> = ref('light');
+const appStore = useAppStore();
 const showScrollButton: Ref<boolean> = ref(false);
 const showAgreeButton: Ref<boolean> = ref(false);
 const agreeTimer: Ref<number | null> = ref(null);
 const isAnimationReady: Ref<boolean> = ref(false);
 const agreeInProgress: Ref<boolean> = ref(false);
+
+// 计算属性：获取当前主题类名
+const themeClass = computed(() => appStore.theme);
 
 const sections: Section[] = [
   {
@@ -99,20 +103,10 @@ const sections: Section[] = [
   },
 ];
 
-const initializeTheme = (): void => {
-  let savedTheme: string | null = null;
-  try { savedTheme = localStorage.getItem('theme'); } catch {}
-  if (savedTheme) {
-    theme.value = savedTheme;
-  } else {
-    theme.value = 'light';
-  }
-};
-
 const toggleTheme = (): void => {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark';
-  try { localStorage.setItem('theme', theme.value); } catch {}
-  checkCurrentTheme();
+  const newTheme = appStore.theme === 'dark' ? 'light' : 'dark';
+  appStore.setTheme(newTheme);
+  updateBodyBackground();
 };
 
 const handleScroll = (): void => {
@@ -123,13 +117,9 @@ const scrollToTop = (): void => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-const checkCurrentTheme = (): void => {
-  document.documentElement.classList.remove('dark-theme', 'light-theme');
-  document.documentElement.classList.add(theme.value + '-theme');
-  document.documentElement.setAttribute('data-theme', theme.value);
-  
+const updateBodyBackground = (): void => {
   document.body.style.backgroundColor =
-    theme.value === 'dark' ? '#1e1e2f' : '#f5f5f5';
+    appStore.theme === 'dark' ? '#1e1e2f' : '#f5f5f5';
 };
 
 const agreeWithTerms = (): void => {
@@ -251,9 +241,13 @@ const openMainWindow = async (): Promise<void> => {
 };
 
 onMounted(() => {
-  initializeTheme();
+  // 初始化主题（如果还没初始化）
+  if (!localStorage.getItem('theme')) {
+    appStore.initTheme();
+  }
+  updateBodyBackground();
+
   window.addEventListener('scroll', handleScroll);
-  checkCurrentTheme();
 
   agreeTimer.value = window.setTimeout(() => {
     showAgreeButton.value = true;

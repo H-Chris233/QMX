@@ -1,5 +1,5 @@
 <template>
-  <div :class="['main-app', theme]">
+  <div :class="['main-app', appStore.theme + '-theme']">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
       <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
@@ -150,7 +150,6 @@ const isDev = import.meta.env.DEV;
 
 // 状态管理
 const activeTab = ref('dashboard');
-const theme = ref('dark-theme');
 const isSidebarOpen = ref(false);
 
 // DOM 引用
@@ -212,6 +211,9 @@ const testConfirmModal = (): void => {
 let cleanupFunctions: (() => void)[] = [];
 
 onMounted(() => {
+  // 初始化主题
+  appStore.initTheme();
+
   // 点击外部关闭侧边栏
   const handleOutsideClick = (e: Event): void => {
     if (window.innerWidth <= 768 && isSidebarOpen.value) {
@@ -255,18 +257,50 @@ onUnmounted(() => cleanupFunctions.forEach(fn => fn()));
   --bg-app: #0f1014;       /* 更深邃的背景 */
   --bg-surface: #1a1c23;   /* 稍微提亮的表面色 */
   --bg-hover: #252836;     /* 悬停色 */
-  
+
   --text-primary: #e2e8f0;
   --text-secondary: #94a3b8;
-  
+
   --primary-color: #6366f1; /* Indigo 500 */
   --primary-glow: rgba(99, 102, 241, 0.3);
-  
+
   --border-subtle: rgba(255, 255, 255, 0.08);
   --shadow-elevation: 0 4px 20px rgba(0, 0, 0, 0.4);
-  
+
   --sidebar-width: 260px;
   --nav-height: 64px;
+}
+
+/* 浅色主题 */
+.light-theme {
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-hover: #f1f5f9;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+
+  --primary-color: #6366f1;
+  --primary-glow: rgba(99, 102, 241, 0.2);
+
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --shadow-elevation: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* 深色主题 (默认) */
+.dark-theme {
+  --bg-app: #0f1014;
+  --bg-surface: #1a1c23;
+  --bg-hover: #252836;
+
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+
+  --primary-color: #6366f1;
+  --primary-glow: rgba(99, 102, 241, 0.3);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --shadow-elevation: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 /* 主应用容器 */

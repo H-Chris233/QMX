@@ -316,7 +316,7 @@
           <div class="modal-body">
             <div class="alert-box">
               <Info :size="16" />
-              <p>当前正在为 <strong>{{ students.find(s => s.uid == selectedStudent)?.name }}</strong> 导入成绩。</p>
+              <p>当前正在为 <strong>{{ students.find(s => String(s.uid) === selectedStudent)?.name }}</strong> 导入成绩。</p>
             </div>
             <div class="form-group">
               <label>成绩列表 (每行一个)</label>
@@ -709,7 +709,7 @@ const saveGrade = () => {
 };
 
 const editGrade = (g: Grade) => {
-  currentGrade.value = { ...g, studentId: String(g.studentId) };
+  currentGrade.value = { ...g, studentId: String(g.studentId), notes: g.notes || '' };
   showEditGrade.value = true;
 };
 

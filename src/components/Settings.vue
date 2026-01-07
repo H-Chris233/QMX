@@ -27,18 +27,18 @@
             
             <!-- 主题切换器 (Segmented Control 风格) -->
             <div class="theme-switcher">
-              <button 
-                class="theme-option" 
-                :class="{ active: theme === 'light' }"
-                @click="setTheme('light')"
+              <button
+                class="theme-option"
+                :class="{ active: appStore.theme === 'light' }"
+                @click="appStore.setTheme('light')"
               >
                 <Sun :size="16" />
                 <span>浅色</span>
               </button>
-              <button 
-                class="theme-option" 
-                :class="{ active: theme === 'dark' }"
-                @click="setTheme('dark')"
+              <button
+                class="theme-option"
+                :class="{ active: appStore.theme === 'dark' }"
+                @click="appStore.setTheme('dark')"
               >
                 <Moon :size="16" />
                 <span>深色</span>
@@ -132,51 +132,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, type Ref } from 'vue';
-import { 
-  Palette, 
-  Sun, 
-  Moon, 
-  Sliders, 
-  Lock, 
-  Info, 
-  Sparkles 
+import { ref, type Ref } from 'vue';
+import { useAppStore } from '../stores/app';
+import {
+  Palette,
+  Sun,
+  Moon,
+  Sliders,
+  Lock,
+  Info,
+  Sparkles
 } from 'lucide-vue-next';
 
-const theme: Ref<string> = ref('dark');
+const appStore = useAppStore();
 const autoSave: Ref<boolean> = ref(true);
-
-const setTheme = (mode: string): void => {
-  theme.value = mode;
-  localStorage.setItem('theme', mode);
-  
-  // 更新 DOM
-  const root = document.documentElement;
-  root.classList.remove('light-theme', 'dark-theme');
-  root.classList.add(`${mode}-theme`);
-  root.setAttribute('data-theme', mode);
-};
-
-onMounted(() => {
-  // 初始化主题
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme) {
-    theme.value = savedTheme;
-  } else {
-    theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-  }
-  
-  // 确保 DOM 状态同步
-  setTheme(theme.value);
-
-  // 加载设置 (虽然 autoSave 是强制的，但保持逻辑完整性)
-  const savedAutoSave = localStorage.getItem('autoSave');
-  if (savedAutoSave) {
-    autoSave.value = savedAutoSave === 'true';
-  }
-});
 </script>
 
 <style scoped>
@@ -223,7 +192,7 @@ onMounted(() => {
 }
 
 .setting-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--border-subtle);
 }
 
 .card-header {

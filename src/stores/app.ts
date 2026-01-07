@@ -43,6 +43,9 @@ export const useAppStore = defineStore('app', () => {
     components: {}
   });
 
+  // 主题状态
+  const theme = ref<'light' | 'dark'>('dark');
+
   const errors = ref<ErrorInfo[]>([]);
   const systemInfo = ref<SystemInfo>({
     version: '0.12.1',
@@ -233,6 +236,40 @@ export const useAppStore = defineStore('app', () => {
     hideConfirm();
   }
 
+  /**
+   * 初始化主题
+   */
+  function initTheme() {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (savedTheme) {
+      theme.value = savedTheme;
+    } else {
+      theme.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    }
+    applyTheme(theme.value);
+  }
+
+  /**
+   * 设置主题
+   */
+  function setTheme(mode: 'light' | 'dark') {
+    theme.value = mode;
+    localStorage.setItem('theme', mode);
+    applyTheme(mode);
+  }
+
+  /**
+   * 应用主题到 DOM
+   */
+  function applyTheme(mode: 'light' | 'dark') {
+    const root = document.documentElement;
+    root.classList.remove('light-theme', 'dark-theme');
+    root.classList.add(`${mode}-theme`);
+    root.setAttribute('data-theme', mode);
+  }
+
   return {
     // State
     loading,
@@ -240,6 +277,7 @@ export const useAppStore = defineStore('app', () => {
     systemInfo,
     isOnline,
     confirmModal,
+    theme,
 
     // Getters
     isLoading,
@@ -262,6 +300,8 @@ export const useAppStore = defineStore('app', () => {
     hideConfirm,
     handleConfirm,
     handleCancel,
+    initTheme,
+    setTheme,
 
     // 便捷方法
     errorHandler
