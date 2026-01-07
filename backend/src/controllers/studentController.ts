@@ -1,13 +1,11 @@
 import { Request, Response } from "express";
-import { Student } from "@/models/mongo";
 import { catchAsync } from "@/middleware/errorHandler";
 import logger from "@/utils/logger";
-import { StudentBuilder, MembershipPayload } from "@/services/studentBuilder";
-import { StudentUpdater } from "@/services/studentUpdater";
-import { StudentQuery } from "@/services/studentQuery";
-import { presentStudent } from "@/services/studentPresenter";
 import type { ClassType, SubjectType } from "@/types";
 import { AppError } from "@/utils/errors";
+import { StudentRepository } from "../db/repositories/studentRepository";
+import { StudentQuery } from "../services/studentQuery.new";
+import { presentStudent } from "../services/studentPresenter.new";
 
 const parseNumber = (value: unknown): number | null => {
   if (value === undefined || value === null || value === "") {
@@ -37,7 +35,7 @@ const parseBoolean = (value: unknown): boolean | null => {
 const buildMembershipPayload = (
   start?: any,
   end?: any
-): MembershipPayload | null | undefined => {
+): { start?: string | null; end?: string | null } | null | undefined => {
   if (start === undefined && end === undefined) {
     return undefined;
   }
@@ -45,40 +43,40 @@ const buildMembershipPayload = (
     return null;
   }
   return {
-    startDate: start ?? null,
-    endDate: end ?? null,
+    start: start ? (typeof start === 'string' ? start : start.toISOString().split('T')[0]) ?? null : null,
+    end: end ? (typeof end === 'string' ? end : end.toISOString().split('T')[0]) ?? null : null,
   };
 };
 
-const applyUpdaterFromPayload = (
-  updater: StudentUpdater,
+const applyUpdaterFromPayload = async (
+  studentId: number,
   payload: Record<string, any>
-): void => {
+): Promise<any> => {
+  const updateData: Record<string, unknown> = {};
+
   if (payload.name !== undefined) {
-    updater.name(payload.name);
+    updateData.name = payload.name;
   }
   if (payload.age !== undefined) {
-    updater.age(payload.age);
+    updateData.age = payload.age === null ? null : Number(payload.age);
   }
   if (payload.phone !== undefined) {
-    updater.phone(payload.phone);
+    updateData.phone = payload.phone;
   }
   if (payload.class !== undefined) {
-    updater.class(payload.class as ClassType);
+    updateData.classType = payload.class;
   }
   if (payload.subject !== undefined) {
-    updater.subject(payload.subject as SubjectType);
+    updateData.subject = payload.subject;
   }
-  if (payload.lesson_left !== undefined) {
-    updater.lessonLeft(payload.lesson_left);
-  } else if (payload.lessonLeft !== undefined) {
-    updater.lessonLeft(payload.lessonLeft);
+  if (payload.lesson_left !== undefined || payload.lessonLeft !== undefined) {
+    updateData.lessonLeft = payload.lesson_left ?? payload.lessonLeft === null ? null : Number(payload.lessonLeft);
   }
   if (payload.note !== undefined) {
-    updater.note(payload.note);
+    updateData.note = payload.note;
   }
   if (payload.rings !== undefined) {
-    updater.setRings(payload.rings);
+    updateData.rings = Array.isArray(payload.rings) ? payload.rings : [];
   }
 
   if (
@@ -93,9 +91,12 @@ const applyUpdaterFromPayload = (
     );
 
     if (membershipPayload !== undefined) {
-      updater.membership(membershipPayload);
+      updateData.membershipStartDate = membershipPayload.start;
+      updateData.membershipEndDate = membershipPayload.end;
     }
   }
+
+  return await StudentRepository.updateByUid(studentId, updateData);
 };
 
 export class StudentController {
@@ -116,139 +117,58 @@ export class StudentController {
       sort_order = "DESC",
     } = req.query;
 
-    // 检测是否有过滤参数（除了分页和排序参数）
-    // 注意：sort_by不作为过滤条件，避免简单排序触发复杂聚合查询
-    const hasFilters = Boolean(
-      name_contains ||
-        min_age ||
-        max_age ||
-        min_score ||
-        max_score ||
-        class_type ||
-        subject ||
-        has_membership ||
-        membership_active_at
-    );
+    // 构建查询选项
+    const options = {
+      page: Number(page),
+      limit: Number(limit),
+      nameContains: name_contains as string | undefined,
+      minAge: parseNumber(min_age),
+      maxAge: parseNumber(max_age),
+      minScore: parseNumber(min_score),
+      maxScore: parseNumber(max_score),
+      classType: class_type as ClassType | undefined,
+      subject: subject as SubjectType | undefined,
+      hasMembership: parseBoolean(has_membership),
+      membershipActiveAt: membership_active_at as string | undefined,
+      sortBy: sort_by as string | undefined,
+      sortOrder: sort_order as "ASC" | "DESC",
+    };
 
-    if (hasFilters) {
-      // 使用复杂查询构建器
-      const queryBuilder = StudentQuery.create()
-        .nameContains(name_contains as string | undefined)
-        .ageRange(
-          parseNumber(min_age as string | undefined),
-          parseNumber(max_age as string | undefined)
-        )
-        .class(class_type as ClassType | undefined)
-        .subject(subject as SubjectType | undefined)
-        .hasMembership(parseBoolean(has_membership))
-        .membershipActiveAt(membership_active_at as string | undefined)
-        .scoreRange(
-          parseNumber(min_score as string | undefined),
-          parseNumber(max_score as string | undefined)
-        )
-        .paginate(Number(page), Number(limit))
-        .sort(
-          sort_by as string | undefined,
-          (sort_order as "ASC" | "DESC") ?? "DESC"
-        );
-
-      const {
-        pipeline,
-        countPipeline,
-        page: currentPage,
-        limit: currentLimit,
-      } = queryBuilder.build();
-
-      const rawStudents = await Student.aggregate(pipeline).exec();
-      const countResult = await Student.aggregate(countPipeline).exec();
-      const total = countResult[0]?.count ?? 0;
-
-      return res.json({
-        success: true,
-        data: rawStudents.map(presentStudent),
-        pagination: {
-          page: currentPage,
-          limit: currentLimit,
-          total,
-          total_pages: currentLimit > 0 ? Math.ceil(total / currentLimit) : 0,
-        },
-      });
-    }
-
-    // 简单分页查询（无过滤条件，但支持排序）
-    // 如果有sort_by参数，也使用StudentQuery构建器以支持排序
-    if (sort_by) {
-      const queryBuilder = StudentQuery.create()
-        .paginate(Number(page), Number(limit))
-        .sort(
-          sort_by as string | undefined,
-          (sort_order as "ASC" | "DESC") ?? "DESC"
-        );
-
-      const {
-        pipeline,
-        countPipeline,
-        page: currentPage,
-        limit: currentLimit,
-      } = queryBuilder.build();
-
-      const rawStudents = await Student.aggregate(pipeline).exec();
-      const countResult = await Student.aggregate(countPipeline).exec();
-      const total = countResult[0]?.count ?? 0;
-
-      return res.json({
-        success: true,
-        data: rawStudents.map(presentStudent),
-        pagination: {
-          page: currentPage,
-          limit: currentLimit,
-          total,
-          total_pages: currentLimit > 0 ? Math.ceil(total / currentLimit) : 0,
-        },
-      });
-    }
-
-    // 完全无参数的简单查询
-    const result = await Student.findWithPagination(
-      Number(page),
-      Number(limit)
-    );
+    const result = await StudentRepository.findWithPagination(options);
 
     res.json({
       success: true,
-      data: result.students.map(presentStudent),
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total: result.total,
-        totalPages: result.totalPages,
-        total_pages: result.totalPages,
-      },
+      data: result.data.map(presentStudent),
+      pagination: result.pagination,
     });
   });
 
   public addStudent = catchAsync(async (req: Request, res: Response) => {
     const payload = req.body;
-    const builder = StudentBuilder.create()
-      .name(payload.name)
-      .age(payload.age)
-      .phone(payload.phone)
-      .class(payload.class as ClassType)
-      .subject(payload.subject as SubjectType)
-      .note(payload.note)
-      .lessonLeft(payload.lesson_left ?? payload.lessonLeft)
-      .rings(payload.rings);
 
-    const membershipPayload = buildMembershipPayload(
-      payload.membership_start_date ?? payload.membershipStartDate,
-      payload.membership_end_date ?? payload.membershipEndDate
-    );
+    // 构建学员数据
+    const newStudent = {
+      name: payload.name,
+      age: payload.age === null || payload.age === undefined ? null : Number(payload.age),
+      phone: payload.phone,
+      classType: payload.class as ClassType ?? 'TEN_TRY',
+      subject: payload.subject as SubjectType ?? 'SHOOTING',
+      note: payload.note ?? '',
+      lessonLeft: payload.lesson_left ?? payload.lessonLeft === null ? null : Number(payload.lesson_left ?? payload.lessonLeft),
+      rings: Array.isArray(payload.rings) ? payload.rings : [],
+      membershipStartDate: payload.membership_start_date ?? payload.membershipStartDate
+        ? (typeof (payload.membership_start_date ?? payload.membershipStartDate) === 'string'
+          ? payload.membership_start_date ?? payload.membershipStartDate
+          : (payload.membership_start_date ?? payload.membershipStartDate).toISOString().split('T')[0])
+        : null,
+      membershipEndDate: payload.membership_end_date ?? payload.membershipEndDate
+        ? (typeof (payload.membership_end_date ?? payload.membershipEndDate) === 'string'
+          ? payload.membership_end_date ?? payload.membershipEndDate
+          : (payload.membership_end_date ?? payload.membershipEndDate).toISOString().split('T')[0])
+        : null,
+    };
 
-    if (membershipPayload !== undefined) {
-      builder.membership(membershipPayload);
-    }
-
-    const student = await builder.build();
+    const student = await StudentRepository.create(newStudent);
 
     logger.info(`添加学员成功，UID: ${student.uid}, 姓名: ${student.name}`);
     res.status(201).json({
@@ -260,11 +180,12 @@ export class StudentController {
 
   public updateStudent = catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const updater = await StudentUpdater.for(Number(id));
 
-    applyUpdaterFromPayload(updater, req.body ?? {});
+    const updatedStudent = await applyUpdaterFromPayload(Number(id), req.body ?? {});
 
-    const updatedStudent = await updater.commit();
+    if (!updatedStudent) {
+      throw AppError.notFound("学员不存在");
+    }
 
     logger.info(`更新学员成功，UID: ${updatedStudent.uid}`);
     res.json({
@@ -276,13 +197,14 @@ export class StudentController {
 
   public deleteStudent = catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const student = await Student.findByUid(Number(id));
+
+    const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
       throw AppError.notFound("学员不存在");
     }
 
-    const deleted = await Student.deleteByUid(student.uid);
+    const deleted = await StudentRepository.deleteByUid(student.uid);
 
     if (!deleted) {
       throw AppError.other("删除学员失败");
@@ -297,7 +219,7 @@ export class StudentController {
 
   public getStudentById = catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const student = await Student.findByUid(Number(id));
+    const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
       throw AppError.notFound("学员不存在");
@@ -326,46 +248,28 @@ export class StudentController {
       sort_order = "DESC",
     } = req.query;
 
-    const queryBuilder = StudentQuery.create()
-      .nameContains(name_contains as string | undefined)
-      .ageRange(
-        parseNumber(min_age as string | undefined),
-        parseNumber(max_age as string | undefined)
-      )
-      .class(class_type as ClassType | undefined)
-      .subject(subject as SubjectType | undefined)
-      .hasMembership(parseBoolean(has_membership))
-      .membershipActiveAt(membership_active_at as string | undefined)
-      .scoreRange(
-        parseNumber(min_score as string | undefined),
-        parseNumber(max_score as string | undefined)
-      )
-      .paginate(Number(page), Number(limit))
-      .sort(
-        sort_by as string | undefined,
-        (sort_order as "ASC" | "DESC") ?? "DESC"
-      );
+    const options = {
+      page: Number(page),
+      limit: Number(limit),
+      nameContains: name_contains as string | undefined,
+      minAge: parseNumber(min_age),
+      maxAge: parseNumber(max_age),
+      minScore: parseNumber(min_score),
+      maxScore: parseNumber(max_score),
+      classType: class_type as ClassType | undefined,
+      subject: subject as SubjectType | undefined,
+      hasMembership: parseBoolean(has_membership),
+      membershipActiveAt: membership_active_at as string | undefined,
+      sortBy: sort_by as string | undefined,
+      sortOrder: sort_order as "ASC" | "DESC",
+    };
 
-    const {
-      pipeline,
-      countPipeline,
-      page: currentPage,
-      limit: currentLimit,
-    } = queryBuilder.build();
-
-    const rawStudents = await Student.aggregate(pipeline).exec();
-    const countResult = await Student.aggregate(countPipeline).exec();
-    const total = countResult[0]?.count ?? 0;
+    const result = await StudentRepository.findWithPagination(options);
 
     res.json({
       success: true,
-      data: rawStudents.map(presentStudent),
-      pagination: {
-        page: currentPage,
-        limit: currentLimit,
-        total,
-        total_pages: currentLimit > 0 ? Math.ceil(total / currentLimit) : 0,
-      },
+      data: result.data.map(presentStudent),
+      pagination: result.pagination,
     });
   });
 
@@ -388,9 +292,7 @@ export class StudentController {
 
       for (const studentId of studentIds) {
         try {
-          const updater = await StudentUpdater.for(Number(studentId));
-          applyUpdaterFromPayload(updater, updates ?? {});
-          await updater.commit();
+          await applyUpdaterFromPayload(Number(studentId), updates ?? {});
           updatedCount += 1;
         } catch (error) {
           logger.warn(
@@ -426,7 +328,7 @@ export class StudentController {
 
       let deletedCount = 0;
       for (const studentId of studentIds) {
-        const deleted = await Student.deleteByUid(Number(studentId));
+        const deleted = await StudentRepository.deleteByUid(Number(studentId));
         if (deleted) {
           deletedCount += 1;
         }
@@ -452,9 +354,13 @@ export class StudentController {
         throw AppError.invalidInput("成绩必须是数组格式");
       }
 
-      const updater = await StudentUpdater.for(Number(id));
-      updater.setRings(rings);
-      const updatedStudent = await updater.commit();
+      const updatedStudent = await StudentRepository.updateByUid(Number(id), {
+        rings,
+      });
+
+      if (!updatedStudent) {
+        throw AppError.notFound("学员不存在");
+      }
 
       logger.info(`更新学员成绩成功，UID: ${updatedStudent.uid}`);
       res.json({
@@ -472,12 +378,9 @@ export class StudentController {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + Number(days));
 
-      const expiringStudents = await Student.search({
-        membershipEndDate: {
-          $gte: new Date(),
-          $lte: futureDate,
-        },
-      });
+      const expiringStudents = await StudentRepository.findExpiringMemberships(
+        Number(days)
+      );
 
       res.json({
         success: true,
@@ -488,22 +391,30 @@ export class StudentController {
   );
 
   public getStudentStats = catchAsync(async (_req: Request, res: Response) => {
-    const total_students = await Student.count({});
+    const allStudents = await StudentRepository.findAll();
+
+    const total_students = allStudents.length;
 
     const now = new Date();
-    const active_students = await Student.search({
-      membershipStartDate: { $lte: now },
-      membershipEndDate: { $gte: now },
+    let active_students_count = 0;
+
+    allStudents.forEach((student) => {
+      if (student.membershipStartDate && student.membershipEndDate) {
+        const start = new Date(student.membershipStartDate);
+        const end = new Date(student.membershipEndDate);
+        if (now >= start && now <= end) {
+          active_students_count++;
+        }
+      }
     });
 
-    const expired_memberships_count = total_students - active_students.length;
+    const expired_memberships = total_students - active_students_count;
 
-    const allStudents = await Student.findAll();
     const classStats = new Map<string, number>();
     const subjectStats = new Map<string, number>();
 
     allStudents.forEach((student) => {
-      const className = student.class || "Others";
+      const className = student.classType || "Others";
       const subjectName = student.subject || "Others";
 
       classStats.set(className, (classStats.get(className) || 0) + 1);
@@ -528,8 +439,8 @@ export class StudentController {
       success: true,
       data: {
         total_students,
-        active_students: active_students.length,
-        expired_memberships: expired_memberships_count,
+        active_students: active_students_count,
+        expired_memberships: expired_memberships,
         class_statistics,
         subject_statistics,
       },

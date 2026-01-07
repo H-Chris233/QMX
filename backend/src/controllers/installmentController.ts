@@ -93,7 +93,7 @@ export class InstallmentController {
     const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     // 获取所有计划（不分页，需要完整统计）
-    const plans = InstallmentPlanRepository.findAll();
+    const plans = await InstallmentPlanRepository.findAll();
 
     // 计算所有计划的统计信息
     const enrichedPlans = await Promise.all(
@@ -134,28 +134,13 @@ export class InstallmentController {
     }
 
     // 构建响应
-    const responseData = displayPlans.map((item) =>
-      this.buildPlanResponse(item, {
-        includeInstallments: true,
-        installments: item.installments,
-        installments_count: item.installments.length,
-        total_amount: this.formatAmount(item.totalAmount),
-        total_installments: item.totalInstallments,
-        progress: item.progress,
-        paid_count: item.stats.paidCount,
-        pending_count: item.stats.pendingCount,
-        overdue_count: item.stats.overdueCount,
-        overdue_amount: this.formatAmount(item.stats.overdueAmount),
-        remaining_amount: this.formatAmount(item.stats.remainingAmount),
-        frequency_text: this.getFrequencyText(
-          item.frequency,
-          item.customDays ?? null
-        ),
-        status_text: this.getStatusText(item.status),
-        student: item.student
-          ? { uid: item.student.uid, name: item.student.name }
-          : null,
-      })
+    const responseData = await Promise.all(
+      displayPlans.map((item) =>
+        this.buildPlanResponse(item, {
+          includeInstallments: true,
+          installments: item.installments,
+        })
+      )
     );
 
     res.json({
@@ -259,24 +244,16 @@ export class InstallmentController {
       ? await StudentRepository.findByUid(plan.studentId)
       : null;
 
-    // 计算统计数据
-    const stats = this.calculatePlanStats(installments);
-    const progress =
-      plan.totalInstallments > 0
-        ? Math.round((stats.paidCount / plan.totalInstallments) * 100)
-        : 0;
-
     await this.refreshPlanStatus(plan.uid);
     const refreshedPlan = await InstallmentPlanRepository.findByUid(plan.uid);
     const refreshedInstallments =
       await InstallmentRepository.findByPlanId(plan.uid);
 
-    const responseData = this.buildPlanResponse(
+    const responseData = await this.buildPlanResponse(
       refreshedPlan ?? plan,
       {
         includeInstallments: true,
         installments: refreshedInstallments,
-        progress,
       }
     );
 
@@ -494,10 +471,9 @@ export class InstallmentController {
     const installments =
       await InstallmentRepository.findByPlanId(result.plan.uid);
 
-    const responseData = this.buildPlanResponse(plan, {
+    const responseData = await this.buildPlanResponse(plan, {
       includeInstallments: true,
       installments,
-      progress: plan.totalInstallments === 1 ? 100 : 0,
     });
 
     res.status(201).json({
@@ -534,13 +510,18 @@ export class InstallmentController {
       installment.planId
     );
 
+    if (!plan) {
+      throw AppError.notFound("分期计划不存在");
+    }
+
     let updateData: Record<string, unknown> = {
       status: normalizedStatus,
       updatedAt: new Date(),
     };
 
-    try {
-      // 如果设置为已支付，需要处理交易记录
+    // 使用事务执行所有更新
+    const result = await db.transaction(async (tx) => {
+      // 处理已支付状态
       if (normalizedStatus === InstallmentStatus.PAID) {
         const paidAmountInCents =
           amount !== undefined
@@ -549,130 +530,126 @@ export class InstallmentController {
 
         const paymentTime = new Date();
 
-        // 使用事务删除旧cash并创建新cash
-        const result = await db.transaction(async (tx) => {
-          // 如果已有支付，删除旧的 cash 记录
-          if (installment.cashUid) {
-            await tx
-              .delete(cashTransactions)
-              .where(eq(cashTransactions.uid, installment.cashUid));
-          }
-
-          // 创建新的支付记录
-          const cashSnapshot = {
-            plan_uid: plan.uid,
-            installment_uid: installment.uid,
-            installment_number: installment.installmentNumber,
-            total_installments: plan.totalInstallments,
-            due_date: installment.dueDate,
-            status: InstallmentStatus.PAID,
-            note: plan.note ?? null,
-          };
-
-          const cashData = {
-            studentId: plan.studentId ?? null,
-            amount: paidAmountInCents,
-            note: this.buildInstallmentNote(
-              plan.note ?? "",
-              installment.installmentNumber,
-              plan.totalInstallments
-            ),
-            installmentSnapshot: cashSnapshot,
-          };
-
-          const [newCash] = await tx
-            .insert(cashTransactions)
-            .values(cashData)
-            .returning();
-
-          if (!newCash) {
-            throw AppError.other("创建支付记录失败");
-          }
-
-          // 更新分期状态
+        // 如果已有支付，删除旧的 cash 记录
+        if (installment.cashUid) {
           await tx
-            .update(installments)
-            .set({
-              status: InstallmentStatus.PAID,
-              paidAmount: paidAmountInCents,
-              cashUid: newCash.uid,
-              paidDate: paymentTime.toISOString().split('T')[0],
-            })
-            .where(eq(installments.uid, installment.uid));
+            .delete(cashTransactions)
+            .where(eq(cashTransactions.uid, installment.cashUid));
+        }
+
+        // 创建新的支付记录
+        const cashSnapshot = {
+          plan_uid: plan.uid,
+          installment_uid: installment.uid,
+          installment_number: installment.installmentNumber,
+          total_installments: plan.totalInstallments,
+          due_date: installment.dueDate,
+          status: InstallmentStatus.PAID,
+          note: plan.note ?? null,
+        };
+
+        const cashData = {
+          studentId: plan.studentId ?? null,
+          amount: paidAmountInCents,
+          note: this.buildInstallmentNote(
+            plan.note ?? "",
+            installment.installmentNumber,
+            plan.totalInstallments
+          ),
+          installmentSnapshot: cashSnapshot,
+        };
+
+        const [newCash] = await tx
+          .insert(cashTransactions)
+          .values(cashData)
+          .returning();
+
+        if (!newCash) {
+          throw AppError.other("创建支付记录失败");
+        }
+
+        // 更新分期状态
+        await tx
+          .update(installments)
+          .set({
+            status: InstallmentStatus.PAID,
+            paidAmount: paidAmountInCents,
+            cashUid: newCash.uid,
+            paidDate: paymentTime.toISOString().split('T')[0],
+          })
+          .where(eq(installments.uid, installment.uid));
 
           // 刷新计划状态
           await this.refreshPlanStatus(tx, plan.uid);
 
-          return { installation, cash: newCash };
-        });
-
-        updateData.cash_uid = result.cash.uid;
-        updateData.paidAmount = paidAmountInCents;
-        updateData.paidDate = paymentTime;
-
-        // 更新本地对象
-        installment.cashUid = result.cash.uid;
-        installment.paidAmount = paidAmountInCents;
-        installment.paidDate = paymentTime;
+          return { installment: installment.uid, cash: newCash };
       } else if (normalizedStatus === InstallmentStatus.PENDING) {
         // 改为待支付，清除支付信息
         if (installment.cashUid) {
-          await db
+          await tx
             .delete(cashTransactions)
             .where(eq(cashTransactions.uid, installment.cashUid));
         }
-        updateData.status = InstallmentStatus.PENDING;
-        updateData.paidAmount = null;
-        updateData.paidDate = null;
 
-        // 更新本地对象
-        installment.cashUid = null;
-        installment.paidAmount = null;
-        installment.paidDate = null;
+        await tx
+          .update(installments)
+          .set({
+            status: InstallmentStatus.PENDING,
+            paidAmount: null,
+            paidDate: null,
+            cashUid: null,
+          })
+          .where(eq(installments.uid, installment.uid));
+
+          // 刷新计划状态
+          await this.refreshPlanStatus(tx, plan.uid);
+
+          return { installment: installment.uid, cash: null };
       } else if (normalizedStatus === InstallmentStatus.CANCELLED) {
-        updateData.status = InstallmentStatus.CANCELLED;
-        updateData.paidDate = null;
+        await tx
+          .update(installments)
+          .set({
+            status: InstallmentStatus.CANCELLED,
+            paidDate: null,
+          })
+          .where(eq(installments.uid, installment.uid));
+
+          // 刷新计划状态
+          await this.refreshPlanStatus(tx, plan.uid);
+
+          return { installment: installment.uid, cash: null };
       } else if (normalizedStatus === InstallmentStatus.OVERDUE) {
-        updateData.status = InstallmentStatus.OVERDUE;
+        await tx
+          .update(installments)
+          .set({ status: InstallmentStatus.OVERDUE })
+          .where(eq(installments.uid, installment.uid));
+
+          // 刷新计划状态
+          await this.refreshPlanStatus(tx, plan.uid);
+
+          return { installment: installment.uid, cash: null };
       }
 
-      // 更新到数据库
-      const updatedInstallment = await InstallmentRepository.updateByUid(
-        installment.uid,
-        updateData
-      );
+      return { installment: installment.uid, cash: null };
+    });
 
-      if (!updatedInstallment) {
-        throw AppError.other("更新分期付款状态失败");
-      }
+    const updatedInstallment = await InstallmentRepository.findByUid(installment.uid);
 
-      // 刷新计划状态
-      if (plan) {
-        await this.refreshPlanStatus(plan.uid);
-      }
+    logger.info(
+      `更新分期付款状态成功，UID: ${installment.uid}, 状态: ${normalizedStatus}`
+    );
 
-      logger.info(
-        `更新分期付款状态成功，UID: ${installment.uid}, 状态: ${normalizedStatus}`
-      );
-
-      res.json({
-        success: true,
-        data: {
-          installment: this.presentInstallmentForCash(updatedInstallment),
-          plan: plan
-            ? this.buildPlanResponse(plan)
-            : null,
-        },
-        message: "分期付款状态更新成功",
-      });
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("更新分期付款状态失败:", error);
-      throw AppError.other("更新分期付款状态失败", { cause: error });
-    }
-  );
+    res.json({
+      success: true,
+      data: {
+        installment: updatedInstallment ? InstallmentRepository.toResponse(updatedInstallment) : null,
+        plan: plan
+          ? await this.buildPlanResponse(plan)
+          : null,
+      },
+      message: "分期付款状态更新成功",
+    });
+  });
 
   /**
    * POST /:id/payments - 记录具体期支付
@@ -697,19 +674,12 @@ export class InstallmentController {
       await InstallmentRepository.findByPlanId(plan.uid);
 
     // 如果没有指定期数，使用第一个未支付的期数
-    let targetInstallment: {
-      uid: number;
-      installmentNumber: number;
-      planId: number;
-      studentId: number | null;
-      cashUid: number | null;
-      installmentAmount: number;
-    } | null = null;
+    let targetInstallment: any | null = null;
 
     if (installment_index !== undefined) {
       // 按期数查找
       targetInstallment = installments.find(
-        (inst) => inst.current_installment === installment_index
+        (inst) => inst.installmentNumber === installment_index
       );
     } else {
       // 查找第一个未支付的期数
@@ -755,7 +725,7 @@ export class InstallmentController {
         plan_uid: target.planId,
         installment_uid: target.uid,
         installment_number: target.installmentNumber,
-        total_installments: target.totalInstallments,
+        total_installments: plan.totalInstallments,
         due_date: target.dueDate,
         status: InstallmentStatus.PAID,
         note: plan.note ?? null,
@@ -809,16 +779,16 @@ export class InstallmentController {
     // 获取更新后的数据
     const updatedInstallment = await InstallmentRepository.findByUid(target.uid);
 
-    const plan = await InstallmentPlanRepository.findByUid(target.planId);
-    const student = plan.studentId
-      ? await StudentRepository.findByUid(plan.studentId)
+    const updatedPlan = await InstallmentPlanRepository.findByUid(target.planId);
+    const student = updatedPlan?.studentId
+      ? await StudentRepository.findByUid(updatedPlan.studentId)
       : null;
 
     const response = {
       success: true,
       data: {
-        installment: this.presentInstallmentForCash(updatedInstallment),
-        plan: this.buildPlanResponse(plan),
+        installment: updatedInstallment ? InstallmentRepository.toResponse(updatedInstallment) : null,
+        plan: updatedPlan ? await this.buildPlanResponse(updatedPlan) : null,
       },
       message: "支付记录成功",
     };
@@ -868,7 +838,7 @@ export class InstallmentController {
 
     logger.info(`更新分期计划成功，UID: ${plan.uid}`);
 
-    const responseData = this.buildPlanResponse(updatedPlan);
+    const responseData = await this.buildPlanResponse(updatedPlan);
 
     res.json({
       success: true,
@@ -975,39 +945,25 @@ export class InstallmentController {
   /**
    * 计算分期统计数据
    */
-  private calculatePlanStats(installments: {
-    uid: number;
-    totalInstallments: number;
-  }[]) {
+  private calculatePlanStats(installments: Array<any>, totalInstallments?: number) {
     return installments.reduce(
       (acc, installment) => {
         const status = installment.status;
 
         if (status === 'PAID') {
           acc.paidCount += 1;
-          acc.paidAmount += installment.installmentAmount;
-        } else if (
-          status !== 'CANCELLED'
-        ) {
+          acc.paidAmount += Math.floor(installment.installmentAmount);
+        } else if (status !== 'CANCELLED') {
           acc.pendingCount += 1;
-          acc.pendingAmount += this.getRemainingAmount(
-            installment,
-            plan.totalInstallments
-          );
-          if (
-            status === 'OVERDUE' || installment.isOverdue()
-          ) {
+          acc.remainingAmount += InstallmentRepository.getRemainingAmount(installment);
+          if (status === 'OVERDUE' || InstallmentRepository.isOverdue(installment)) {
             acc.overdueCount += 1;
-            acc.overdueAmount += this.getRemainingAmount(
-              installment,
-              plan.totalInstallments
-            );
+            acc.overdueAmount += InstallmentRepository.getRemainingAmount(installment);
           }
         }
-        acc.remainingAmount += this.getRemainingAmount(
-          installment,
-          plan.totalInstallments
-        );
+        if (status !== 'CANCELLED') {
+          acc.remainingAmount += InstallmentRepository.getRemainingAmount(installment);
+        }
 
         return acc;
       },
@@ -1021,38 +977,6 @@ export class InstallmentController {
         remainingAmount: 0,
       }
     );
-  }
-
-  /**
-   * 获取分期剩余金额（分/摊算法）
-   */
-  private getRemainingAmount(
-    installment: {
-    installmentAmount: number;
-    paidAmount?: number;
-  },
-    totalInstallments: number,
-    totalAmount?: number
-  ): number {
-    const paid = Math.floor(installment.paidAmount ?? 0);
-    const due = installment.installmentAmount;
-
-    if (totalAmount !== undefined) {
-      const paidInPreviousTerms = paid;
-      const installmentsCompleted = installment.current_installment - 1;
-      const installmentsPerTerm = totalInstallments;
-
-      // 如果总金额被修改（可能有补缴/超额支付情况）
-      if (installmentsCompleted > 0) {
-        const installmentAmounts = this.getInstallmentAmounts(
-          totalAmount,
-          installmentsPerTerm
-        );
-        return installmentAmounts[installmentsCompleted - 1] - paid;
-      }
-    }
-
-    return Math.max(due - paid, 0);
   }
 
   /**
@@ -1102,7 +1026,7 @@ export class InstallmentController {
   /**
    * 构建分期计划响应数据
    */
-  private buildPlanResponse(
+  private async buildPlanResponse(
     plan: {
       uid: number;
       studentId: number | null;
@@ -1118,199 +1042,86 @@ export class InstallmentController {
       updatedAt: Date | string;
       },
     options: IPlanResponseOptions = {}
-  ): Record<string, unknown> {
+  ): Promise<Record<string, unknown>> {
     const installments =
       options.installments ||
-      (previous
-        ? this.findByPlanId(plan.uid)
-        : []);
+      await InstallmentRepository.findByPlanId(plan.uid);
 
     const student = plan.studentId
-      ? StudentRepository.findByUid(plan.studentId)
+      ? await StudentRepository.findByUid(plan.studentId)
       : null;
 
-    const stats = this.calculatePlanStats(installments);
+    const stats = this.calculatePlanStats(installments, plan.totalInstallments);
     const progress =
       plan.totalInstallments > 0
         ? Math.round((stats.paidCount / plan.totalInstallments) * 100)
         : 0;
 
-    // 格式化金额（分 → 元）
-    const totalAmount = this.formatAmount(plan.totalAmount);
-    const installmentAmountStr =
-      this.formatAmount(plan.totalAmount / plan.totalInstallments);
+    // 构建分期响应数据
+    const installmentsResponse = installments.map((inst: any) => {
+      const isOverdue = InstallmentRepository.isOverdue(inst);
+      const daysOverdue = InstallmentRepository.getDaysOverdue(inst);
+      const remainingAmount = InstallmentRepository.getRemainingAmount(inst);
 
-    return this.buildBaseResponse({
-      uid: plan.uid,
-      studentId: plan.studentId,
-      student: student ? { uid: student.uid, name: student.name, phone: student.phone } : null,
-      totalAmount: totalAmount,
-      totalAmountInCents: plan.totalAmount,
-      installmentAmountStr,
-      totalInstallments: plan.totalInstallments,
-      frequency: plan.frequency,
-      customDays: plan.customDays ?? null,
-      startDate: plan.startDate,
-      status: plan.status,
-      note: plan.note,
-      createdAt: plan.createdAt,
-      updatedAt: plan.updatedAt,
-    },
-      options,
-      installments,
-      progress,
-     (stats: stats),
-    );
-  }
-
-  /**
-   * 构建基础响应
-   */
-  private buildBaseResponse(
-    base: any,
-    options: IPlanResponseOptions = {},
-    stats?: {
-      paidCount: number;
-      pendingCount: number;
-      overdueCount: number;
-      paidAmount: number;
-      pendingAmount: number;
-      overdueAmount: number;
-      remainingAmount: number;
-    } = {}
-  ): Record<string, unknown> {
-    const installments = options.installments || [];
-
-    return {
-      uid: base.uid as number,
-      student_id: base.studentId as number | null,
-      student: base.studentId ? { ...base.student, name: base.student.name } : null,
-      total_amount: this.formatAmount(
-        base.totalAmount as number
-      ) as string,
-      totalAmountInCents: base.totalAmount as number,
-      installment_amount: this.formatAmount(
-        (base.totalAmount as number) /
-        (base.totalInstallments as number)
-      ) as string,
-      total_installments: base.totalInstallments as number,
-      frequency: base.frequency as string,
-      custom_days: base.customDays as number | null,
-      start_date: typeof base.startDate === "string" ? base.startDate : new Date(base.startDate).toISOString().split('T')[0],
-      status: base.status as string,
-      status_text: this.getStatusText(base.status),
-      frequency_text: this.getFrequencyText(
-        base.frequency as string,
-        base.customDays as number
-      ),
-      progress: base.progress as number,
-      paid_count: stats?.paidCount ?? 0,
-      pending_count: stats?.pendingCount ?? 0,
-      overdue_count: stats?.overdueCount ?? 0,
-      overdue_amount: this.formatAmount(stats?.overdueAmount ?? 0) as string,
-      overdue_amount_in_cents: stats?.overdueAmount ?? 0 as number,
-      paid_amount: this.formatAmount(stats?.paidAmount ?? 0) as string,
-      pending_amount: this.formatAmount(stats?.pendingAmount ?? 0) as string,
-      remaining_amount: this.formatAmount(stats?.remainingAmount ?? 0) as string,
-      installment_amount_in_cents: stats?.pendingAmount ?? 0 as number,
-      cash_uid: stats?.cashUid ?? 0, // 用于内部关联
-      created_at: typeof base.createdAt === "string" ? base.createdAt : new Date(base.createdAt).toISOString().split('T')[0],
-      updated_at: typeof base.updatedAt === "string" ? base.updatedAt : new Date(base.updatedAt).toISOString().split('T')[0],
-    };
-  }
-
-  /**
-   * 构建分期响应数据（带前端兼容）
-   */
-  private presentInstallment(installment: {
-    uid: number;
-    plan_id: number;
-    student_id: number | null;
-    installmentNumber: number;
-    totalInstallments: number;
-    installmentAmount: string;
-    installmentNumberInCents: number;
-    dueDate: Date | string;
-    status: string;
-    statusText: string;
-    paidAmount: string;
-    paidDate: Date | string | null;
-    cashUid: number | null;
-    isOverdue: boolean;
-    daysOverdue: number;
-    remainingAmount: number;
-    remainingAmountInCents: number;
-    created_at: Date | string;
-    updated_at: Date | string;
-  }) {
-    return {
-      uid: installment.uid,
-      plan_id: installment.plan_id,
-      planId: installment.plan_id,
-      current_installment: installment.installmentNumber,
-      currentInstallment: installment.installmentNumber,
-      total_installments: installment.totalInstallments,
-      installment_amount: installmentAmount, // 已经是元的值
-      installment_amount_in_cents: installment.installmentAmount/100, // 转为分
-      due_date: installment.dueDate instanceof Date
-        ? installment.dueDate.toISOString().split('T')[0]
-        : installment.dueDate,
-      status: installment.status,
-      status_text: statusText,
-      paid_amount: paidAmount, // 已经是元的值
-      paid_amount_in_cents: paidAmount/100,
-      paid_at: installment.paidDate instanceof Date
-        ? installment.paidDate.toISOString().split('T')[0]
-        : null,
-      is_overdue: isOverdue,
-      isOverdue,
-      days_overdue: daysOverdue,
-      remaining_amount: remainingAmount, // 已经是元的值
-      remaining_amount_in_cents: remainingAmount/100,
-      student_id: installment.student_id,
-      studentId: installment.student_id,
-      cash_uid: installment.cashUid,
-      cashUid: installment.cashUid,
-      created_at: installment.createdAt instanceof Date
-        ? installment.createdAt.toISOString().split('T')[0]
-        : ''
-          : installment.created_at.substring(0, 10), // 取前10字符的日期
-      updated_at: installment.updatedAt instanceof Date
-        ? installment.updatedAt.toISOString().split('T')[0]
-        : '',
-    };
-  }
-
-  /**
-   * 计算指定分期的剩余金额
-   */
-  private getRemainingAmount(
-    installment: {
-      installmentAmount: number;
-      paidAmount?: number;
-      plan: {
-        totalInstallments: number;
-        totalAmount: number;
+      return {
+        uid: inst.uid,
+        plan_id: inst.planId,
+        planId: inst.planId,
+        current_installment: inst.installmentNumber,
+        currentInstallment: inst.installmentNumber,
+        installment_number: inst.installmentNumber,
+        installment_amount: this.formatAmount(inst.installmentAmount),
+        installment_amount_in_cents: inst.installmentAmount,
+        due_date: inst.dueDate,
+        status: inst.status,
+        status_text: this.getStatusText(inst.status),
+        paid_amount: this.formatAmount(inst.paidAmount ?? 0),
+        paid_amount_in_cents: inst.paidAmount ?? 0,
+        paid_at: inst.paidDate,
+        is_overdue: isOverdue,
+        isOverdue,
+        days_overdue: daysOverdue,
+        remaining_amount: this.formatAmount(remainingAmount),
+        remaining_amount_in_cents: remainingAmount,
+        student_id: inst.studentId,
+        studentId: inst.studentId,
+        cash_uid: inst.cashUid,
+        cashUid: inst.cashUid,
+        created_at: inst.createdAt,
+        updated_at: inst.updatedAt,
       };
-    }
-  ): number {
-    // 如果有总金额，使用分摊算法
-    if (plan.totalAmount !== undefined) {
-      const installmentsPerTerm = plan.totalInstallments;
-      const installmentAmounts = this.getInstallmentAmounts(
-        plan.totalAmount / 100, // 转为元
-        installmentsPerTerm
-      );
+    });
 
-      const paidInPreviousTerms = Math.floor(installment.installmentNumber/100);
-      const installmentAmountForThisTerm =
-        installmentAmounts[paidInPreviousTerms - 1] * 100; // 转为分
-
-      return Math.max(installmentAmountForThisTerm - paidInPreviousTerms, 0);
-    }
-
-    return installment.installmentAmount -
-      Math.floor(installment.paidAmount ?? 0);
+    return {
+      uid: plan.uid,
+      student_id: plan.studentId,
+      student: student
+        ? { uid: student.uid, name: student.name, phone: student.phone }
+        : null,
+      total_amount: this.formatAmount(plan.totalAmount),
+      totalAmountInCents: plan.totalAmount,
+      installment_amount: this.formatAmount(plan.totalAmount / plan.totalInstallments),
+      total_installments: plan.totalInstallments,
+      frequency: plan.frequency,
+      custom_days: plan.customDays,
+      start_date: typeof plan.startDate === "string" ? plan.startDate : new Date(plan.startDate).toISOString().split('T')[0],
+      status: plan.status,
+      status_text: this.getStatusText(plan.status),
+      frequency_text: this.getFrequencyText(plan.frequency, plan.customDays),
+      progress,
+      paid_count: stats.paidCount,
+      pending_count: stats.pendingCount,
+      overdue_count: stats.overdueCount,
+      overdue_amount: this.formatAmount(stats.overdueAmount),
+      paid_amount: this.formatAmount(stats.paidAmount),
+      pending_amount: this.formatAmount(stats.pendingAmount),
+      remaining_amount: this.formatAmount(stats.remainingAmount),
+      note: plan.note,
+      installments: options.includeInstallments ? installmentsResponse : undefined,
+      installments_count: installments.length,
+      created_at: typeof plan.createdAt === "string" ? plan.createdAt : new Date(plan.createdAt).toISOString().split('T')[0],
+      updated_at: typeof plan.updatedAt === "string" ? plan.updatedAt : new Date(plan.updatedAt).toISOString().split('T')[0],
+    };
   }
 
   /**
@@ -1355,6 +1166,18 @@ export class InstallmentController {
       return null;
     }
     return numeric;
+  }
+
+  /**
+   * 辅助方法：构建分期备注
+   */
+  private buildInstallmentNote(
+    baseNote: string,
+    current: number,
+    total: number
+  ): string {
+    const label = baseNote ? baseNote : "分期付款";
+    return `${label}: 第${current}/${total}期`;
   }
 
   /**
@@ -1413,6 +1236,30 @@ export class InstallmentController {
     }
 
     return next;
+  }
+
+  /**
+   * 辅助方法：获取状态文本
+   */
+  private getStatusText(status: string): string {
+    switch (status) {
+      case InstallmentStatus.PENDING:
+        return "待支付";
+      case InstallmentStatus.PAID:
+        return "已支付";
+      case InstallmentStatus.OVERDUE:
+        return "已逾期";
+      case InstallmentStatus.CANCELLED:
+        return "已取消";
+      case InstallmentPlanStatus.CANCELLED:
+        return "已取消";
+      case InstallmentPlanStatus.ACTIVE:
+        return "进行中";
+      case InstallmentPlanStatus.COMPLETED:
+        return "已完成";
+      default:
+        return status;
+    }
   }
 }
 

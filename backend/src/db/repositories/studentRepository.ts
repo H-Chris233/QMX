@@ -1,18 +1,21 @@
 import { db } from '../index';
 import { students, Student, NewStudent } from '../schema/students';
-import { eq, like, and, or, gte, lte, isNull, isNotNull, desc, asc, count } from 'drizzle-orm';
+import { eq, like, and, or, gte, lte, isNull, isNotNull, desc, asc, count, sql } from 'drizzle-orm';
 
 export interface StudentSearchOptions {
-  name_contains?: string;
-  min_age?: number;
-  max_age?: number;
-  class_type?: string;
+  nameContains?: string;
+  minAge?: number;
+  maxAge?: number;
+  minScore?: number;
+  maxScore?: number;
+  classType?: string;
   subject?: string;
-  has_membership?: boolean;
+  hasMembership?: boolean;
+  membershipActiveAt?: string;
   page?: number;
   limit?: number;
-  sort_by?: string;
-  sort_order?: 'ASC' | 'DESC';
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 export interface PaginationResult<T> {
@@ -76,7 +79,7 @@ export class StudentRepository {
   // 搜索
   static async search(options: StudentSearchOptions): Promise<Student[]> {
     const conditions = this.buildConditions(options);
-    const orderBy = this.buildOrderBy(options.sort_by, options.sort_order);
+    const orderBy = this.buildOrderBy(options.sortBy, options.sortOrder);
 
     let query = db.select().from(students);
 
@@ -84,17 +87,17 @@ export class StudentRepository {
       query = query.where(and(...conditions));
     }
 
-    return await query.orderBy(orderBy).limit(options.limit || 100);
+    return await query.orderBy(orderBy).limit(options.limit || 20);
   }
 
   // 分页查询
   static async findWithPagination(options: StudentSearchOptions): Promise<PaginationResult<Student>> {
     const page = options.page || 1;
-    const limit = options.limit || 10;
+    const limit = Math.min(options.limit || 20, 100);
     const offset = (page - 1) * limit;
 
     const conditions = this.buildConditions(options);
-    const orderBy = this.buildOrderBy(options.sort_by, options.sort_order);
+    const orderBy = this.buildOrderBy(options.sortBy, options.sortOrder);
 
     // 查询数据
     let dataQuery = db.select().from(students);
@@ -122,38 +125,58 @@ export class StudentRepository {
     };
   }
 
+  // 查找即将过期的会员
+  static async findExpiringMemberships(days: number): Promise<Student[]> {
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+
+    return await db
+      .select()
+      .from(students)
+      .where(
+        and(
+          isNotNull(students.membershipStartDate),
+          isNotNull(students.membershipEndDate),
+          gte(students.membershipEndDate, now.toISOString().split('T')[0]),
+          lte(students.membershipEndDate, futureDate.toISOString().split('T')[0])
+        )
+      )
+      .orderBy(asc(students.membershipEndDate));
+  }
+
   // 构建查询条件
   private static buildConditions(options: StudentSearchOptions) {
     const conditions = [];
 
-    if (options.name_contains) {
-      conditions.push(like(students.name, `%${options.name_contains}%`));
+    if (options.nameContains) {
+      conditions.push(like(students.name, `%${options.nameContains}%`));
     }
 
-    if (options.min_age !== undefined) {
-      conditions.push(gte(students.age, options.min_age));
+    if (options.minAge !== undefined) {
+      conditions.push(gte(students.age, options.minAge));
     }
 
-    if (options.max_age !== undefined) {
-      conditions.push(lte(students.age, options.max_age));
+    if (options.maxAge !== undefined) {
+      conditions.push(lte(students.age, options.maxAge));
     }
 
-    if (options.class_type) {
-      conditions.push(eq(students.classType, options.class_type));
+    if (options.classType) {
+      conditions.push(eq(students.classType, options.classType));
     }
 
     if (options.subject) {
       conditions.push(eq(students.subject, options.subject));
     }
 
-    if (options.has_membership === true) {
+    if (options.hasMembership === true) {
       conditions.push(
         and(
           isNotNull(students.membershipStartDate),
           isNotNull(students.membershipEndDate)
         )
       );
-    } else if (options.has_membership === false) {
+    } else if (options.hasMembership === false) {
       conditions.push(
         or(
           isNull(students.membershipStartDate),
