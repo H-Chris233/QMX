@@ -4,8 +4,8 @@ import logger from "@/utils/logger";
 import type { ClassType, SubjectType } from "@/types";
 import { AppError } from "@/utils/errors";
 import { StudentRepository } from "../db/repositories/studentRepository";
-import { StudentQuery } from "../services/studentQuery.new";
-import { presentStudent } from "../services/studentPresenter.new";
+import { StudentQuery } from "../services/studentQuery";
+import { presentStudent } from "../services/studentPresenter";
 
 const parseNumber = (value: unknown): number | null => {
   if (value === undefined || value === null || value === "") {

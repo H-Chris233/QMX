@@ -1,12 +1,16 @@
 import { Request, Response } from "express";
-import { Student } from "@/models/mongo";
-import { CashClass } from "@/models/CashMongo";
-import { Installment } from "@/models/InstallmentMongo";
-import { InstallmentPlan } from "@/models/InstallmentPlanMongo";
-import StatsService from "@/services/statsService";
 import { catchAsync } from "@/middleware/errorHandler";
 import logger from "@/utils/logger";
+import { StudentRepository } from "../db/repositories/studentRepository";
+import { CashRepository } from "../db/repositories/cashRepository";
+import {
+  InstallmentRepository,
+  InstallmentPlanRepository,
+} from "../db/repositories/installmentRepository";
+import StatsService from "@/services/statsService";
 import { PaymentFrequency } from "@/types";
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 const formatCurrency = (cents: number): number => {
   if (!Number.isFinite(cents)) {
@@ -15,7 +19,7 @@ const formatCurrency = (cents: number): number => {
   return Number((cents / 100).toFixed(2));
 };
 
-// 统计控制器 - 统一使用MongoDB数据源
+// 统计控制器 - 统一使用 PostgreSQL 数据源
 export class StatsController {
   // 获取仪表板统计数据
   public getDashboardStats = catchAsync(
@@ -140,7 +144,7 @@ export class StatsController {
   // 获取全局学员统计
   public getGlobalStudentStats = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const allStudents = await Student.findAll();
+      const allStudents = await StudentRepository.findAll();
 
       // 计算成绩统计
       let totalScore = 0;
@@ -151,7 +155,7 @@ export class StatsController {
       );
 
       studentsWithScores.forEach((student) => {
-        student.rings.forEach((score: number) => {
+        (student.rings || []).forEach((score: number) => {
           totalScore += score;
           scoreCount++;
           maxScore = Math.max(maxScore, score);
@@ -172,8 +176,8 @@ export class StatsController {
         (student) =>
           student.membershipStartDate &&
           student.membershipEndDate &&
-          student.membershipStartDate <= now &&
-          student.membershipEndDate >= now
+          new Date(student.membershipStartDate) <= now &&
+          new Date(student.membershipEndDate) >= now
       ).length;
 
       const responseData = {
@@ -197,49 +201,49 @@ export class StatsController {
   // 获取全局财务统计
   public getGlobalFinancialStats = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const transactions = await CashClass.findAll();
+      const transactions = await CashRepository.findAll();
 
       const totalRevenue = transactions
-        .filter((t) => t.isIncome())
-        .reduce((sum, t) => sum + t.getAmount(), 0);
+        .filter((t) => t.amount > 0)
+        .reduce((sum, t) => sum + t.amount, 0);
 
       const totalExpense = Math.abs(
         transactions
-          .filter((t) => !t.isIncome())
-          .reduce((sum, t) => sum + t.getAmount(), 0)
+          .filter((t) => t.amount < 0)
+          .reduce((sum, t) => sum + t.amount, 0)
       );
 
       const netIncome = totalRevenue - totalExpense;
 
       // 分期付款统计
-      const installmentPlans = await InstallmentPlan.findAll();
-      const overdueInstallments = await Installment.findOverdue();
+      const installmentPlans = await InstallmentPlanRepository.findAll();
+      const overdueInstallments = await InstallmentRepository.findOverdue();
 
       let totalInstallmentAmount = 0;
       let paidInstallmentAmount = 0;
 
       for (const plan of installmentPlans) {
-        totalInstallmentAmount += plan.total_amount / 100;
-        const installments = await Installment.findByPlanId(plan.uid);
+        totalInstallmentAmount += plan.totalAmount;
+        const installments = await InstallmentRepository.findByPlanId(plan.uid);
         for (const installment of installments) {
-          if (installment.status === "Paid") {
+          if (installment.status === "PAID") {
             paidInstallmentAmount +=
-              (installment.paid_amount || installment.installment_amount) / 100;
+              installment.paidAmount || installment.installmentAmount;
           }
         }
       }
 
       const responseData = {
-        total_income: Number(totalRevenue.toFixed(2)),
-        total_expense: Number(totalExpense.toFixed(2)),
-        net_income: Number(netIncome.toFixed(2)),
-        net_profit: Number(netIncome.toFixed(2)),
+        total_income: formatCurrency(totalRevenue),
+        total_expense: formatCurrency(totalExpense),
+        net_income: formatCurrency(netIncome),
+        net_profit: formatCurrency(netIncome),
         is_profitable: netIncome > 0,
         transaction_count: transactions.length,
-        installment_total: Number(totalInstallmentAmount.toFixed(2)),
-        installment_paid: Number(paidInstallmentAmount.toFixed(2)),
-        installment_pending: Number(
-          (totalInstallmentAmount - paidInstallmentAmount).toFixed(2)
+        installment_total: formatCurrency(totalInstallmentAmount),
+        installment_paid: formatCurrency(paidInstallmentAmount),
+        installment_pending: formatCurrency(
+          totalInstallmentAmount - paidInstallmentAmount
         ),
         overdue_count: overdueInstallments.length,
       };
@@ -261,32 +265,29 @@ export class StatsController {
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() + Number(days));
 
-      const allStudents = await Student.findAll();
-      const expiringStudents = allStudents
-        .filter((student) => {
-          if (!student.membershipEndDate) return false;
-          const endDate = new Date(student.membershipEndDate);
-          return endDate >= new Date() && endDate <= targetDate;
-        })
-        .sort((a, b) => {
-          const dateA = new Date(a.membershipEndDate!);
-          const dateB = new Date(b.membershipEndDate!);
-          return dateA.getTime() - dateB.getTime();
-        });
+      const expiringStudents = await StudentRepository.findExpiringMemberships(
+        Number(days)
+      );
 
       const responseData = expiringStudents.map((student) => {
-        const daysRemaining = student.getMembershipDaysRemaining();
+        const daysRemaining = student.membershipEndDate
+          ? Math.ceil(
+              (new Date(student.membershipEndDate).getTime() - new Date().getTime()) /
+                MS_PER_DAY
+            )
+          : null;
+
         return {
           uid: student.uid,
           name: student.name,
           phone: student.phone,
-          class: student.class,
+          class: student.classType,
           subject: student.subject,
           membership_end_date: student.membershipEndDate,
           days_remaining: daysRemaining,
-          is_membership_active: student.hasMembership(),
+          is_membership_active: daysRemaining !== null && daysRemaining > 0,
           membership_status:
-            daysRemaining && daysRemaining <= 7 ? "即将到期" : "正常",
+            daysRemaining !== null && daysRemaining <= 7 ? "即将到期" : "正常",
         };
       });
 
@@ -463,47 +464,37 @@ export class StatsController {
 
         switch (trendMetric) {
           case "revenue": {
-            const { data: revenueTransactions } = await CashClass.search({
-              dateFrom: point.rangeStart,
-              dateTo: point.rangeEnd,
-              isIncome: true,
-              limit: 200,
-              page: 1,
-            });
-            const totalRevenue = revenueTransactions.reduce<number>(
-              (sum, transaction) => sum + transaction.getAmount(),
-              0
+            const stats = await CashRepository.getFinancialStats(
+              point.rangeStart.toISOString(),
+              point.rangeEnd.toISOString()
             );
-            rawValue = totalRevenue;
+            rawValue = stats.totalIncome;
             break;
           }
           case "expense": {
-            const { data: expenseTransactions } = await CashClass.search({
-              dateFrom: point.rangeStart,
-              dateTo: point.rangeEnd,
-              isIncome: false,
-              limit: 200,
-              page: 1,
-            });
-            const totalExpense = expenseTransactions.reduce<number>(
-              (sum, transaction) => sum + transaction.getAmount(),
-              0
+            const stats = await CashRepository.getFinancialStats(
+              point.rangeStart.toISOString(),
+              point.rangeEnd.toISOString()
             );
-            rawValue = totalExpense;
+            rawValue = stats.totalExpense;
             break;
           }
           case "students": {
-            const count = await Student.count({
-              createdAt: { $gte: point.rangeStart, $lte: point.rangeEnd },
-            });
+            const allStudents = await StudentRepository.findAll();
+            const count = allStudents.filter(student => {
+              const createdAt = student.createdAt ? new Date(student.createdAt) : new Date();
+              return createdAt >= point.rangeStart && createdAt <= point.rangeEnd;
+            }).length;
             rawValue = count;
             break;
           }
           case "installments": {
-            const installmentPlans = await InstallmentPlan.search({
-              created_at: { $gte: point.rangeStart, $lte: point.rangeEnd },
-            });
-            rawValue = installmentPlans.length;
+            const allPlans = await InstallmentPlanRepository.findAll();
+            const count = allPlans.filter(plan => {
+              const createdAt = plan.createdAt ? new Date(plan.createdAt) : new Date();
+              return createdAt >= point.rangeStart && createdAt <= point.rangeEnd;
+            }).length;
+            rawValue = count;
             break;
           }
         }
@@ -582,7 +573,7 @@ export class StatsController {
   // 获取课程分布统计
   public getCourseDistribution = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const allStudents = await Student.findAll();
+      const allStudents = await StudentRepository.findAll();
 
       // 按班级统计
       const classDistribution = new Map<string, number>();
@@ -590,7 +581,7 @@ export class StatsController {
       const subjectDistribution = new Map<string, number>();
 
       allStudents.forEach((student) => {
-        const className = student.class || "Others";
+        const className = student.classType || "Others";
         const subjectName = student.subject || "Others";
 
         classDistribution.set(
@@ -636,7 +627,7 @@ export class StatsController {
   // 获取成绩分布统计
   public getScoreDistribution = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const allStudents = await Student.findAll();
+      const allStudents = await StudentRepository.findAll();
 
       const scoreRanges = [
         { label: "0-4分", min: 0, max: 4, count: 0 },
@@ -697,34 +688,37 @@ export class StatsController {
   // 获取逾期分期付款统计
   public getOverdueInstallments = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const overdueInstallments = await Installment.findOverdue();
+      const overdueInstallments = await InstallmentRepository.findOverdue();
 
       const responseData = await Promise.all(
         overdueInstallments.map(async (installment) => {
-          const plan = await InstallmentPlan.findByUid(installment.plan_id);
-          const student = plan?.student_id
-            ? await Student.findByUid(plan.student_id)
+          const plan = await InstallmentPlanRepository.findByUid(installment.planId);
+          const student = plan?.studentId
+            ? await StudentRepository.findByUid(plan.studentId)
             : null;
+
+          const daysOverdue = InstallmentRepository.getDaysOverdue(installment);
+          const overdueAmount =
+            (installment.installmentAmount / 100) *
+            (1 + daysOverdue * 0.01);
 
           return {
             uid: installment.uid,
-            plan_id: installment.plan_id,
-            current_installment: installment.current_installment,
-            total_installments: installment.total_installments,
-            installment_amount: installment.installment_amount / 100,
-            due_date: installment.due_date,
-            days_overdue: installment.getDaysOverdue(),
-            overdue_amount:
-              (installment.installment_amount / 100) *
-              (1 + installment.getDaysOverdue() * 0.01),
+            plan_id: installment.planId,
+            current_installment: installment.installmentNumber,
+            total_installments: installment.totalInstallments,
+            installment_amount: installment.installmentAmount / 100,
+            due_date: installment.dueDate,
+            days_overdue: daysOverdue,
+            overdue_amount: overdueAmount,
             plan: plan
               ? {
                   frequency: plan.frequency,
                   frequency_text: this.getFrequencyText(
                     plan.frequency,
-                    plan.custom_days
+                    plan.customDays
                   ),
-                  total_amount: plan.total_amount / 100,
+                  total_amount: plan.totalAmount / 100,
                 }
               : null,
             student: student

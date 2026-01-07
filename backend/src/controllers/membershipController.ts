@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import { Student, IStudentDoc } from '@/models/mongo';
 import { IApiResponse, MembershipStatus } from '@/types';
 import { catchAsync } from '@/middleware/errorHandler';
 import logger from '@/utils/logger';
-import { StudentUpdater } from '@/services/studentUpdater';
-import { presentStudent, type PresentedStudent } from '@/services/studentPresenter';
+import { StudentRepository } from '../db/repositories/studentRepository';
 import { AppError } from '@/utils/errors';
+import type { Student } from '../db/schema/students';
+import { presentStudent } from '../services/studentPresenter';
 
 type MembershipType = 'month' | 'year';
 
@@ -34,6 +34,28 @@ const normalizeMembershipStatus = (value: unknown): MembershipStatus => {
   return MembershipStatus.NONE;
 };
 
+interface PresentedStudent {
+  uid: number;
+  name: string;
+  phone: string | null;
+  classType: string;
+  subject: string;
+  lessonLeft: number | null;
+  rings: number[];
+  note: string | null;
+  membershipStartDate: string | null;
+  membershipEndDate: string | null;
+  membershipStatus: MembershipStatus;
+  membership_status: MembershipStatus;
+  isMembershipActive: boolean;
+  is_membership_active: boolean;
+  membershipDaysRemaining: number | null;
+  membership_days_remaining: number | null;
+  averageScore: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface MembershipResponseBase {
   uid: number;
   name: string;
@@ -51,19 +73,18 @@ interface MembershipResponseBase {
 }
 
 const buildMembershipResponse = <T extends Record<string, unknown> = Record<string, never>>(
-  student: IStudentDoc,
+  student: Student,
   extra?: T,
 ): MembershipResponseBase & T => {
-  const presentedStudent = presentStudent(student);
+  const presentedStudent = presentStudent(student) as PresentedStudent;
 
   const membershipStatus = normalizeMembershipStatus(presentedStudent.membershipStatus);
   const membershipStartDate = presentedStudent.membershipStartDate ?? null;
   const membershipEndDate = presentedStudent.membershipEndDate ?? null;
   const isMembershipActive = typeof presentedStudent.isMembershipActive === 'boolean'
     ? presentedStudent.isMembershipActive
-    : student.hasMembership();
-  const membershipDaysRemaining = presentedStudent.membershipDaysRemaining
-    ?? student.getMembershipDaysRemaining();
+    : membershipStatus === MembershipStatus.ACTIVE;
+  const membershipDaysRemaining = presentedStudent.membershipDaysRemaining ?? null;
 
   const normalizedStudent: PresentedStudent = {
     ...presentedStudent,
@@ -104,19 +125,29 @@ export class MembershipController {
     const { id } = req.params;
     const { startDate, endDate } = req.body;
 
-    const student = await Student.findByUid(Number(id));
+    const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
       throw AppError.notFound('学员不存在');
     }
 
-    const updater = StudentUpdater.fromDocument(student);
-    const membershipPayload = startDate === null && endDate === null ? null : { startDate, endDate };
-    updater.membership(membershipPayload);
-    const updatedStudent = await updater.commit();
+    const updateData: any = {};
+    if (startDate === null && endDate === null) {
+      updateData.membershipStartDate = null;
+      updateData.membershipEndDate = null;
+    } else {
+      updateData.membershipStartDate = startDate ? new Date(startDate).toISOString().split('T')[0] : null;
+      updateData.membershipEndDate = endDate ? new Date(endDate).toISOString().split('T')[0] : null;
+    }
+
+    const updatedStudent = await StudentRepository.updateByUid(Number(id), updateData);
+
+    if (!updatedStudent) {
+      throw AppError.notFound('学员不存在');
+    }
 
     const responseData = buildMembershipResponse(updatedStudent, {
-      updated_at: updatedStudent.updatedAt,
+      updated_at: updatedStudent.updatedAt || new Date().toISOString(),
     });
 
     const response: IApiResponse<typeof responseData> = {
@@ -132,18 +163,23 @@ export class MembershipController {
   public clearStudentMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
 
-    const student = await Student.findByUid(Number(id));
+    const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
       throw AppError.notFound('学员不存在');
     }
 
-    const updater = StudentUpdater.fromDocument(student);
-    updater.membership(null);
-    const updatedStudent = await updater.commit();
+    const updatedStudent = await StudentRepository.updateByUid(Number(id), {
+      membershipStartDate: null,
+      membershipEndDate: null,
+    });
+
+    if (!updatedStudent) {
+      throw AppError.notFound('学员不存在');
+    }
 
     const responseData = buildMembershipResponse(updatedStudent, {
-      cleared_at: updatedStudent.updatedAt,
+      cleared_at: updatedStudent.updatedAt || new Date().toISOString(),
     });
 
     const response: IApiResponse<typeof responseData> = {
@@ -164,7 +200,7 @@ export class MembershipController {
       throw AppError.invalidInput('会员类型无效，只支持 month 或 year');
     }
 
-    const student = await Student.findByUid(Number(id));
+    const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
       throw AppError.notFound('学员不存在');
@@ -172,18 +208,23 @@ export class MembershipController {
 
     const now = new Date();
     const startDate = startFromToday ? now : new Date(now.getFullYear(), now.getMonth(), 1);
-    const { startDate: periodStart, endDate: periodEnd } = calculateMembershipPeriod(membershipType, startDate);
+    const { startDate: periodStart, endDate: periodEnd } = calculateMembershipPeriod(membershipType as MembershipType, startDate);
 
-    const updater = StudentUpdater.fromDocument(student);
-    updater.membership({ startDate: periodStart, endDate: periodEnd });
-    const updatedStudent = await updater.commit();
+    const updatedStudent = await StudentRepository.updateByUid(Number(id), {
+      membershipStartDate: periodStart.toISOString().split('T')[0],
+      membershipEndDate: periodEnd.toISOString().split('T')[0],
+    });
+
+    if (!updatedStudent) {
+      throw AppError.notFound('学员不存在');
+    }
 
     const typeText = membershipType === 'month' ? '月卡' : '年卡';
     const responseData = buildMembershipResponse(updatedStudent, {
       membership_type: membershipType,
       membership_type_text: typeText,
       duration_days: Math.ceil((periodEnd.getTime() - periodStart.getTime()) / MS_PER_DAY),
-      updated_at: updatedStudent.updatedAt,
+      updated_at: updatedStudent.updatedAt || new Date().toISOString(),
     });
 
     const response: IApiResponse<typeof responseData> = {
@@ -204,7 +245,7 @@ export class MembershipController {
       throw AppError.invalidInput('会员类型无效，只支持 month 或 year');
     }
 
-    const student = await Student.findByUid(Number(id));
+    const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
       throw AppError.notFound('学员不存在');
@@ -218,21 +259,26 @@ export class MembershipController {
       renewalStart = new Date();
     }
 
-    const { endDate: renewalEnd } = calculateMembershipPeriod(membershipType, renewalStart);
+    const { endDate: renewalEnd } = calculateMembershipPeriod(membershipType as MembershipType, renewalStart);
     const membershipStart = student.membershipStartDate ?? renewalStart;
 
-    const updater = StudentUpdater.fromDocument(student);
-    updater.membership({ startDate: membershipStart, endDate: renewalEnd });
-    const updatedStudent = await updater.commit();
+    const updatedStudent = await StudentRepository.updateByUid(Number(id), {
+      membershipStartDate: membershipStart instanceof Date ? membershipStart.toISOString().split('T')[0] : membershipStart,
+      membershipEndDate: renewalEnd.toISOString().split('T')[0],
+    });
+
+    if (!updatedStudent) {
+      throw AppError.notFound('学员不存在');
+    }
 
     const typeText = membershipType === 'month' ? '月卡' : '年卡';
     const responseData = buildMembershipResponse(updatedStudent, {
       membership_type: membershipType,
       membership_type_text: typeText,
-      renewal_start_date: renewalStart,
-      renewal_end_date: renewalEnd,
+      renewal_start_date: renewalStart.toISOString(),
+      renewal_end_date: renewalEnd.toISOString(),
       duration_days: Math.ceil((renewalEnd.getTime() - renewalStart.getTime()) / MS_PER_DAY),
-      renewed_at: updatedStudent.updatedAt,
+      renewed_at: updatedStudent.updatedAt || new Date().toISOString(),
     });
 
     const response: IApiResponse<typeof responseData> = {
@@ -258,9 +304,10 @@ export class MembershipController {
 
     const results: Array<Record<string, unknown>> = [];
     const now = new Date();
+    const startDate = startFromToday ? now : new Date(now.getFullYear(), now.getMonth(), 1);
 
     for (const studentId of studentIds) {
-      const student = await Student.findByUid(Number(studentId));
+      const student = await StudentRepository.findByUid(Number(studentId));
       if (!student) {
         results.push({
           uid: studentId,
@@ -271,11 +318,15 @@ export class MembershipController {
       }
 
       try {
-        const startDate = startFromToday ? now : new Date(now.getFullYear(), now.getMonth(), 1);
-        const { startDate: periodStart, endDate: periodEnd } = calculateMembershipPeriod(membershipType, startDate);
-        const updater = StudentUpdater.fromDocument(student);
-        updater.membership({ startDate: periodStart, endDate: periodEnd });
-        const updatedStudent = await updater.commit();
+        const { startDate: periodStart, endDate: periodEnd } = calculateMembershipPeriod(membershipType as MembershipType, startDate);
+        const updatedStudent = await StudentRepository.updateByUid(Number(studentId), {
+          membershipStartDate: periodStart.toISOString().split('T')[0],
+          membershipEndDate: periodEnd.toISOString().split('T')[0],
+        });
+
+        if (!updatedStudent) {
+          throw new Error('更新失败');
+        }
 
         results.push({
           uid: updatedStudent.uid,
@@ -320,31 +371,42 @@ export class MembershipController {
   public getMembershipStats = catchAsync(async (_req: Request, res: Response): Promise<void> => {
     const now = new Date();
 
-    const totalMembers = await Student.count({
-      membershipStartDate: { $exists: true, $ne: null },
-      membershipEndDate: { $exists: true, $ne: null },
-    });
+    // 总会员数（有会员日期的）
+    const allStudents = await StudentRepository.findAll();
+    const totalMembers = allStudents.filter(
+      s => s.membershipStartDate && s.membershipEndDate
+    ).length;
 
-    const activeMembers = await Student.count({
-      membershipStartDate: { $lte: now },
-      membershipEndDate: { $gte: now },
-    });
+    // 活跃会员数
+    const activeMembers = allStudents.filter(student => {
+      if (!student.membershipStartDate || !student.membershipEndDate) {
+        return false;
+      }
+      const start = new Date(student.membershipStartDate);
+      const end = new Date(student.membershipEndDate);
+      return now >= start && now <= end;
+    }).length;
 
-    const thirtyDaysLater = new Date(now);
+    // 30天内到期会员数
+    const thirtyDaysLater = new Date();
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
 
-    const expiringSoon = await Student.count({
-      membershipEndDate: {
-        $gte: now,
-        $lte: thirtyDaysLater,
-      },
-      membershipStartDate: { $exists: true, $ne: null },
-    });
+    const expiringSoon = allStudents.filter(student => {
+      if (!student.membershipEndDate || !student.membershipStartDate) {
+        return false;
+      }
+      const endDate = new Date(student.membershipEndDate);
+      return endDate >= now && endDate <= thirtyDaysLater;
+    }).length;
 
-    const expiredMembers = await Student.count({
-      membershipEndDate: { $lt: now },
-      membershipStartDate: { $exists: true, $ne: null },
-    });
+    // 已过期会员数
+    const expiredMembers = allStudents.filter(student => {
+      if (!student.membershipEndDate || !student.membershipStartDate) {
+        return false;
+      }
+      const endDate = new Date(student.membershipEndDate);
+      return endDate < now;
+    }).length;
 
     const responseData = {
       total_members: totalMembers,

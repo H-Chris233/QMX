@@ -1,9 +1,4 @@
 import { Request, Response } from "express";
-import { CashClass, ICashDoc } from "@/models/CashMongo";
-import { Student } from "@/models/mongo";
-import { Installment } from "@/models/InstallmentMongo";
-import { InstallmentPlan } from "@/models/InstallmentPlanMongo";
-import { InstallmentPlanStatus } from "@/types";
 import { catchAsync } from "@/middleware/errorHandler";
 import {
   CashBuilder,
@@ -13,31 +8,29 @@ import {
 import {
   InstallmentStatus,
   PaymentFrequency,
+  InstallmentPlanStatus,
   IApiResponse,
   IPaginatedResponse,
 } from "@/types";
 import type { ICashSearchOptions } from "@/types";
-import type { PipelineStage } from "mongoose";
 import logger from "@/utils/logger";
 import { AppError } from "@/utils/errors";
-
-interface CashStatsAggregate {
-  _id: null;
-  total_income: number;
-  total_expense: number;
-  transaction_count: number;
-  total_transactions: unknown[];
-}
-
-interface StudentIncomeAggregate {
-  _id: number;
-  amount: number;
-}
+import { CashRepository } from "../db/repositories/cashRepository";
+import { StudentRepository } from "../db/repositories/studentRepository";
+import {
+  InstallmentRepository,
+  InstallmentPlanRepository,
+} from "../db/repositories/installmentRepository";
+import type {
+  CashTransaction,
+  InstallmentPlan,
+  Installment,
+} from "../db/schema";
 
 interface StudentIncomeSummary {
-  student_id: number;
-  amount: number;
+  studentId: number;
   student_name: string;
+  amount: number;
 }
 
 interface FinancialStatsResponse {
@@ -54,13 +47,13 @@ interface FinancialStatsResponse {
 
 const CASH_SORT_FIELDS = [
   "uid",
-  "student_id",
-  "cash",
+  "studentId",
+  "amount",
   "created_at",
   "updated_at",
 ] as const;
 type CashSortField = (typeof CASH_SORT_FIELDS)[number];
-type CashSortOrder = NonNullable<ICashSearchOptions["sortOrder"]>;
+type CashSortOrder = "ASC" | "DESC";
 const isCashSortField = (value: unknown): value is CashSortField =>
   typeof value === "string" &&
   (CASH_SORT_FIELDS as readonly string[]).includes(value);
@@ -69,9 +62,7 @@ const normalizeCashSortOrder = (value: unknown): CashSortOrder | undefined => {
     return undefined;
   }
   const upper = value.toUpperCase();
-  return upper === "ASC" || upper === "DESC"
-    ? (upper as CashSortOrder)
-    : undefined;
+  return upper === "ASC" || upper === "DESC" ? (upper as CashSortOrder) : undefined;
 };
 
 const INSTALLMENT_PLAN_SORT_FIELDS = [
@@ -93,7 +84,8 @@ export class CashController {
   // 获取所有交易记录
   public getAllTransactions = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const result = await CashClass.search(this.buildSearchOptions(req.query));
+      const options = this.buildSearchOptions(req.query);
+      const result = await CashRepository.findWithPagination(options);
 
       const responseData = result.data.map((transaction) =>
         this.presentTransaction(transaction)
@@ -103,14 +95,14 @@ export class CashController {
         success: true,
         data: responseData,
         pagination: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalPages: Math.ceil(result.total / result.limit),
+          page: result.pagination.page,
+          limit: result.pagination.limit,
+          total: result.pagination.total,
+          totalPages: result.pagination.total_pages,
         },
       };
 
-      logger.info(`获取交易记录成功，共 ${result.total} 条记录`);
+      logger.info(`获取交易记录成功，共 ${result.pagination.total} 条记录`);
       res.json(response);
     }
   );
@@ -143,7 +135,7 @@ export class CashController {
       logger.info(
         `添加交易记录成功，UID: ${
           transaction.uid
-        }, 金额: ${transaction.getFormattedAmount()}`
+        }, 金额: ¥${this.formatAmount(transaction.amount)}`
       );
       res.status(201).json(response);
     }
@@ -164,7 +156,7 @@ export class CashController {
 
       // 验证学员是否存在
       if (student_id !== null && student_id !== undefined) {
-        const student = await Student.findByUid(Number(student_id));
+        const student = await StudentRepository.findByUid(Number(student_id));
         if (!student) {
           throw AppError.invalidInput("指定的学员不存在");
         }
@@ -177,10 +169,7 @@ export class CashController {
       }
 
       const totalInstallmentsInt = Number(total_installments);
-      if (
-        !Number.isInteger(totalInstallmentsInt) ||
-        totalInstallmentsInt <= 0
-      ) {
+      if (!Number.isInteger(totalInstallmentsInt) || totalInstallmentsInt <= 0) {
         throw AppError.invalidInput("总期数必须为正整数");
       }
 
@@ -205,38 +194,42 @@ export class CashController {
         const totalAmountCents = convertAmountToCents(total_amount);
         const sanitizedNote = normalizeNote(note);
 
-        const installmentPlan = await InstallmentPlan.create({
-          student_id: student_id !== undefined ? Number(student_id) : null,
-          total_amount: totalAmountCents,
-          total_installments: totalInstallmentsInt,
+        const installmentPlan = await InstallmentPlanRepository.create({
+          studentId: student_id !== undefined ? Number(student_id) : null,
+          totalAmount: totalAmountCents,
+          totalInstallments: totalInstallmentsInt,
           frequency: normalizedFrequency,
-          custom_days: customDaysValue ?? undefined,
-          start_date: startDateValue,
+          customDays: customDaysValue ?? undefined,
+          startDate: startDateValue,
           note: sanitizedNote,
           status: InstallmentPlanStatus.ACTIVE,
         });
 
-        const installments = [];
+        const installmentsToCreate = [];
         let dueDateCursor = new Date(startDateValue);
 
         for (let i = 1; i <= totalInstallmentsInt; i++) {
           const dueDate = new Date(dueDateCursor);
-          const amountForInstallment = installmentPlan.getInstallmentAmount(i);
+          const amountForInstallment = InstallmentPlanRepository.calculateInstallmentAmount(
+            totalAmountCents,
+            totalInstallmentsInt,
+            i
+          );
 
-          const installment = await Installment.create({
-            plan_id: installmentPlan.uid,
-            current_installment: i,
-            total_installments: totalInstallmentsInt,
-            installment_amount: amountForInstallment,
-            due_date: dueDate,
+          const installmentData = {
+            planId: installmentPlan.uid,
+            installmentNumber: i,
+            totalInstallments: totalInstallmentsInt,
+            installmentAmount: amountForInstallment,
+            dueDate: dueDate,
             status:
               i === 1 ? InstallmentStatus.PAID : InstallmentStatus.PENDING,
-            paid_amount: i === 1 ? amountForInstallment : undefined,
-            paid_at: i === 1 ? new Date() : undefined,
-            student_id: installmentPlan.student_id ?? null,
-          });
+            paidAmount: i === 1 ? amountForInstallment : undefined,
+            paidDate: i === 1 ? new Date() : undefined,
+            studentId: installmentPlan.studentId ?? null,
+          };
+          installmentsToCreate.push(installmentData);
 
-          installments.push(installment);
           dueDateCursor = this.calculateNextDueDate(
             dueDateCursor,
             normalizedFrequency,
@@ -244,38 +237,42 @@ export class CashController {
           );
         }
 
-        const firstInstallment = installments[0];
+        const createdInstallments = await InstallmentRepository.createMany(
+          installmentsToCreate as any
+        );
+
+        const firstInstallment = createdInstallments[0];
         const firstInstallmentAmount = firstInstallment
-          ? this.formatAmount(firstInstallment.installment_amount)
+          ? firstInstallment.installmentAmount / 100
           : this.formatAmount(
               Math.round(totalAmountCents / totalInstallmentsInt)
             );
 
         const transaction = await CashBuilder.create()
-          .amount(firstInstallmentAmount)
           .studentId(student_id ?? null)
+          .amount(firstInstallmentAmount)
           .note(
             this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt)
           )
           .installment({
             plan_uid: installmentPlan.uid,
             installment_uid: firstInstallment?.uid ?? null,
-            installment_number: firstInstallment?.current_installment ?? 1,
+            installment_number: firstInstallment?.installmentNumber ?? 1,
             total_installments: totalInstallmentsInt,
-            due_date: firstInstallment?.due_date ?? startDateValue,
+            due_date: firstInstallment?.dueDate ?? startDateValue,
             status: InstallmentStatus.PAID,
             note: sanitizedNote ?? undefined,
           })
           .build();
 
         if (firstInstallment) {
-          await Installment.updateByUid(firstInstallment.uid, {
-            cash_uid: transaction.uid,
+          await InstallmentRepository.updateByUid(firstInstallment.uid, {
+            cashUid: transaction.uid,
           });
         }
 
         if (totalInstallmentsInt === 1) {
-          await InstallmentPlan.updateByUid(installmentPlan.uid, {
+          await InstallmentPlanRepository.updateByUid(installmentPlan.uid, {
             status: InstallmentPlanStatus.COMPLETED,
           });
           installmentPlan.status = InstallmentPlanStatus.COMPLETED;
@@ -285,24 +282,24 @@ export class CashController {
           transaction: this.presentTransaction(transaction),
           plan: {
             uid: installmentPlan.uid,
-            student_id: installmentPlan.student_id,
-            total_amount: this.formatAmount(installmentPlan.total_amount),
-            total_installments: installmentPlan.total_installments,
+            student_id: installmentPlan.studentId,
+            total_amount: this.formatAmount(installmentPlan.totalAmount),
+            total_installments: installmentPlan.totalInstallments,
             frequency: installmentPlan.frequency,
-            custom_days: installmentPlan.custom_days,
-            start_date: installmentPlan.start_date,
+            custom_days: installmentPlan.customDays,
+            start_date: installmentPlan.startDate,
             status: installmentPlan.status,
             note: sanitizedNote,
           },
-          installments: installments.map((inst) => ({
+          installments: createdInstallments.map((inst) => ({
             uid: inst.uid,
-            current_installment: inst.current_installment,
-            total_installments: inst.total_installments,
-            installment_amount: this.formatAmount(inst.installment_amount),
-            due_date: inst.due_date,
+            current_installment: inst.installmentNumber,
+            total_installments: inst.totalInstallments,
+            installment_amount: this.formatAmount(inst.installmentAmount),
+            due_date: inst.dueDate,
             status: inst.status,
-            paid_amount: this.formatAmount(inst.paid_amount ?? 0),
-            paid_at: inst.paid_at,
+            paid_amount: this.formatAmount(inst.paidAmount ?? 0),
+            paid_date: inst.paidDate,
           })),
         };
 
@@ -331,13 +328,13 @@ export class CashController {
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
 
-      const transaction = await CashClass.findByUid(Number(id));
+      const transaction = await CashRepository.findByUid(Number(id));
 
       if (!transaction) {
         throw AppError.notFound("交易记录不存在");
       }
 
-      const deleted = await CashClass.deleteByUid(Number(id));
+      const deleted = await CashRepository.deleteByUid(Number(id));
 
       if (!deleted) {
         throw AppError.other("删除交易记录失败");
@@ -356,7 +353,8 @@ export class CashController {
   // 搜索现金记录
   public searchCash = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const result = await CashClass.search(this.buildSearchOptions(req.query));
+      const options = this.buildSearchOptions(req.query);
+      const result = await CashRepository.findWithPagination(options);
 
       const responseData = result.data.map((transaction) =>
         this.presentTransaction(transaction)
@@ -366,14 +364,14 @@ export class CashController {
         success: true,
         data: responseData,
         pagination: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalPages: Math.ceil(result.total / result.limit),
+          page: result.pagination.page,
+          limit: result.pagination.limit,
+          total: result.pagination.total,
+          totalPages: result.pagination.total_pages,
         },
       };
 
-      logger.info(`搜索现金记录完成，找到 ${result.total} 条记录`);
+      logger.info(`搜索现金记录完成，找到 ${result.pagination.total} 条记录`);
       res.json(response);
     }
   );
@@ -383,15 +381,15 @@ export class CashController {
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
 
-      const transaction = await CashClass.findByUid(Number(id));
+      const transaction = await CashRepository.findByUid(Number(id));
 
       if (!transaction) {
         throw AppError.notFound("交易记录不存在");
       }
 
       let student = null;
-      if (transaction.student_id) {
-        student = await Student.findByUid(transaction.student_id);
+      if (transaction.studentId) {
+        student = await StudentRepository.findByUid(transaction.studentId);
       }
 
       const responseData = this.presentTransaction(transaction, {
@@ -400,7 +398,7 @@ export class CashController {
               uid: student.uid,
               name: student.name,
               phone: student.phone,
-              class: student.class,
+              class: student.classType,
               subject: student.subject,
             }
           : null,
@@ -417,30 +415,30 @@ export class CashController {
     }
   );
 
-  private buildSearchOptions(query: Record<string, any>): ICashSearchOptions {
-    const options: ICashSearchOptions = {};
+  private buildSearchOptions(query: Record<string, any>): any {
+    const options: any = {};
 
     const student = query.studentId ?? query.student_id;
     if (student !== undefined && student !== null && student !== "") {
-      options.studentId = Number(student);
+      options.student_id = Number(student);
     }
 
     const minAmount = query.minAmount ?? query.min_amount;
     if (minAmount !== undefined && minAmount !== null && minAmount !== "") {
-      options.minAmount = Number(minAmount);
+      options.min_amount = Math.round(Number(minAmount) * 100); // 转换为分
     }
 
     const maxAmount = query.maxAmount ?? query.max_amount;
     if (maxAmount !== undefined && maxAmount !== null && maxAmount !== "") {
-      options.maxAmount = Number(maxAmount);
+      options.max_amount = Math.round(Number(maxAmount) * 100); // 转换为分
     }
 
     const incomeFlag = query.isIncome ?? query.is_income;
     if (incomeFlag !== undefined && incomeFlag !== null && incomeFlag !== "") {
       if (incomeFlag === true || incomeFlag === "true") {
-        options.isIncome = true;
+        options.is_income = true;
       } else if (incomeFlag === false || incomeFlag === "false") {
-        options.isIncome = false;
+        options.is_income = false;
       }
     }
 
@@ -451,20 +449,20 @@ export class CashController {
       installmentFlag !== ""
     ) {
       if (installmentFlag === true || installmentFlag === "true") {
-        options.hasInstallment = true;
+        options.has_installment = true;
       } else if (installmentFlag === false || installmentFlag === "false") {
-        options.hasInstallment = false;
+        options.has_installment = false;
       }
     }
 
     const dateFrom = query.dateFrom ?? query.date_from;
     if (dateFrom) {
-      options.dateFrom = dateFrom;
+      options.date_from = dateFrom;
     }
 
     const dateTo = query.dateTo ?? query.date_to;
     if (dateTo) {
-      options.dateTo = dateTo;
+      options.date_to = dateTo;
     }
 
     const pageValue = query.page;
@@ -479,59 +477,62 @@ export class CashController {
 
     const sortByCandidate = query.sortBy ?? query.sort_by;
     if (isCashSortField(sortByCandidate)) {
-      options.sortBy = sortByCandidate;
+      options.sort_by = sortByCandidate;
     }
 
     const sortOrderCandidate = query.sortOrder ?? query.sort_order;
     const normalizedSortOrder = normalizeCashSortOrder(sortOrderCandidate);
     if (normalizedSortOrder) {
-      options.sortOrder = normalizedSortOrder;
+      options.sort_order = normalizedSortOrder;
     }
 
     return options;
   }
 
   private presentTransaction(
-    transaction: ICashDoc,
+    transaction: CashTransaction,
     overrides: Record<string, unknown> = {}
   ) {
-    const amount = transaction.getAmount();
-    const formattedAmount = transaction.getFormattedAmount();
-    const isIncome = transaction.isIncome();
+    const amountYuan = transaction.amount / 100;
+    const isIncome = transaction.amount > 0;
 
     const base = {
       uid: transaction.uid,
-      student_id: transaction.student_id,
-      studentId: transaction.student_id,
+      student_id: transaction.studentId,
+      studentId: transaction.studentId,
       student_name: null as string | null,
       student: null as Record<string, unknown> | null,
-      cash: transaction.cash,
-      amount_in_cents: transaction.cash,
-      amountInCents: transaction.cash,
-      amount,
+      cash: transaction.amount,
+      amount_in_cents: transaction.amount,
+      amountInCents: transaction.amount,
+      amount: amountYuan,
       description: this.getTransactionDescription(transaction),
       note: transaction.note,
       is_income: isIncome,
       isIncome,
       is_expense: !isIncome,
       isExpense: !isIncome,
-      formatted_amount: formattedAmount,
-      formattedAmount,
-      installment: transaction.installment ?? null,
-      created_at: transaction.created_at,
-      createdAt: transaction.created_at,
-      updated_at: transaction.updated_at,
-      updatedAt: transaction.updated_at,
+      formatted_amount: isIncome
+        ? `+¥${amountYuan.toFixed(2)}`
+        : `-¥${Math.abs(amountYuan).toFixed(2)}`,
+      formattedAmount: isIncome
+        ? `+¥${amountYuan.toFixed(2)}`
+        : `-¥${Math.abs(amountYuan).toFixed(2)}`,
+      installment: transaction.installmentSnapshot ?? null,
+      created_at: transaction.createdAt?.toISOString() || '',
+      createdAt: transaction.createdAt,
+      updated_at: transaction.updatedAt?.toISOString() || '',
+      updatedAt: transaction.updatedAt,
     };
 
     return { ...base, ...overrides };
   }
 
   // 私有辅助方法：获取交易描述
-  private getTransactionDescription(transaction: ICashDoc): string {
-    const amount = transaction.getAmount();
-    const prefix = transaction.isIncome() ? "收入" : "支出";
-    return `${prefix} ¥${amount.toFixed(2)}`;
+  private getTransactionDescription(transaction: CashTransaction): string {
+    const amountYuan = transaction.amount / 100;
+    const prefix = transaction.amount > 0 ? "收入" : "支出";
+    return `${prefix} ¥${amountYuan.toFixed(2)}`;
   }
 
   private normalizeFrequency(value: unknown): PaymentFrequency | null {
@@ -626,80 +627,32 @@ export class CashController {
           dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
       }
 
-      // 使用聚合管道优化查询，只获取需要的字段并计算统计信息
-      const pipeline: PipelineStage[] = [
-        { $match: { created_at: { $gte: dateFrom } } },
-        {
-          $group: {
-            _id: null,
-            total_income: {
-              $sum: {
-                $cond: [
-                  { $gt: ["$cash", 0] },
-                  { $divide: [{ $abs: "$cash" }, 100] },
-                  0,
-                ],
-              },
-            },
-            total_expense: {
-              $sum: {
-                $cond: [
-                  { $lt: ["$cash", 0] },
-                  { $divide: [{ $abs: "$cash" }, 100] },
-                  0,
-                ],
-              },
-            },
-            transaction_count: { $sum: 1 },
-            total_transactions: { $push: "$ROOT" },
-          },
-        },
-      ];
+      const dateFromStr = dateFrom.toISOString();
+      const dateToStr = now.toISOString();
 
-      const statsResults = await CashClass.aggregate<CashStatsAggregate>(
-        pipeline
-      ).exec();
-      const stats: CashStatsAggregate = statsResults[0] ?? {
-        _id: null,
-        total_income: 0,
-        total_expense: 0,
-        transaction_count: 0,
-        total_transactions: [],
-      };
+      // 使用 PostgreSQL 聚合查询
+      const stats = await CashRepository.getFinancialStats(
+        dateFromStr,
+        dateToStr
+      );
 
-      const net_income = stats.total_income - stats.total_expense;
+      const net_income = stats.totalIncome - stats.totalExpense;
 
-      // 按学生ID聚合收入，限制在聚合阶段完成，而不是在应用层
-      const studentIncomePipeline: PipelineStage[] = [
-        {
-          $match: {
-            created_at: { $gte: dateFrom },
-            cash: { $gt: 0 },
-            student_id: { $ne: null },
-          },
-        },
-        {
-          $group: {
-            _id: "$student_id",
-            amount: {
-              $sum: { $divide: [{ $abs: "$cash" }, 100] },
-            },
-          },
-        },
-        { $sort: { amount: -1 } },
-        { $limit: 10 },
-      ];
-
+      // 按学员ID聚合收入
       const studentIncomeResults =
-        await CashClass.aggregate<StudentIncomeAggregate>(
-          studentIncomePipeline
-        ).exec();
+        await CashRepository.getStudentIncomeRanking(10, dateFromStr, dateToStr);
 
-      const student_income: StudentIncomeSummary[] = studentIncomeResults.map(
-        (aggregate): StudentIncomeSummary => ({
-          student_id: aggregate._id,
-          amount: aggregate.amount,
-          student_name: this.getStudentDisplayName(aggregate._id),
+      // 获取学员姓名
+      const student_income: StudentIncomeSummary[] = await Promise.all(
+        studentIncomeResults.map(async (item) => {
+          const student = item.studentId
+            ? await StudentRepository.findByUid(item.studentId)
+            : null;
+          return {
+            studentId: item.studentId,
+            student_name: student?.name ?? this.getStudentDisplayName(item.studentId),
+            amount: item.totalAmount / 100, // 转换为元
+          };
         })
       );
 
@@ -707,10 +660,10 @@ export class CashController {
         period,
         date_from: dateFrom,
         date_to: now,
-        total_income: stats.total_income,
-        total_expense: stats.total_expense,
-        net_income,
-        transaction_count: stats.transaction_count,
+        total_income: stats.totalIncome / 100,
+        total_expense: stats.totalExpense / 100,
+        net_income: net_income / 100,
+        transaction_count: stats.transactionCount,
         student_income,
         monthly_stats: [],
       };
@@ -721,7 +674,7 @@ export class CashController {
       };
 
       logger.info(
-        `获取财务统计成功，周期: ${period}, 收入: ¥${stats.total_income}, 支出: ¥${stats.total_expense}`
+        `获取财务统计成功，周期: ${period}, 收入: ¥${stats.totalIncome / 100}, 支出: ¥${stats.totalExpense / 100}`
       );
       res.json(response);
     }
@@ -742,7 +695,7 @@ export class CashController {
       const whereCondition: any = {};
 
       if (student_id) {
-        whereCondition.student_id = Number(student_id);
+        whereCondition.studentId = Number(student_id);
       }
 
       if (status) {
@@ -755,64 +708,71 @@ export class CashController {
         sortFieldCandidate && isInstallmentPlanSortField(sortFieldCandidate)
           ? sortFieldCandidate
           : "created_at";
-      const sortOrder: 1 | -1 =
+      const sortOrderValue: "ASC" | "DESC" =
         typeof sort_order === "string" && sort_order.toUpperCase() === "ASC"
-          ? 1
-          : -1;
-      const sort: Record<string, 1 | -1> = { [sortField]: sortOrder };
+          ? "ASC"
+          : "DESC";
 
-      // 获取分期计划数据
-      const result = await InstallmentPlan.findWithPagination(
-        whereCondition,
-        Number(page),
-        Number(limit),
-        sort
-      );
+      const options = {
+        ...whereCondition,
+        page: Number(page),
+        limit: Number(limit),
+        sort_by: sortField,
+        sort_order: sortOrderValue,
+      };
+
+      const result = await InstallmentPlanRepository.findWithPagination(options);
 
       const responseData = [];
 
       for (const plan of result.data) {
-        // 获取该计划的所有分期
-        const installments = await Installment.findByPlanId(plan.uid);
+        const planInstallments = await InstallmentRepository.findByPlanId(plan.uid);
 
-        const paidCount = installments.filter(
-          (i) => i.status === "Paid"
+        const paidCount = planInstallments.filter(
+          (i) => i.status === "PAID"
         ).length;
-        const pendingCount = installments.filter(
-          (i) => i.status === "Pending"
+        const pendingCount = planInstallments.filter(
+          (i) => i.status === "PENDING"
         ).length;
-        const overdueCount = installments.filter((i) => i.isOverdue()).length;
+        const overdueCount = planInstallments.filter((i) =>
+          InstallmentRepository.isOverdue(i)
+        ).length;
 
         responseData.push({
           uid: plan.uid,
-          student_id: plan.student_id,
-          total_amount: plan.total_amount / 100,
-          total_installments: plan.total_installments,
+          student_id: plan.studentId,
+          total_amount: this.formatAmount(plan.totalAmount),
+          total_installments: plan.totalInstallments,
           frequency: plan.frequency,
-          custom_days: plan.custom_days,
-          start_date: plan.start_date,
+          custom_days: plan.customDays,
+          start_date: plan.startDate,
           status: plan.status,
           status_text: this.getStatusText(plan.status),
           frequency_text: this.getFrequencyText(
             plan.frequency,
-            plan.custom_days
+            plan.customDays
           ),
-          installment_amount: plan.getInstallmentAmount() / 100,
-          progress: Math.round((paidCount / plan.total_installments) * 100),
+          installment_amount: this.formatAmount(
+            InstallmentPlanRepository.calculateInstallmentAmount(
+              plan.totalAmount,
+              plan.totalInstallments
+            )
+          ),
+          progress: Math.round((paidCount / plan.totalInstallments) * 100),
           paid_count: paidCount,
           pending_count: pendingCount,
           overdue_count: overdueCount,
-          installments: installments.map((inst) => ({
+          installments: planInstallments.map((inst) => ({
             uid: inst.uid,
-            current_installment: inst.current_installment,
-            installment_amount: inst.installment_amount / 100,
-            due_date: inst.due_date,
+            current_installment: inst.installmentNumber,
+            installment_amount: this.formatAmount(inst.installmentAmount),
+            due_date: inst.dueDate,
             status: inst.status,
             status_text: this.getStatusText(inst.status),
-            paid_amount: (inst.paid_amount || 0) / 100,
-            paid_at: inst.paid_at,
-            days_overdue: inst.getDaysOverdue(),
-            is_overdue: inst.isOverdue(),
+            paid_amount: this.formatAmount(inst.paidAmount ?? 0),
+            paid_date: inst.paidDate,
+            days_overdue: InstallmentRepository.getDaysOverdue(inst),
+            is_overdue: InstallmentRepository.isOverdue(inst),
           })),
         });
       }
@@ -821,14 +781,14 @@ export class CashController {
         success: true,
         data: responseData,
         pagination: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalPages: Math.ceil(result.total / result.limit),
+          page: result.pagination.page,
+          limit: result.pagination.limit,
+          total: result.pagination.total,
+          totalPages: result.pagination.total_pages,
         },
       };
 
-      logger.info(`获取分期付款列表成功，共 ${result.total} 条记录`);
+      logger.info(`获取分期付款列表成功，共 ${result.pagination.total} 条记录`);
       res.json(response);
     }
   );
@@ -839,48 +799,62 @@ export class CashController {
       const { id } = req.params;
       const { status } = req.body;
 
-      const validStatuses = ["Pending", "Paid", "Overdue", "Cancelled"];
+      const validStatuses = ["PENDING", "PAID", "OVERDUE", "CANCELLED"];
       if (!validStatuses.includes(status)) {
         throw AppError.invalidInput("无效的分期状态");
       }
 
-      const installment = await Installment.findByUid(Number(id));
+      const installment = await InstallmentRepository.findByUid(Number(id));
 
       if (!installment) {
         throw AppError.notFound("分期记录不存在");
       }
 
       // 如果是支付，创建交易记录
-      if (status === "Paid" && installment.status !== "Paid") {
-        const plan = await InstallmentPlan.findByUid(installment.plan_id);
+      if (status === "PAID" && installment.status !== "PAID") {
+        const plan = await InstallmentPlanRepository.findByUid(installment.planId);
         if (plan) {
-          await CashClass.create({
-            student_id: plan.student_id,
-            cash: installment.installment_amount,
-            note: `分期付款: 第${installment.current_installment}/${installment.total_installments}期`,
-          });
+          await CashBuilder.create()
+            .studentId(plan.studentId ?? undefined)
+            .installment({
+              plan_uid: plan.uid,
+              installment_uid: installment.uid,
+              installment_number: installment.installmentNumber,
+              total_installments: installment.totalInstallments,
+              due_date: installment.dueDate,
+              status: status as InstallmentStatus,
+            })
+            .amount(installment.installmentAmount / 100)
+            .note(`分期付款: 第${installment.installmentNumber}/${installment.totalInstallments}期`)
+            .build();
         }
       }
 
-      const updatedInstallment = await Installment.updateByUid(Number(id), {
-        status,
-        paid_at: status === "Paid" ? new Date() : installment.paid_at,
-        paid_amount:
-          status === "Paid"
-            ? installment.installment_amount
-            : installment.paid_amount,
-      });
+      const updatedInstallment = await InstallmentRepository.updateByUid(
+        Number(id),
+        {
+          status: status as InstallmentStatus,
+          paidDate: status === "PAID" ? new Date() : installment.paidDate,
+          paidAmount:
+            status === "PAID"
+              ? installment.installmentAmount
+              : installment.paidAmount,
+        }
+      );
 
       if (!updatedInstallment) {
         throw AppError.other("更新分期付款状态失败");
       }
+
+      // 刷新计划状态
+      await InstallmentRepository.refreshPlanStatus(installment.planId);
 
       logger.info(
         `更新分期付款状态成功，ID: ${installment.uid}, 状态: ${status}`
       );
       res.json({
         success: true,
-        data: updatedInstallment,
+        data: InstallmentRepository.toResponse(updatedInstallment),
         message: "分期付款状态更新成功",
       });
     }
