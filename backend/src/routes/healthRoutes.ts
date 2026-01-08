@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMongoDBUri } from '@/config';
+import { testConnection } from '@/db';
 
 const router = Router();
 
@@ -14,13 +14,11 @@ router.get('/', async (req, res) => {
     // 检查数据库连接
     let dbStatus = 'disconnected';
     let dbResponseTime = 0;
-    
+
     try {
       const startTime = Date.now();
-      // 这里应该导入实际的数据库连接实例
-      // 由于当前架构，我们做简单的连接检查
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState === 1) {
+      const success = await testConnection();
+      if (success) {
         dbStatus = 'connected';
         dbResponseTime = Date.now() - startTime;
       }
@@ -34,6 +32,7 @@ router.get('/', async (req, res) => {
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: process.env.npm_package_version || '1.0.0',
+      database: 'postgresql',
       services: {
         database: {
           status: dbStatus,
@@ -71,16 +70,15 @@ router.get('/ready', async (req, res) => {
       environment: false,
     };
 
-    // 检查数据库
+    // 检查数据库（PostgreSQL）
     try {
-      const mongoose = require('mongoose');
-      checks.database = mongoose.connection.readyState === 1;
+      checks.database = await testConnection();
     } catch (error) {
       checks.database = false;
     }
 
     // 检查环境变量
-    checks.environment = !!(process.env.MONGODB_URI && process.env.JWT_SECRET);
+    checks.environment = !!(process.env.DATABASE_URL && process.env.JWT_SECRET);
 
     const allReady = Object.values(checks).every(check => check === true);
 

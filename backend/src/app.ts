@@ -76,15 +76,14 @@ export const createApp = (appConfig: AppConfig = {}): Application => {
   // 数据库健康检查端点
   app.get('/api/v1/health/db', async (req: Request, res: Response) => {
     try {
-      const { mongoManager } = await import('@/config/mongodb');
-      const health = await mongoManager.checkHealth();
+      const { testConnection } = await import('@/db');
+      const success = await testConnection();
 
       res.json({
         success: true,
         data: {
-          database_type: 'mongodb',
-          connection_status: health.status,
-          details: health.details,
+          database_type: 'postgresql',
+          connection_status: success ? 'connected' : 'disconnected',
           timestamp: new Date()
         }
       });

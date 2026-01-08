@@ -9,15 +9,16 @@ export interface Config {
     nodeEnv: string;
     corsOrigin: string;
   };
-  mongodb: {
+  // PostgreSQL 配置 - 主数据库
+  postgresql: {
+    database_url?: string;
+    poolSize: number;
+    connectionTimeout: number;
+    idleTimeout: number;
+  };
+  // MongoDB 配置（保留用于历史数据迁移，已废弃）
+  mongodb?: {
     uri?: string;
-    options: {
-      maxPoolSize: number;
-      serverSelectionTimeoutMS: number;
-      socketTimeoutMS: number;
-      retryWrites: boolean;
-      w: string;
-    };
   };
   security: {
     jwtSecret: string;
@@ -46,16 +47,17 @@ export const config: Config = {
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:1420',
   },
 
-  // MongoDB 配置 - 唯一数据库
+  // PostgreSQL 配置 - 主数据库
+  postgresql: {
+    database_url: process.env.DATABASE_URL,
+    poolSize: parseInt(process.env.DB_POOL_SIZE || '10', 10),
+    connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000', 10),
+    idleTimeout: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
+  },
+
+  // MongoDB 配置（保留用于历史数据迁移，已废弃）
   mongodb: {
     uri: process.env.MONGODB_URI || process.env.MONGODB_URL || process.env.mongodburl || process.env.mongodb_uri,
-    options: {
-      maxPoolSize: parseInt(process.env.MONGO_POOL_SIZE || '10', 10),
-      serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_TIMEOUT || '5000', 10),
-      socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT || '45000', 10),
-      retryWrites: process.env.MONGO_RETRY_WRITES !== 'false',
-      w: process.env.MONGO_WRITE_CONCERN || 'majority',
-    },
   },
 
   // 安全配置
@@ -86,18 +88,18 @@ export const config: Config = {
 
 // 验证必需的环境变量
 export function validateConfig(): void {
-  // 检查MongoDB连接必需的环境变量
-  if (!config.mongodb.uri) {
-    throw new Error('MONGODB_URI is required for QMX to work. Setting examples:');
+  // 检查PostgreSQL连接必需的环境变量
+  if (!config.postgresql.database_url) {
+    throw new Error('DATABASE_URL is required for QMX to work. Setting examples:');
     console.error('');
-    console.error('  # MongoDB Atlas (recommended):');
-    console.error('  MONGODB_URI=mongodb+srv://username:password@cluster_name.mongodb.net/qmx');
+    console.error('  # PostgreSQL (recommended):');
+    console.error('  DATABASE_URL=postgresql://username:password@localhost:5432/qmx');
     console.error('');
-    console.error('  # Local MongoDB:');
-    console.error('  MONGODB_URI=mongodb://localhost:27017/qmx');
+    console.error('  # PostgreSQL with password:');
+    console.error('  DATABASE_URL=postgresql://user:pass@host:5432/dbname?sslmode=require');
     console.error('');
-    console.error('  # MongoDB Compass (local):');
-    console.error('  MONGODB_URI=mongodb://admin:password@localhost:27017/qmx?authSource=admin');
+    console.error('  # Docker Compose PostgreSQL:');
+    console.error('  DATABASE_URL=postgresql://qmx:qmx_password@postgres:5432/qmx');
     console.error('');
   }
 
@@ -106,10 +108,10 @@ export function validateConfig(): void {
   }
 }
 
-// 获取MongoDB URI
-export function getMongoDBUri(): string {
-  if (!config.mongodb.uri) {
-    throw new Error('MONGODB_URI is not configured');
+// 获取PostgreSQL URL
+export function getPostgreSQLUrl(): string {
+  if (!config.postgresql.database_url) {
+    throw new Error('DATABASE_URL is not configured');
   }
-  return config.mongodb.uri;
+  return config.postgresql.database_url;
 }

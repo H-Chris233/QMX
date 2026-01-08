@@ -4,7 +4,7 @@ import adapterController from '@/controllers/adapterController';
 
 const router: Router = express.Router();
 
-// MongoDB专用路由
+// 数据库适配器路由 - PostgreSQL (使用 Drizzle ORM)
 
 // 学生相关接口
 router.get('/students', adapterController.getStudents);
@@ -25,10 +25,12 @@ router.get('/info', (_req: Request, res: Response, _next: NextFunction): void =>
   res.json({
     success: true,
     data: {
-      adapter_version: '1.0.0',
-      supported_databases: ['mongodb'],
+      adapter_version: '2.0.0',
+      database_type: 'postgresql',
+      supported_databases: ['postgresql'],
+      orm: 'drizzle-orm',
       features: {
-        mongodb: 'Full support with Mongoose models',
+        postgresql: 'Full support with Drizzle ORM + pg connection pool',
       },
       endpoints: {
         students: {

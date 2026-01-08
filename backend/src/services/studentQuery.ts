@@ -20,7 +20,7 @@ export interface StudentQueryResult {
     page: number;
     limit: number;
     total: number;
-    totalPages: number;
+    total_pages: number;
   };
 }
 
@@ -378,7 +378,7 @@ export class StudentQuery {
         page: this.page,
         limit: this.limit,
         total,
-        totalPages: Math.ceil(total / this.limit),
+        total_pages: Math.ceil(total / this.limit),
       },
     };
   }
