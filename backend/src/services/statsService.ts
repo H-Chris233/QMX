@@ -39,7 +39,7 @@ export interface FinancialPeriod {
 }
 
 export interface FinancialStatsData {
-  period: FinancialPeriod;
+  period: string;
   totals: {
     incomeCents: number;
     expenseCents: number;
@@ -279,7 +279,7 @@ export class StatsService {
     return {
       studentUid,
       payments: {
-        totalAmountCents,
+        totalAmountCents: totalIncomeCents,
         count: incomeCount,
       },
       scores: {
@@ -290,8 +290,8 @@ export class StatsService {
       },
       membership,
       installments: {
-        totalAmountCents,
-        paidAmountCents,
+        totalAmountCents: totalInstallmentCents,
+        paidAmountCents: paidInstallmentCents,
         remainingAmountCents,
         pendingAmountCents,
         pendingCount,
@@ -302,7 +302,7 @@ export class StatsService {
   /**
    * 构建财务统计数据
    */
-  static async buildFinancialStats(period: FinancialPeriod | string = 'ThisMonth') {
+  static async buildFinancialStats(period: string = 'ThisMonth'): Promise<FinancialStatsData> {
     const normalizedPeriod = this.normalizeFinancialPeriod(period);
     const dateRange = this.resolveDateRange(normalizedPeriod);
 
@@ -438,10 +438,10 @@ export class StatsService {
   /**
    * 归一化财务周期
    */
-  private static normalizeFinancialPeriod(period?: string | null): FinancialPeriod {
+  private static normalizeFinancialPeriod(period?: string | null): string {
     const validPeriods = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
     if (period && (validPeriods as readonly string[]).includes(period)) {
-      return period as FinancialPeriod;
+      return period;
     }
     return 'ThisMonth';
   }
@@ -449,7 +449,7 @@ export class StatsService {
   /**
    * 解析日期范围
    */
-  private static resolveDateRange(period: FinancialPeriod) {
+  private static resolveDateRange(period: string) {
     const now = new Date();
     let start: Date;
     let end: Date;

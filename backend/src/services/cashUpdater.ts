@@ -59,7 +59,20 @@ export class CashUpdater {
   }
 
   installment(info?: ICashInstallmentSnapshot | null): this {
-    this.pendingInstallment = sanitizeInstallmentSnapshot(info);
+    const sanitized = sanitizeInstallmentSnapshot(info);
+    if (sanitized && sanitized.due_date) {
+      // 确保 due_date 是字符串格式
+      this.pendingInstallment = {
+        ...sanitized,
+        due_date: typeof sanitized.due_date === 'string'
+          ? sanitized.due_date
+          : sanitized.due_date instanceof Date
+            ? sanitized.due_date.toISOString().split('T')[0]
+            : null
+      };
+    } else {
+      this.pendingInstallment = sanitized;
+    }
     return this;
   }
 

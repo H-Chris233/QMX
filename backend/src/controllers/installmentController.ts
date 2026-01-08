@@ -807,7 +807,7 @@ export class InstallmentController {
     const { id } = req.params;
     const { note, status } = req.body as {
       note?: string;
-      status?: InstallmentPlanStatus;
+      status?: string;
     };
 
     const plan = await InstallmentPlanRepository.findByUid(Number(id));

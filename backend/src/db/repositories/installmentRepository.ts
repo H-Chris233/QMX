@@ -96,7 +96,7 @@ export class InstallmentPlanRepository {
     return await db
       .select()
       .from(installmentPlans)
-      .where(eq(installmentPlans.status, 'ACTIVE' as PlanStatus))
+      .where(eq(installmentPlans.status, 'ACTIVE'))
       .orderBy(desc(installmentPlans.createdAt));
   }
 
@@ -105,7 +105,7 @@ export class InstallmentPlanRepository {
     const [result] = await db
       .select({ count: count() })
       .from(installmentPlans)
-      .where(eq(installmentPlans.status, 'ACTIVE' as PlanStatus));
+      .where(eq(installmentPlans.status, 'ACTIVE'));
     return result?.count || 0;
   }
 
@@ -155,7 +155,7 @@ export class InstallmentPlanRepository {
   }
 
   // 查找指定学员和状态的计划
-  static async findByStudentIdAndStatus(studentId: number, status?: PlanStatus): Promise<InstallmentPlan[]> {
+  static async findByStudentIdAndStatus(studentId: number, status?: string): Promise<InstallmentPlan[]> {
     const conditions = [eq(installmentPlans.studentId, studentId)];
     if (status) {
       conditions.push(eq(installmentPlans.status, status));
@@ -349,7 +349,7 @@ export class InstallmentRepository {
   }
 
   // 根据状态查找分期
-  static async findByStatus(status: InstallmentStatus): Promise<Installment[]> {
+  static async findByStatus(status: string): Promise<Installment[]> {
     return await db
       .select()
       .from(installments)
@@ -365,7 +365,7 @@ export class InstallmentRepository {
       .where(
         and(
           eq(installments.studentId, studentId),
-          eq(installments.status, 'PENDING' as InstallmentStatus)
+          eq(installments.status, 'PENDING')
         )
       )
       .orderBy(asc(installments.dueDate));
@@ -444,7 +444,7 @@ export class InstallmentRepository {
       const today = new Date().toISOString().split('T')[0];
       conditions.push(
         and(
-          eq(installments.status, 'PENDING' as InstallmentStatus),
+          eq(installments.status, 'PENDING'),
           lt(installments.dueDate, today)
         )
       );
@@ -486,7 +486,7 @@ export class InstallmentRepository {
     );
     const allCancelled = planInstallments.every((i) => i.status === 'CANCELLED');
 
-    let newStatus: PlanStatus = 'ACTIVE';
+    let newStatus: string = 'ACTIVE';
     if (allPaid) {
       newStatus = 'COMPLETED';
     } else if (allCancelled) {
