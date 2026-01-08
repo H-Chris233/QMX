@@ -14,9 +14,11 @@ import {
   lte,
   eq,
   gt,
+  lt,
   sql,
   desc,
   asc,
+  isNotNull,
 } from 'drizzle-orm';
 
 export interface DashboardStatsData {
@@ -104,12 +106,8 @@ export class StatsService {
         // 收入支出统计
         db
           .select({
-            totalRevenue:
-              // @ts-expect-error - 动态 SQL CASE 表达式
-              sql`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
-            totalExpense:
-              // @ts-expect-error - 动态 SQL CASE 表达式
-              sql`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+            totalRevenue: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+            totalExpense: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
           })
           .from(cashTransactions),
 
@@ -215,12 +213,8 @@ export class StatsService {
     // 学员收入统计
     const [studentIncomeResult] = await db
       .select({
-        totalIncome:
-          // @ts-expect-error - 动态 SQL CASE 表达式
-          sql`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
-        incomeCount:
-          // @ts-expect-error - 动态 SQL CASE 表达式
-          sql`COUNT(CASE WHEN ${cashTransactions.amount} > 0 THEN 1 END)`,
+        totalIncome: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+        incomeCount: sql<number>`COUNT(CASE WHEN ${cashTransactions.amount} > 0 THEN 1 END)`,
       })
       .from(cashTransactions)
       .where(eq(cashTransactions.studentId, studentUid));
@@ -247,7 +241,7 @@ export class StatsService {
           .select()
           .from(installments)
           .where(
-            sql`${installments.planId} = ANY(${planIds})` // @ts-expect-error - 数组查询
+            sql`${installments.planId} = ANY(${planIds})`
           )
       : [];
 
@@ -315,12 +309,8 @@ export class StatsService {
     // 收入支出统计
     const [incomeExpenseResult] = await db
       .select({
-        incomeCents:
-          // @ts-expect-error - 动态 SQL CASE 表达式
-          sql`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
-        expenseCents:
-          // @ts-expect-error - 动态 SQL CASE 表达式
-          sql`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ABS(${cashTransactions.amount}) ELSE 0 END)`,
+        incomeCents: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+        expenseCents: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ABS(${cashTransactions.amount}) ELSE 0 END)`,
         transactionCount: count(),
       })
       .from(cashTransactions)
@@ -362,7 +352,7 @@ export class StatsService {
       const studentDocs = await db
         .select({ uid: students.uid, name: students.name })
         .from(students)
-        .where(sql`${students.uid} = ANY(${studentIds})`); // @ts-expect-error - 数组查询
+        .where(sql`${students.uid} = ANY(${studentIds})`);
 
       for (const doc of studentDocs) {
         studentMap.set(doc.uid, doc.name);
@@ -394,7 +384,7 @@ export class StatsService {
           .select()
           .from(installments)
           .where(
-            sql`${installments.planId} = ANY(${planIds2})` // @ts-expect-error - 数组查询
+            sql`${installments.planId} = ANY(${planIds2})`
           )
       : [];
 
@@ -423,7 +413,7 @@ export class StatsService {
     );
 
     return {
-      period: normalizedPeriod,
+      period: normalizedPeriod as FinancialPeriod,
       totals: {
         incomeCents,
         expenseCents,
@@ -446,7 +436,7 @@ export class StatsService {
    */
   private static normalizeFinancialPeriod(period?: string | null): FinancialPeriod {
     const validPeriods = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
-    if (period && validPeriods.includes(period as FinancialPeriod)) {
+    if (period && (validPeriods as readonly string[]).includes(period)) {
       return period as FinancialPeriod;
     }
     return 'ThisMonth';

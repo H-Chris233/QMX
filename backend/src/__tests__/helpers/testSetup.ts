@@ -5,7 +5,7 @@ import { installmentPlans, installments } from '@/db/schema/installments';
 import { sql } from 'drizzle-orm';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
-import type { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
+import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
 
 export interface TestContext {
   db: typeof db;
@@ -42,16 +42,27 @@ export async function createTestStudent(
     name?: string;
     phone?: string;
     class?: ClassType;
+    classType?: ClassType;
     subject?: SubjectType;
     rings?: number[];
     membership?: { startDate: Date; endDate: Date } | null;
+    age?: number | null;
+    lessonLeft?: number;
   } = {}
 ) {
   const builder = StudentBuilder.create()
     .name(overrides.name || 'Test Student')
     .phone(overrides.phone || '13800138000')
-    .class(overrides.class || ClassType.MONTH)
+    .classType(overrides.classType || overrides.class || ClassType.MONTH)
     .subject(overrides.subject || SubjectType.SHOOTING);
+
+  if (overrides.age !== undefined) {
+    builder.age(overrides.age);
+  }
+
+  if (overrides.lessonLeft !== undefined) {
+    builder.lessonLeft(overrides.lessonLeft);
+  }
 
   if (overrides.rings) {
     builder.rings(overrides.rings);
@@ -118,7 +129,7 @@ export async function createTestInstallment(
     studentId,
     installmentNumber,
     installmentAmount: amount * 100, // 转换为分
-    dueDate,
+    dueDate: dueDate.toISOString().split('T')[0],
     status,
     note: undefined,
   });

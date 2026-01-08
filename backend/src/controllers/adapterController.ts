@@ -25,6 +25,13 @@ export class AdapterController {
       subject: subject as any,
     });
 
+    // 计算平均分
+    const calculateAverageScore = (rings: number[]): number => {
+      if (!rings || rings.length === 0) return 0;
+      const sum = rings.reduce((acc, r) => acc + (Number.isFinite(r) ? r : 0), 0);
+      return Number((sum / rings.length).toFixed(1));
+    };
+
     const response = {
       success: true,
       data: result.data.map(student => ({
@@ -39,7 +46,7 @@ export class AdapterController {
         membership_end_date: student.membershipEndDate,
         note: student.note,
         membership_status: presentStudent(student).membershipStatus,
-        average_score: presentStudent(student).averageScore,
+        average_score: calculateAverageScore(student.rings || []),
         has_membership: presentStudent(student).isMembershipActive,
         days_remaining: presentStudent(student).membershipDaysRemaining,
         created_at: student.createdAt,
@@ -138,7 +145,7 @@ export class AdapterController {
   });
 
   // 财务统计接口
-  public getFinancialStats = catchAsync(async (req: Request, res: Response): Promise<void>): Promise<void> => {
+  public getFinancialStats = catchAsync(async (req: Request, res: Response) => {
     const { period = 'month' } = req.query;
 
     let dateFrom: Date;
@@ -186,7 +193,7 @@ export class AdapterController {
   });
 
   // 数据库健康检查接口
-  public getHealthStatus = catchAsync(async (req: Request, res: Response): Promise<void>): Promise<void> => {
+  public getHealthStatus = catchAsync(async (req: Request, res: Response) => {
     try {
       // 简单查询测试数据库连接
       await StudentRepository.findAll();

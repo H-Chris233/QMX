@@ -1,10 +1,6 @@
 import { Request, Response } from "express";
 import { catchAsync } from "@/middleware/errorHandler";
-import {
-  CashBuilder,
-  convertAmountToCents,
-  normalizeNote,
-} from "@/services/cashBuilder";
+import { CashBuilder, convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
 import {
   InstallmentStatus,
   PaymentFrequency,
@@ -25,6 +21,7 @@ import type {
   CashTransaction,
   InstallmentPlan,
   Installment,
+  InstallmentSnapshot,
 } from "../db/schema";
 
 interface StudentIncomeSummary {
@@ -823,7 +820,8 @@ export class CashController {
               total_installments: installment.totalInstallments,
               due_date: installment.dueDate,
               status: status as InstallmentStatus,
-            })
+              note: null,
+            } as InstallmentSnapshot)
             .amount(installment.installmentAmount / 100)
             .note(`分期付款: 第${installment.installmentNumber}/${installment.totalInstallments}期`)
             .build();

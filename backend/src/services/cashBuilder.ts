@@ -2,6 +2,60 @@ import { CashRepository } from '../db/repositories/cashRepository';
 import { NewCashTransaction, InstallmentSnapshot } from '../db/schema/cash';
 import { StudentRepository } from '../db/repositories/studentRepository';
 
+/**
+ * 金额转换工具函数
+ * 将元转换为分（整数）
+ */
+export function convertAmountToCents(amount: number): number {
+  const cents = Math.round(amount * 100);
+  if (!Number.isInteger(cents)) {
+    throw new Error('金额必须保留最多两位小数');
+  }
+  if (!Number.isFinite(cents)) {
+    throw new Error('金额必须是有效数字');
+  }
+  if (Math.abs(cents) > 999999999999) {
+    throw new Error('金额超出允许范围');
+  }
+  return cents;
+}
+
+/**
+ * 备注归一化工具函数
+ */
+export function normalizeNote(note: string | null | undefined): string | null {
+  if (note === undefined || note === null) {
+    return null;
+  }
+  const trimmed = note.trim();
+  if (trimmed === '') {
+    return null;
+  }
+  return trimmed;
+}
+
+/**
+ * 清理分期快照
+ */
+export function sanitizeInstallmentSnapshot(
+  snapshot: Partial<InstallmentSnapshot> | null | undefined
+): InstallmentSnapshot | null {
+  if (!snapshot) return null;
+
+  return {
+    plan_uid: snapshot.plan_uid ?? 0,
+    installment_uid: snapshot.installment_uid ?? null,
+    installment_number: snapshot.installment_number ?? null,
+    total_installments: snapshot.total_installments ?? null,
+    due_date: snapshot.due_date ?? null,
+    status: snapshot.status ?? null,
+    note: snapshot.note ?? null,
+  };
+}
+
+export { PaymentFrequency } from '@/types';
+export type { PaymentFrequency as PaymentFrequencyType };
+
 export class CashBuilder {
   private payload: Partial<NewCashTransaction> = {};
   private checkStudent = true;

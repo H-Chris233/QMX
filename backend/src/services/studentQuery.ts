@@ -3,6 +3,7 @@ import { students, Student } from '../db/schema/students';
 import {
   eq,
   and,
+  or,
   gte,
   lte,
   like,
@@ -333,6 +334,9 @@ export class StudentQuery {
     const sort = this.sortOrder === 1 ? asc(orderByColumn) : desc(orderByColumn);
     finalQuery = finalQuery.orderBy(sort);
 
+    // 添加排序以满足类型检查
+    finalQuery = finalQuery.orderBy(sort);
+
     // 分页
     const rawData = await finalQuery.limit(this.limit).offset(offset);
 
@@ -348,12 +352,12 @@ export class StudentQuery {
     }
 
     // 查询总数
-    let countQuery = db.select({ count: count() }).from(students);
+    let countQuery = db.select({ count: sql<number>`count(*)` }).from(students);
     if (conditions.length > 0) {
       countQuery = countQuery.where(and(...conditions));
     }
     const [countResult] = await countQuery;
-    const total = countResult?.count || 0;
+    const total = Number(countResult?.count) || 0;
 
     // 转换为查询结果格式
     const resultData: StudentQueryItem[] = data.map((item) => ({

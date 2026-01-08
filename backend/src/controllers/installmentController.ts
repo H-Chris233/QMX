@@ -1,11 +1,7 @@
 import { Request, Response } from "express";
 import { AppError } from "@/utils/errors";
 import { catchAsync } from "@/middleware/errorHandler";
-import {
-  PaymentFrequency,
-  convertAmountToCents,
-  normalizeNote,
-} from "@/services/cashBuilder";
+import { PaymentFrequency, convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
 import { InstallmentStatus, InstallmentPlanStatus } from "@/types";
 import logger from "@/utils/logger";
 import { db } from "../db";
@@ -36,13 +32,13 @@ import {
 import { CashRepository } from "../db/repositories/cashRepository";
 
 // 原有的排序字段映射
-const ALLOWED_SORT_FIELDS = new Set([
+const ALLOWED_SORT_FIELDS = [
   "created_at",
   "start_date",
   "total_amount",
   "status",
   "updated_at",
-]) as const;
+] as const;
 
 type SortField = (typeof ALLOWED_SORT_FIELDS)[number];
 
@@ -85,7 +81,7 @@ export class InstallmentController {
     let sortField: SortField = sort_by as SortField | "created_at";
     if (
       typeof sort_by === "string" &&
-      ALLOWED_SORT_FIELDS.has(sort_by)
+      (ALLOWED_SORT_FIELDS as readonly string[]).includes(sort_by)
     ) {
       sortField = sort_by as SortField;
     }
