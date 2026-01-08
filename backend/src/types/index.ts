@@ -17,6 +17,9 @@ export enum SubjectType {
   OTHERS = 'Others',
 }
 
+// 兼容旧类型名
+export type Subject = SubjectType;
+
 export enum MembershipStatus {
   NONE = 'None',
   ACTIVE = 'Active',
@@ -72,8 +75,8 @@ export interface IStudent {
   membershipEndDate: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  // 禁止使用下划线版本的字段名
   membership_start_date?: never;
-  membershipEndDate?: never;
   membership_end_date?: never;
   lesson_left?: never;
 }

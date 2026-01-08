@@ -14,7 +14,6 @@ import {
 import { sql } from 'drizzle-orm';
 import { students } from './students';
 import { cashTransactions } from './cash';
-import { PaymentFrequency, InstallmentStatus, InstallmentPlanStatus } from '../../types';
 
 // 分期计划表
 export const installmentPlans = pgTable('installment_plans', {
@@ -71,3 +70,24 @@ export type InstallmentPlan = typeof installmentPlans.$inferSelect;
 export type NewInstallmentPlan = typeof installmentPlans.$inferInsert;
 export type Installment = typeof installments.$inferSelect;
 export type NewInstallment = typeof installments.$inferInsert;
+
+// 枚举值导出（用于运行时比较）
+export const InstallmentStatus = {
+  PENDING: 'PENDING',
+  PAID: 'PAID',
+  OVERDUE: 'OVERDUE',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const InstallmentPlanStatus = {
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const PaymentFrequency = {
+  WEEKLY: 'WEEKLY',
+  MONTHLY: 'MONTHLY',
+  QUARTERLY: 'QUARTERLY',
+  CUSTOM: 'CUSTOM',
+} as const;

@@ -1,11 +1,11 @@
 import { db } from '@/db';
 import { students } from '@/db/schema/students';
 import { cashTransactions } from '@/db/schema/cash';
-import { installmentPlans, installments } from '@/db/schema/installments';
+import { installmentPlans, installments, InstallmentStatus } from '@/db/schema/installments';
 import { sql } from 'drizzle-orm';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
-import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
+import { ClassType, SubjectType, PaymentFrequency } from '@/types';
 
 export interface TestContext {
   db: typeof db;
@@ -121,7 +121,7 @@ export async function createTestInstallment(
   totalInstallments: number,
   amount: number,
   dueDate: Date,
-  status: InstallmentStatus = InstallmentStatus.PENDING
+  status: keyof typeof InstallmentStatus = 'PENDING'
 ) {
   const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
   return await InstallmentRepository.create({

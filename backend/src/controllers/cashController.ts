@@ -2,12 +2,13 @@ import { Request, Response } from "express";
 import { catchAsync } from "@/middleware/errorHandler";
 import { CashBuilder, convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
 import {
-  InstallmentStatus,
-  InstallmentPlanStatus,
+  InstallmentStatusValues,
+  InstallmentPlanStatusValues,
   PaymentFrequencyValues,
   IApiResponse,
   IPaginatedResponse,
 } from "@/types";
+import type { InstallmentStatus, InstallmentPlanStatus, PaymentFrequency } from "@/types";
 import type { ICashSearchOptions } from "@/types";
 import logger from "@/utils/logger";
 import { AppError } from "@/utils/errors";
@@ -199,7 +200,7 @@ export class CashController {
           customDays: customDaysValue ?? undefined,
           startDate: startDateValue,
           note: sanitizedNote,
-          status: InstallmentPlanStatus.ACTIVE,
+          status: InstallmentPlanStatusValues.ACTIVE,
         });
 
         const installmentsToCreate = [];
@@ -220,7 +221,7 @@ export class CashController {
             installmentAmount: amountForInstallment,
             dueDate: dueDate,
             status:
-              i === 1 ? InstallmentStatus.PAID : InstallmentStatus.PENDING,
+              i === 1 ? InstallmentStatusValues.PAID : InstallmentStatusValues.PENDING,
             paidAmount: i === 1 ? amountForInstallment : undefined,
             paidDate: i === 1 ? new Date() : undefined,
             studentId: installmentPlan.studentId ?? null,
@@ -257,7 +258,7 @@ export class CashController {
             installment_number: firstInstallment?.installmentNumber ?? 1,
             total_installments: totalInstallmentsInt,
             due_date: firstInstallment?.dueDate ?? startDateValue,
-            status: InstallmentStatus.PAID,
+            status: InstallmentStatusValues.PAID,
             note: sanitizedNote ?? undefined,
           })
           .build();
@@ -270,9 +271,9 @@ export class CashController {
 
         if (totalInstallmentsInt === 1) {
           await InstallmentPlanRepository.updateByUid(installmentPlan.uid, {
-            status: InstallmentPlanStatus.COMPLETED,
+            status: InstallmentPlanStatusValues.COMPLETED,
           });
-          installmentPlan.status = InstallmentPlanStatus.COMPLETED;
+          installmentPlan.status = InstallmentPlanStatusValues.COMPLETED;
         }
 
         const responseData = {
@@ -858,18 +859,18 @@ export class CashController {
   // 私有辅助方法：获取状态文本
   private getStatusText(status: string): string {
     switch (status) {
-      case InstallmentStatus.PENDING:
+      case InstallmentStatusValues.PENDING:
         return "待支付";
-      case InstallmentStatus.PAID:
+      case InstallmentStatusValues.PAID:
         return "已支付";
-      case InstallmentStatus.OVERDUE:
+      case InstallmentStatusValues.OVERDUE:
         return "已逾期";
-      case InstallmentStatus.CANCELLED:
-      case InstallmentPlanStatus.CANCELLED:
+      case InstallmentStatusValues.CANCELLED:
+      case InstallmentPlanStatusValues.CANCELLED:
         return "已取消";
-      case InstallmentPlanStatus.ACTIVE:
+      case InstallmentPlanStatusValues.ACTIVE:
         return "进行中";
-      case InstallmentPlanStatus.COMPLETED:
+      case InstallmentPlanStatusValues.COMPLETED:
         return "已完成";
       default:
         return status;

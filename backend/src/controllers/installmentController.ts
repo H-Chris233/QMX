@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { AppError } from "@/utils/errors";
 import { catchAsync } from "@/middleware/errorHandler";
 import { convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
-import { PaymentFrequency, PaymentFrequencyValues, InstallmentStatusValues, InstallmentPlanStatusValues } from "@/types";
 import logger from "@/utils/logger";
 import { db } from "../db";
 import {
@@ -10,6 +9,9 @@ import {
   cashTransactions,
   installmentPlans,
   installments,
+  InstallmentStatus,
+  InstallmentPlanStatus,
+  PaymentFrequency,
 } from "../db/schema";
 import {
   eq,
@@ -488,7 +490,7 @@ export class InstallmentController {
     async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const { status, amount } = req.body as {
-      status: InstallmentStatus;
+      status: string;
       amount?: number;
     };
 
@@ -879,7 +881,7 @@ export class InstallmentController {
           );
 
         if (paidCountResult.count > 0) {
-          throw AppError.badRequest(
+          throw AppError.invalidInput(
             `已有${paidCountResult.count}期已支付，无法删除`
           );
         }
@@ -1031,10 +1033,10 @@ export class InstallmentController {
       totalAmount: number;
       downPayment: number;
       totalInstallments: number;
-      frequency: PaymentFrequency;
+      frequency: string;
       customDays: number | null;
       startDate: Date | string;
-      status: InstallmentPlanStatus;
+      status: string;
       note: string | null;
       createdAt: Date | string;
       updatedAt: Date | string;
@@ -1125,11 +1127,11 @@ export class InstallmentController {
   /**
    * 辅助方法：归一化付款频率
    */
-  private normalizeFrequency(value: unknown): PaymentFrequency | null {
+  private normalizeFrequency(value: unknown): keyof typeof PaymentFrequency | null {
     if (typeof value !== "string") {
       return null;
     }
-    const validFrequencies: PaymentFrequency[] = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'CUSTOM'];
+    const validFrequencies = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'CUSTOM'] as const;
     const matched = validFrequencies.find((item) => item === value);
     return matched ?? null;
   }
@@ -1139,11 +1141,11 @@ export class InstallmentController {
    */
   private normalizeInstallmentStatus(
     value: unknown
-  ): InstallmentStatus | null {
+  ): keyof typeof InstallmentStatus | null {
     if (typeof value !== "string") {
       return null;
     }
-    const matched = Object.values(InstallmentStatusValues).find(
+    const matched = Object.values(InstallmentStatus).find(
       (item) => item === value
     );
     return matched ?? null;
@@ -1181,7 +1183,7 @@ export class InstallmentController {
    * 辅助方法：获取频率文本
    */
   private getFrequencyText(
-    frequency: PaymentFrequency,
+    frequency: string,
     customDays?: number | null
   ): string {
     const safeCustomDays =
@@ -1192,13 +1194,13 @@ export class InstallmentController {
         : null;
 
     switch (frequency) {
-      case PaymentFrequencyValues.WEEKLY:
+      case PaymentFrequency.WEEKLY:
         return "周付";
-      case PaymentFrequencyValues.MONTHLY:
+      case PaymentFrequency.MONTHLY:
         return "月付";
-      case PaymentFrequencyValues.QUARTERLY:
+      case PaymentFrequency.QUARTERLY:
         return "季付";
-      case PaymentFrequencyValues.CUSTOM:
+      case PaymentFrequency.CUSTOM:
         return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
       default:
         return frequency;
@@ -1210,22 +1212,22 @@ export class InstallmentController {
    */
   private calculateNextDueDate(
     current: Date,
-    frequency: PaymentFrequency,
+    frequency: string,
     customDays?: number | null
   ): Date {
     const next = new Date(current);
 
     switch (frequency) {
-      case PaymentFrequencyValues.WEEKLY:
+      case PaymentFrequency.WEEKLY:
         next.setDate(next.getDate() + 7);
         break;
-      case PaymentFrequencyValues.MONTHLY:
+      case PaymentFrequency.MONTHLY:
         next.setMonth(next.getMonth() + 1);
         break;
-      case PaymentFrequencyValues.QUARTERLY:
+      case PaymentFrequency.QUARTERLY:
         next.setMonth(next.getMonth() + 3);
         break;
-      case PaymentFrequencyValues.CUSTOM:
+      case PaymentFrequency.CUSTOM:
         next.setDate(next.getDate() + (customDays ?? 0));
         break;
     }
@@ -1238,19 +1240,19 @@ export class InstallmentController {
    */
   private getStatusText(status: string): string {
     switch (status) {
-      case InstallmentStatusValues.PENDING:
+      case InstallmentStatus.PENDING:
         return "待支付";
-      case InstallmentStatusValues.PAID:
+      case InstallmentStatus.PAID:
         return "已支付";
-      case InstallmentStatusValues.OVERDUE:
+      case InstallmentStatus.OVERDUE:
         return "已逾期";
-      case InstallmentStatusValues.CANCELLED:
+      case InstallmentStatus.CANCELLED:
         return "已取消";
-      case InstallmentPlanStatusValues.CANCELLED:
+      case InstallmentPlanStatus.CANCELLED:
         return "已取消";
-      case InstallmentPlanStatusValues.ACTIVE:
+      case InstallmentPlanStatus.ACTIVE:
         return "进行中";
-      case InstallmentPlanStatusValues.COMPLETED:
+      case InstallmentPlanStatus.COMPLETED:
         return "已完成";
       default:
         return status;

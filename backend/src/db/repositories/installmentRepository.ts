@@ -6,8 +6,8 @@ import {
   Installment,
   NewInstallmentPlan,
   NewInstallment,
-  PlanStatus,
   InstallmentStatus,
+  InstallmentPlanStatus,
 } from '../schema/installments';
 import { eq, and, lt, lte, isNull, count, desc, asc, gte } from 'drizzle-orm';
 import { PaginationResult } from './studentRepository';
@@ -15,7 +15,7 @@ import { PaginationResult } from './studentRepository';
 export interface InstallmentSearchOptions {
   planId?: number;
   studentId?: number;
-  status?: InstallmentStatus;
+  status?: keyof typeof InstallmentStatus;
   minDueDate?: string;
   maxDueDate?: string;
   isOverdue?: boolean;
@@ -27,7 +27,7 @@ export interface InstallmentSearchOptions {
 
 export interface InstallmentPlanSearchOptions {
   studentId?: number;
-  status?: PlanStatus;
+  status?: keyof typeof InstallmentPlanStatus;
   minTotalAmount?: number;
   maxTotalAmount?: number;
   page?: number;
