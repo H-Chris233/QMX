@@ -42,8 +42,8 @@ export interface PresentedStudent {
   membershipDaysRemaining: number | null;
   isMembershipActive: boolean;
   membershipStatus: MembershipStatus;
-  createdAt: Date | null;
-  updatedAt: Date | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   lesson_left: number | null;
   membership_start_date: string | null;
   membership_end_date: string | null;
@@ -139,10 +139,10 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     ?? json.is_membership_active
     ?? hasMembership(student.membershipStartDate ?? null, student.membershipEndDate ?? null);
 
-  const createdAt = student.createdAt ?? null;
-  const updatedAt = student.updatedAt ?? null;
-  const created_at = json.created_at ?? formatDateTime(createdAt);
-  const updated_at = json.updated_at ?? formatDateTime(updatedAt);
+  const createdAt = student.createdAt ? formatDateTime(student.createdAt) : null;
+  const updatedAt = student.updatedAt ? formatDateTime(student.updatedAt) : null;
+  const created_at = json.created_at ?? createdAt;
+  const updated_at = json.updated_at ?? updatedAt;
 
   // 处理 rings - 可能是数组或 undefined
   const rings = Array.isArray(json.rings) ? json.rings : [];
@@ -162,8 +162,8 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     membershipDaysRemaining,
     isMembershipActive,
     membershipStatus,
-    createdAt,
-    updatedAt,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
     lesson_left: lessonLeft,
     membership_start_date: membershipStartDate,
     membership_end_date: membershipEndDate,

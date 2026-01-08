@@ -14,12 +14,12 @@ import { students } from './students';
 // 分期快照类型
 export interface InstallmentSnapshot {
   plan_uid: number;
-  installment_uid: number | null;
-  installment_number: number | null;
-  total_installments: number | null;
-  due_date: string | null;
-  status: string | null;
-  note: string | null;
+  installment_uid?: number | null | undefined;
+  installment_number?: number | null | undefined;
+  total_installments?: number | null | undefined;
+  due_date?: string | Date | null | undefined;
+  status?: string | null | undefined;
+  note?: string | null | undefined;
 }
 
 // 交易表

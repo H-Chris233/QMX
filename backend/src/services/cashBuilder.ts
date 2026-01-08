@@ -1,6 +1,7 @@
 import { CashRepository } from '../db/repositories/cashRepository';
 import { NewCashTransaction, InstallmentSnapshot } from '../db/schema/cash';
 import { StudentRepository } from '../db/repositories/studentRepository';
+import { PaymentFrequency } from '@/types';
 
 /**
  * 金额转换工具函数
@@ -42,12 +43,18 @@ export function sanitizeInstallmentSnapshot(
 ): InstallmentSnapshot | null {
   if (!snapshot) return null;
 
+  const due_date = snapshot.due_date
+    ? (typeof snapshot.due_date === 'string'
+        ? snapshot.due_date
+        : snapshot.due_date.toISOString().split('T')[0])
+    : null;
+
   return {
     plan_uid: snapshot.plan_uid ?? 0,
     installment_uid: snapshot.installment_uid ?? null,
     installment_number: snapshot.installment_number ?? null,
     total_installments: snapshot.total_installments ?? null,
-    due_date: snapshot.due_date ?? null,
+    due_date,
     status: snapshot.status ?? null,
     note: snapshot.note ?? null,
   };

@@ -817,13 +817,13 @@ export class CashController {
               plan_uid: plan.uid,
               installment_uid: installment.uid,
               installment_number: installment.installmentNumber,
-              total_installments: installment.totalInstallments,
+              total_installments: plan.totalInstallments,
               due_date: installment.dueDate,
               status: status as InstallmentStatus,
               note: null,
             } as InstallmentSnapshot)
             .amount(installment.installmentAmount / 100)
-            .note(`分期付款: 第${installment.installmentNumber}/${installment.totalInstallments}期`)
+            .note(`分期付款: 第${installment.installmentNumber}/${plan.totalInstallments}期`)
             .build();
         }
       }
@@ -832,7 +832,7 @@ export class CashController {
         Number(id),
         {
           status: status as InstallmentStatus,
-          paidDate: status === "PAID" ? new Date() : installment.paidDate,
+          paidDate: status === "PAID" ? new Date().toISOString().split('T')[0] : installment.paidDate,
           paidAmount:
             status === "PAID"
               ? installment.installmentAmount

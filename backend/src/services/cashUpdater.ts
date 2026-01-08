@@ -31,7 +31,7 @@ export class CashUpdater {
   }
 
   amount(amount: number | string): this {
-    this.cashData.amount = convertAmountToCents(amount);
+    this.cashData.amount = typeof amount === 'string' ? convertAmountToCents(Number(amount)) : convertAmountToCents(amount);
     return this;
   }
 

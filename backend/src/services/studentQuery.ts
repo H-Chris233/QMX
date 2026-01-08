@@ -13,6 +13,7 @@ import {
   asc,
   count,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 
 export interface StudentQueryResult {
@@ -212,14 +213,14 @@ export class StudentQuery {
         and(
           isNotNull(students.membershipStartDate),
           isNotNull(students.membershipEndDate)
-        ) as unknown as typeof eq
+        ) as SQL<unknown>
       );
     } else if (this.membershipFilter === 'withoutMembership') {
       conditions.push(
         or(
           isNull(students.membershipStartDate),
           isNull(students.membershipEndDate)
-        ) as unknown as typeof eq
+        ) as SQL<unknown>
       );
     }
 
@@ -227,15 +228,15 @@ export class StudentQuery {
       const today = sql`CURRENT_DATE`;
       if (this.membershipStatusFilter === 'ACTIVE') {
         conditions.push(
-          sql`(${students.membershipStartDate} <= ${today} AND ${students.membershipEndDate} >= ${today})` as unknown as typeof eq
+          sql`(${students.membershipStartDate} <= ${today} AND ${students.membershipEndDate} >= ${today})` as SQL<unknown>
         );
       } else if (this.membershipStatusFilter === 'EXPIRED') {
         conditions.push(
-          sql`${students.membershipEndDate} < ${today}` as unknown as typeof eq
+          sql`${students.membershipEndDate} < ${today}` as SQL<unknown>
         );
       } else if (this.membershipStatusFilter === 'UPCOMING') {
         conditions.push(
-          sql`${students.membershipStartDate} > ${today}` as unknown as typeof eq
+          sql`${students.membershipStartDate} > ${today}` as SQL<unknown>
         );
       }
     }

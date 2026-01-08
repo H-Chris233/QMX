@@ -133,7 +133,7 @@ export class InstallmentPlanRepository {
     if (conditions.length > 0) {
       dataQuery = dataQuery.where(and(...conditions));
     }
-    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset);
+    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as InstallmentPlan[];
 
     // 查询总数
     let countQuery = db.select({ count: count() }).from(installmentPlans);
@@ -395,7 +395,7 @@ export class InstallmentRepository {
     if (conditions.length > 0) {
       dataQuery = dataQuery.where(and(...conditions));
     }
-    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset);
+    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as Installment[];
 
     // 查询总数
     let countQuery = db.select({ count: count() }).from(installments);

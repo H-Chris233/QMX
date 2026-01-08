@@ -103,7 +103,7 @@ export class CashRepository {
   }
 
   // 分页查询
-  static async findWithPagination(options: CashSearchOptions) {
+  static async findWithPagination(options: CashSearchOptions): Promise<PaginationResult<CashTransaction>> {
     const page = options.page || 1;
     const limit = Math.min(options.limit || 20, 100);
     const offset = (page - 1) * limit;
@@ -116,7 +116,7 @@ export class CashRepository {
     if (conditions.length > 0) {
       dataQuery = dataQuery.where(and(...conditions));
     }
-    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset);
+    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as CashTransaction[];
 
     // 查询总数
     let countQuery = db.select({ count: count() }).from(cashTransactions);

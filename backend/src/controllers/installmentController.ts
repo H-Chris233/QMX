@@ -198,11 +198,11 @@ export class InstallmentController {
 
     // 计算汇总统计
     const totalOverdueAmount = enriched.reduce(
-      (sum, item) => sum + (item.overdueAmountInCents ?? 0),
+      (sum, item) => sum + (item.overdue_amount ?? 0),
       0
     );
     const totalDays = enriched.reduce(
-      (sum, item) => sum + (item.daysOverdue ?? 0),
+      (sum, item) => sum + (item.days_overdue ?? 0),
       0
     );
     const count = enriched.length;
@@ -576,7 +576,7 @@ export class InstallmentController {
           .where(eq(installments.uid, installment.uid));
 
           // 刷新计划状态
-          await this.refreshPlanStatus(tx, plan.uid);
+          await InstallmentRepository.refreshPlanStatus(plan.uid);
 
           return { installment: installment.uid, cash: newCash };
       } else if (normalizedStatus === InstallmentStatus.PENDING) {
@@ -598,7 +598,7 @@ export class InstallmentController {
           .where(eq(installments.uid, installment.uid));
 
           // 刷新计划状态
-          await this.refreshPlanStatus(tx, plan.uid);
+          await InstallmentRepository.refreshPlanStatus(plan.uid);
 
           return { installment: installment.uid, cash: null };
       } else if (normalizedStatus === InstallmentStatus.CANCELLED) {
@@ -611,7 +611,7 @@ export class InstallmentController {
           .where(eq(installments.uid, installment.uid));
 
           // 刷新计划状态
-          await this.refreshPlanStatus(tx, plan.uid);
+          await InstallmentRepository.refreshPlanStatus(plan.uid);
 
           return { installment: installment.uid, cash: null };
       } else if (normalizedStatus === InstallmentStatus.OVERDUE) {
@@ -621,7 +621,7 @@ export class InstallmentController {
           .where(eq(installments.uid, installment.uid));
 
           // 刷新计划状态
-          await this.refreshPlanStatus(tx, plan.uid);
+          await InstallmentRepository.refreshPlanStatus(plan.uid);
 
           return { installment: installment.uid, cash: null };
       }
@@ -759,7 +759,7 @@ export class InstallmentController {
         .where(eq(installments.uid, target.uid));
 
       // 4. 刷新计划状态
-      await this.refreshPlanStatus(tx, plan.uid);
+      await InstallmentRepository.refreshPlanStatus(plan.uid);
 
       return { target, cash: newCash };
     });
