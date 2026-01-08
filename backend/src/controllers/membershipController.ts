@@ -89,13 +89,13 @@ const buildMembershipResponse = <T extends Record<string, unknown> = Record<stri
     ...presentedStudent,
     membershipStatus,
     membership_status: membershipStatus,
-    membershipStartDate: membershipStartDate ?? null,
+    membershipStartDate: membershipStartDate,
     membership_start_date: membershipStartDate,
-    membershipEndDate: membershipEndDate ?? null,
+    membershipEndDate: membershipEndDate,
     membership_end_date: membershipEndDate,
     isMembershipActive,
     is_membership_active: isMembershipActive,
-    membershipDaysRemaining: membershipDaysRemaining ?? null,
+    membershipDaysRemaining: membershipDaysRemaining,
     membership_days_remaining: membershipDaysRemaining,
   };
 

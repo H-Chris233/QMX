@@ -109,7 +109,7 @@ export async function createTestInstallmentPlan(
     totalInstallments,
     frequency,
     customDays,
-    startDate,
+    startDate: startDate.toISOString().split('T')[0],
     note: undefined,
   });
 }

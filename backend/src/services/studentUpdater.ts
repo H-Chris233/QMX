@@ -153,8 +153,8 @@ export class StudentUpdater {
       throw new Error('会员开始日期不能晚于结束日期');
     }
 
-    this.updates.membershipStartDate = formattedStart;
-    this.updates.membershipEndDate = formattedEnd;
+    this.updates.membershipStartDate = formattedStart ?? undefined;
+    this.updates.membershipEndDate = formattedEnd ?? undefined;
 
     return this;
   }

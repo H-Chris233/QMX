@@ -33,8 +33,8 @@ interface StudentIncomeSummary {
 
 interface FinancialStatsResponse {
   period: string;
-  date_from: Date;
-  date_to: Date;
+  date_from: string;
+  date_to: string;
   total_income: number;
   total_expense: number;
   net_income: number;
@@ -217,14 +217,13 @@ export class CashController {
           const installmentData = {
             planId: installmentPlan.uid,
             installmentNumber: i,
-            totalInstallments: totalInstallmentsInt,
             installmentAmount: amountForInstallment,
-            dueDate: dueDate,
+            dueDate: dueDate.toISOString().split('T')[0],
             status:
               i === 1 ? InstallmentStatusValues.PAID : InstallmentStatusValues.PENDING,
-            paidAmount: i === 1 ? amountForInstallment : undefined,
-            paidDate: i === 1 ? new Date() : undefined,
-            studentId: installmentPlan.studentId ?? null,
+            paidAmount: i === 1 ? amountForInstallment : 0,
+            paidDate: i === 1 ? new Date().toISOString().split('T')[0] : undefined,
+            studentId: installmentPlan.studentId,
           };
           installmentsToCreate.push(installmentData);
 
@@ -257,7 +256,7 @@ export class CashController {
             installment_uid: firstInstallment?.uid ?? null,
             installment_number: firstInstallment?.installmentNumber ?? 1,
             total_installments: totalInstallmentsInt,
-            due_date: firstInstallment?.dueDate ?? startDateValue,
+            due_date: firstInstallment?.dueDate ?? (typeof startDateValue === 'string' ? startDateValue : startDateValue.toISOString().split('T')[0]),
             status: InstallmentStatusValues.PAID,
             note: sanitizedNote ?? undefined,
           })
@@ -292,7 +291,6 @@ export class CashController {
           installments: createdInstallments.map((inst) => ({
             uid: inst.uid,
             current_installment: inst.installmentNumber,
-            total_installments: inst.totalInstallments,
             installment_amount: this.formatAmount(inst.installmentAmount),
             due_date: inst.dueDate,
             status: inst.status,
@@ -517,10 +515,10 @@ export class CashController {
         ? `+¥${amountYuan.toFixed(2)}`
         : `-¥${Math.abs(amountYuan).toFixed(2)}`,
       installment: transaction.installmentSnapshot ?? null,
-      created_at: transaction.createdAt?.toISOString() || '',
-      createdAt: transaction.createdAt,
-      updated_at: transaction.updatedAt?.toISOString() || '',
-      updatedAt: transaction.updatedAt,
+      created_at: transaction.createdAt instanceof Date ? transaction.createdAt.toISOString() : (transaction.createdAt || ''),
+      createdAt: transaction.createdAt instanceof Date ? transaction.createdAt.toISOString() : (transaction.createdAt || ''),
+      updated_at: transaction.updatedAt instanceof Date ? transaction.updatedAt.toISOString() : (transaction.updatedAt || ''),
+      updatedAt: transaction.updatedAt instanceof Date ? transaction.updatedAt.toISOString() : (transaction.updatedAt || ''),
     };
 
     return { ...base, ...overrides };
@@ -654,7 +652,7 @@ export class CashController {
       const responseData: FinancialStatsResponse = {
         period,
         date_from: dateFrom,
-        date_to: now,
+        date_to: now.toISOString().split('T')[0],
         total_income: stats.totalIncome / 100,
         total_expense: stats.totalExpense / 100,
         net_income: net_income / 100,

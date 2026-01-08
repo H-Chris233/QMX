@@ -350,7 +350,16 @@ export class InstallmentController {
         remainingAmount / totalInstallmentsInt
       );
 
-      const installmentRecords = [];
+      const installmentRecords: Array<{
+        planId: number;
+        studentId: number | null;
+        installmentNumber: number;
+        installmentAmount: number;
+        dueDate: string;
+        status: string;
+        paidAmount: number;
+        paidDate: string | null;
+      }> = [];
       let dueDate = new Date(createdPlan.startDate.toString());
 
       for (let i = 1; i <= totalInstallmentsInt; i++) {
@@ -391,6 +400,10 @@ export class InstallmentController {
 
       // 3. 创建首期交易记录
       const firstInstallment = createdInstallments[0];
+      if (!firstInstallment) {
+        throw AppError.other("创建分期记录失败");
+      }
+
       const totalFirstPayment =
         createdPlan.downPayment + firstInstallment.installmentAmount;
 
@@ -399,9 +412,11 @@ export class InstallmentController {
         installment_uid: firstInstallment.uid,
         installment_number: 1,
         total_installments: totalInstallmentsInt,
-        due_date: firstInstallment.dueDate,
+        due_date: typeof firstInstallment.dueDate === 'string'
+          ? firstInstallment.dueDate
+          : firstInstallment.dueDate.toISOString().split('T')[0],
         status: InstallmentStatus.PAID,
-        note: createdPlan.note,
+        note: createdPlan.note ?? undefined,
       };
 
       const cashData = {
@@ -725,9 +740,11 @@ export class InstallmentController {
         installment_uid: target.uid,
         installment_number: target.installmentNumber,
         total_installments: plan.totalInstallments,
-        due_date: target.dueDate,
+        due_date: typeof target.dueDate === 'string'
+          ? target.dueDate
+          : target.dueDate.toISOString().split('T')[0],
         status: InstallmentStatus.PAID,
-        note: plan.note ?? null,
+        note: plan.note ?? undefined,
       };
 
       const [newCash] = await tx

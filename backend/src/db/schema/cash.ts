@@ -17,7 +17,7 @@ export interface InstallmentSnapshot {
   installment_uid?: number | null | undefined;
   installment_number?: number | null | undefined;
   total_installments?: number | null | undefined;
-  due_date?: string | Date | null | undefined;
+  due_date?: string | null | undefined;
   status?: string | null | undefined;
   note?: string | null | undefined;
 }

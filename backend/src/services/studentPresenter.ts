@@ -43,8 +43,8 @@ export interface PresentedStudent {
   membershipDaysRemaining: number | null;
   isMembershipActive: boolean;
   membershipStatus: MembershipStatus;
-  createdAt: Date | string | null;
-  updatedAt: Date | string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   lesson_left: number | null;
   membership_start_date: string | null;
   membership_end_date: string | null;
