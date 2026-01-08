@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import { AppError } from "@/utils/errors";
 import { catchAsync } from "@/middleware/errorHandler";
-import { PaymentFrequency, convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
-import { InstallmentStatus, InstallmentPlanStatus } from "@/types";
+import { convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
+import { PaymentFrequency, PaymentFrequencyValues, InstallmentStatusValues, InstallmentPlanStatusValues } from "@/types";
 import logger from "@/utils/logger";
 import { db } from "../db";
 import {
@@ -69,7 +69,8 @@ export class InstallmentController {
       filter.studentId = Number(student_id);
     }
 
-    if (status && Object.values(InstallmentPlanStatus).includes(status)) {
+    const validStatuses = ['ACTIVE', 'COMPLETED', 'CANCELLED'];
+    if (status && validStatuses.includes(status)) {
       filter.status = status;
     }
 
@@ -819,7 +820,8 @@ export class InstallmentController {
       updateData.note = normalizeNote(note);
     }
 
-    if (status && Object.values(InstallmentPlanStatus).includes(status)) {
+    const validStatuses = ['ACTIVE', 'COMPLETED', 'CANCELLED'];
+    if (status && validStatuses.includes(status)) {
       updateData.status = status;
     }
 
@@ -1127,9 +1129,8 @@ export class InstallmentController {
     if (typeof value !== "string") {
       return null;
     }
-    const matched = Object.values(PaymentFrequency).find(
-      (item) => item === value
-    );
+    const validFrequencies: PaymentFrequency[] = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'CUSTOM'];
+    const matched = validFrequencies.find((item) => item === value);
     return matched ?? null;
   }
 
@@ -1142,7 +1143,7 @@ export class InstallmentController {
     if (typeof value !== "string") {
       return null;
     }
-    const matched = Object.values(InstallmentStatus).find(
+    const matched = Object.values(InstallmentStatusValues).find(
       (item) => item === value
     );
     return matched ?? null;
@@ -1191,13 +1192,13 @@ export class InstallmentController {
         : null;
 
     switch (frequency) {
-      case PaymentFrequency.WEEKLY:
+      case PaymentFrequencyValues.WEEKLY:
         return "周付";
-      case PaymentFrequency.MONTHLY:
+      case PaymentFrequencyValues.MONTHLY:
         return "月付";
-      case PaymentFrequency.QUARTERLY:
+      case PaymentFrequencyValues.QUARTERLY:
         return "季付";
-      case PaymentFrequency.CUSTOM:
+      case PaymentFrequencyValues.CUSTOM:
         return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
       default:
         return frequency;
@@ -1215,19 +1216,17 @@ export class InstallmentController {
     const next = new Date(current);
 
     switch (frequency) {
-      case PaymentFrequency.WEEKLY:
+      case PaymentFrequencyValues.WEEKLY:
         next.setDate(next.getDate() + 7);
         break;
-      case PaymentFrequency.MONTHLY:
+      case PaymentFrequencyValues.MONTHLY:
         next.setMonth(next.getMonth() + 1);
         break;
-      case PaymentFrequency.QUARTERLY:
+      case PaymentFrequencyValues.QUARTERLY:
         next.setMonth(next.getMonth() + 3);
         break;
-      case PaymentFrequency.CUSTOM:
+      case PaymentFrequencyValues.CUSTOM:
         next.setDate(next.getDate() + (customDays ?? 0));
-        break;
-      default:
         break;
     }
 
@@ -1239,19 +1238,19 @@ export class InstallmentController {
    */
   private getStatusText(status: string): string {
     switch (status) {
-      case InstallmentStatus.PENDING:
+      case InstallmentStatusValues.PENDING:
         return "待支付";
-      case InstallmentStatus.PAID:
+      case InstallmentStatusValues.PAID:
         return "已支付";
-      case InstallmentStatus.OVERDUE:
+      case InstallmentStatusValues.OVERDUE:
         return "已逾期";
-      case InstallmentStatus.CANCELLED:
+      case InstallmentStatusValues.CANCELLED:
         return "已取消";
-      case InstallmentPlanStatus.CANCELLED:
+      case InstallmentPlanStatusValues.CANCELLED:
         return "已取消";
-      case InstallmentPlanStatus.ACTIVE:
+      case InstallmentPlanStatusValues.ACTIVE:
         return "进行中";
-      case InstallmentPlanStatus.COMPLETED:
+      case InstallmentPlanStatusValues.COMPLETED:
         return "已完成";
       default:
         return status;

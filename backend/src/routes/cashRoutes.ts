@@ -4,7 +4,7 @@ import type { Router } from 'express';
 import cashController from '@/controllers/cashController';
 import { validate, validateParams, validateQuery, commonValidations } from '@/middleware/validation';
 import { apiRateLimitMiddleware } from '@/middleware/rateLimiter';
-import { PaymentFrequency } from '@/types';
+import { PaymentFrequencyValues } from '@/types';
 
 const router: Router = express.Router();
 
@@ -43,7 +43,7 @@ const addInstallmentTransactionSchema = Joi.object({
     'number.min': '总期数至少为1',
     'any.required': '总期数不能为空',
   }),
-  frequency: Joi.string().valid(...Object.values(PaymentFrequency)).required().messages({
+  frequency: Joi.string().valid(...Object.values(PaymentFrequencyValues)).required().messages({
     'any.only': '无效的付款频率',
     'any.required': '付款频率不能为空',
   }),
@@ -54,7 +54,7 @@ const addInstallmentTransactionSchema = Joi.object({
   current_installment: Joi.number().integer().min(1).default(1),
   plan_id: commonValidations.optionalId,
   custom_days: Joi.number().integer().min(1).max(365).when('frequency', {
-    is: PaymentFrequency.CUSTOM,
+    is: PaymentFrequencyValues.CUSTOM,
     then: Joi.required(),
     otherwise: Joi.optional(),
   }),

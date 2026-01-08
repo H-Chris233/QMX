@@ -51,9 +51,8 @@ interface PresentedStudent {
   is_membership_active: boolean;
   membershipDaysRemaining: number | null;
   membership_days_remaining: number | null;
-  averageScore: number;
-  created_at: string;
-  updated_at: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface MembershipResponseBase {
@@ -90,13 +89,13 @@ const buildMembershipResponse = <T extends Record<string, unknown> = Record<stri
     ...presentedStudent,
     membershipStatus,
     membership_status: membershipStatus,
-    membershipStartDate,
+    membershipStartDate: membershipStartDate ?? null,
     membership_start_date: membershipStartDate,
-    membershipEndDate,
+    membershipEndDate: membershipEndDate ?? null,
     membership_end_date: membershipEndDate,
     isMembershipActive,
     is_membership_active: isMembershipActive,
-    membershipDaysRemaining,
+    membershipDaysRemaining: membershipDaysRemaining ?? null,
     membership_days_remaining: membershipDaysRemaining,
   };
 

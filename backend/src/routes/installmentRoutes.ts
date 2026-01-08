@@ -10,9 +10,9 @@ import {
 } from "@/middleware/validation";
 import { apiRateLimitMiddleware } from "@/middleware/rateLimiter";
 import {
-  InstallmentStatus,
-  PaymentFrequency,
-  InstallmentPlanStatus,
+  InstallmentStatusValues,
+  PaymentFrequencyValues,
+  InstallmentPlanStatusValues,
 } from "@/types";
 
 const router: Router = express.Router();
@@ -35,7 +35,7 @@ const createInstallmentPlanSchema = Joi.object({
     "any.required": "总期数不能为空",
   }),
   frequency: Joi.string()
-    .valid(...Object.values(PaymentFrequency))
+    .valid(...Object.values(PaymentFrequencyValues))
     .required()
     .messages({
       "any.only": "无效的付款频率",
@@ -45,7 +45,7 @@ const createInstallmentPlanSchema = Joi.object({
     .integer()
     .min(1)
     .when("frequency", {
-      is: PaymentFrequency.CUSTOM,
+      is: PaymentFrequencyValues.CUSTOM,
       then: Joi.required().messages({
         "any.required": "自定义频率必须指定天数",
       }),
@@ -59,7 +59,7 @@ const createInstallmentPlanSchema = Joi.object({
 
 const updateInstallmentStatusSchema = Joi.object({
   status: Joi.string()
-    .valid(...Object.values(InstallmentStatus))
+    .valid(...Object.values(InstallmentStatusValues))
     .required()
     .messages({
       "any.only": "无效的分期付款状态",
@@ -79,7 +79,7 @@ const queryInstallmentSchema = Joi.object({
   sort_order: commonValidations.sortOrder,
   student_id: commonValidations.id.optional(),
   status: Joi.string()
-    .valid(...Object.values(InstallmentPlanStatus))
+    .valid(...Object.values(InstallmentPlanStatusValues))
     .optional(),
 });
 
@@ -88,7 +88,7 @@ const updateInstallmentPlanSchema = Joi.object({
     "string.max": "备注长度不能超过1000字符",
   }),
   status: Joi.string()
-    .valid(...Object.values(InstallmentPlanStatus))
+    .valid(...Object.values(InstallmentPlanStatusValues))
     .optional()
     .messages({
       "any.only": "无效的分期计划状态",

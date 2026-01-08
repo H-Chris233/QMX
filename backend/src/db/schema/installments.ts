@@ -14,15 +14,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { students } from './students';
 import { cashTransactions } from './cash';
-
-// 枚举类型
-export const frequencyEnum = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'CUSTOM'] as const;
-export const planStatusEnum = ['ACTIVE', 'COMPLETED', 'CANCELLED'] as const;
-export const installmentStatusEnum = ['PENDING', 'PAID', 'OVERDUE', 'CANCELLED'] as const;
-
-export type Frequency = typeof frequencyEnum[number];
-export type PlanStatus = typeof planStatusEnum[number];
-export type InstallmentStatus = typeof installmentStatusEnum[number];
+import { PaymentFrequency, InstallmentStatus, InstallmentPlanStatus } from '../../types';
 
 // 分期计划表
 export const installmentPlans = pgTable('installment_plans', {

@@ -24,27 +24,37 @@ export enum MembershipStatus {
   UPCOMING = 'Upcoming',
 }
 
-// 分期付款状态枚举
-export enum InstallmentStatus {
-  PENDING = 'Pending',
-  PAID = 'Paid',
-  OVERDUE = 'Overdue',
-  CANCELLED = 'Cancelled',
-}
+// 分期付款状态类型 (与数据库一致)
+export type InstallmentStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
 
-// 付款频率枚举
-export enum PaymentFrequency {
-  WEEKLY = 'Weekly',
-  MONTHLY = 'Monthly',
-  QUARTERLY = 'Quarterly',
-  CUSTOM = 'Custom',
-}
+// 分期计划状态类型 (与数据库一致)
+export type InstallmentPlanStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
-export enum InstallmentPlanStatus {
-  ACTIVE = 'Active',
-  COMPLETED = 'Completed',
-  CANCELLED = 'Cancelled',
-}
+// 付款频率类型 (与数据库一致)
+export type PaymentFrequency = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'CUSTOM';
+
+// 付款频率常量 (用于 switch case)
+export const PaymentFrequencyValues = {
+  WEEKLY: 'WEEKLY' as PaymentFrequency,
+  MONTHLY: 'MONTHLY' as PaymentFrequency,
+  QUARTERLY: 'QUARTERLY' as PaymentFrequency,
+  CUSTOM: 'CUSTOM' as PaymentFrequency,
+};
+
+// 分期状态常量 (用于 switch case)
+export const InstallmentStatusValues = {
+  PENDING: 'PENDING' as InstallmentStatus,
+  PAID: 'PAID' as InstallmentStatus,
+  OVERDUE: 'OVERDUE' as InstallmentStatus,
+  CANCELLED: 'CANCELLED' as InstallmentStatus,
+};
+
+// 分期计划状态常量 (用于 switch case)
+export const InstallmentPlanStatusValues = {
+  ACTIVE: 'ACTIVE' as InstallmentPlanStatus,
+  COMPLETED: 'COMPLETED' as InstallmentPlanStatus,
+  CANCELLED: 'CANCELLED' as InstallmentPlanStatus,
+};
 
 // 学员接口
 export interface IStudent {
@@ -52,26 +62,20 @@ export interface IStudent {
   name: string;
   age: number | null;
   phone: string;
-  class: ClassType;
-  subject: SubjectType;
+  classType: ClassType;
+  subject: Subject;
   rings: number[];
-  note: string;
-  lesson_left: number | null;
-  lessonLeft?: number | null;
-  membership_start_date: string | null;
-  membershipStartDate?: string | null;
-  membership_end_date: string | null;
-  membershipEndDate?: string | null;
-  membership_days_remaining: number | null;
-  membershipDaysRemaining?: number | null;
-  is_membership_active: boolean;
-  isMembershipActive?: boolean;
-  membership_status?: MembershipStatus;
-  membershipStatus?: MembershipStatus;
-  created_at?: string | null;
-  createdAt?: Date;
-  updated_at?: string | null;
-  updatedAt?: Date;
+  note: string | null;
+  lessonLeft: number | null;
+  class?: never;
+  membershipStartDate: Date | null;
+  membershipEndDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  membership_start_date?: never;
+  membershipEndDate?: never;
+  membership_end_date?: never;
+  lesson_left?: never;
 }
 
 // 学员创建属性
@@ -83,34 +87,20 @@ export interface ICashInstallmentSnapshot {
   installment_uid?: number | null;
   installment_number?: number | null;
   total_installments?: number | null;
-  due_date?: Date | string | null;
-  status?: InstallmentStatus | string | null;
+  due_date?: string | null;
+  status?: string | null;
   note?: string | null;
 }
 
 // 交易记录接口
 export interface ICash {
   uid: number;
-  student_id: number | null;
-  studentId?: number | null;
-  cash: number;
-  amount_in_cents?: number;
-  amountInCents?: number;
+  studentId: number | null;
   amount: number;
   note: string | null;
-  installment?: ICashInstallmentSnapshot | null;
-  student?: Record<string, unknown> | null;
-  is_income: boolean;
-  isIncome?: boolean;
-  is_expense: boolean;
-  isExpense?: boolean;
-  formatted_amount: string;
-  formattedAmount?: string;
-  description?: string;
-  created_at: Date | string;
-  createdAt?: Date;
-  updated_at?: Date | string;
-  updatedAt?: Date;
+  installmentSnapshot?: ICashInstallmentSnapshot | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // 交易创建属性
@@ -125,23 +115,17 @@ export interface ICashCreationAttributes {
 // 分期付款计划接口
 export interface IInstallmentPlan {
   uid: number;
-  student_id: number | null;
-  studentId?: number | null;
-  total_amount: number;
-  totalAmount?: number;
-  total_installments: number;
-  totalInstallments?: number;
+  studentId: number;
+  totalAmount: number;
+  downPayment: number;
+  totalInstallments: number;
   frequency: PaymentFrequency;
-  custom_days?: number | null;
-  customDays?: number | null;
-  start_date: Date | string;
-  startDate?: Date | string;
+  customDays: number | null;
+  startDate: Date;
   status: InstallmentPlanStatus;
-  note?: string | null;
-  created_at: Date | string;
-  createdAt?: Date;
-  updated_at: Date | string;
-  updatedAt?: Date;
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // 分期付款创建属性
@@ -150,35 +134,18 @@ export interface IInstallmentPlanCreationAttributes extends Omit<IInstallmentPla
 // 分期付款详情接口
 export interface IInstallment {
   uid: number;
-  plan_id: number;
-  planId?: number;
-  installment_amount: number;
-  installmentAmount?: number;
-  current_installment: number;
-  currentInstallment?: number;
-  total_installments: number;
-  totalInstallments?: number;
-  due_date: Date | string;
-  dueDate?: Date | string;
+  planId: number;
+  studentId: number;
+  installmentNumber: number;
+  installmentAmount: number;
+  paidAmount: number;
+  dueDate: Date;
+  paidDate: Date | null;
   status: InstallmentStatus;
-  paid_amount: number;
-  paidAmount?: number;
-  paid_at: Date | string | null;
-  paidAt?: Date | string | null;
-  student_id: number | null;
-  studentId?: number | null;
-  cash_uid: number | null;
-  cashUid?: number | null;
-  is_overdue?: boolean;
-  isOverdue?: boolean;
-  days_overdue?: number;
-  daysOverdue?: number;
-  remaining_amount?: number;
-  remainingAmount?: number;
-  created_at: Date | string;
-  createdAt?: Date;
-  updated_at: Date | string;
-  updatedAt?: Date;
+  note: string | null;
+  cashUid: number | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // 分期付款创建属性

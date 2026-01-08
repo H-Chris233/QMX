@@ -706,7 +706,6 @@ export class StatsController {
             uid: installment.uid,
             plan_id: installment.planId,
             current_installment: installment.installmentNumber,
-            total_installments: installment.totalInstallments,
             installment_amount: installment.installmentAmount / 100,
             due_date: installment.dueDate,
             days_overdue: daysOverdue,
@@ -777,13 +776,13 @@ export class StatsController {
         : null;
 
     switch (frequency) {
-      case PaymentFrequency.WEEKLY:
+      case 'WEEKLY':
         return "周付";
-      case PaymentFrequency.MONTHLY:
+      case 'MONTHLY':
         return "月付";
-      case PaymentFrequency.QUARTERLY:
+      case 'QUARTERLY':
         return "季付";
-      case PaymentFrequency.CUSTOM:
+      case 'CUSTOM':
         return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
       default:
         return typeof frequency === "string" ? frequency : String(frequency);

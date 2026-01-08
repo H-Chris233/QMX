@@ -33,6 +33,7 @@ export interface PresentedStudent {
   age: number | null;
   phone: string;
   class: string;
+  classType: string;
   subject: string;
   rings: number[];
   note: string;
@@ -42,8 +43,8 @@ export interface PresentedStudent {
   membershipDaysRemaining: number | null;
   isMembershipActive: boolean;
   membershipStatus: MembershipStatus;
-  createdAt: string | null;
-  updatedAt: string | null;
+  createdAt: Date | string | null;
+  updatedAt: Date | string | null;
   lesson_left: number | null;
   membership_start_date: string | null;
   membership_end_date: string | null;
@@ -152,7 +153,8 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     name: json.name ?? '',
     age: json.age ?? null,
     phone: json.phone ?? '',
-    class: json.class ?? '',
+    class: json.class ?? json.classType ?? '',
+    classType: json.classType ?? json.class ?? '',
     subject: json.subject ?? '',
     rings,
     note: json.note ?? '',
@@ -162,15 +164,15 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     membershipDaysRemaining,
     isMembershipActive,
     membershipStatus,
-    createdAt: createdAt,
-    updatedAt: updatedAt,
+    createdAt: json.createdAt ?? student.createdAt ?? null,
+    updatedAt: json.updatedAt ?? student.updatedAt ?? null,
     lesson_left: lessonLeft,
     membership_start_date: membershipStartDate,
     membership_end_date: membershipEndDate,
     membership_days_remaining: membershipDaysRemaining,
     is_membership_active: isMembershipActive,
     membership_status: membershipStatus,
-    created_at,
-    updated_at,
+    created_at: created_at,
+    updated_at: updated_at,
   };
 };

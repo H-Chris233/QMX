@@ -3,8 +3,8 @@ import { catchAsync } from "@/middleware/errorHandler";
 import { CashBuilder, convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
 import {
   InstallmentStatus,
-  PaymentFrequency,
   InstallmentPlanStatus,
+  PaymentFrequencyValues,
   IApiResponse,
   IPaginatedResponse,
 } from "@/types";
@@ -171,12 +171,12 @@ export class CashController {
       }
 
       const customDaysValue =
-        normalizedFrequency === PaymentFrequency.CUSTOM
+        normalizedFrequency === PaymentFrequencyValues.CUSTOM
           ? this.normalizePositiveInteger(custom_days)
           : null;
 
       if (
-        normalizedFrequency === PaymentFrequency.CUSTOM &&
+        normalizedFrequency === PaymentFrequencyValues.CUSTOM &&
         customDaysValue === null
       ) {
         throw AppError.invalidInput("自定义频率必须指定天数且大于0");
@@ -536,9 +536,8 @@ export class CashController {
     if (typeof value !== "string") {
       return null;
     }
-    const matched = Object.values(PaymentFrequency).find(
-      (item) => item === value
-    );
+    const validFrequencies: PaymentFrequency[] = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'CUSTOM'];
+    const matched = validFrequencies.find((item) => item === value);
     return matched ?? null;
   }
 
@@ -561,19 +560,17 @@ export class CashController {
     const next = new Date(current);
 
     switch (frequency) {
-      case PaymentFrequency.WEEKLY:
+      case PaymentFrequencyValues.WEEKLY:
         next.setDate(next.getDate() + 7);
         break;
-      case PaymentFrequency.MONTHLY:
+      case PaymentFrequencyValues.MONTHLY:
         next.setMonth(next.getMonth() + 1);
         break;
-      case PaymentFrequency.QUARTERLY:
+      case PaymentFrequencyValues.QUARTERLY:
         next.setMonth(next.getMonth() + 3);
         break;
-      case PaymentFrequency.CUSTOM:
+      case PaymentFrequencyValues.CUSTOM:
         next.setDate(next.getDate() + (customDays ?? 0));
-        break;
-      default:
         break;
     }
 
@@ -892,13 +889,13 @@ export class CashController {
         : null;
 
     switch (frequency) {
-      case PaymentFrequency.WEEKLY:
+      case PaymentFrequencyValues.WEEKLY:
         return "周付";
-      case PaymentFrequency.MONTHLY:
+      case PaymentFrequencyValues.MONTHLY:
         return "月付";
-      case PaymentFrequency.QUARTERLY:
+      case PaymentFrequencyValues.QUARTERLY:
         return "季付";
-      case PaymentFrequency.CUSTOM:
+      case PaymentFrequencyValues.CUSTOM:
         return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
       default:
         return typeof frequency === "string" ? frequency : String(frequency);
