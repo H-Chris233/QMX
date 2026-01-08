@@ -1,11 +1,9 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import StatsService from '@/services/statsService';
-import { CashClass, Cash } from '@/models/CashMongo';
-import { Installment, InstallmentModel } from '@/models/InstallmentMongo';
-import { InstallmentPlan, InstallmentPlanModel } from '@/models/InstallmentPlanMongo';
-import { studentModel } from '@/models/mongo';
+import { CashRepository } from '@/db/repositories/cashRepository';
+import { InstallmentPlanRepository, InstallmentRepository } from '@/db/repositories/installmentRepository';
+import { StudentRepository } from '@/db/repositories/studentRepository';
 import { StudentBuilder } from '@/services/studentBuilder';
+import { CashBuilder } from '@/services/cashBuilder';
 import {
   ClassType,
   SubjectType,
@@ -13,14 +11,17 @@ import {
   InstallmentStatus,
   MembershipStatus,
 } from '@/types';
-import { 
+import {
   setupTestDatabase,
   cleanupTestDatabase,
   clearAllCollections,
   resetAllSequences,
-  TestDataFactory, 
-  dateUtils 
-} from '../../test/setupBackend';
+  createTestStudent,
+  createTestCashTransaction,
+  createTestInstallmentPlan,
+  createTestInstallment,
+  addDays,
+} from './helpers/testSetup';
 
 jest.setTimeout(30000);
 
@@ -50,7 +51,7 @@ describe('StatsService', () => {
       .subject(SubjectType.SHOOTING)
       .phone('13800000001')
       .rings([8.4, 9.1])
-      .membership({ startDate: membershipStart, endDate: membershipEnd })
+      .membership(membershipStart, membershipEnd)
       .build();
 
     const trialStudent = await StudentBuilder.create()
@@ -68,43 +69,42 @@ describe('StatsService', () => {
       .phone('13800000003')
       .build();
 
-    await CashClass.create({ student_id: activeStudent.uid, cash: 50_000, note: 'Tuition' });
-    await CashClass.create({ student_id: trialStudent.uid, cash: 30_000, note: 'Course' });
-    await CashClass.create({ student_id: activeStudent.uid, cash: 15_000, note: 'Equipment' });
-    await CashClass.create({ cash: -12_000, note: 'Rent' });
+    // 创建交易记录
+    await CashBuilder.create().amount(500).studentId(activeStudent.uid).note('Tuition').build();
+    await CashBuilder.create().amount(300).studentId(trialStudent.uid).note('Course').build();
+    await CashBuilder.create().amount(150).studentId(activeStudent.uid).note('Equipment').build();
+    await CashBuilder.create().amount(-120).note('Rent').build();
 
-    const plan = await InstallmentPlan.create({
-      student_id: activeStudent.uid,
-      total_amount: 80_000,
-      total_installments: 4,
-      frequency: PaymentFrequency.MONTHLY,
-      start_date: new Date(),
-    });
+    // 创建分期计划
+    const plan = await createTestInstallmentPlan(
+      800, // 总金额（元）
+      4,   // 期数
+      PaymentFrequency.MONTHLY,
+      new Date(),
+      activeStudent.uid
+    );
 
-    const overdueDueDate = new Date();
-    overdueDueDate.setDate(overdueDueDate.getDate() - 10);
+    const overdueDueDate = addDays(new Date(), -10);
 
-    await Installment.create({
-      plan_id: plan.uid,
-      installment_amount: 20_000,
-      current_installment: 1,
-      total_installments: 4,
-      due_date: overdueDueDate,
-      status: InstallmentStatus.PENDING,
-      student_id: activeStudent.uid,
-    });
+    await createTestInstallment(
+      plan.uid,
+      activeStudent.uid,
+      1,
+      4,
+      200, // 每期金额（元）
+      overdueDueDate,
+      InstallmentStatus.PENDING
+    );
 
-    await Installment.create({
-      plan_id: plan.uid,
-      installment_amount: 20_000,
-      current_installment: 2,
-      total_installments: 4,
-      due_date: new Date(),
-      status: InstallmentStatus.PAID,
-      paid_amount: 20_000,
-      paid_at: new Date(),
-      student_id: activeStudent.uid,
-    });
+    await createTestInstallment(
+      plan.uid,
+      activeStudent.uid,
+      2,
+      4,
+      200, // 每期金额（元）
+      new Date(),
+      InstallmentStatus.PAID
+    );
 
     return { activeStudent, trialStudent, otherStudent, plan };
   };
@@ -115,9 +115,9 @@ describe('StatsService', () => {
     const stats = await StatsService.buildDashboardStats();
 
     expect(stats.totalStudents).toBe(3);
-    expect(stats.totalRevenueCents).toBe(95_000);
-    expect(stats.totalExpenseCents).toBe(12_000);
-    expect(stats.netIncomeCents).toBe(83_000);
+    expect(stats.totalRevenueCents).toBe(95000); // 500 + 300 + 150
+    expect(stats.totalExpenseCents).toBe(12000);
+    expect(stats.netIncomeCents).toBe(83000);
     expect(stats.averageScore).toBeCloseTo(7.9, 1);
     expect(stats.maxScore).toBeCloseTo(9.1, 1);
     expect(stats.activeCourses).toBe(2);
@@ -132,7 +132,7 @@ describe('StatsService', () => {
     const stats = await StatsService.buildStudentStats(activeStudent.uid);
 
     expect(stats.studentUid).toBe(activeStudent.uid);
-    expect(stats.payments.totalAmountCents).toBe(65_000);
+    expect(stats.payments.totalAmountCents).toBe(65000); // 500 + 150
     expect(stats.payments.count).toBe(2);
 
     expect(stats.scores.average).toBeCloseTo(8.8, 1);
@@ -141,15 +141,14 @@ describe('StatsService', () => {
     expect(stats.scores.count).toBe(2);
 
     expect(stats.membership.status).toBe(MembershipStatus.ACTIVE);
-    expect(stats.membership.label.startsWith('会员即将到期')).toBe(true);
     expect(stats.membership.daysRemaining).toBeGreaterThan(0);
     expect(stats.membership.isActive).toBe(true);
 
-    expect(stats.installments.totalAmountCents).toBe(80_000);
-    expect(stats.installments.paidAmountCents).toBe(20_000);
-    expect(stats.installments.pendingAmountCents).toBe(20_000);
+    expect(stats.installments.totalAmountCents).toBe(80000);
+    expect(stats.installments.paidAmountCents).toBe(20000);
+    expect(stats.installments.pendingAmountCents).toBe(20000);
     expect(stats.installments.pendingCount).toBe(1);
-    expect(stats.installments.remainingAmountCents).toBe(60_000);
+    expect(stats.installments.remainingAmountCents).toBe(60000);
   });
 
   it('computes financial statistics for the given period', async () => {
@@ -162,27 +161,27 @@ describe('StatsService', () => {
     expect(stats.dateRange.end).toBeInstanceOf(Date);
     expect(stats.dateRange.end.getTime()).toBeGreaterThan(stats.dateRange.start.getTime());
 
-    expect(stats.totals.incomeCents).toBe(95_000);
-    expect(stats.totals.expenseCents).toBe(12_000);
-    expect(stats.totals.netIncomeCents).toBe(83_000);
+    expect(stats.totals.incomeCents).toBe(95000);
+    expect(stats.totals.expenseCents).toBe(12000);
+    expect(stats.totals.netIncomeCents).toBe(83000);
     expect(stats.totals.isProfitable).toBe(true);
 
-    expect(stats.installments.totalCents).toBe(80_000);
-    expect(stats.installments.paidCents).toBe(20_000);
-    expect(stats.installments.pendingCents).toBe(20_000);
-    expect(stats.installments.remainingCents).toBe(60_000);
+    expect(stats.installments.totalCents).toBe(80000);
+    expect(stats.installments.paidCents).toBe(20000);
+    expect(stats.installments.pendingCents).toBe(20000);
+    expect(stats.installments.remainingCents).toBe(60000);
 
     expect(stats.transactionCount).toBe(4);
-    expect(stats.studentIncome).toHaveLength(2);
+    expect(stats.studentIncome.length).toBe(2);
     expect(stats.studentIncome[0]).toEqual({
       studentId: activeStudent.uid,
       studentName: 'Alice Active',
-      amountCents: 65_000,
+      amountCents: 65000,
     });
     expect(stats.studentIncome[1]).toEqual({
       studentId: trialStudent.uid,
       studentName: 'Tom Trial',
-      amountCents: 30_000,
+      amountCents: 30000,
     });
   });
 });

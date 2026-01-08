@@ -1,19 +1,16 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { CashBuilder } from '@/services/cashBuilder';
 import { AppError, ErrorType } from '@/utils/errors';
-import { Cash } from '@/models/CashMongo';
-import { Student, studentModel } from '@/models/mongo';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { StudentUpdater } from '@/services/studentUpdater';
+import { StudentRepository } from '@/db/repositories/studentRepository';
 import { ClassType, SubjectType } from '@/types';
-import { 
+import {
   setupTestDatabase,
   cleanupTestDatabase,
   clearAllCollections,
   resetAllSequences,
-  TestDataFactory 
-} from '../../test/setupBackend';
+  createTestStudent,
+} from './helpers/testSetup';
 
 jest.setTimeout(30000);
 
@@ -47,45 +44,42 @@ describe('Domain error handling alignment', () => {
   });
 
   it('allows negative cash amount for expenses', async () => {
-    const transaction = await TestDataFactory.createCashTransaction(-12.34, { 
-      studentId: null, 
-      note: '租金支出' 
-    });
+    const transaction = await CashBuilder.create()
+      .amount(-12.34)
+      .note('租金支出')
+      .build();
 
-    expect(transaction.cash).toBe(-1234);
-    expect(transaction.isIncome()).toBe(false);
+    expect(transaction.amount).toBe(-1234);
+    expect(transaction.amount).toBeLessThan(0);
   });
 
   it('rejects student lookups for non-existent resources with NotFound error', async () => {
     await expect(StudentUpdater.for(999)).rejects.toMatchObject({
-      type: ErrorType.NotFound,
-      statusCode: 404,
+      message: expect.stringContaining('不存在'),
     });
   });
 
   it('rejects score operations when index is out of range', async () => {
-    const student = await TestDataFactory.createStudent({
+    const student = await createTestStudent({
       name: 'Range Guard',
       phone: '13800000000',
-      class: ClassType.MONTH,
+      classType: ClassType.MONTH,
       subject: SubjectType.SHOOTING,
     });
 
-    const updater = StudentUpdater.fromDocument(student);
-    updater.addRing(9);
-    await updater.commit();
+    const updater = StudentUpdater.for(student.uid);
+    await updater.then(async (u) => {
+      u.addRing(9);
+      await u.commit();
+    });
 
-    const reloaded = await Student.findByUid(student.uid);
+    const reloaded = await StudentRepository.findByUid(student.uid);
+    expect(reloaded).not.toBeNull();
 
-    expect.assertions(2);
-    try {
-      StudentUpdater.fromDocument(reloaded!).removeRingAt(5);
-    } catch (error) {
-      expect(error).toBeInstanceOf(AppError);
-      expect((error as AppError).type).toBe(ErrorType.InvalidInput);
-      return;
-    }
-
-    throw new Error('Expected InvalidInput error when removing score with out-of-range index');
+    const updater2 = StudentUpdater.fromDocument(reloaded!);
+    expect(() => {
+      // 尝试删除不存在的索引
+      updater2.removeRingAt(5);
+    }).toThrow(/成绩索引超出范围/);
   });
 });

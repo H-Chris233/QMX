@@ -1,5 +1,6 @@
-import { CashClass, ICashDoc } from '@/models/CashMongo';
-import { Student } from '@/models/mongo';
+import { CashRepository } from '../db/repositories/cashRepository';
+import { StudentRepository } from '../db/repositories/studentRepository';
+import { CashTransaction } from '../db/schema/cash';
 import type { ICashInstallmentSnapshot } from '@/types';
 import { AppError } from '@/utils/errors';
 import { convertAmountToCents, normalizeNote, sanitizeInstallmentSnapshot } from './cashBuilder';
@@ -7,27 +8,30 @@ import { convertAmountToCents, normalizeNote, sanitizeInstallmentSnapshot } from
 export class CashUpdater {
   private pendingStudentId?: number | null;
   private pendingInstallment?: ICashInstallmentSnapshot | null;
+  private cashData: Partial<CashTransaction>;
 
-  private constructor(private readonly cash: ICashDoc) {}
+  private constructor(cash: CashTransaction) {
+    this.cashData = { ...cash };
+  }
 
   static async for(uid: number): Promise<CashUpdater> {
-    const doc = await CashClass.findByUid(uid);
-    if (!doc) {
+    const cash = await CashRepository.findByUid(uid);
+    if (!cash) {
       throw AppError.notFound('交易记录不存在');
     }
-    return new CashUpdater(doc);
+    return new CashUpdater(cash);
   }
 
-  static fromDocument(doc: ICashDoc): CashUpdater {
-    return new CashUpdater(doc);
+  static fromDocument(cash: CashTransaction): CashUpdater {
+    return new CashUpdater(cash);
   }
 
-  get document(): ICashDoc {
-    return this.cash;
+  get document(): CashTransaction {
+    return this.cashData as CashTransaction;
   }
 
   amount(amount: number | string): this {
-    this.cash.cash = convertAmountToCents(amount);
+    this.cashData.amount = convertAmountToCents(amount);
     return this;
   }
 
@@ -50,7 +54,7 @@ export class CashUpdater {
   }
 
   note(note?: string | null): this {
-    this.cash.note = normalizeNote(note);
+    this.cashData.note = normalizeNote(note);
     return this;
   }
 
@@ -59,24 +63,41 @@ export class CashUpdater {
     return this;
   }
 
-  async commit(): Promise<ICashDoc> {
+  async commit(): Promise<CashTransaction> {
+    const uid = this.cashData.uid;
+    if (!uid) {
+      throw new Error('交易记录UID不存在');
+    }
+
+    // 更新学员ID
     if (this.pendingStudentId !== undefined) {
       if (this.pendingStudentId === null) {
-        this.cash.student_id = null;
+        this.cashData.studentId = null;
       } else {
-        const student = await Student.findByUid(this.pendingStudentId);
+        const student = await StudentRepository.findByUid(this.pendingStudentId);
         if (!student) {
           throw AppError.notFound('学员不存在');
         }
-        this.cash.student_id = student.uid;
+        this.cashData.studentId = student.uid;
       }
     }
 
+    // 更新分期信息
     if (this.pendingInstallment !== undefined) {
-      this.cash.installment = this.pendingInstallment ?? null;
-      this.cash.markModified('installment');
+      this.cashData.installmentSnapshot = this.pendingInstallment ?? null;
     }
 
-    return await this.cash.save();
+    const updated = await CashRepository.updateByUid(uid, {
+      amount: this.cashData.amount ?? undefined,
+      studentId: this.cashData.studentId ?? undefined,
+      note: this.cashData.note ?? undefined,
+      installmentSnapshot: this.cashData.installmentSnapshot ?? undefined,
+    });
+
+    if (!updated) {
+      throw new Error('更新交易记录失败');
+    }
+
+    return updated;
   }
 }

@@ -1,7 +1,9 @@
 import { Router } from 'express';
-import { studentModel } from '../models/mongo';
-import { Cash } from '../models/CashMongo';
-import { InstallmentModel } from '../models/InstallmentMongo';
+import { db } from '../db';
+import { students } from '../db/schema/students';
+import { cashTransactions } from '../db/schema/cash';
+import { installmentPlans, installments } from '../db/schema/installments';
+import { eq, sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -18,9 +20,11 @@ const isTestEnvironment = () => {
 // 清空所有测试数据
 const clearTestData = async () => {
   try {
-    await studentModel.deleteMany({});
-    await Cash.deleteMany({});
-    await InstallmentModel.deleteMany({});
+    // 按正确顺序删除（因为有外键约束）
+    await db.delete(installments);
+    await db.delete(installmentPlans);
+    await db.delete(cashTransactions);
+    await db.delete(students);
     console.log('测试数据清理完成');
   } catch (error) {
     console.error('测试数据清理失败:', error);
@@ -36,85 +40,110 @@ const createTestData = async () => {
       {
         name: '测试学生1',
         phone: '13800138001',
-        email: 'test1@example.com',
-        idCard: '110101199001011234',
-        gender: '男',
-        birthday: new Date('1990-01-01'),
-        address: '北京市朝阳区测试地址1',
-        registrationDate: new Date(),
-        membershipType: 'basic',
-        status: 'active',
+        classType: 'TEN_TRY' as const,
+        subject: 'SHOOTING' as const,
+        lessonLeft: 10,
+        rings: [],
+        note: '测试学生1',
+        membershipStartDate: null,
+        membershipEndDate: null,
       },
       {
         name: '测试学生2',
         phone: '13800138002',
-        email: 'test2@example.com',
-        idCard: '110101199002021234',
-        gender: '女',
-        birthday: new Date('1990-02-02'),
-        address: '北京市海淀区测试地址2',
-        registrationDate: new Date(),
-        membershipType: 'premium',
-        status: 'active',
+        classType: 'MONTH' as const,
+        subject: 'ARCHERY' as const,
+        lessonLeft: 20,
+        rings: [],
+        note: '测试学生2',
+        membershipStartDate: null,
+        membershipEndDate: null,
       },
       {
         name: '测试学生3',
         phone: '13800138003',
-        email: 'test3@example.com',
-        idCard: '110101199003031234',
-        gender: '男',
-        birthday: new Date('1990-03-03'),
-        address: '北京市西城区测试地址3',
-        registrationDate: new Date(),
-        membershipType: 'vip',
-        status: 'inactive',
+        classType: 'YEAR' as const,
+        subject: 'SHOOTING' as const,
+        lessonLeft: 30,
+        rings: [],
+        note: '测试学生3',
+        membershipStartDate: null,
+        membershipEndDate: null,
       },
     ];
 
-    const savedStudents = await studentModel.insertMany(testStudents);
+    const savedStudents = await db.insert(students).values(testStudents).returning();
     console.log(`创建了 ${savedStudents.length} 个测试学生`);
 
     // 创建示例财务记录
     const testCashRecords = [
       {
-        student_id: savedStudents[0]._id,
-        cash: 10000,
+        studentId: savedStudents[0].uid,
+        amount: 10000, // 单位：分
         note: '测试学生1学费缴纳',
-        installment: null,
+        installmentSnapshot: null,
       },
       {
-        student_id: savedStudents[1]._id,
-        cash: 15000,
+        studentId: savedStudents[1].uid,
+        amount: 15000, // 单位：分
         note: '测试学生2学费缴纳',
-        installment: null,
+        installmentSnapshot: null,
       },
       {
-        student_id: null,
-        cash: -500,
+        studentId: null,
+        amount: -500, // 单位：分
         note: '测试办公用品购买',
-        installment: null,
+        installmentSnapshot: null,
       },
     ];
 
-    const savedCashRecords = await Cash.insertMany(testCashRecords);
+    const savedCashRecords = await db.insert(cashTransactions).values(testCashRecords).returning();
     console.log(`创建了 ${savedCashRecords.length} 个测试财务记录`);
 
     // 创建示例分期付款记录
-    const testInstallments = [
+    const now = new Date();
+    const dueDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const testInstallmentPlans = [
       {
-        plan_id: 1,
-        installment_amount: 2000,
-        current_installment: 2,
-        total_installments: 6,
-        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        status: 'active',
-        paid_amount: 4000,
-        student_id: savedStudents[0].uid,
-        cash_uid: null,
+        studentId: savedStudents[0].uid,
+        totalAmount: 12000, // 单位：分
+        downPayment: 0,
+        totalInstallments: 6,
+        frequency: 'MONTHLY' as const,
+        status: 'ACTIVE' as const,
+        startDate: now,
+        note: '测试分期计划',
       },
     ];
 
-    const savedInstallments = await InstallmentModel.insertMany(testInstallments);
+    const savedPlans = await db.insert(installmentPlans).values(testInstallmentPlans).returning();
+    console.log(`创建了 ${savedPlans.length} 个测试分期计划`);
+
+    const testInstallments = [
+      {
+        planId: savedPlans[0].uid,
+        studentId: savedStudents[0].uid,
+        installmentNumber: 1,
+        installmentAmount: 2000,
+        paidAmount: 0,
+        dueDate: dueDate,
+        status: 'PENDING' as const,
+        note: '第1期',
+      },
+      {
+        planId: savedPlans[0].uid,
+        studentId: savedStudents[0].uid,
+        installmentNumber: 2,
+        installmentAmount: 2000,
+        paidAmount: 2000,
+        paidDate: now,
+        status: 'PAID' as const,
+        note: '第2期已支付',
+      },
+    ];
+
+    const savedInstallments = await db.insert(installments).values(testInstallments).returning();
     console.log(`创建了 ${savedInstallments.length} 个测试分期记录`);
 
     return {
@@ -147,18 +176,18 @@ router.post('/seed', async (req, res) => {
         await clearTestData();
         result = await createTestData();
         break;
-      
+
       case 'clear':
         // 仅清空测试数据
         await clearTestData();
         result = { message: '测试数据已清空' };
         break;
-      
+
       case 'create':
         // 仅创建测试数据
         result = await createTestData();
         break;
-      
+
       default:
         return res.status(400).json({
           success: false,
@@ -192,7 +221,7 @@ router.post('/cleanup', async (req, res) => {
 
   try {
     await clearTestData();
-    
+
     res.json({
       success: true,
       message: '测试数据清理完成',
@@ -217,16 +246,16 @@ router.get('/status', async (req, res) => {
   }
 
   try {
-    const studentCount = await studentModel.countDocuments();
-    const cashCount = await Cash.countDocuments();
-    const installmentCount = await InstallmentModel.countDocuments();
+    const [studentCount] = await db.select({ count: sql<number>`count(*)` }).from(students);
+    const [cashCount] = await db.select({ count: sql<number>`count(*)` }).from(cashTransactions);
+    const [installmentCount] = await db.select({ count: sql<number>`count(*)` }).from(installments);
 
     res.json({
       success: true,
       data: {
-        students: studentCount,
-        cashRecords: cashCount,
-        installments: installmentCount,
+        students: Number(studentCount.count) || 0,
+        cashRecords: Number(cashCount.count) || 0,
+        installments: Number(installmentCount.count) || 0,
         environment: process.env.NODE_ENV,
       },
     });

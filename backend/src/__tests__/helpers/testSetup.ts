@@ -1,60 +1,40 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import { Student, studentModel, type IStudentDoc } from '@/models/mongo';
-import { Cash, type ICashDoc } from '@/models/CashMongo';
-import { Installment, InstallmentModel, type IInstallmentDoc } from '@/models/InstallmentMongo';
-import { InstallmentPlan, InstallmentPlanModel, type IInstallmentPlanDoc } from '@/models/InstallmentPlanMongo';
+import { db } from '@/db';
+import { students } from '@/db/schema/students';
+import { cashTransactions } from '@/db/schema/cash';
+import { installmentPlans, installments } from '@/db/schema/installments';
+import { sql } from 'drizzle-orm';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
-import CounterModel, {
-  resetSequence,
-  STUDENT_SEQUENCE_NAME,
-  CASH_SEQUENCE_NAME,
-  INSTALLMENT_SEQUENCE_NAME,
-  INSTALLMENT_PLAN_SEQUENCE_NAME,
-} from '@/models/counter';
-import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
+import type { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
 
 export interface TestContext {
-  mongoServer: MongoMemoryServer;
+  db: typeof db;
 }
 
-export async function setupTestDatabase(dbName: string): Promise<MongoMemoryServer> {
-  const mongoServer = await MongoMemoryServer.create();
-  await mongoose.connect(mongoServer.getUri(), { dbName });
-  return mongoServer;
+export async function setupTestDatabase(): Promise<void> {
+  // PostgreSQL 不需要特殊设置，连接已在 db/index.ts 中配置
+  // 测试时会使用真实的 DATABASE_URL 或环境变量
 }
 
-export async function cleanupTestDatabase(mongoServer: MongoMemoryServer): Promise<void> {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+export async function cleanupTestDatabase(): Promise<void> {
+  // 清理数据
+  await clearAllCollections();
 }
 
 export async function clearAllCollections(): Promise<void> {
   try {
-    await Promise.all([
-      studentModel.deleteMany({}).exec(),
-      Cash.deleteMany({}).exec(),
-      InstallmentModel.deleteMany({}).exec(),
-      InstallmentPlanModel.deleteMany({}).exec(),
-      CounterModel.deleteMany({}).exec(),
-    ]);
+    // 按正确顺序删除（因为有外键约束）
+    await db.delete(installments);
+    await db.delete(installmentPlans);
+    await db.delete(cashTransactions);
+    await db.delete(students);
   } catch (error) {
     console.warn('[testSetup] Failed to clear collections', error);
   }
 }
 
 export async function resetAllSequences(): Promise<void> {
-  try {
-    await Promise.all([
-      resetSequence(STUDENT_SEQUENCE_NAME),
-      resetSequence(CASH_SEQUENCE_NAME),
-      resetSequence(INSTALLMENT_SEQUENCE_NAME),
-      resetSequence(INSTALLMENT_PLAN_SEQUENCE_NAME),
-    ]);
-  } catch (error) {
-    console.warn('[testSetup] Failed to reset counter sequences', error);
-  }
+  // PostgreSQL 使用 serial/identity，不需要手动重置序列
 }
 
 export async function createTestStudent(
@@ -66,7 +46,7 @@ export async function createTestStudent(
     rings?: number[];
     membership?: { startDate: Date; endDate: Date } | null;
   } = {}
-): Promise<IStudentDoc> {
+) {
   const builder = StudentBuilder.create()
     .name(overrides.name || 'Test Student')
     .phone(overrides.phone || '13800138000')
@@ -78,7 +58,7 @@ export async function createTestStudent(
   }
 
   if (overrides.membership) {
-    builder.membership(overrides.membership);
+    builder.membership(overrides.membership.startDate, overrides.membership.endDate);
   }
 
   return await builder.build();
@@ -88,7 +68,7 @@ export async function createTestCashTransaction(
   amount: number,
   studentId?: number | null,
   note?: string
-): Promise<ICashDoc> {
+) {
   const builder = CashBuilder.create().amount(amount);
 
   if (studentId !== undefined) {
@@ -109,17 +89,18 @@ export async function createTestInstallmentPlan(
   startDate: Date,
   studentId?: number | null,
   customDays?: number
-): Promise<IInstallmentPlanDoc> {
-  const payload = {
-    student_id: studentId ?? null,
-    total_amount: totalAmount * 100,
-    total_installments: totalInstallments,
+) {
+  const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
+  return await InstallmentPlanRepository.create({
+    studentId: studentId ?? null,
+    totalAmount: totalAmount * 100, // 转换为分
+    downPayment: 0,
+    totalInstallments,
     frequency,
-    start_date: startDate,
-    custom_days: customDays,
-  };
-
-  return await InstallmentPlan.create(payload);
+    customDays,
+    startDate,
+    note: undefined,
+  });
 }
 
 export async function createTestInstallment(
@@ -130,15 +111,16 @@ export async function createTestInstallment(
   amount: number,
   dueDate: Date,
   status: InstallmentStatus = InstallmentStatus.PENDING
-): Promise<IInstallmentDoc> {
-  return await Installment.create({
-    plan_id: planId,
-    student_id: studentId,
-    current_installment: installmentNumber,
-    total_installments: totalInstallments,
-    installment_amount: amount * 100,
-    due_date: dueDate,
+) {
+  const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
+  return await InstallmentRepository.create({
+    planId,
+    studentId,
+    installmentNumber,
+    installmentAmount: amount * 100, // 转换为分
+    dueDate,
     status,
+    note: undefined,
   });
 }
 

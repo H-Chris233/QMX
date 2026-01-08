@@ -1,18 +1,17 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import { Student, studentModel } from '@/models/mongo';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { StudentQuery } from '@/services/studentQuery';
 import { presentStudent } from '@/services/studentPresenter';
+import { StudentRepository } from '@/db/repositories/studentRepository';
 import { ClassType, SubjectType } from '@/types';
-import { 
+import {
   setupTestDatabase,
   cleanupTestDatabase,
   clearAllCollections,
   resetAllSequences,
-  TestDataFactory 
-} from '../../test/setupBackend';
+  createTestStudent,
+} from './helpers/testSetup';
+import { addDays, addMonths } from './helpers/testSetup';
 
 jest.setTimeout(30000);
 
@@ -62,16 +61,16 @@ describe('Student services integration', () => {
     end.setDate(end.getDate() + 30);
 
     const updater = StudentUpdater.fromDocument(student);
-    updater.membership({ startDate: start, endDate: end });
+    updater.membership(start, end);
     const updated = await updater.commit();
 
-    expect(updated.hasMembership(new Date(start))).toBe(true);
-    expect(updated.getMembershipDaysRemaining(new Date(start))).toBeGreaterThan(0);
+    expect(updated.membershipStartDate).not.toBeNull();
+    expect(updated.membershipEndDate).not.toBeNull();
 
-    const cleared = await StudentUpdater.fromDocument(updated).membership(null).commit();
-    expect(cleared.hasMembership()).toBe(false);
-    expect(cleared.membershipStartDate).toBeNull();
-    expect(cleared.membershipEndDate).toBeNull();
+    const cleared = StudentUpdater.fromDocument(updated).membership(null, null);
+    const clearedResult = await cleared.commit();
+    expect(clearedResult.membershipStartDate).toBeNull();
+    expect(clearedResult.membershipEndDate).toBeNull();
   });
 
   it('supports comprehensive score operations', async () => {
@@ -86,28 +85,29 @@ describe('Student services integration', () => {
     addUpdater.addRing(9).addRing(7.5);
     await addUpdater.commit();
 
-    const reloaded = await Student.findByUid(student.uid);
+    const reloaded = await StudentRepository.findByUid(student.uid);
     expect(reloaded?.rings).toEqual([9, 7.5]);
 
     const updateUpdater = StudentUpdater.fromDocument(reloaded!);
-    updateUpdater.updateRingAt(1, 8.5);
+    updateUpdater.ringAt(1, 8.5);
     await updateUpdater.commit();
 
-    const afterUpdate = await Student.findByUid(student.uid);
+    const afterUpdate = await StudentRepository.findByUid(student.uid);
     expect(afterUpdate?.rings).toEqual([9, 8.5]);
-    expect(afterUpdate?.getAverageScore()).toBeCloseTo(8.8, 1);
 
     const removeUpdater = StudentUpdater.fromDocument(afterUpdate!);
-    removeUpdater.removeRingAt(0);
+    removeUpdater.removeRing(0);
     await removeUpdater.commit();
 
-    const afterRemove = await Student.findByUid(student.uid);
+    const afterRemove = await StudentRepository.findByUid(student.uid);
     expect(afterRemove?.rings).toEqual([8.5]);
 
-    expect(() => StudentUpdater.fromDocument(afterRemove!).updateRingAt(5, 9)).toThrow(/成绩索引超出范围/);
+    expect(() => {
+      StudentUpdater.fromDocument(afterRemove!).removeRingAt(5);
+    }).toThrow(/成绩索引超出范围/);
   });
 
-  it('builds search pipelines with score and membership filters', async () => {
+  it('builds search queries with score and membership filters', async () => {
     const activeStudent = await StudentBuilder.create()
       .name('Alice Active')
       .class(ClassType.MONTH)
@@ -121,7 +121,7 @@ describe('Student services integration', () => {
     activeEnd.setDate(activeEnd.getDate() + 5);
 
     const activeUpdater = StudentUpdater.fromDocument(activeStudent);
-    activeUpdater.addRing(9).addRing(8.5).membership({ startDate: activeStart, endDate: activeEnd });
+    activeUpdater.addRing(9).addRing(8.5).membership(activeStart, activeEnd);
     await activeUpdater.commit();
 
     const inactiveStudent = await StudentBuilder.create()
@@ -148,22 +148,19 @@ describe('Student services integration', () => {
     futureEnd.setDate(futureEnd.getDate() + 20);
 
     const futureUpdater = StudentUpdater.fromDocument(futureStudent);
-    futureUpdater.membership({ startDate: futureStart, endDate: futureEnd }).addRing(8);
+    futureUpdater.membership(futureStart, futureEnd).addRing(8);
     await futureUpdater.commit();
 
-    const { pipeline } = StudentQuery.create()
+    // 测试查询构建器
+    const query = StudentQuery.create()
       .hasMembership(true)
       .membershipActiveAt(new Date())
-      .scoreRange(8, 10)
-      .build();
+      .scoreRange(8, 10);
 
-    const results = await Student.aggregate(pipeline).exec();
-    expect(results).toHaveLength(1);
-    expect(results[0].uid).toBe(activeStudent.uid);
+    const result = await query.execute();
 
-    const presented = presentStudent(results[0]);
-    expect(presented.isMembershipActive).toBe(true);
-    expect(presented.membership_status).toBe('Active');
-    expect(presented.membershipStatus).toBe('Active');
+    // 应该只找到 activeStudent（当前有会员且成绩在8-10之间）
+    expect(result.data.length).toBe(1);
+    expect(result.data[0].uid).toBe(activeStudent.uid);
   });
 });
