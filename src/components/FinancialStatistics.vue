@@ -622,7 +622,7 @@ const updateInstallmentStatus = async () => {
   if (!selectedTransaction.value || !selectedTransaction.value.installment) return;
   try {
     const installmentId = selectedTransaction.value.installment.installment_uid || selectedTransaction.value.uid;
-    await ApiService.updateInstallmentStatus(installmentId, selectedStatus.value);
+    await ApiService.updateInstallmentPayment(installmentId, { status: selectedStatus.value });
     showSuccess('状态已更新');
     closeModals();
     await loadTransactions();

@@ -392,63 +392,37 @@ export class ApiService {
   // ============================================================================
 
   /**
-   * 获取所有分期付款状态
+   * 获取所有分期计划（支持分页）
    */
-  static async getInstallmentStatuses(): Promise<Installment[]> {
-    return handleApiOperation(
-      () => InstallmentsApiService.getInstallmentStatuses(),
-      '获取分期状态',
-      { retryable: true }
-    );
-  }
-
-  /**
-   * 获取即将到期的分期付款
-   */
-  static async getUpcomingInstallments(days?: number): Promise<Installment[]> {
-    return handleApiOperation(
-      () => InstallmentsApiService.getUpcomingInstallments(days),
-      '获取即将到期分期',
-      { retryable: true, context: { days } }
-    );
-  }
-
-  /**
-   * 更新分期付款状态
-   */
-  static async updateInstallmentStatus(
-    transactionUid: number,
-    status: InstallmentStatus
-  ): Promise<Installment> {
-    return handleApiOperation(
-      () => InstallmentsApiService.updateInstallmentStatus(transactionUid, status),
-      '更新分期状态',
-      { retryable: false, context: { transactionUid, status } }
-    );
-  }
-
-  /**
-   * 支付下一期
-   */
-  static async payNextInstallment(planId: number): Promise<{
-    installment: Installment;
-    transaction: any;
+  static async getAllInstallmentPlans(params?: {
+    page?: number;
+    limit?: number;
+    student_id?: number;
+    status?: string;
+  }): Promise<{
+    data: InstallmentPlan[];
+    pagination: { page: number; limit: number; total: number; total_pages: number };
   }> {
     return handleApiOperation(
-      () => InstallmentsApiService.payNextInstallment(planId),
-      '支付下一期',
-      { retryable: false, context: { planId } }
+      () => InstallmentsApiService.getAllInstallmentPlans(params),
+      '获取分期计划列表',
+      { retryable: true, context: params }
     );
   }
 
   /**
-   * 取消分期计划
+   * 获取逾期分期列表
    */
-  static async cancelInstallmentPlan(planId: number): Promise<InstallmentPlan> {
+  static async getOverdueInstallments(): Promise<{
+    overdue_installments: Installment[];
+    total_overdue_count: number;
+    total_overdue_amount: number;
+    average_days_overdue: number;
+  }> {
     return handleApiOperation(
-      () => InstallmentsApiService.cancelInstallmentPlan(planId),
-      '取消分期计划',
-      { retryable: false, context: { planId } }
+      () => InstallmentsApiService.getOverdueInstallments(),
+      '获取逾期分期',
+      { retryable: true }
     );
   }
 
@@ -463,6 +437,89 @@ export class ApiService {
       () => InstallmentsApiService.getInstallmentPlan(planId),
       '获取分期计划',
       { retryable: true, context: { planId } }
+    );
+  }
+
+  /**
+   * 创建分期计划
+   */
+  static async createInstallmentPlan(data: {
+    student_id?: number | null;
+    total_amount: number;
+    note?: string;
+    total_installments: number;
+    frequency: string;
+    custom_days?: number | null;
+    start_date: string;
+  }): Promise<InstallmentPlan> {
+    return handleApiOperation(
+      () => InstallmentsApiService.createInstallmentPlan(data),
+      '创建分期计划',
+      { retryable: false, context: data }
+    );
+  }
+
+  /**
+   * 更新分期付款状态（支付/标记逾期等）
+   */
+  static async updateInstallmentPayment(
+    installmentUid: number,
+    data: { status: InstallmentStatus; amount?: number }
+  ): Promise<{ installment: Installment; plan: InstallmentPlan }> {
+    return handleApiOperation(
+      () => InstallmentsApiService.updateInstallmentPayment(installmentUid, data),
+      '更新分期付款状态',
+      { retryable: false, context: { installmentUid, ...data } }
+    );
+  }
+
+  /**
+   * 记录分期支付
+   */
+  static async recordInstallmentPayment(
+    planId: number,
+    data?: { installment_index?: number; paid_amount?: number; paid_date?: string }
+  ): Promise<{ installment: Installment; plan: InstallmentPlan }> {
+    return handleApiOperation(
+      () => InstallmentsApiService.recordPayment(planId, data),
+      '记录分期支付',
+      { retryable: false, context: { planId, ...data } }
+    );
+  }
+
+  /**
+   * 支付下一期
+   */
+  static async payNextInstallment(planId: number): Promise<{
+    installment: Installment;
+    transaction: { uid: number; amount: number; note: string };
+  }> {
+    return handleApiOperation(
+      () => InstallmentsApiService.payNextInstallment(planId),
+      '支付下一期',
+      { retryable: false, context: { planId } }
+    );
+  }
+
+  /**
+   * 取消分期计划
+   */
+  static async cancelInstallmentPlan(planId: number): Promise<InstallmentPlan> {
+    return handleApiOperation(
+      () => InstallmentsApiService.updateInstallmentPlan(planId, { status: 'CANCELLED' }),
+      '取消分期计划',
+      { retryable: false, context: { planId } }
+    );
+  }
+
+  /**
+   * 删除分期计划
+   */
+  static async deleteInstallmentPlan(planId: number): Promise<void> {
+    return handleApiOperation(
+      () => InstallmentsApiService.deleteInstallmentPlan(planId),
+      '删除分期计划',
+      { retryable: false, context: { planId } }
     );
   }
 
@@ -582,24 +639,28 @@ export class ApiService {
    */
   static async setMembershipByType(
     studentId: number,
-    type: MembershipType,
-    startDate?: string
+    membershipType: MembershipType,
+    startFromToday: boolean = true
   ): Promise<Student> {
     return handleApiOperation(
-      () => MembershipApiService.setMembershipByType(studentId, type, startDate),
+      () => MembershipApiService.setMembershipByType(studentId, membershipType, startFromToday),
       '按类型设置会员',
-      { retryable: false, context: { studentId, type, startDate } }
+      { retryable: false, context: { studentId, membershipType, startFromToday } }
     );
   }
 
   /**
    * 续费会员
    */
-  static async renewMembership(studentId: number, type: MembershipType): Promise<Student> {
+  static async renewMembership(
+    studentId: number,
+    membershipType: MembershipType,
+    extendFromCurrent: boolean = true
+  ): Promise<Student> {
     return handleApiOperation(
-      () => MembershipApiService.renewMembership(studentId, type),
+      () => MembershipApiService.renewMembership(studentId, membershipType, extendFromCurrent),
       '续费会员',
-      { retryable: false, context: { studentId, type } }
+      { retryable: false, context: { studentId, membershipType, extendFromCurrent } }
     );
   }
 
@@ -619,12 +680,13 @@ export class ApiService {
    */
   static async batchSetMembership(
     studentIds: number[],
-    membership: MembershipData
+    membershipType: MembershipType,
+    startFromToday: boolean = true
   ): Promise<{ success: number; failed: number }> {
     return handleApiOperation(
-      () => MembershipApiService.batchSetMembership(studentIds, membership),
+      () => MembershipApiService.batchSetMembership(studentIds, membershipType, startFromToday),
       '批量设置会员',
-      { retryable: false, context: { studentIds, membership } }
+      { retryable: false, context: { studentIds, membershipType, startFromToday } }
     );
   }
 
