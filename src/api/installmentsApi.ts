@@ -13,55 +13,38 @@ import type {
  */
 export class InstallmentsApiService {
   /**
-   * 获取所有分期付款状态
+   * 获取所有分期计划（支持分页）
    */
-  static async getInstallmentStatuses(): Promise<Installment[]> {
-    return apiCall<Installment[]>(
-      baseClient.get('/installments/statuses')
-    );
-  }
-
-  /**
-   * 获取即将到期的分期付款
-   */
-  static async getUpcomingInstallments(days?: number): Promise<Installment[]> {
-    const params = days ? { days: String(days) } : {};
-    
-    return apiCall<Installment[]>(
-      baseClient.get('/installments/upcoming', { params })
-    );
-  }
-
-  /**
-   * 更新分期付款状态
-   */
-  static async updateInstallmentStatus(
-    transactionUid: number,
-    status: InstallmentStatus
-  ): Promise<Installment> {
-    return apiCall<Installment>(
-      baseClient.patch(`/installments/${transactionUid}/status`, { status })
-    );
-  }
-
-  /**
-   * 支付下一期
-   */
-  static async payNextInstallment(planId: number): Promise<{
-    installment: Installment;
-    transaction: any;
+  static async getAllInstallmentPlans(params?: {
+    page?: number;
+    limit?: number;
+    student_id?: number;
+    status?: string;
+  }): Promise<{
+    data: InstallmentPlan[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      total_pages: number;
+    };
   }> {
     return apiCall(
-      baseClient.post(`/installments/${planId}/next`)
+      baseClient.get('/installments', { params })
     );
   }
 
   /**
-   * 取消分期计划
+   * 获取逾期分期列表
    */
-  static async cancelInstallmentPlan(planId: number): Promise<InstallmentPlan> {
-    return apiCall<InstallmentPlan>(
-      baseClient.post(`/installments/${planId}/cancel`)
+  static async getOverdueInstallments(): Promise<{
+    overdue_installments: Installment[];
+    total_overdue_count: number;
+    total_overdue_amount: number;
+    average_days_overdue: number;
+  }> {
+    return apiCall(
+      baseClient.get('/installments/overdue')
     );
   }
 
@@ -74,6 +57,86 @@ export class InstallmentsApiService {
   }> {
     return apiCall(
       baseClient.get(`/installments/${planId}`)
+    );
+  }
+
+  /**
+   * 创建分期计划
+   */
+  static async createInstallmentPlan(data: {
+    student_id?: number | null;
+    total_amount: number;
+    note?: string;
+    total_installments: number;
+    frequency: string;
+    custom_days?: number | null;
+    start_date: string;
+  }): Promise<InstallmentPlan> {
+    return apiCall<InstallmentPlan>(
+      baseClient.post('/installments', data)
+    );
+  }
+
+  /**
+   * 更新分期计划
+   */
+  static async updateInstallmentPlan(
+    planId: number,
+    data: { note?: string; status?: string }
+  ): Promise<InstallmentPlan> {
+    return apiCall<InstallmentPlan>(
+      baseClient.put(`/installments/${planId}`, data)
+    );
+  }
+
+  /**
+   * 更新分期付款状态（支付/标记逾期等）
+   */
+  static async updateInstallmentPayment(
+    installmentUid: number,
+    data: { status: InstallmentStatus; amount?: number }
+  ): Promise<{
+    installment: Installment;
+    plan: InstallmentPlan;
+  }> {
+    return apiCall(
+      baseClient.put(`/installments/${installmentUid}/payment`, data)
+    );
+  }
+
+  /**
+   * 记录分期支付
+   */
+  static async recordPayment(
+    planId: number,
+    data?: { installment_index?: number; paid_amount?: number; paid_date?: string }
+  ): Promise<{
+    installment: Installment;
+    plan: InstallmentPlan;
+  }> {
+    return apiCall(
+      baseClient.post(`/installments/${planId}/payments`, data)
+    );
+  }
+
+  /**
+   * 支付分期计划的下一期
+   */
+  static async payNextInstallment(planId: number): Promise<{
+    installment: Installment;
+    transaction: { uid: number; amount: number; note: string };
+  }> {
+    return apiCall(
+      baseClient.post(`/installments/${planId}/next`)
+    );
+  }
+
+  /**
+   * 删除分期计划
+   */
+  static async deleteInstallmentPlan(planId: number): Promise<void> {
+    return apiCall(
+      baseClient.delete(`/installments/${planId}`)
     );
   }
 }

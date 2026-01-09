@@ -60,9 +60,9 @@ export class StatsApiService {
    */
   static async getDashboardStats(period?: StatsPeriod): Promise<DashboardStats> {
     const params = parsePeriodParams(period);
-    
+
     return apiCall<DashboardStats>(
-      baseClient.get('/dashboard/stats', { params })
+      baseClient.get('/stats/dashboard', { params })
     );
   }
 
@@ -71,9 +71,9 @@ export class StatsApiService {
    */
   static async getStudentStats(studentId: number, period?: StatsPeriod): Promise<StudentStats> {
     const params = parsePeriodParams(period);
-    
+
     return apiCall<StudentStats>(
-      baseClient.get(`/dashboard/students/${studentId}/stats`, { params })
+      baseClient.get(`/stats/student/${studentId}`, { params })
     );
   }
 
@@ -94,9 +94,9 @@ export class StatsApiService {
     }>;
   }> {
     const params = parsePeriodParams(period);
-    
+
     return apiCall(
-      baseClient.get('/dashboard/global-student-stats', { params })
+      baseClient.get('/stats/global-student-stats', { params })
     );
   }
 
@@ -105,9 +105,9 @@ export class StatsApiService {
    */
   static async getFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {
     const params = parsePeriodParams(period);
-    
+
     return apiCall<FinancialStats>(
-      baseClient.get('/dashboard/financial-stats', { params })
+      baseClient.get('/stats/financial', { params })
     );
   }
 
@@ -116,9 +116,9 @@ export class StatsApiService {
    */
   static async getGlobalFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {
     const params = parsePeriodParams(period);
-    
+
     return apiCall<FinancialStats>(
-      baseClient.get('/dashboard/global-financial-stats', { params })
+      baseClient.get('/stats/global-financial-stats', { params })
     );
   }
 
@@ -127,9 +127,9 @@ export class StatsApiService {
    */
   static async getMembershipExpiringSoon(days: number = 30): Promise<Student[]> {
     const params = { days: String(days) };
-    
+
     return apiCall<Student[]>(
-      baseClient.get('/dashboard/membership-expiring', { params })
+      baseClient.get('/stats/membership-expiring', { params })
     );
   }
 }

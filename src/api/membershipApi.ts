@@ -50,14 +50,10 @@ export class MembershipApiService {
    */
   static async setMembershipByType(
     studentId: number,
-    type: MembershipType,
-    startDate?: string
+    membershipType: MembershipType,
+    startFromToday: boolean = true
   ): Promise<Student> {
-    const payload: Record<string, any> = { type };
-
-    if (startDate) {
-      payload.start_date = startDate;
-    }
+    const payload = { membershipType, startFromToday };
 
     return apiCall<Student>(
       baseClient.post(
@@ -72,9 +68,10 @@ export class MembershipApiService {
    */
   static async renewMembership(
     studentId: number,
-    type: MembershipType
+    membershipType: MembershipType,
+    extendFromCurrent: boolean = true
   ): Promise<Student> {
-    const payload = { type };
+    const payload = { membershipType, extendFromCurrent };
 
     return apiCall<Student>(
       baseClient.post(
@@ -96,12 +93,13 @@ export class MembershipApiService {
    */
   static async batchSetMembership(
     studentIds: number[],
-    membership: MembershipData
+    membershipType: MembershipType,
+    startFromToday: boolean = true
   ): Promise<{ success: number; failed: number }> {
     const payload = {
-      student_ids: studentIds,
-      membership_start_date: membership.startDate,
-      membership_end_date: membership.endDate,
+      studentIds,
+      membershipType,
+      startFromToday,
     };
 
     return apiCall(baseClient.post("/membership/batch", payload));

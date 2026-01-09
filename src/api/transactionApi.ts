@@ -105,7 +105,7 @@ export class TransactionApiService {
    */
   static async addInstallmentTransaction(data: {
     student_id?: number | null;
-    amount: number;
+    total_amount: number;
     note?: string | null;
     total_installments: number;
     frequency: string;
