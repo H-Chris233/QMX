@@ -1,9 +1,9 @@
 <template>
   <div class="student-management" data-testid="student-management">
-    
+
     <!-- 顶部工具栏 -->
     <header class="management-toolbar" data-testid="student-top-bar">
-      
+
       <!-- 左侧：搜索与筛选 -->
       <div class="toolbar-left">
         <div class="search-wrapper">
@@ -54,7 +54,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 右侧：操作按钮 -->
       <div class="toolbar-right">
         <button @click="exportStudents" class="btn btn-secondary" data-testid="export-students-btn" title="导出 CSV">
@@ -70,9 +70,9 @@
 
     <!-- 学员列表网格 -->
     <div class="student-grid" data-testid="student-list">
-      <div 
-        v-for="student in students" 
-        :key="student.uid" 
+      <div
+        v-for="student in students"
+        :key="student.uid"
         :class="['student-card', { selected: selectedStudent?.uid === student.uid }]"
         @click="selectStudent(student)"
         :data-testid="`student-card-${student.uid}`"
@@ -93,7 +93,7 @@
             {{ getMembershipStatusText(student) }}
           </div>
         </div>
-        
+
         <!-- 卡片主体：详细属性 -->
         <div class="card-body">
           <div class="info-row">
@@ -119,7 +119,7 @@
             </span>
           </div>
         </div>
-        
+
         <!-- 卡片底部：操作栏 -->
         <div class="card-footer">
           <button @click.stop="editStudent(student)" class="card-btn edit" :data-testid="`edit-student-${student.uid}`">
@@ -137,8 +137,8 @@
 
     <!-- 分页控件 -->
     <div class="pagination-wrapper" v-if="totalPages > 1" data-testid="student-pagination">
-      <button 
-        @click="changePage(currentPage - 1)" 
+      <button
+        @click="changePage(currentPage - 1)"
         :disabled="currentPage === 1"
         class="page-nav-btn"
         data-testid="prev-page-btn"
@@ -146,13 +146,13 @@
         <ChevronLeft :size="18" />
         上一页
       </button>
-      
+
       <span class="page-indicator" data-testid="page-info">
         Page <b>{{ currentPage }}</b> of {{ totalPages }}
       </span>
-      
-      <button 
-        @click="changePage(currentPage + 1)" 
+
+      <button
+        @click="changePage(currentPage + 1)"
         :disabled="currentPage === totalPages"
         class="page-nav-btn"
         data-testid="next-page-btn"
@@ -163,7 +163,7 @@
     </div>
   </div>
 
-  <!-- 模态框 (保持逻辑，优化样式) -->
+  <!-- 模态框 -->
   <Transition name="modal-fade">
     <div v-if="showAddStudentForm || showEditForm" class="modal-overlay" @click="closeForm">
       <div class="modal-content" @click.stop>
@@ -173,30 +173,38 @@
             <X :size="24" />
           </button>
         </div>
-        
+
         <div class="modal-body">
-          <StudentForm 
+          <StudentForm
             :model-value="currentStudent"
-            <script setup lang="ts">
+            @save="handleSave"
+            @cancel="closeForm"
+          />
+        </div>
+      </div>
+    </div>
+  </Transition>
+</template>
+
+<script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '../stores/app';
 import { useStudentStore } from '../stores/student';
 import StudentForm from './StudentForm.vue';
-import { ApiService } from '../api/ApiService';
 import type { Student, CurrentStudentInput } from '../types/api';
 
 // 引入图标
-import { 
-  Search, 
-  Download, 
-  UserPlus, 
-  ChevronDown, 
-  Target, 
-  Phone, 
-  BookOpen, 
-  Clock, 
-  Edit3, 
+import {
+  Search,
+  Download,
+  UserPlus,
+  ChevronDown,
+  Target,
+  Phone,
+  BookOpen,
+  Clock,
+  Edit3,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -205,14 +213,13 @@ import {
 
 const appStore = useAppStore();
 const studentStore = useStudentStore();
-const { students, pagination, loading, currentStudent } = storeToRefs(studentStore);
+const { students, pagination, currentStudent } = storeToRefs(studentStore);
 
 // 响应式数据
 const searchQuery = ref('');
 const searchFilters = ref({
   subject: '',
   classType: '',
-  hasMembership: '',
   membershipStatus: ''
 });
 
@@ -242,14 +249,12 @@ const fetchStudents = async (page: number = 1): Promise<void> => {
     if (searchQuery.value) params.name_contains = searchQuery.value;
     if (searchFilters.value.subject) params.subject = searchFilters.value.subject;
     if (searchFilters.value.classType) params.class_type = searchFilters.value.classType;
-    if (searchFilters.value.hasMembership) params.has_membership = searchFilters.value.hasMembership === 'true';
     if (searchFilters.value.membershipStatus) params.membership_status = searchFilters.value.membershipStatus;
 
     await studentStore.fetchStudents(params);
   } catch (error) {
-    // Error handling is mostly done in store, but we catch here for safety
-    if (!studentStore.loading) { // Avoid double error if store handles it
-        appStore.errorHandler.showError('无法获取学员列表');
+    if (!studentStore.loading) {
+      appStore.errorHandler.showError('无法获取学员列表');
     }
   }
 };
@@ -261,7 +266,7 @@ const editStudent = (student: Student) => {
   showEditForm.value = true;
 };
 
-const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
+const handleSave = async (data: CurrentStudentInput): Promise<void> => {
   try {
     if (showAddStudentForm.value) {
       await studentStore.createStudent(data);
@@ -271,9 +276,6 @@ const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
       appStore.errorHandler.showSuccess('学员信息更新成功');
     }
     closeForm();
-    // No need to fetch manually if store updates state, but to be safe with search params:
-    // fetchStudents(currentPage.value); 
-    // Store update actions usually update the list locally.
   } catch (error) {
     const msg = (error as any)?.message || '操作失败';
     appStore.errorHandler.showError('操作失败：' + msg);
@@ -352,15 +354,6 @@ const closeForm = () => {
   showAddStudentForm.value = false;
   showEditForm.value = false;
   studentStore.setCurrentStudent(null);
-};
-
-onMounted(() => fetchStudents());
-</script>
-
-const closeForm = () => {
-  showAddStudentForm.value = false;
-  showEditForm.value = false;
-  currentStudent.value = null;
 };
 
 onMounted(() => fetchStudents());
@@ -473,7 +466,7 @@ onMounted(() => fetchStudents());
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 .btn-primary:hover {
-  background-color: #5558e6; /* slightly darker primary */
+  background-color: #5558e6;
   transform: translateY(-1px);
 }
 .btn-secondary {
@@ -589,7 +582,7 @@ onMounted(() => fetchStudents());
 
 .info-label {
   color: var(--text-secondary);
-  width: 3.5rem; /* fixed width for alignment */
+  width: 3.5rem;
 }
 
 .info-val {
@@ -741,6 +734,6 @@ onMounted(() => fetchStudents());
   .select-wrapper select { width: 100%; }
   .toolbar-right { justify-content: stretch; }
   .btn { flex: 1; justify-content: center; }
-  .btn-text { display: none; } /* Hide export text on mobile */
+  .btn-text { display: none; }
 }
 </style>

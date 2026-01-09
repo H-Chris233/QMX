@@ -22,17 +22,39 @@
 
 ## 入口与启动
 
-**主入口**：`ApiService.ts` - 统一的API服务类，整合所有子模块
+**统一入口**：`index.ts` - 推荐从这里导入所有 API 服务
 
 **使用方式**：
 ```typescript
-import { ApiService } from '@/api/ApiService';
+// ✅ 推荐：从统一入口导入
+import { ApiService, type Student } from '@/api';
 
 // 获取学员列表
 const students = await ApiService.getAllStudents({ page: 1, limit: 20 });
 
 // 创建交易记录
-const transaction = await ApiService.createTransaction(data);
+const transaction = await ApiService.addCashTransaction(data);
+```
+
+**旧方式（仍兼容，但推荐迁移）**：
+```typescript
+// ❌ 不推荐：直接导入具体模块
+import { ApiService } from '@/api/ApiService';
+import { StudentApiService } from '@/api/studentApi';
+```
+
+## 新增功能：API 方法别名
+
+为解决多程序员开发时的命名不一致问题，提供 `ApiAliases`：
+
+```typescript
+import { ApiService, ApiAliases } from '@/api';
+
+// 使用别名（统一命名风格）
+await ApiService[ApiAliases.students.list]({ page: 1 });
+
+// 直接调用
+await ApiService.getAllStudents({ page: 1 });
 ```
 
 ## 对外接口
@@ -143,6 +165,7 @@ A: 后端统一返回`{ success: boolean, data?: any, error?: string }`格式，
 
 ```
 src/api/
+├── index.ts               # 统一导出入口（推荐使用）
 ├── ApiService.ts          # 统一API服务类（主入口）
 ├── baseClient.ts          # axios客户端配置
 ├── studentApi.ts          # 学员API
@@ -150,6 +173,7 @@ src/api/
 ├── installmentsApi.ts     # 分期API
 ├── statsApi.ts            # 统计API
 ├── membershipApi.ts       # 会员API
+├── authApi.ts             # 认证API
 └── adapterApi.ts          # 适配器API
 ```
 

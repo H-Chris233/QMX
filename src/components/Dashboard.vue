@@ -208,6 +208,8 @@ import { useStatsStore } from '../stores/stats';
 import { useStudentStore } from '../stores/student';
 import { transformDashboardData, safeParseNumber } from '../utils/dataTransformers';
 import ErrorModal from './ErrorModal.vue';
+import { ApiService } from '../api';
+import type { Student as ApiStudent } from '../types/api';
 
 // 引入图标
 import {
@@ -226,16 +228,6 @@ import {
 
 // === 以下保持原有的业务逻辑不变 ===
 
-interface Student {
-  uid: number;
-  name: string;
-  phone?: string;
-  membership_days_remaining: number | null;
-  is_membership_active: boolean;
-  membership_start_date?: string;
-  membership_end_date?: string;
-}
-
 const abortController: Ref<AbortController | null> = ref(null);
 const lastUpdateTime: Ref<Date | null> = ref(null);
 
@@ -247,6 +239,8 @@ const { showError, showSuccess } = appStore.errorHandler;
 const { dashboardStats, dashboardLoading } = storeToRefs(statsStore);
 // loading state
 const loading = computed(() => dashboardLoading.value || studentStore.fetchLoading || studentStore.loading);
+// extendMembership 专用 loading 状态
+const extendLoading = ref(false);
 
 // 续费天数映射
 const extendDaysMap: Record<number, number> = reactive({});
@@ -276,10 +270,10 @@ const showMembershipError = (title: string, message: string, details?: string): 
 };
 
 const dashboardData = computed(() => {
-  return transformDashboardData(dashboardStats.value || {});
+  return transformDashboardData((dashboardStats.value || {}) as any);
 });
 
-const expiringMemberships: Ref<Student[]> = ref([]);
+const expiringMemberships: Ref<ApiStudent[]> = ref([]);
 
 const loadDashboardData = async (): Promise<void> => {
   if (loading.value) return;
@@ -317,8 +311,6 @@ const loadDashboardData = async (): Promise<void> => {
     }
   }
 };
-      }
-    };
 
     const formatNumber = (val: any) => {
       try {
@@ -345,7 +337,7 @@ const loadDashboardData = async (): Promise<void> => {
     const retryLoadMembership = () => { closeMembershipError(); loadDashboardData(); };
 
     // 续费逻辑
-    const extendMembership = async (student: Student): Promise<void> => {
+    const extendMembership = async (student: ApiStudent): Promise<void> => {
       if (!student?.uid) return;
       const days = extendDaysMap[student.uid] || 0;
       if (days <= 0) {
@@ -353,7 +345,7 @@ const loadDashboardData = async (): Promise<void> => {
         return;
       }
 
-      loading.value = true;
+      extendLoading.value = true;
       try {
         const baseDate = student.is_membership_active && student.membership_end_date
           ? new Date(student.membership_end_date)
@@ -377,12 +369,12 @@ const loadDashboardData = async (): Promise<void> => {
       } catch (error) {
         showError('续费失败', (error as Error).message);
       } finally {
-        loading.value = false;
+        extendLoading.value = false;
       }
     };
 
     // 联系学员
-    const contactStudent = (student: Student): void => {
+    const contactStudent = (student: ApiStudent): void => {
       if (!student.phone) {
         showError('无电话号码');
         return;
