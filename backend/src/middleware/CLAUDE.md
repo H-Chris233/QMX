@@ -4,6 +4,11 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-01-09 - 文档更新
+- 更新文档以反映当前中间件实现
+- 确认PostgreSQL迁移后中间件无需修改
+- 更新最后更新日期
+
 ### 2025-11-06T06:48:29+0000
 - 初始化模块文档
 - 记录中间件架构和安全机制
@@ -35,8 +40,8 @@ Express中间件，处理请求拦截、验证、安全检查和错误处理。�
 ```typescript
 // 主要功能：
 - errorHandler()            // 全局错误处理
-- notFound()                // 404错误处理
-- asyncHandler()            // 异步错误包装
+- notFoundHandler()         // 404错误处理
+- catchAsync()              // 异步错误包装
 - AppError                  // 自定义错误类
 
 // 错误类型：
@@ -45,9 +50,10 @@ Express中间件，处理请求拦截、验证、安全检查和错误处理。�
 - UnauthorizedError        // 未授权
 - ForbiddenError           // 禁止访问
 - ConflictError            // 冲突错误
+- DatabaseError            // 数据库错误
 ```
 
-**验证中间件** (`validation.ts`) - 请求数据验证
+**validation.ts** - 请求数据验证
 ```typescript
 // 主要功能：
 - validateRequest()        // 请求体验证
@@ -61,12 +67,12 @@ Express中间件，处理请求拦截、验证、安全检查和错误处理。�
 - 错误信息格式化
 ```
 
-**速率限制中间件** (`rateLimiter.ts`) - API调用频率控制
+**rateLimiter.ts** - API调用频率控制
 ```typescript
 // 主要功能：
 - rateLimitMiddleware()    // 通用速率限制
 - createRateLimiter()      // 自定义速率限制器
-- get_client_ip()          // IP地址获取
+- getClientIp()            // IP地址获取
 
 // 限制策略：
 - 基于IP的限制
@@ -79,7 +85,7 @@ Express中间件，处理请求拦截、验证、安全检查和错误处理。�
 
 ### 外部依赖
 - **joi**: 数据验证库
-- **rate-limiter-flexible**: 速率限制
+- **express**: Web框架
 - **helmet**: 安全头部
 - **cors**: 跨域处理
 - **compression**: 响应压缩
@@ -95,7 +101,7 @@ const errorConfig = {
   production: {
     showStack: false,
     logErrors: true,
-    sendToSentry: true
+    sendToSentry: false  // 可选：发送到错误追踪服务
   }
 };
 
@@ -119,7 +125,7 @@ const rateLimitConfig = {
 ```typescript
 // CORS配置
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:1420'],
+  origin: process.env.CORS_ORIGIN || 'http://localhost:1420',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -150,7 +156,7 @@ app.use(express.json());               // 4. 请求体解析
 app.use(rateLimitMiddleware);          // 5. 速率限制
 app.use(requestLogger);                // 6. 请求日志
 app.use('/api/v1', routes);            // 7. 路由处理
-app.use(notFound);                     // 8. 404处理
+app.use(notFoundHandler);              // 8. 404处理
 app.use(errorHandler);                 // 9. 错误处理
 ```
 
@@ -174,6 +180,10 @@ const errorHandler = (err: Error, req: Request, res: Response, next: NextFunctio
 
   if (err instanceof NotFoundError) {
     return handleNotFoundError(err, res);
+  }
+
+  if (err.name === 'DatabaseError') {
+    return handleDatabaseError(err, res);
   }
 
   // 3. 默认错误处理
@@ -238,9 +248,9 @@ A: 中间件执行顺序很重要：
 **Q: 如何处理异步错误？**
 A:
 1. 使用try-catch包装异步代码
-2. 使用asyncHandler包装器
+2. 使用catchAsync包装器
 3. 确保next(error)被调用
-4. 不要在异步函数中抛出错误
+4. 不要在异步函数中直接抛出错误
 
 **Q: 如何自定义错误类型？**
 A:
@@ -269,7 +279,7 @@ class ValidationError extends AppError {
 
 **Q: 如何优化速率限制？**
 A:
-1. 使用Redis存储限制计数
+1. 使用Redis存储限制计数（生产环境）
 2. 实现分层限制策略
 3. 考虑不同端点的不同限制
 4. 监控限制效果
@@ -304,7 +314,7 @@ import { AppError } from '@/middleware/errorHandler';
 // 在控制器中使用
 export const getStudent = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const student = await Student.findByUid(req.params.uid);
+    const student = await StudentRepository.findByUid(Number(req.params.uid));
 
     if (!student) {
       throw new AppError('Student not found', 404);
@@ -322,7 +332,6 @@ export const getStudent = async (req: Request, res: Response, next: NextFunction
 
 ### 自定义速率限制
 ```typescript
-import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { createRateLimiter } from '@/middleware/rateLimiter';
 
 // 创建API特定的速率限制器
@@ -385,8 +394,8 @@ backend/src/middleware/
 ┌─────────────────────────────────────────┐
 │           Validation Layer              │
 │  ┌─────────────┬─────────────────────┐  │
-│  │   Input     │    Authentication  │  │
-│  │ Validation  │      Middleware    │  │
+│  │   Input     │    Authentication   │  │
+│  │ Validation  │      Middleware     │  │
 │  └─────────────┴─────────────────────┘  │
 └──────────────┬──────────────────────────┘
                │
@@ -414,4 +423,5 @@ backend/src/middleware/
 
 ---
 
-**最后更新**: 2025-11-06T06:48:29+0000
+**最后更新**: 2026-01-09
+**维护者**: H-Chris233

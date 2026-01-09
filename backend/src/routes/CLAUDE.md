@@ -4,6 +4,12 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-01-09 - 路由更新
+- 添加healthRoutes.ts健康检查路由
+- 添加testRoutes.ts测试路由
+- 更新所有路由以支持PostgreSQL
+- 完善API端点文档
+
 ### 2025-11-06T06:48:29+0000
 - 初始化模块文档
 - 记录路由架构和API端点定义
@@ -34,7 +40,9 @@ routes/
 ├── installmentRoutes.ts  # 分期付款路由
 ├── membershipRoutes.ts   # 会员管理路由
 ├── statsRoutes.ts        # 统计数据路由
-└── adapterRoutes.ts      # 数据库适配器路由
+├── adapterRoutes.ts      # 数据库适配器路由
+├── healthRoutes.ts       # 健康检查路由
+└── testRoutes.ts         # 测试路由
 ```
 
 ## 对外接口
@@ -54,6 +62,8 @@ GET /api/v1/              # API信息
 /api/v1/membership        # 会员管理
 /api/v1/dashboard         # 统计数据
 /api/v1/adapter           # 数据库适配器
+/api/v1/health            # 健康检查
+/api/v1/test              # 测试端点（开发环境）
 ```
 
 **studentRoutes.ts** - 学员管理路由
@@ -71,6 +81,7 @@ GET    /students/:uid/scores  # 获取学员成绩
 GET    /transactions          # 获取交易列表
 GET    /transactions/:uid     # 获取单个交易
 POST   /transactions          # 创建交易
+POST   /transactions/installment  # 创建分期交易
 PUT    /transactions/:uid     # 更新交易
 DELETE /transactions/:uid     # 删除交易
 GET    /transactions/search   # 搜索交易
@@ -78,11 +89,15 @@ GET    /transactions/search   # 搜索交易
 
 **installmentRoutes.ts** - 分期付款路由
 ```typescript
-GET    /installments          # 获取分期列表
-GET    /installments/:id      # 获取分期详情
-POST   /installments          # 创建分期计划
-PUT    /installments/:id/pay  # 支付分期
-DELETE /installments/:id      # 取消分期计划
+GET    /installments                    # 获取分期列表
+GET    /installments/plans              # 获取分期计划列表
+GET    /installments/plans/:planId      # 获取分期计划详情
+POST   /installments/plans              # 创建分期计划
+PUT    /installments/plans/:planId      # 更新分期计划
+DELETE /installments/plans/:planId      # 删除分期计划
+GET    /installments/:uid               # 获取单个分期详情
+PUT    /installments/:uid               # 更新分期状态
+POST   /installments/:uid/pay           # 支付分期
 ```
 
 **statsRoutes.ts** - 统计数据路由
@@ -91,6 +106,27 @@ GET    /dashboard             # 仪表盘统计
 GET    /dashboard/students    # 学员统计
 GET    /dashboard/financial   # 财务统计
 GET    /dashboard/membership  # 会员统计
+```
+
+**healthRoutes.ts** - 健康检查路由
+```typescript
+GET    /health                # 应用健康状态
+GET    /health/db             # 数据库连接状态
+GET    /health/detailed       # 详细健康信息
+```
+
+**adapterRoutes.ts** - 数据库适配器路由
+```typescript
+GET    /adapter/status        # 数据库适配器状态
+GET    /adapter/info          # 数据库信息
+```
+
+**testRoutes.ts** - 测试路由（仅开发环境）
+```typescript
+GET    /test/db               # 测试数据库连接
+GET    /test/students         # 测试学员查询
+POST   /test/seed             # 填充测试数据
+DELETE /test/cleanup          # 清理测试数据
 ```
 
 ## 关键依赖与配置
@@ -121,10 +157,22 @@ interface PaginationQuery {
   sort?: string;
   order?: 'asc' | 'desc';
 }
+
+// 分页响应格式
+interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
 ```
 
 ### 安全配置
-- **JWT验证**: 受保护路由需要token
+- **JWT验证**: 受保护路由需要token（未来实现）
 - **输入验证**: Joi schema验证
 - **速率限制**: 防止API滥用
 - **CORS配置**: 指定允许的源
@@ -143,6 +191,10 @@ DELETE /students/:id       # 删除资源
 // 嵌套资源
 GET    /students/:id/scores     # 学员的成绩
 POST   /students/:id/scores     # 为学员添加成绩
+
+// 特殊操作
+POST   /installments/:id/pay    # 支付分期
+GET    /transactions/search     # 搜索交易
 ```
 
 ### 响应格式标准
@@ -165,11 +217,71 @@ POST   /students/:id/scores     # 为学员添加成绩
   }
 }
 
+// 创建响应
+{
+  "success": true,
+  "data": { /* 创建的资源 */ },
+  "message": "创建成功"
+}
+
 // 错误响应
 {
   "success": false,
   "error": "错误信息",
   "message": "详细描述（可选）"
+}
+```
+
+## 健康检查端点
+
+### 基础健康检查
+```typescript
+GET /api/v1/health
+Response:
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2026-01-09T10:00:00.000Z",
+    "uptime": 3600
+  }
+}
+```
+
+### 数据库健康检查
+```typescript
+GET /api/v1/health/db
+Response:
+{
+  "success": true,
+  "data": {
+    "database_type": "postgresql",
+    "connection_status": "connected",
+    "timestamp": "2026-01-09T10:00:00.000Z"
+  }
+}
+```
+
+### 详细健康信息
+```typescript
+GET /api/v1/health/detailed
+Response:
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2026-01-09T10:00:00.000Z",
+    "uptime": 3600,
+    "database": {
+      "type": "postgresql",
+      "status": "connected"
+    },
+    "memory": {
+      "used": 123456789,
+      "total": 1073741824
+    },
+    "version": "0.12.1"
+  }
 }
 ```
 
@@ -198,13 +310,13 @@ POST   /students/:id/scores     # 为学员添加成绩
 A:
 1. 在对应的路由文件中添加路由定义
 2. 创建相应的控制器方法
-3. 添加验证规则
+3. 添加验证规则（如需要）
 4. 编写集成测试
 5. 更新API文档
 
 **Q: 如何处理认证？**
 A:
-1. 使用JWT中间件保护路由
+1. 使用JWT中间件保护路由（未来实现）
 2. 在路由前添加认证中间件
 3. 检查token有效性
 4. 处理权限验证
@@ -236,7 +348,7 @@ router.post('/students',
 );
 ```
 
-### 认证中间件
+### 认证中间件（未来实现）
 ```typescript
 import { authenticateToken } from '@/middleware/auth';
 
@@ -263,7 +375,9 @@ backend/src/routes/
 ├── installmentRoutes.ts    # 分期付款路由
 ├── membershipRoutes.ts     # 会员管理路由
 ├── statsRoutes.ts          # 统计数据路由
-└── adapterRoutes.ts        # 数据库适配器路由
+├── adapterRoutes.ts        # 数据库适配器路由
+├── healthRoutes.ts         # 健康检查路由
+└── testRoutes.ts           # 测试路由
 ```
 
 ## 路由架构图
@@ -284,16 +398,16 @@ backend/src/routes/
 │  └───────────────────────────────────┘  │
 └──────────────┬──────────────────────────┘
                │
-      ┌────────┴────────┐
-      ▼                 ▼
-┌──────────┐      ┌──────────┐
-│Student   │      │Transaction│
-│Routes    │      │   Routes  │
-│(CRUD +   │      │(CRUD +   │
-│Scores)   │      │Search)   │
-└────┬─────┘      └────┬─────┘
-     │                 │
-     └────────┬────────┘
+      ┌────────┴────────┬────────────┐
+      ▼                 ▼            ▼
+┌──────────┐      ┌──────────┐  ┌──────────┐
+│Student   │      │Transaction│ │Health    │
+│Routes    │      │   Routes  │ │Routes    │
+│(CRUD +   │      │(CRUD +    │ │(Status)  │
+│Scores)   │      │Search)    │ │          │
+└────┬─────┘      └────┬─────┘  └────┬─────┘
+     │                 │             │
+     └────────┬────────┴─────────────┘
               ▼
      ┌─────────────────┐
      │  Controllers    │
@@ -302,11 +416,24 @@ backend/src/routes/
               │
               ▼
      ┌─────────────────┐
-     │   Models        │
+     │   Services      │
+     │ (Query/Builder) │
+     └─────────────────┘
+              │
+              ▼
+     ┌─────────────────┐
+     │  Repositories   │
      │ (Data Access)   │
+     └─────────────────┘
+              │
+              ▼
+     ┌─────────────────┐
+     │   PostgreSQL    │
+     │  (Drizzle ORM)  │
      └─────────────────┘
 ```
 
 ---
 
-**最后更新**: 2025-11-06T06:48:29+0000
+**最后更新**: 2026-01-09
+**维护者**: H-Chris233

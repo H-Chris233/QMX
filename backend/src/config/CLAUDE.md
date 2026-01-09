@@ -4,6 +4,13 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-01-09 - PostgreSQL迁移完成
+- 完成从MongoDB到PostgreSQL的配置迁移
+- 移除MongoDB连接管理，保留URI仅用于历史数据迁移
+- 采用PostgreSQL连接池（pg + Drizzle ORM）
+- 添加指数退避重连机制
+- 更新环境变量配置为DATABASE_URL
+
 ### 2025-11-06T11:37:40+0000
 - 补扫配置管理机制，发现企业级配置架构
 - 分析分层配置设计和环境变量验证
@@ -22,15 +29,14 @@
 **核心价值**：
 - 环境配置隔离
 - 配置验证和默认值
-- 数据库连接管理
+- PostgreSQL连接池管理
 - 安全配置保护
 
 ## 入口与启动
 
 **核心配置文件**：
 - `index.ts` - 主配置入口和验证
-- `database.ts` - 数据库配置
-- `mongodb.ts` - MongoDB连接管理
+- `database.ts` - PostgreSQL连接管理
 
 ## 对外接口
 
@@ -41,75 +47,64 @@
 // 主要功能：
 - config                    // 配置对象导出
 - validateConfig()          // 配置验证
-- loadEnvironmentConfig()   // 环境配置加载
-- getDatabaseConfig()       // 数据库配置获取
+- getPostgreSQLUrl()        // PostgreSQL URL获取
 
 // 配置结构：
 interface Config {
   server: {
     port: number;
     nodeEnv: string;
-    corsOrigin: string[];
-    logLevel: string;
+    corsOrigin: string;
   };
-  database: {
-    mongodb: {
-      uri: string;
-      dbName: string;
-      options: MongoOptions;
-    };
+  postgresql: {
+    database_url?: string;
+    poolSize: number;
+    connectionTimeout: number;
+    idleTimeout: number;
+  };
+  mongodb?: {
+    uri?: string;  // 保留用于历史数据迁移，已废弃
   };
   security: {
     jwtSecret: string;
     jwtExpiresIn: string;
-    bcryptRounds: number;
+    bcryptSaltRounds: number;
   };
-  features: {
-    enableRegistration: boolean;
-    enableEmailVerification: boolean;
-    maxLoginAttempts: number;
+  logging: {
+    level: string;
+    file: string;
+  };
+  rateLimit: {
+    windowMs: number;
+    maxRequests: number;
+  };
+  upload: {
+    maxFileSize: number;
+    uploadPath: string;
+  };
+  pagination: {
+    defaultLimit: number;
+    maxLimit: number;
+  };
+  request: {
+    bodyLimit: string;
   };
 }
 ```
 
-**database.ts** - 数据库配置
+**database.ts** - PostgreSQL连接管理
 ```typescript
 // 主要功能：
-- databaseConfig            // 数据库配置对象
-- validateDatabaseConfig()  // 数据库配置验证
-- getConnectionString()     // 连接字符串构建
-
-// 数据库选项：
-interface DatabaseConfig {
-  type: 'mongodb';
-  host: string;
-  port: number;
-  database: string;
-  username?: string;
-  password?: string;
-  ssl: boolean;
-  poolSize: number;
-  connectionTimeout: number;
-}
-```
-
-**mongodb.ts** - MongoDB连接管理
-```typescript
-// 主要功能：
-- mongoManager              // MongoDB管理器实例
-- connectDatabase()         // 建立数据库连接
+- connectDatabase()         // 建立PostgreSQL连接（带重试）
 - disconnectDatabase()      // 断开数据库连接
-- checkHealth()             // 健康检查
-- createIndexes()           // 创建索引
+- isUsingPostgreSQL()       // 返回true
+- isUsingMongoDB()          // 返回false（已废弃）
 
-// 连接管理：
-class MongoManager {
-  private connection: mongoose.Connection | null;
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  isConnected(): boolean;
-  checkHealth(): Promise<HealthStatus>;
-}
+// 连接管理特性：
+- 指数退避重连算法
+- 后台持续重试机制
+- 连接池管理（Drizzle + pg）
+- 健康检查支持
 ```
 
 ## 关键依赖与配置
@@ -122,85 +117,120 @@ NODE_ENV=development
 CORS_ORIGIN=http://localhost:1420
 LOG_LEVEL=info
 
-# MongoDB配置
+# PostgreSQL配置（主数据库）
+DATABASE_URL=postgresql://username:password@localhost:5432/qmx
+DB_POOL_SIZE=10
+DB_CONNECTION_TIMEOUT=2000
+DB_IDLE_TIMEOUT=30000
+
+# MongoDB配置（已废弃，仅用于历史数据迁移）
 MONGODB_URI=mongodb://localhost:27017/qmx
-MONGODB_DB_NAME=qmx
-MONGODB_MAX_POOL_SIZE=10
 
 # 安全配置
 JWT_SECRET=your-jwt-secret-key
 JWT_EXPIRES_IN=7d
-BCRYPT_ROUNDS=12
+BCRYPT_SALT_ROUNDS=12
 
-# 功能开关
-ENABLE_REGISTRATION=true
-ENABLE_EMAIL_VERIFICATION=false
-MAX_LOGIN_ATTEMPTS=5
+# 速率限制配置
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# 文件上传配置
+MAX_FILE_SIZE=10485760
+UPLOAD_PATH=./uploads
+
+# 分页配置
+PAGINATION_DEFAULT_LIMIT=20
+PAGINATION_MAX_LIMIT=100
+
+# 请求配置
+REQUEST_BODY_LIMIT=10mb
 ```
 
 ### 配置验证规则
 ```typescript
-// 使用Joi进行配置验证
-const configSchema = Joi.object({
-  server: Joi.object({
-    port: Joi.number().port().default(3001),
-    nodeEnv: Joi.string().valid('development', 'production', 'test').default('development'),
-    corsOrigin: Joi.array().items(Joi.string()).default(['http://localhost:1420']),
-    logLevel: Joi.string().valid('error', 'warn', 'info', 'debug').default('info')
-  }).required(),
+// 启动时配置验证
+export function validateConfig(): void {
+  // 检查PostgreSQL连接必需的环境变量
+  if (!config.postgresql.database_url) {
+    throw new Error('DATABASE_URL is required for QMX to work. Setting examples:');
+    console.error('');
+    console.error('  # PostgreSQL (recommended):');
+    console.error('  DATABASE_URL=postgresql://username:password@localhost:5432/qmx');
+    console.error('');
+    console.error('  # PostgreSQL with password:');
+    console.error('  DATABASE_URL=postgresql://user:pass@host:5432/dbname?sslmode=require');
+    console.error('');
+    console.error('  # Docker Compose PostgreSQL:');
+    console.error('  DATABASE_URL=postgresql://qmx:qmx_password@postgres:5432/qmx');
+    console.error('');
+  }
 
-  database: Joi.object({
-    mongodb: Joi.object({
-      uri: Joi.string().required(),
-      dbName: Joi.string().required(),
-      options: Joi.object({
-        maxPoolSize: Joi.number().integer().min(1).default(10),
-        serverSelectionTimeoutMS: Joi.number().integer().min(1000).default(5000),
-        connectTimeoutMS: Joi.number().integer().min(1000).default(10000)
-      })
-    }).required()
-  }).required()
-});
+  // 生产环境安全检查
+  if (config.server.nodeEnv === 'production' &&
+      config.security.jwtSecret === 'your-super-secret-jwt-key-change-this-in-production') {
+    throw new Error('JWT_SECRET must be changed in production environment');
+  }
+}
 ```
 
-### 环境特定配置
+## PostgreSQL连接管理 - 企业级实现
+
+**指数退避重连机制**：
 ```typescript
-// 开发环境配置
-const developmentConfig = {
-  server: {
-    port: 3001,
-    nodeEnv: 'development',
-    corsOrigin: ['http://localhost:1420'],
-    logLevel: 'debug'
-  },
-  database: {
-    mongodb: {
-      uri: 'mongodb://localhost:27017/qmx_dev',
-      dbName: 'qmx_dev'
-    }
-  }
-};
+export const connectDatabase = async (): Promise<void> => {
+  const baseDelay = 2000; // 基础延迟2秒
+  const maxDelay = 30000; // 最大延迟30秒
+  let attempt = 1;
 
-// 生产环境配置
-const productionConfig = {
-  server: {
-    port: process.env.PORT || 3001,
-    nodeEnv: 'production',
-    corsOrigin: process.env.CORS_ORIGIN?.split(',') || [],
-    logLevel: 'info'
-  },
-  database: {
-    mongodb: {
-      uri: process.env.MONGODB_URI!,
-      dbName: process.env.MONGODB_DB_NAME!
+  // 先尝试一次连接
+  try {
+    const success = await testPostgreSQLConnection();
+    if (success) {
+      logger.info('PostgreSQL 连接成功');
+      return;
     }
+  } catch (error) {
+    logger.error('PostgreSQL 初始连接失败，将启动后台重试:', error);
   }
+
+  // 后台持续重试 - 指数退避
+  const retryConnection = async () => {
+    while (true) {
+      try {
+        const success = await testPostgreSQLConnection();
+        if (success) {
+          logger.info('🎉 PostgreSQL 后台重连成功！');
+          return;
+        }
+      } catch (error) {
+        // 指数退避算法：delay = min(baseDelay * 2^(attempt-1), maxDelay)
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+
+        logger.error(`PostgreSQL 后台重连失败 (尝试 ${attempt}):`, error);
+        logger.info(`⏳ ${Math.round(delay/1000)}秒后继续重试 (指数退避)...`);
+
+        attempt++;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
+  // 启动后台重试，不阻塞主线程
+  setTimeout(retryConnection, 1000);
 };
 ```
 
-## 配置管理深度分析 - 优秀成熟度
+**连接管理特性**：
+- ✅ **指数退避算法** - 智能重试间隔（2s → 4s → 8s → 16s → 30s）
+- ✅ **后台重试** - 不阻塞应用启动
+- ✅ **连接池管理** - pg连接池，默认10个连接
+- ✅ **超时控制** - 连接超时2秒，空闲超时30秒
+- ✅ **优雅关闭** - 应用退出时正确关闭连接池
 
-**分层配置架构**：
+## 配置架构设计
+
+### 分层配置
 ```
 Environment Variables (环境变量)
     ↓
@@ -213,86 +243,26 @@ Validation (配置验证)
 Final Config Object (最终配置对象)
 ```
 
-**配置管理机制评估 - 优秀**：
-
-**多层配置验证机制**：
+### 数据库架构（PostgreSQL）
 ```typescript
-// 启动时配置验证
-export function validateConfig(): void {
-  // 必需环境变量检查
-  if (!config.mongodb.uri) {
-    throw new Error('MONGODB_URI is required for QMX to work. Setting examples:');
-    // 详细的配置示例和错误提示
-  }
-
-  // 生产环境安全检查
-  if (config.server.nodeEnv === 'production' &&
-      config.security.jwtSecret === 'your-super-secret-jwt-key-change-this-in-production') {
-    throw new Error('JWT_SECRET must be changed in production environment');
-  }
-}
+// PostgreSQL数据库架构
+PostgreSQL 15+
+  ↓
+pg Connection Pool (连接池)
+  ↓
+Drizzle ORM (Type-safe SQL)
+  ↓
+Repository Pattern
+  ↓
+Services & Controllers
+  ↓
+API Responses
 ```
 
-**MongoDB连接管理** - 企业级实现：
-```typescript
-class MongoConnectionManager {
-  private isConnected = false;
-
-  async connect(): Promise<void> {
-    const { uri, options } = getMongoConfig();
-
-    // 专业级连接选项
-    const options: mongoose.ConnectOptions = {
-      maxPoolSize: 10, // 连接池管理
-      serverSelectionTimeoutMS: 5000, // 超时控制
-      socketTimeoutMS: 45000, // Socket超时
-      bufferCommands: false, // 禁用缓冲
-      retryWrites: true, // 重试机制
-      w: 'majority', // 写入确认级别
-    };
-
-    // 连接事件监听
-    mongoose.connection.on('error', (error) => {
-      logger.error('MongoDB连接错误:', error);
-      this.isConnected = false;
-    });
-
-    mongoose.connection.on('reconnected', () => {
-      logger.info('MongoDB重新连接成功');
-      this.isConnected = true;
-    });
-  }
-
-  // 健康检查功能
-  async checkHealth(): Promise<{ status: string; details: any }> {
-    try {
-      if (!this.isConnected) {
-        return { status: 'disconnected', details: { state: this.getConnectionState() } };
-      }
-
-      // 执行数据库ping操作
-      await mongoose.connection.db.admin().ping();
-
-      return {
-        status: 'healthy',
-        details: {
-          state: this.getConnectionState(),
-          host: mongoose.connection.host,
-          port: mongoose.connection.port,
-          name: mongoose.connection.name
-        }
-      };
-    } catch (error) {
-      return { status: 'error', details: { error: error.message } };
-    }
-  }
-}
-```
-
-**安全配置保护**：
+### 安全配置保护
 ```typescript
 // 敏感信息保护
-logger.info(`🔄 正在连接MongoDB: ${uri.replace(/\/\/[^@]+@/, '//***:***@')}`);
+logger.info(`🔄 正在连接PostgreSQL: ${url.replace(/\/\/[^@]+@/, '//***:***@')}`);
 
 // 生产环境强制检查
 if (config.server.nodeEnv === 'production' && config.security.jwtSecret === 'default') {
@@ -300,122 +270,9 @@ if (config.server.nodeEnv === 'production' && config.security.jwtSecret === 'def
 }
 
 // 配置覆盖机制
-const uri = process.env.MONGODB_URI ||
-             process.env.MONGODB_URL ||
-             process.env.mongodburl ||
-             process.env.mongodb_uri;
-```
-
-**配置文件结构**：
-- ✅ **.env.example** - 完整的配置模板
-- ✅ **环境特定配置** - 开发/测试/生产环境分离
-- ✅ **类型安全** - TypeScript接口定义
-- ✅ **默认值处理** - 智能回退机制
-- ✅ **验证规则** - 启动时验证
-
-**发现的专业特性**：
-- ✅ **连接池管理** - 10个连接的最大池大小
-- ✅ **超时控制** - 服务器选择和Socket超时
-- ✅ **重试机制** - 写入操作自动重试
-- ✅ **健康检查** - 实时连接状态监控
-- ✅ **事件监听** - 完整的连接生命周期管理
-- ✅ **错误日志** - 敏感信息脱敏处理
-
-**配置加载流程**：
-```typescript
-const loadConfiguration = (): Config => {
-  // 1. 加载环境变量 (dotenv.config())
-  const envVars = process.env;
-
-  // 2. 设置智能默认值
-  const defaultConfig = getDefaultConfig();
-
-  // 3. 多种环境变量名称支持
-  const mongoUri = envVars.MONGODB_URI ||
-                   envVars.MONGODB_URL ||
-                   envVars.mongodburl ||
-                   envVars.mongodb_uri;
-
-  // 4. 类型转换和验证
-  const port = parseInt(envVars.PORT || '3001', 10);
-
-  // 5. 配置验证
-  validateConfig();
-};
-```
-
-## 配置架构设计
-
-### 分层配置
-
-### 配置加载流程
-```typescript
-const loadConfiguration = (): Config => {
-  // 1. 加载环境变量
-  const envVars = process.env;
-
-  // 2. 设置默认值
-  const defaultConfig = getDefaultConfig();
-
-  // 3. 合并环境特定配置
-  const envConfig = getEnvironmentConfig(envVars.NODE_ENV);
-
-  // 4. 合并所有配置
-  const rawConfig = mergeConfig(defaultConfig, envConfig, envVars);
-
-  // 5. 验证配置
-  const { error, value } = configSchema.validate(rawConfig);
-  if (error) {
-    throw new Error(`Configuration validation failed: ${error.message}`);
-  }
-
-  return value as Config;
-};
-```
-
-### 数据库连接管理
-```typescript
-class MongoManager {
-  private static instance: MongoManager;
-  private connection: mongoose.Connection | null = null;
-
-  static getInstance(): MongoManager {
-    if (!MongoManager.instance) {
-      MongoManager.instance = new MongoManager();
-    }
-    return MongoManager.instance;
-  }
-
-  async connect(): Promise<void> {
-    try {
-      const options = {
-        maxPoolSize: config.database.mongodb.options.maxPoolSize,
-        serverSelectionTimeoutMS: config.database.mongodb.options.serverSelectionTimeoutMS,
-        connectTimeoutMS: config.database.mongodb.options.connectTimeoutMS
-      };
-
-      await mongoose.connect(config.database.mongodb.uri, options);
-      this.connection = mongoose.connection;
-
-      // 监听连接事件
-      this.connection.on('connected', () => {
-        logger.info('MongoDB connected successfully');
-      });
-
-      this.connection.on('error', (error) => {
-        logger.error('MongoDB connection error:', error);
-      });
-
-      this.connection.on('disconnected', () => {
-        logger.warn('MongoDB disconnected');
-      });
-
-    } catch (error) {
-      logger.error('Failed to connect to MongoDB:', error);
-      throw error;
-    }
-  }
-}
+const url = process.env.DATABASE_URL ||
+            process.env.POSTGRES_URL ||
+            process.env.postgresql_url;
 ```
 
 ## 测试与质量
@@ -423,7 +280,7 @@ class MongoManager {
 ### 配置测试
 - **验证测试**: 配置验证规则测试
 - **环境测试**: 不同环境配置测试
-- **连接测试**: 数据库连接测试
+- **连接测试**: PostgreSQL连接测试
 
 ### 代码质量
 - TypeScript类型定义
@@ -442,9 +299,9 @@ class MongoManager {
 **Q: 如何添加新的配置项？**
 A:
 1. 在环境变量中定义新变量
-2. 在配置Schema中添加验证规则
-3. 在Config接口中添加类型定义
-4. 设置合适的默认值
+2. 在Config接口中添加类型定义
+3. 在config对象中添加默认值
+4. 在validateConfig中添加验证规则（如果必需）
 
 **Q: 如何管理敏感配置？**
 A:
@@ -453,19 +310,20 @@ A:
 3. 使用加密存储生产环境密钥
 4. 限制配置文件访问权限
 
-**Q: 数据库连接失败怎么办？**
+**Q: PostgreSQL连接失败怎么办？**
 A:
-1. 检查连接字符串是否正确
-2. 确认MongoDB服务是否运行
+1. 检查DATABASE_URL是否正确
+2. 确认PostgreSQL服务是否运行
 3. 验证网络连接和防火墙设置
 4. 查看详细的错误日志
+5. 系统会自动后台重试连接
 
 **Q: 如何在不同环境使用不同配置？**
 A:
 1. 使用NODE_ENV区分环境
-2. 为每个环境创建配置对象
+2. 为每个环境创建.env文件
 3. 使用环境变量覆盖配置
-4. 实现配置加载逻辑
+4. Docker部署时通过环境变量注入
 
 ## 配置使用示例
 
@@ -479,7 +337,7 @@ const server = app.listen(config.server.port, () => {
   console.log(`Environment: ${config.server.nodeEnv}`);
 });
 
-// 数据库连接
+// PostgreSQL连接
 await connectDatabase();
 ```
 
@@ -499,17 +357,17 @@ try {
 
 ### 数据库健康检查
 ```typescript
-import { mongoManager } from '@/config/mongodb';
+import { testConnection } from '@/db';
 
 // API健康检查端点
 app.get('/health/db', async (req, res) => {
   try {
-    const health = await mongoManager.checkHealth();
+    const isHealthy = await testConnection();
     res.json({
       success: true,
       data: {
-        database_type: 'mongodb',
-        connection_status: health.status,
+        database_type: 'postgresql',
+        connection_status: isHealthy ? 'connected' : 'disconnected',
         timestamp: new Date()
       }
     });
@@ -526,9 +384,8 @@ app.get('/health/db', async (req, res) => {
 
 ```
 backend/src/config/
-├── index.ts              # 主配置入口
-├── database.ts           # 数据库配置
-└── mongodb.ts            # MongoDB连接管理
+├── index.ts              # 主配置入口（PostgreSQL配置）
+└── database.ts           # PostgreSQL连接管理
 ```
 
 ## 配置架构图
@@ -536,7 +393,7 @@ backend/src/config/
 ```
 ┌─────────────────────────────────────────┐
 │        Environment Variables            │
-│  (MONGODB_URI, JWT_SECRET, NODE_ENV...) │
+│  (DATABASE_URL, JWT_SECRET, NODE_ENV...)│
 └──────────────┬──────────────────────────┘
                │
                ▼
@@ -555,18 +412,18 @@ backend/src/config/
                ▼
 ┌─────────────────────────────────────────┐
 │          Configuration Validator        │
-│         (Joi Schema Validation)         │
+│         (Required Fields Check)         │
 └──────────────┬──────────────────────────┘
                │
                ▼
 ┌─────────────────────────────────────────┐
 │           Final Config Object           │
 │  ┌─────────────┬─────────────────────┐  │
-│  │   Server    │     Database        │  │
+│  │   Server    │    PostgreSQL       │  │
 │  │  Config     │      Config         │  │
 │  └─────────────┴─────────────────────┘  │
 │  ┌─────────────┬─────────────────────┐  │
-│  │  Security   │      Features       │  │
+│  │  Security   │      Logging        │  │
 │  │  Config     │      Config         │  │
 │  └─────────────┴─────────────────────┘  │
 └──────────────┬──────────────────────────┘
@@ -578,6 +435,18 @@ backend/src/config/
 └─────────────────────────────────────────┘
 ```
 
+## 迁移检查清单
+- [x] 移除MongoDB连接管理代码
+- [x] 添加PostgreSQL连接配置
+- [x] 实现指数退避重连机制
+- [x] 更新环境变量为DATABASE_URL
+- [x] 保留MongoDB URI仅用于历史数据迁移
+- [x] 更新配置验证逻辑
+- [x] 添加连接池配置
+- [x] 实现优雅关闭机制
+
 ---
 
-**最后更新**: 2025-11-06T06:48:29+0000
+**最后更新**: 2026-01-09
+**迁移状态**: PostgreSQL迁移完成
+**维护者**: H-Chris233
