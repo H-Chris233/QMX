@@ -80,7 +80,7 @@ export class StatsApiService {
     const params = parsePeriodParams(period);
 
     return apiCall<StudentStats>(
-      baseClient.get(`/stats/student/${studentId}`, { params })
+      baseClient.get(`/stats/students/${studentId}`, { params })
     );
   }
 

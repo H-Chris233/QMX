@@ -36,32 +36,15 @@ const membershipExpiringSchema = Joi.object({
 
 // 路由定义
 /**
- * @route GET /api/v1/dashboard/stats
- * @desc 获取仪表板统计数据
- * @access Public
- */
-router.get('/stats', statsController.getDashboardStats);
-
-/**
  * @route GET /api/v1/stats/dashboard
- * @desc 获取仪表板统计数据（别名路由）
+ * @desc 获取仪表板统计数据
  * @access Public
  */
 router.get('/dashboard', statsController.getDashboardStats);
 
 /**
- * @route GET /api/v1/dashboard/financial-stats
- * @desc 获取财务统计（支持周期选择）
- * @access Public
- */
-router.get('/financial-stats',
-  validateQuery(financialStatsSchema),
-  statsController.getFinancialStats
-);
-
-/**
  * @route GET /api/v1/stats/financial
- * @desc 获取财务统计（支持周期选择）- 别名路由
+ * @desc 获取财务统计（支持周期选择）
  * @access Public
  */
 router.get('/financial',
@@ -70,35 +53,35 @@ router.get('/financial',
 );
 
 /**
- * @route GET /api/v1/dashboard/global-student-stats
+ * @route GET /api/v1/stats/global-student-stats
  * @desc 获取全局学员统计
  * @access Public
  */
 router.get('/global-student-stats', statsController.getGlobalStudentStats);
 
 /**
- * @route GET /api/v1/dashboard/global-financial-stats
+ * @route GET /api/v1/stats/global-financial-stats
  * @desc 获取全局财务统计
  * @access Public
  */
 router.get('/global-financial-stats', statsController.getGlobalFinancialStats);
 
 /**
- * @route GET /api/v1/dashboard/membership-expiring
+ * @route GET /api/v1/stats/membership-expiring
  * @desc 获取即将到期的会员
  * @access Public
  */
-router.get('/membership-expiring', 
+router.get('/membership-expiring',
   validateQuery(membershipExpiringSchema),
   statsController.getMembershipExpiringSoon
 );
 
 /**
- * @route GET /api/v1/dashboard/students/:id/stats
+ * @route GET /api/v1/stats/students/:id
  * @desc 获取特定学员的统计信息
  * @access Public
  */
-router.get('/students/:id/stats',
+router.get('/students/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
   statsController.getStudentStats
 );

@@ -603,7 +603,7 @@ describe('ApiService - 统计模块', () => {
     let receivedUrl: URL | null = null;
 
     mswServer.use(
-      http.get(`${API_BASE}/dashboard/stats`, ({ request }) => {
+      http.get(`${API_BASE}/stats/dashboard`, ({ request }) => {
         receivedUrl = new URL(request.url);
         return HttpResponse.json({
           success: true,
@@ -623,7 +623,7 @@ describe('ApiService - 统计模块', () => {
     let receivedUrl: URL | null = null;
 
     mswServer.use(
-      http.get(`${API_BASE}/dashboard/financial-stats`, ({ request }) => {
+      http.get(`${API_BASE}/stats/financial`, ({ request }) => {
         receivedUrl = new URL(request.url);
         return HttpResponse.json({
           success: true,
@@ -642,7 +642,7 @@ describe('ApiService - 统计模块', () => {
 
   it('should notify UI when student stats fetch fails', async () => {
     mswServer.use(
-      http.get(`${API_BASE}/dashboard/students/:studentId/stats`, () => {
+      http.get(`${API_BASE}/stats/students/:studentId`, () => {
         return HttpResponse.json({
           success: false,
           error: '统计不可用',
@@ -666,7 +666,7 @@ describe('ApiService - 统计模块', () => {
     let receivedUrl: URL | null = null;
 
     mswServer.use(
-      http.get(`${API_BASE}/dashboard/membership-expiring`, ({ request }) => {
+      http.get(`${API_BASE}/stats/membership-expiring`, ({ request }) => {
         receivedUrl = new URL(request.url);
         return HttpResponse.json({
           success: true,

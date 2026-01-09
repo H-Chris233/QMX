@@ -197,7 +197,7 @@ export const apiCache = new ApiCacheManager({
     '/transactions': 2 * 60 * 1000,
     // 统计数据按类型设置不同缓存时间
     '/stats/dashboard': 5 * 60 * 1000,
-    '/stats/student': 10 * 60 * 1000,
+    '/stats/students': 10 * 60 * 1000,
     '/stats/financial': 3 * 60 * 1000,
     '/stats/membership': 15 * 60 * 1000,
   }

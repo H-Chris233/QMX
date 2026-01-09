@@ -72,6 +72,7 @@ export const ApiAliases = {
   stats: {
     dashboard: 'getDashboardStats',
     student: 'getStudentStats',
+    students: 'getStudentStats',  // 别名
     financial: 'getFinancialStats',
     globalStudent: 'getGlobalStudentStats',
     globalFinancial: 'getGlobalFinancialStats',
