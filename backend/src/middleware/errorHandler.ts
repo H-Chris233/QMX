@@ -103,7 +103,9 @@ export const errorHandler = (
   res.status(statusCode).json(responseBody);
 };
 
-export const catchAsync = (fn: Function) => {
+export const catchAsync = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
+) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };

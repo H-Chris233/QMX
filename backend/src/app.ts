@@ -51,8 +51,8 @@ export const createApp = (appConfig: AppConfig = {}): Application => {
   app.use(compression());
 
   // 请求体解析
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: finalConfig.request?.bodyLimit || config.request.bodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: finalConfig.request?.bodyLimit || config.request.bodyLimit }));
 
   // 请求日志记录
   app.use((req: Request, _res: Response, next: NextFunction) => {

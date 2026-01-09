@@ -78,40 +78,48 @@ export class StudentRepository {
 
   // 搜索
   static async search(options: StudentSearchOptions): Promise<Student[]> {
+    const { config } = await import('@/config');
     const conditions = this.buildConditions(options);
     const orderBy = this.buildOrderBy(options.sortBy, options.sortOrder);
 
-    let query = db.select().from(students);
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
-    }
+    const results = await db
+      .select()
+      .from(students)
+      .where(whereClause)
+      .orderBy(orderBy)
+      .limit(options.limit || config.pagination.defaultLimit);
 
-    return await query.orderBy(orderBy).limit(options.limit || 20) as Student[];
+    return results;
   }
 
   // 分页查询
   static async findWithPagination(options: StudentSearchOptions): Promise<PaginationResult<Student>> {
+    const { config } = await import('@/config');
     const page = options.page || 1;
-    const limit = Math.min(options.limit || 20, 100);
+    const limit = Math.min(options.limit || config.pagination.defaultLimit, config.pagination.maxLimit);
     const offset = (page - 1) * limit;
 
     const conditions = this.buildConditions(options);
     const orderBy = this.buildOrderBy(options.sortBy, options.sortOrder);
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // 查询数据
-    let dataQuery = db.select().from(students);
-    if (conditions.length > 0) {
-      dataQuery = dataQuery.where(and(...conditions)) as any;
-    }
-    const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as Student[];
+    const data = await db
+      .select()
+      .from(students)
+      .where(whereClause)
+      .orderBy(orderBy)
+      .limit(limit)
+      .offset(offset);
 
     // 查询总数
-    let countQuery = db.select({ count: count() }).from(students);
-    if (conditions.length > 0) {
-      countQuery = countQuery.where(and(...conditions)) as any;
-    }
-    const [countResult] = await countQuery;
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(students)
+      .where(whereClause);
+
     const total = countResult?.count || 0;
 
     return {
@@ -192,8 +200,8 @@ export class StudentRepository {
         and(
           isNotNull(students.membershipStartDate),
           isNotNull(students.membershipEndDate),
-          gte(students.membershipStartDate, activeAtDate),
-          lte(students.membershipEndDate, activeAtDate)
+          lte(students.membershipStartDate, activeAtDate),
+          gte(students.membershipEndDate, activeAtDate)
         )
       );
     }

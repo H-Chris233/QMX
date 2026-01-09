@@ -37,6 +37,13 @@ export interface Config {
     maxFileSize: number;
     uploadPath: string;
   };
+  pagination: {
+    defaultLimit: number;
+    maxLimit: number;
+  };
+  request: {
+    bodyLimit: string;
+  };
 }
 
 export const config: Config = {
@@ -83,6 +90,17 @@ export const config: Config = {
   upload: {
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10), // 10MB
     uploadPath: process.env.UPLOAD_PATH || './uploads',
+  },
+
+  // 分页配置
+  pagination: {
+    defaultLimit: parseInt(process.env.PAGINATION_DEFAULT_LIMIT || '20', 10),
+    maxLimit: parseInt(process.env.PAGINATION_MAX_LIMIT || '100', 10),
+  },
+
+  // 请求配置
+  request: {
+    bodyLimit: process.env.REQUEST_BODY_LIMIT || '10mb',
   },
 };
 
