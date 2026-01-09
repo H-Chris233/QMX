@@ -177,18 +177,11 @@
         <div class="modal-body">
           <StudentForm 
             :model-value="currentStudent"
-            @save="saveStudent"
-            @cancel="closeForm"
-          />
-        </div>
-      </div>
-    </div>
-  </Transition>
-</template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
+            <script setup lang="ts">
+import { ref, onMounted, computed } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useAppStore } from '../stores/app';
+import { useStudentStore } from '../stores/student';
 import StudentForm from './StudentForm.vue';
 import { ApiService } from '../api/ApiService';
 import type { Student, CurrentStudentInput } from '../types/api';
@@ -211,9 +204,10 @@ import {
 } from 'lucide-vue-next';
 
 const appStore = useAppStore();
+const studentStore = useStudentStore();
+const { students, pagination, loading, currentStudent } = storeToRefs(studentStore);
 
 // 响应式数据
-const students = ref<Student[]>([]);
 const searchQuery = ref('');
 const searchFilters = ref({
   subject: '',
@@ -221,20 +215,20 @@ const searchFilters = ref({
   hasMembership: '',
   membershipStatus: ''
 });
-const currentPage = ref(1);
-const totalPages = ref(1);
-const totalStudents = ref(0);
+
+// Computed properties for pagination
+const currentPage = computed(() => pagination.value.currentPage);
+const totalPages = computed(() => pagination.value.totalPages);
+
 const selectedStudent = ref<Student | null>(null);
 
 // 表单状态
 const showAddStudentForm = ref(false);
 const showEditForm = ref(false);
-const currentStudent = ref<Student | null>(null);
 
 // 搜索逻辑
 const performSearch = async (): Promise<void> => {
   try {
-    currentPage.value = 1;
     await fetchStudents(1);
   } catch (error) {
     console.error('搜索学员失败:', error);
@@ -251,36 +245,37 @@ const fetchStudents = async (page: number = 1): Promise<void> => {
     if (searchFilters.value.hasMembership) params.has_membership = searchFilters.value.hasMembership === 'true';
     if (searchFilters.value.membershipStatus) params.membership_status = searchFilters.value.membershipStatus;
 
-    const response = await ApiService.getAllStudents(params);
-    students.value = response.students;
-    currentPage.value = response.pagination.page;
-    totalPages.value = response.pagination.total_pages;
-    totalStudents.value = response.pagination.total;
+    await studentStore.fetchStudents(params);
   } catch (error) {
-    appStore.errorHandler.showError('无法获取学员列表');
+    // Error handling is mostly done in store, but we catch here for safety
+    if (!studentStore.loading) { // Avoid double error if store handles it
+        appStore.errorHandler.showError('无法获取学员列表');
+    }
   }
 };
 
 const selectStudent = (student: Student) => selectedStudent.value = student;
 
 const editStudent = (student: Student) => {
-  currentStudent.value = student;
+  studentStore.setCurrentStudent(student);
   showEditForm.value = true;
 };
 
 const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
   try {
     if (showAddStudentForm.value) {
-      await ApiService.addStudent(data);
+      await studentStore.createStudent(data);
       appStore.errorHandler.showSuccess('学员添加成功');
     } else if (currentStudent.value) {
-      await ApiService.updateStudentInfo(currentStudent.value.uid, data);
+      await studentStore.updateStudent(currentStudent.value.uid, data);
       appStore.errorHandler.showSuccess('学员信息更新成功');
     }
     closeForm();
-    fetchStudents(currentPage.value);
+    // No need to fetch manually if store updates state, but to be safe with search params:
+    // fetchStudents(currentPage.value); 
+    // Store update actions usually update the list locally.
   } catch (error) {
-    const msg = (error as any)?.response?.data?.error || (error as Error).message;
+    const msg = (error as any)?.message || '操作失败';
     appStore.errorHandler.showError('操作失败：' + msg);
   }
 };
@@ -293,12 +288,10 @@ const deleteStudent = async (uid: number): Promise<void> => {
     confirmType: 'danger',
     onConfirm: async () => {
       try {
-        await ApiService.deleteStudent(uid);
+        await studentStore.deleteStudent(uid);
         appStore.errorHandler.showSuccess('学员已删除');
-        if (students.value.length === 1 && currentPage.value > 1) {
+        if (students.value.length === 0 && currentPage.value > 1) {
           await fetchStudents(currentPage.value - 1);
-        } else {
-          await fetchStudents(currentPage.value);
         }
       } catch (error) {
         appStore.errorHandler.showError('删除失败');
@@ -354,6 +347,15 @@ const getMembershipStatusText = (s: Student) => {
   if (s.membership_end_date && new Date(s.membership_end_date) < new Date()) return '已过期';
   return '非会员';
 };
+
+const closeForm = () => {
+  showAddStudentForm.value = false;
+  showEditForm.value = false;
+  studentStore.setCurrentStudent(null);
+};
+
+onMounted(() => fetchStudents());
+</script>
 
 const closeForm = () => {
   showAddStudentForm.value = false;

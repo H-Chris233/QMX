@@ -1,25 +1,34 @@
-import { defineStore } from 'pinia';
-import { ref, computed, shallowRef } from 'vue';
-import type { Student, StudentCreateData, StudentUpdateData, StudentSearchParams, CurrentStudentInput } from '../types/api';
-import type { StudentListResponse } from '../api/studentApi';
-import { ApiService } from '../api/ApiService';
-import { storeActionWrapper, StoreActionPresets } from '../utils/storeErrorHandling';
+import { defineStore } from "pinia";
+import { ref, computed, shallowRef } from "vue";
+import type {
+  Student,
+  StudentCreateData,
+  StudentUpdateData,
+  StudentSearchParams,
+  CurrentStudentInput,
+} from "../types/api";
+import type { StudentListResponse } from "../api/studentApi";
+import { ApiService } from "../api/ApiService";
+import {
+  storeActionWrapper,
+  StoreActionPresets,
+} from "../utils/storeErrorHandling";
 
 /**
  * 学生数据状态管理
  * 负责学生信息的CRUD操作，缓存已移至API层统一管理
  */
-export const useStudentStore = defineStore('student', () => {
+export const useStudentStore = defineStore("student", () => {
   // State - 使用shallowRef优化性能
   const students = shallowRef<Student[]>([]);
   const currentStudent = shallowRef<Student | null>(null);
   const searchParams = ref<StudentSearchParams>({
     page: 1,
     limit: 20,
-    keyword: '',
-    class: '',
-    subject: '',
-    status: undefined
+    keyword: "",
+    class: "",
+    subject: "",
+    status: undefined,
   });
 
   const pagination = ref({
@@ -28,7 +37,7 @@ export const useStudentStore = defineStore('student', () => {
     totalItems: 0,
     itemsPerPage: 20,
     hasNextPage: false,
-    hasPrevPage: false
+    hasPrevPage: false,
   });
 
   // Loading状态
@@ -50,21 +59,25 @@ export const useStudentStore = defineStore('student', () => {
   };
 
   const activeStudents = computed(() => {
-    return students.value.filter(student =>
-      !student.membership_end_date || new Date(student.membership_end_date) > new Date()
+    return students.value.filter(
+      (student) =>
+        !student.membership_end_date ||
+        new Date(student.membership_end_date) > new Date()
     );
   });
 
   const inactiveStudents = computed(() => {
-    return students.value.filter(student =>
-      student.membership_end_date && new Date(student.membership_end_date) <= new Date()
+    return students.value.filter(
+      (student) =>
+        student.membership_end_date &&
+        new Date(student.membership_end_date) <= new Date()
     );
   });
 
   const studentsByClass = computed(() => {
     const groups: Record<string, Student[]> = {};
-    students.value.forEach(student => {
-      const className = student.class || '未分配班级';
+    students.value.forEach((student) => {
+      const className = student.class || "未分配班级";
       if (!groups[className]) {
         groups[className] = [];
       }
@@ -82,34 +95,44 @@ export const useStudentStore = defineStore('student', () => {
   /**
    * 获取学生列表 - 使用统一错误处理
    */
-  async function fetchStudents(params?: Partial<StudentSearchParams>, forceRefresh = false): Promise<StudentListResponse> {
+  async function fetchStudents(
+    params?: Partial<StudentSearchParams>,
+    forceRefresh = false
+  ): Promise<StudentListResponse> {
     fetchLoading.value = true;
 
     try {
-      return await storeActionWrapper(async () => {
-        const mergedParams = { ...searchParams.value, ...params };
-        const response = await ApiService.getAllStudents(mergedParams, forceRefresh);
+      return await storeActionWrapper(
+        async () => {
+          const mergedParams = { ...searchParams.value, ...params };
+          const response = await ApiService.getAllStudents(
+            mergedParams,
+            forceRefresh
+          );
 
-        students.value = response.students;
-        // 转换分页格式
-        pagination.value = {
-          currentPage: response.pagination.page,
-          totalPages: response.pagination.total_pages,
-          totalItems: response.pagination.total,
-          itemsPerPage: response.pagination.limit,
-          hasNextPage: response.pagination.page < response.pagination.total_pages,
-          hasPrevPage: response.pagination.page > 1
-        };
-        searchParams.value = mergedParams;
+          students.value = response.students;
+          // 转换分页格式
+          pagination.value = {
+            currentPage: response.pagination.page,
+            totalPages: response.pagination.total_pages,
+            totalItems: response.pagination.total,
+            itemsPerPage: response.pagination.limit,
+            hasNextPage:
+              response.pagination.page < response.pagination.total_pages,
+            hasPrevPage: response.pagination.page > 1,
+          };
+          searchParams.value = mergedParams;
 
-        return response;
-      }, {
-        ...StoreActionPresets.fetch('学生列表'),
-        context: { params, forceRefresh },
-        retryCallback: async () => {
-          await fetchStudents(params, true);
+          return response;
+        },
+        {
+          ...StoreActionPresets.fetch("学生列表"),
+          context: { params, forceRefresh },
+          retryCallback: async () => {
+            await fetchStudents(params, true);
+          },
         }
-      });
+      );
     } finally {
       fetchLoading.value = false;
     }
@@ -119,25 +142,28 @@ export const useStudentStore = defineStore('student', () => {
    * 获取单个学生详情 - 简化缓存逻辑，使用API层缓存
    */
   async function fetchStudentById(id: number, forceRefresh = false) {
-    return storeActionWrapper(async () => {
-      const student = await ApiService.getStudentById(id, forceRefresh);
-      currentStudent.value = student;
+    return storeActionWrapper(
+      async () => {
+        const student = await ApiService.getStudentById(id, forceRefresh);
+        currentStudent.value = student;
 
-      // 更新本地列表中的学生信息
-      const index = students.value.findIndex(s => s.uid === id);
-      if (index !== -1) {
-        const newStudents = [...students.value];
-        newStudents[index] = student;
-        students.value = newStudents;
-      } else {
-        students.value = [...students.value, student];
+        // 更新本地列表中的学生信息
+        const index = students.value.findIndex((s) => s.uid === id);
+        if (index !== -1) {
+          const newStudents = [...students.value];
+          newStudents[index] = student;
+          students.value = newStudents;
+        } else {
+          students.value = [...students.value, student];
+        }
+
+        return student;
+      },
+      {
+        ...StoreActionPresets.fetch("学生详情"),
+        context: { id, forceRefresh },
       }
-
-      return student;
-    }, {
-      ...StoreActionPresets.fetch('学生详情'),
-      context: { id, forceRefresh }
-    });
+    );
   }
 
   /**
@@ -147,18 +173,21 @@ export const useStudentStore = defineStore('student', () => {
     loading.value = true;
 
     try {
-      return await storeActionWrapper(async () => {
-        const newStudent = await ApiService.addStudent(data);
+      return await storeActionWrapper(
+        async () => {
+          const newStudent = await ApiService.addStudent(data);
 
-        // 更新本地状态
-        students.value = [newStudent, ...students.value];
-        currentStudent.value = newStudent;
+          // 更新本地状态
+          students.value = [newStudent, ...students.value];
+          currentStudent.value = newStudent;
 
-        return newStudent;
-      }, {
-        ...StoreActionPresets.create('学生'),
-        context: { data }
-      });
+          return newStudent;
+        },
+        {
+          ...StoreActionPresets.create("学生"),
+          context: { data },
+        }
+      );
     } finally {
       loading.value = false;
     }
@@ -171,26 +200,29 @@ export const useStudentStore = defineStore('student', () => {
     loading.value = true;
 
     try {
-      return await storeActionWrapper(async () => {
-        const updatedStudent = await ApiService.updateStudentInfo(id, data);
+      return await storeActionWrapper(
+        async () => {
+          const updatedStudent = await ApiService.updateStudentInfo(id, data);
 
-        // 更新本地状态
-        const index = students.value.findIndex(s => s.uid === id);
-        if (index !== -1) {
-          const newStudents = [...students.value];
-          newStudents[index] = updatedStudent;
-          students.value = newStudents;
+          // 更新本地状态
+          const index = students.value.findIndex((s) => s.uid === id);
+          if (index !== -1) {
+            const newStudents = [...students.value];
+            newStudents[index] = updatedStudent;
+            students.value = newStudents;
+          }
+
+          if (currentStudent.value?.uid === id) {
+            currentStudent.value = updatedStudent;
+          }
+
+          return updatedStudent;
+        },
+        {
+          ...StoreActionPresets.update("学生信息"),
+          context: { id, data },
         }
-
-        if (currentStudent.value?.uid === id) {
-          currentStudent.value = updatedStudent;
-        }
-
-        return updatedStudent;
-      }, {
-        ...StoreActionPresets.update('学生信息'),
-        context: { id, data }
-      });
+      );
     } finally {
       loading.value = false;
     }
@@ -203,18 +235,72 @@ export const useStudentStore = defineStore('student', () => {
     loading.value = true;
 
     try {
-      await storeActionWrapper(async () => {
-        await ApiService.deleteStudent(id);
+      await storeActionWrapper(
+        async () => {
+          await ApiService.deleteStudent(id);
 
-        // 更新本地状态
-        students.value = students.value.filter(s => s.uid !== id);
-        if (currentStudent.value?.uid === id) {
-          currentStudent.value = null;
+          // 更新本地状态
+          students.value = students.value.filter((s) => s.uid !== id);
+          if (currentStudent.value?.uid === id) {
+            currentStudent.value = null;
+          }
+        },
+        {
+          ...StoreActionPresets.delete("学生"),
+          context: { id },
         }
-      }, {
-        ...StoreActionPresets.delete('学生'),
-        context: { id }
-      });
+      );
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * 获取即将过期的会员
+   */
+  async function fetchExpiringStudents(days: number): Promise<Student[]> {
+    fetchLoading.value = true;
+    try {
+      const expiring = await ApiService.getMembershipExpiringSoon(days);
+      if (!Array.isArray(expiring)) throw new Error("返回的数据格式不正确");
+      return expiring.filter((s) => s && s.uid && s.name) as Student[];
+    } finally {
+      fetchLoading.value = false;
+    }
+  }
+
+  /**
+   * 设置学生会员信息
+   */
+  async function setStudentMembership(
+    uid: number,
+    data: { startDate: string; endDate: string }
+  ) {
+    loading.value = true;
+    try {
+      await ApiService.setStudentMembership(uid, data);
+
+      // 更新本地状态
+      const index = students.value.findIndex((s) => s.uid === uid);
+      if (index !== -1) {
+        const student = students.value[index];
+        const updatedStudent = {
+          ...student,
+          membership_start_date: data.startDate,
+          membership_end_date: data.endDate,
+          is_membership_active: new Date(data.endDate) > new Date(),
+        };
+
+        const newStudents = [...students.value];
+        newStudents[index] = updatedStudent;
+        students.value = newStudents;
+
+        if (currentStudent.value?.uid === uid) {
+          currentStudent.value = updatedStudent;
+        }
+      }
+
+      return true;
     } finally {
       loading.value = false;
     }
@@ -248,10 +334,10 @@ export const useStudentStore = defineStore('student', () => {
     searchParams.value = {
       page: 1,
       limit: 20,
-      keyword: '',
-      class: '',
-      subject: '',
-      status: undefined
+      keyword: "",
+      class: "",
+      subject: "",
+      status: undefined,
     };
   }
 
@@ -293,11 +379,13 @@ export const useStudentStore = defineStore('student', () => {
     createStudent,
     updateStudent,
     deleteStudent,
+    fetchExpiringStudents,
+    setStudentMembership,
     searchStudents,
     setCurrentStudent,
     updateSearchParams,
     resetSearchParams,
     clearStudents,
-    refresh
+    refresh,
   };
 });
