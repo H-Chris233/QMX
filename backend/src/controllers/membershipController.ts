@@ -75,7 +75,7 @@ const buildMembershipResponse = <T extends Record<string, unknown> = Record<stri
   student: Student,
   extra?: T,
 ): MembershipResponseBase & T => {
-  const presentedStudent = presentStudent(student) as PresentedStudent;
+  const presentedStudent = presentStudent(student as any) as unknown as PresentedStudent;
 
   const membershipStatus = normalizeMembershipStatus(presentedStudent.membershipStatus);
   const membershipStartDate = presentedStudent.membershipStartDate ?? null;
@@ -89,10 +89,6 @@ const buildMembershipResponse = <T extends Record<string, unknown> = Record<stri
     ...presentedStudent,
     membershipStatus,
     membership_status: membershipStatus,
-    membershipStartDate: membershipStartDate,
-    membership_start_date: membershipStartDate,
-    membershipEndDate: membershipEndDate,
-    membership_end_date: membershipEndDate,
     isMembershipActive,
     is_membership_active: isMembershipActive,
     membershipDaysRemaining: membershipDaysRemaining,

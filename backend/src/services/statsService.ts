@@ -413,11 +413,7 @@ export class StatsService {
     );
 
     return {
-      period: normalizedPeriod as FinancialPeriod,
-      dateRange: {
-        start: dateRange.start,
-        end: dateRange.end,
-      },
+      period: normalizedPeriod,
       totals: {
         incomeCents,
         expenseCents,

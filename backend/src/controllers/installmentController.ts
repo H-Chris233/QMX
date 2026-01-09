@@ -405,7 +405,7 @@ export class InstallmentController {
       }
 
       const totalFirstPayment =
-        createdPlan.downPayment + firstInstallment.installmentAmount;
+        (createdPlan.downPayment ?? 0) + firstInstallment.installmentAmount;
 
       const cashSnapshot = {
         plan_uid: createdPlan.uid,
@@ -414,7 +414,7 @@ export class InstallmentController {
         total_installments: totalInstallmentsInt,
         due_date: typeof firstInstallment.dueDate === 'string'
           ? firstInstallment.dueDate
-          : firstInstallment.dueDate.toISOString().split('T')[0],
+          : (firstInstallment.dueDate as any)?.toISOString?.()?.split('T')[0] ?? null,
         status: InstallmentStatus.PAID,
         note: createdPlan.note ?? undefined,
       };
@@ -482,12 +482,12 @@ export class InstallmentController {
 
     // 重新获取计划数据以获取最新状态
     const plan = await InstallmentPlanRepository.findByUid(result.plan.uid);
-    const installments =
+    const installmentsList =
       await InstallmentRepository.findByPlanId(result.plan.uid);
 
     const responseData = await this.buildPlanResponse(plan, {
       includeInstallments: true,
-      installments,
+      installments: installmentsList,
     });
 
     res.status(201).json({
@@ -684,7 +684,7 @@ export class InstallmentController {
       throw AppError.notFound("分期计划不存在");
     }
 
-    const installments =
+    const installmentsList =
       await InstallmentRepository.findByPlanId(plan.uid);
 
     // 如果没有指定期数，使用第一个未支付的期数
@@ -692,12 +692,12 @@ export class InstallmentController {
 
     if (installment_index !== undefined) {
       // 按期数查找
-      targetInstallment = installments.find(
+      targetInstallment = installmentsList.find(
         (inst) => inst.installmentNumber === installment_index
       );
     } else {
       // 查找第一个未支付的期数
-      targetInstallment = installments.find(
+      targetInstallment = installmentsList.find(
         (inst) => inst.status === InstallmentStatus.PENDING
       );
     }

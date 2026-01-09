@@ -134,10 +134,11 @@ export class StudentUpdater {
   }
 
   membership(startDate?: string | Date | null, endDate?: string | Date | null): this {
-    const formatDate = (d?: string | Date | null): Date | null => {
+    const formatDate = (d?: string | Date | null): string | null => {
       if (d === null || d === undefined) return null;
       const date = typeof d === 'string' ? new Date(d) : d;
-      return Number.isNaN(date.getTime()) ? null : date;
+      if (Number.isNaN(date.getTime())) return null;
+      return date.toISOString().split('T')[0]; // 返回 YYYY-MM-DD 格式
     };
 
     const formattedStart = formatDate(startDate);

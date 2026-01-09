@@ -46,7 +46,7 @@ export function sanitizeInstallmentSnapshot(
   const due_date = snapshot.due_date
     ? (typeof snapshot.due_date === 'string'
         ? snapshot.due_date
-        : snapshot.due_date.toISOString().split('T')[0])
+        : (snapshot.due_date as any).toISOString().split('T')[0])
     : null;
 
   return {

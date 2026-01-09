@@ -122,7 +122,7 @@ export class CashController {
 
       const transaction = await builder.build();
 
-      const responseData = this.presentTransaction(transaction);
+      const responseData = this.presentTransaction(transaction as any);
 
       const response: IApiResponse<typeof responseData> = {
         success: true,
@@ -183,10 +183,11 @@ export class CashController {
         throw AppError.invalidInput("自定义频率必须指定天数且大于0");
       }
 
-      const startDateValue = new Date(start_date);
-      if (Number.isNaN(startDateValue.getTime())) {
+      const startDateObj = new Date(start_date);
+      if (Number.isNaN(startDateObj.getTime())) {
         throw AppError.invalidInput("开始日期格式不正确");
       }
+      const startDateValue = startDateObj.toISOString().split('T')[0];
 
       try {
         const totalAmountCents = convertAmountToCents(total_amount);
@@ -204,7 +205,7 @@ export class CashController {
         });
 
         const installmentsToCreate = [];
-        let dueDateCursor = new Date(startDateValue);
+        let dueDateCursor = new Date(startDateObj);
 
         for (let i = 1; i <= totalInstallmentsInt; i++) {
           const dueDate = new Date(dueDateCursor);
@@ -256,7 +257,7 @@ export class CashController {
             installment_uid: firstInstallment?.uid ?? null,
             installment_number: firstInstallment?.installmentNumber ?? 1,
             total_installments: totalInstallmentsInt,
-            due_date: firstInstallment?.dueDate ?? (typeof startDateValue === 'string' ? startDateValue : startDateValue.toISOString().split('T')[0]),
+            due_date: firstInstallment?.dueDate ?? startDateValue,
             status: InstallmentStatusValues.PAID,
             note: sanitizedNote ?? undefined,
           })
@@ -276,7 +277,7 @@ export class CashController {
         }
 
         const responseData = {
-          transaction: this.presentTransaction(transaction),
+          transaction: this.presentTransaction(transaction as any),
           plan: {
             uid: installmentPlan.uid,
             student_id: installmentPlan.studentId,
@@ -644,14 +645,14 @@ export class CashController {
           return {
             studentId: item.studentId,
             student_name: student?.name ?? this.getStudentDisplayName(item.studentId),
-            amount: item.totalAmount / 100, // 转换为元
+            amount: (item.totalAmount as unknown as number) / 100, // 转换为元
           };
         })
       );
 
       const responseData: FinancialStatsResponse = {
         period,
-        date_from: dateFrom,
+        date_from: dateFrom.toISOString().split('T')[0],
         date_to: now.toISOString().split('T')[0],
         total_income: stats.totalIncome / 100,
         total_expense: stats.totalExpense / 100,

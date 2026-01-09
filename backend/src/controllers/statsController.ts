@@ -107,10 +107,6 @@ export class StatsController {
       // 返回 camelCase 格式（与测试期望一致）
       const responseData = {
         period: stats.period,
-        dateRange: {
-          start: stats.dateRange.start,
-          end: stats.dateRange.end,
-        },
         totals: {
           incomeCents: stats.totals.incomeCents,
           expenseCents: stats.totals.expenseCents,

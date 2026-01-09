@@ -84,7 +84,7 @@ export class StudentRepository {
     let query = db.select().from(students);
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      query = query.where(and(...conditions)) as any;
     }
 
     return await query.orderBy(orderBy).limit(options.limit || 20) as Student[];
@@ -102,14 +102,14 @@ export class StudentRepository {
     // 查询数据
     let dataQuery = db.select().from(students);
     if (conditions.length > 0) {
-      dataQuery = dataQuery.where(and(...conditions));
+      dataQuery = dataQuery.where(and(...conditions)) as any;
     }
     const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as Student[];
 
     // 查询总数
     let countQuery = db.select({ count: count() }).from(students);
     if (conditions.length > 0) {
-      countQuery = countQuery.where(and(...conditions));
+      countQuery = countQuery.where(and(...conditions)) as any;
     }
     const [countResult] = await countQuery;
     const total = countResult?.count || 0;

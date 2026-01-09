@@ -131,14 +131,14 @@ export class InstallmentPlanRepository {
     // 查询数据
     let dataQuery = db.select().from(installmentPlans);
     if (conditions.length > 0) {
-      dataQuery = dataQuery.where(and(...conditions));
+      dataQuery = dataQuery.where(and(...conditions)) as any;
     }
     const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as InstallmentPlan[];
 
     // 查询总数
     let countQuery = db.select({ count: count() }).from(installmentPlans);
     if (conditions.length > 0) {
-      countQuery = countQuery.where(and(...conditions));
+      countQuery = countQuery.where(and(...conditions)) as any;
     }
     const [countResult] = await countQuery;
     const total = countResult?.count || 0;
@@ -393,14 +393,14 @@ export class InstallmentRepository {
     // 查询数据
     let dataQuery = db.select().from(installments);
     if (conditions.length > 0) {
-      dataQuery = dataQuery.where(and(...conditions));
+      dataQuery = dataQuery.where(and(...conditions)) as any;
     }
     const data = await dataQuery.orderBy(orderBy).limit(limit).offset(offset) as Installment[];
 
     // 查询总数
     let countQuery = db.select({ count: count() }).from(installments);
     if (conditions.length > 0) {
-      countQuery = countQuery.where(and(...conditions));
+      countQuery = countQuery.where(and(...conditions)) as any;
     }
     const [countResult] = await countQuery;
     const total = countResult?.count || 0;

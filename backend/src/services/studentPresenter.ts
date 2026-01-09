@@ -124,12 +124,12 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
   const json = student as StudentJson;
 
   const lessonLeft = json.lessonLeft ?? json.lesson_left ?? null;
-  const membershipStartDate = json.membershipStartDate
-    ?? json.membership_start_date
-    ?? formatDateOnly(student.membershipStartDate ?? null);
-  const membershipEndDate = json.membershipEndDate
-    ?? json.membership_end_date
-    ?? formatDateOnly(student.membershipEndDate ?? null);
+  const membershipStartDate = formatDateOnly(
+    json.membershipStartDate ?? json.membership_start_date ?? student.membershipStartDate ?? null
+  );
+  const membershipEndDate = formatDateOnly(
+    json.membershipEndDate ?? json.membership_end_date ?? student.membershipEndDate ?? null
+  );
   const membershipDaysRemaining = json.membershipDaysRemaining
     ?? json.membership_days_remaining
     ?? getMembershipDaysRemaining(student.membershipEndDate ?? null);
@@ -140,10 +140,10 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     ?? json.is_membership_active
     ?? hasMembership(student.membershipStartDate ?? null, student.membershipEndDate ?? null);
 
-  const createdAt = student.createdAt ? formatDateTime(student.createdAt) : null;
-  const updatedAt = student.updatedAt ? formatDateTime(student.updatedAt) : null;
-  const created_at = json.created_at ?? createdAt;
-  const updated_at = json.updated_at ?? updatedAt;
+  const createdAt = formatDateTime(student.createdAt ?? json.createdAt ?? json.created_at ?? null);
+  const updatedAt = formatDateTime(student.updatedAt ?? json.updatedAt ?? json.updated_at ?? null);
+  const created_at = json.created_at ?? (createdAt ?? null);
+  const updated_at = json.updated_at ?? (updatedAt ?? null);
 
   // 处理 rings - 可能是数组或 undefined
   const rings = Array.isArray(json.rings) ? json.rings : [];
@@ -159,20 +159,20 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     rings,
     note: json.note ?? '',
     lessonLeft,
-    membershipStartDate,
-    membershipEndDate,
+    membershipStartDate: membershipStartDate ?? null,
+    membershipEndDate: membershipEndDate ?? null,
     membershipDaysRemaining,
     isMembershipActive,
     membershipStatus,
-    createdAt: createdAt,
-    updatedAt: updatedAt,
+    createdAt: createdAt ?? null,
+    updatedAt: updatedAt ?? null,
     lesson_left: lessonLeft,
-    membership_start_date: membershipStartDate,
-    membership_end_date: membershipEndDate,
+    membership_start_date: membershipStartDate ?? null,
+    membership_end_date: membershipEndDate ?? null,
     membership_days_remaining: membershipDaysRemaining,
     is_membership_active: isMembershipActive,
     membership_status: membershipStatus,
-    created_at: created_at,
-    updated_at: updated_at,
+    created_at: created_at ?? null,
+    updated_at: updated_at ?? null,
   };
 };

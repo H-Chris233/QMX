@@ -333,10 +333,10 @@ export class StudentQuery {
     }
 
     const sort = this.sortOrder === 1 ? asc(orderByColumn) : desc(orderByColumn);
-    finalQuery = finalQuery.orderBy(sort);
+    finalQuery = finalQuery.orderBy(sort) as any;
 
     // 添加排序以满足类型检查
-    finalQuery = finalQuery.orderBy(sort);
+    finalQuery = finalQuery.orderBy(sort) as any;
 
     // 分页
     const rawData = await finalQuery.limit(this.limit).offset(offset);
@@ -355,7 +355,7 @@ export class StudentQuery {
     // 查询总数
     let countQuery = db.select({ count: sql<number>`count(*)` }).from(students);
     if (conditions.length > 0) {
-      countQuery = countQuery.where(and(...conditions));
+      countQuery = countQuery.where(and(...conditions)) as any;
     }
     const [countResult] = await countQuery;
     const total = Number(countResult?.count) || 0;
