@@ -73,6 +73,12 @@ const searchCashSchema = Joi.object({
   sort_order: commonValidations.sortOrder,
 });
 
+const updateTransactionSchema = Joi.object({
+  amount: optionalAmountSchema,
+  description: Joi.string().optional().allow(null),
+  note: commonValidations.text.default(''),
+});
+
 // 路由定义
 /**
  * @route GET /api/v1/transactions
@@ -113,9 +119,20 @@ router.post('/',
  * @desc 添加分期付款交易
  * @access Public
  */
-router.post('/installment', 
+router.post('/installment',
   validate(addInstallmentTransactionSchema),
   cashController.addInstallmentTransaction
+);
+
+/**
+ * @route PUT /api/v1/transactions/:id
+ * @desc 更新交易记录
+ * @access Public
+ */
+router.put('/:id',
+  validateParams(Joi.object({ id: commonValidations.id })),
+  validate(updateTransactionSchema),
+  cashController.updateTransaction
 );
 
 /**

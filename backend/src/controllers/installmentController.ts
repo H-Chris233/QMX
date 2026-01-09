@@ -920,6 +920,111 @@ export class InstallmentController {
   });
 
   /**
+   * 支付分期计划的下一期
+   */
+  public payNextInstallment = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+
+      // 1. 验证分期计划存在
+      const plan = await InstallmentPlanRepository.findByUid(Number(id));
+
+      if (!plan) {
+        throw AppError.notFound("分期计划不存在");
+      }
+
+      if (plan.status !== InstallmentPlanStatus.ACTIVE) {
+        throw AppError.invalidInput("分期计划不是活跃状态，无法支付");
+      }
+
+      // 2. 查找下一个待支付的 installment（最小的 PENDING 或 OVERDUE 序号）
+      const allInstallments = await InstallmentRepository.findByPlanId(plan.uid);
+
+      const nextInstallment = allInstallments
+        .filter((i) => i.status === InstallmentStatus.PENDING || i.status === InstallmentStatus.OVERDUE)
+        .sort((a, b) => a.installmentNumber - b.installmentNumber)[0];
+
+      if (!nextInstallment) {
+        throw AppError.invalidInput("所有分期已支付完成");
+      }
+
+      // 3. 使用事务创建支付
+      const result = await db.transaction(async (tx) => {
+        const paymentTime = new Date();
+
+        // 创建现金交易记录
+        const cashSnapshot = {
+          plan_uid: plan.uid,
+          installment_uid: nextInstallment.uid,
+          installment_number: nextInstallment.installmentNumber,
+          total_installments: plan.totalInstallments,
+          due_date: nextInstallment.dueDate,
+          status: InstallmentStatus.PAID,
+          note: plan.note ?? null,
+        };
+
+        const [newCash] = await tx
+          .insert(cashTransactions)
+          .values({
+            studentId: plan.studentId ?? null,
+            amount: nextInstallment.installmentAmount,
+            note: this.buildInstallmentNote(
+              plan.note ?? "",
+              nextInstallment.installmentNumber,
+              plan.totalInstallments
+            ),
+            installmentSnapshot: cashSnapshot,
+          })
+          .returning();
+
+        if (!newCash) {
+          throw AppError.other("创建支付记录失败");
+        }
+
+        // 更新分期状态
+        const [updatedInstallment] = await tx
+          .update(installments)
+          .set({
+            status: InstallmentStatus.PAID,
+            paidAmount: nextInstallment.installmentAmount,
+            cashUid: newCash.uid,
+            paidDate: paymentTime.toISOString().split('T')[0],
+          })
+          .where(eq(installments.uid, nextInstallment.uid))
+          .returning();
+
+        // 刷新计划状态
+        await InstallmentRepository.refreshPlanStatus(plan.uid);
+
+        return {
+          installment: updatedInstallment,
+          transaction: newCash,
+        };
+      });
+
+      const responseData = {
+        installment: InstallmentRepository.toResponse(result.installment),
+        transaction: {
+          uid: result.transaction.uid,
+          amount: this.formatAmount(result.transaction.amount),
+          note: result.transaction.note,
+          created_at: result.transaction.createdAt,
+        },
+      };
+
+      logger.info(
+        `支付分期下一期成功，计划ID: ${plan.uid}，分期ID: ${nextInstallment.uid}，金额: ¥${this.formatAmount(nextInstallment.installmentAmount)}`
+      );
+
+      res.json({
+        success: true,
+        data: responseData,
+        message: `第${nextInstallment.installmentNumber}/${plan.totalInstallments}期支付成功`,
+      });
+    }
+  );
+
+  /**
    * 刷新计划状态（内部方法，可在事务或普通查询中使用）
    */
   private async refreshPlanStatus(

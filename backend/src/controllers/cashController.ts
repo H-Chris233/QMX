@@ -412,6 +412,52 @@ export class CashController {
     }
   );
 
+  // 更新交易记录
+  public updateTransaction = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+      const { amount, description, note } = req.body;
+
+      const transaction = await CashRepository.findByUid(Number(id));
+
+      if (!transaction) {
+        throw AppError.notFound("交易记录不存在");
+      }
+
+      const updateData: Record<string, any> = {};
+
+      if (amount !== undefined) {
+        updateData.amount = Math.round(Number(amount) * 100); // 转换为分
+      }
+
+      if (note !== undefined) {
+        updateData.note = note;
+      }
+
+      // description 是计算字段，不直接存储，但可以更新 note
+      if (description !== undefined) {
+        updateData.note = description;
+      }
+
+      const updated = await CashRepository.updateByUid(Number(id), updateData);
+
+      if (!updated) {
+        throw AppError.other("更新交易记录失败");
+      }
+
+      const responseData = this.presentTransaction(updated);
+
+      const response: IApiResponse<typeof responseData> = {
+        success: true,
+        data: responseData,
+        message: "交易记录更新成功",
+      };
+
+      logger.info(`更新交易记录成功，UID: ${transaction.uid}`);
+      res.json(response);
+    }
+  );
+
   private buildSearchOptions(query: Record<string, any>): any {
     const options: any = {};
 

@@ -181,6 +181,17 @@ router.post(
 );
 
 /**
+ * @route POST /api/v1/installments/:id/next
+ * @desc 支付分期计划的下一期
+ * @access Public
+ */
+router.post(
+  "/:id/next",
+  validateParams(Joi.object({ id: commonValidations.id })),
+  installmentController.payNextInstallment
+);
+
+/**
  * @route DELETE /api/v1/installments/:id
  * @desc 删除分期计划
  * @access Public

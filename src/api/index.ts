@@ -50,13 +50,13 @@ export const ApiAliases = {
     list: 'getAllStudents',
     get: 'getStudentById',
     create: 'addStudent',
-    update: 'updateStudentInfo',
+    update: 'updateStudent',
     delete: 'deleteStudent',
     search: 'searchStudents',
     scores: 'getStudentScores',
     addScore: 'addScore',
-    deleteScore: 'deleteStudentScore',
-    updateScore: 'updateStudentScore',
+    deleteScore: 'deleteScore',
+    updateScore: 'updateScore',
   },
   // 交易相关
   transactions: {
