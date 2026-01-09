@@ -1067,6 +1067,79 @@ export class InstallmentController {
   });
 
   /**
+   * POST /:id/cancel - 取消分期计划
+   * 取消计划会将所有未支付的分期标记为已取消，并更新计划状态
+   */
+  public cancelInstallmentPlan = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+
+    const plan = await InstallmentPlanRepository.findByUid(Number(id));
+
+    if (!plan) {
+      throw AppError.notFound("分期计划不存在");
+    }
+
+    if (plan.status === InstallmentPlanStatus.CANCELLED) {
+      throw AppError.invalidInput("分期计划已经是取消状态");
+    }
+
+    // 使用事务执行取消操作
+    await db.transaction(async (tx) => {
+      // 1. 将所有未支付的分期标记为已取消
+      await tx
+        .update(installments)
+        .set({
+          status: InstallmentStatus.CANCELLED,
+          paidAmount: null,
+          paidDate: null,
+          cashUid: null,
+        })
+        .where(
+          and(
+            eq(installments.planId, plan.uid),
+            sql`${installments.status} != ${InstallmentStatus.PAID}`
+          )
+        );
+
+      // 2. 删除与这些分期关联的现金交易记录
+      const cancelledInstallments = await tx
+        .select()
+        .from(installments)
+        .where(eq(installments.planId, plan.uid));
+
+      for (const inst of cancelledInstallments) {
+        if (inst.cashUid) {
+          await tx
+            .delete(cashTransactions)
+            .where(eq(cashTransactions.uid, inst.cashUid));
+        }
+      }
+
+      // 3. 更新计划状态为已取消
+      await tx
+        .update(installmentPlans)
+        .set({
+          status: InstallmentPlanStatus.CANCELLED,
+          updatedAt: new Date(),
+        })
+        .where(eq(installmentPlans.uid, plan.uid));
+    });
+
+    logger.info(`取消分期计划成功，UID: ${id}`);
+
+    // 获取更新后的计划数据
+    const cancelledPlan = await InstallmentPlanRepository.findByUid(Number(id));
+    const responseData = await this.buildPlanResponse(cancelledPlan);
+
+    res.json({
+      success: true,
+      data: responseData,
+      message: "分期计划已取消",
+    });
+  });
+
+  /**
    * 支付分期计划的下一期
    */
   public payNextInstallment = catchAsync(

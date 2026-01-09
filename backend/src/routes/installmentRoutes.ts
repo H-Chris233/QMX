@@ -239,6 +239,17 @@ router.post(
 );
 
 /**
+ * @route POST /api/v1/installments/:id/cancel
+ * @desc 取消分期计划
+ * @access Public
+ */
+router.post(
+  "/:id/cancel",
+  validateParams(Joi.object({ id: commonValidations.id })),
+  installmentController.cancelInstallmentPlan
+);
+
+/**
  * @route DELETE /api/v1/installments/:id
  * @desc 删除分期计划
  * @access Public

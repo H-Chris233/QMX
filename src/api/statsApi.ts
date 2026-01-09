@@ -28,9 +28,16 @@ function parsePeriodParams(period?: StatsPeriod): Record<string, string> {
   }
 
   if (typeof period === 'string') {
-    // 转换为小写以兼容后端
-    const normalized = period.toLowerCase().replace('this', '');
-    return { period: normalized };
+    // 转换为首字母大写以匹配后端期望的格式
+    const normalized = period.charAt(0).toUpperCase() + period.slice(1).toLowerCase();
+    // 特殊处理：today -> Today, week -> ThisWeek, month -> ThisMonth, year -> ThisYear
+    const periodMap: Record<string, string> = {
+      'Today': 'Today',
+      'Week': 'ThisWeek',
+      'Month': 'ThisMonth',
+      'Year': 'ThisYear',
+    };
+    return { period: periodMap[normalized] || normalized };
   }
 
   // 自定义日期范围 - 支持两种格式
@@ -40,7 +47,7 @@ function parsePeriodParams(period?: StatsPeriod): Record<string, string> {
       date_to: period.date_to,
     };
   }
-  
+
   if ('start' in period && 'end' in period) {
     return {
       date_from: period.start,

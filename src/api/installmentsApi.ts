@@ -178,4 +178,22 @@ export class InstallmentsApiService {
       baseClient.delete(`/installments/${planId}`)
     );
   }
+
+  /**
+   * 取消分期计划
+   * 将计划标记为已取消状态，保留已支付的分期记录
+   */
+  static async cancelInstallmentPlan(planId: number): Promise<{
+    uid: number;
+    status: string;
+    status_text: string;
+    total_amount: number;
+    total_installments: number;
+    paid_count: number;
+    note: string | null;
+  }> {
+    return apiCall(
+      baseClient.post(`/installments/${planId}/cancel`)
+    );
+  }
 }
