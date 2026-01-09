@@ -155,6 +155,85 @@ export class InstallmentController {
   });
 
   /**
+   * GET /upcoming - 获取即将到期的分期
+   */
+  public getUpcomingInstallments = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { days = 7 } = req.query as { days?: number };
+
+      // 获取所有计划，再获取每个计划的分期
+      const allPlans = await InstallmentPlanRepository.findAll();
+
+      // 收集所有分期
+      let allInstallments: typeof installments.$inferSelect[] = [];
+      for (const plan of allPlans) {
+        const planInstallments = await InstallmentRepository.findByPlanId(plan.uid);
+        allInstallments = allInstallments.concat(planInstallments);
+      }
+
+      // 过滤即将到期的分期（状态为PENDING，到期日在未来days天内）
+      const upcomingInstallments = allInstallments.filter((inst) => {
+        if (inst.status !== InstallmentStatus.PENDING) return false;
+        const dueDate = new Date(inst.dueDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dueDate.setHours(0, 0, 0, 0);
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= Number(days);
+      });
+
+      const enriched = await Promise.all(
+        upcomingInstallments.map(async (installment) => {
+          const plan = await InstallmentPlanRepository.findByUid(
+            installment.planId
+          );
+          const student = plan?.studentId
+            ? await StudentRepository.findByUid(plan.studentId)
+            : null;
+
+          const dueDate = new Date(installment.dueDate);
+          const today = new Date();
+          const daysUntilDue = Math.ceil(
+            (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          return {
+            uid: installment.uid,
+            plan_id: installment.planId,
+            current_installment: installment.installmentNumber,
+            installment_amount: this.formatAmount(
+              installment.installmentAmount
+            ),
+            due_date: installment.dueDate,
+            days_until_due: daysUntilDue,
+            status: installment.status,
+            status_text: this.getStatusText(installment.status),
+            plan: plan
+              ? {
+                  uid: plan.uid,
+                  total_installments: plan.totalInstallments,
+                  student: student
+                    ? { uid: student.uid, name: student.name, phone: student.phone }
+                    : null,
+                }
+              : null,
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        data: enriched,
+        meta: {
+          days: Number(days),
+          count: enriched.length,
+        },
+      });
+    }
+  );
+
+  /**
    * 获取逾期分期列表
    */
   public getOverdueInstallments = catchAsync(
@@ -664,6 +743,74 @@ export class InstallmentController {
       message: "分期付款状态更新成功",
     });
   });
+
+  /**
+   * PATCH /:id/status - 更新分期状态（简洁版）
+   * 直接更新状态，不创建交易记录
+   */
+  public updateInstallmentStatus = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+      const { status } = req.body as { status: string };
+
+      const normalizedStatus = this.normalizeInstallmentStatus(status);
+      if (!normalizedStatus) {
+        throw AppError.invalidInput("无效的分期状态");
+      }
+
+      const installment = await InstallmentRepository.findByUid(Number(id));
+
+      if (!installment) {
+        throw AppError.notFound("分期记录不存在");
+      }
+
+      const plan = await InstallmentPlanRepository.findByUid(installment.planId);
+
+      if (!plan) {
+        throw AppError.notFound("分期计划不存在");
+      }
+
+      // 直接更新状态
+      const updateData: Record<string, unknown> = {
+        status: normalizedStatus,
+        updatedAt: new Date(),
+      };
+
+      // 如果是取消状态，清除支付信息
+      if (normalizedStatus === InstallmentStatus.CANCELLED) {
+        updateData.paidAmount = null;
+        updateData.paidDate = null;
+        updateData.cashUid = null;
+      }
+
+      await InstallmentRepository.updateByUid(installment.uid, updateData);
+
+      // 刷新计划状态
+      await InstallmentRepository.refreshPlanStatus(plan.uid);
+
+      const updatedInstallment = await InstallmentRepository.findByUid(installment.uid);
+      const refreshedPlan = await InstallmentPlanRepository.findByUid(plan.uid);
+
+      logger.info(
+        `更新分期状态成功，UID: ${installment.uid}, 状态: ${normalizedStatus}`
+      );
+
+      res.json({
+        success: true,
+        data: {
+          uid: updatedInstallment?.uid,
+          status: normalizedStatus,
+          plan: refreshedPlan
+            ? {
+                uid: refreshedPlan.uid,
+                status: refreshedPlan.status,
+              }
+            : null,
+        },
+        message: "分期状态更新成功",
+      });
+    }
+  );
 
   /**
    * POST /:id/payments - 记录具体期支付

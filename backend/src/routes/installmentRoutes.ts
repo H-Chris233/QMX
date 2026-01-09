@@ -70,6 +70,30 @@ const updateInstallmentStatusSchema = Joi.object({
   }),
 });
 
+const updateStatusSimpleSchema = Joi.object({
+  status: Joi.string()
+    .valid(...Object.values(InstallmentStatusValues))
+    .required()
+    .messages({
+      "any.only": "无效的分期付款状态",
+      "any.required": "分期付款状态不能为空",
+    }),
+});
+
+const upcomingInstallmentsSchema = Joi.object({
+  days: Joi.number()
+    .integer()
+    .min(1)
+    .max(90)
+    .default(7)
+    .messages({
+      "number.base": "天数必须是数字",
+      "number.integer": "天数必须是整数",
+      "number.min": "天数至少为1",
+      "number.max": "天数不能超过90",
+    }),
+});
+
 const queryInstallmentSchema = Joi.object({
   page: commonValidations.page,
   limit: commonValidations.limit,
@@ -121,6 +145,29 @@ router.get(
  * @access Public
  */
 router.get("/overdue", installmentController.getOverdueInstallments);
+
+/**
+ * @route GET /api/v1/installments/upcoming
+ * @desc 获取即将到期的分期
+ * @access Public
+ */
+router.get(
+  "/upcoming",
+  validateQuery(upcomingInstallmentsSchema),
+  installmentController.getUpcomingInstallments
+);
+
+/**
+ * @route PATCH /api/v1/installments/:id/status
+ * @desc 更新分期状态（简洁版）
+ * @access Public
+ */
+router.patch(
+  "/:id/status",
+  validateParams(Joi.object({ id: commonValidations.id })),
+  validate(updateStatusSimpleSchema),
+  installmentController.updateInstallmentStatus
+);
 
 /**
  * @route GET /api/v1/installments/:id

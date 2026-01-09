@@ -523,6 +523,49 @@ export class ApiService {
     );
   }
 
+  /**
+   * 获取即将到期的分期
+   */
+  static async getUpcomingInstallments(days: number = 7): Promise<{
+    uid: number;
+    plan_id: number;
+    current_installment: number;
+    installment_amount: number;
+    due_date: string;
+    days_until_due: number;
+    status: string;
+    status_text: string;
+    plan: {
+      uid: number;
+      total_installments: number;
+      student: { uid: number; name: string; phone: string } | null;
+    } | null;
+  }[]> {
+    return handleApiOperation(
+      () => InstallmentsApiService.getUpcomingInstallments(days),
+      '获取即将到期分期',
+      { retryable: true, context: { days } }
+    );
+  }
+
+  /**
+   * 更新分期状态（简洁版）
+   */
+  static async updateInstallmentStatus(
+    installmentUid: number,
+    status: InstallmentStatus
+  ): Promise<{
+    uid: number;
+    status: string;
+    plan: { uid: number; status: string } | null;
+  }> {
+    return handleApiOperation(
+      () => InstallmentsApiService.updateInstallmentStatus(installmentUid, status),
+      '更新分期状态',
+      { retryable: false, context: { installmentUid, status } }
+    );
+  }
+
   // ============================================================================
   // 统计数据
   // ============================================================================

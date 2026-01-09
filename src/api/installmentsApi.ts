@@ -49,6 +49,45 @@ export class InstallmentsApiService {
   }
 
   /**
+   * 获取即将到期的分期
+   */
+  static async getUpcomingInstallments(days: number = 7): Promise<{
+    uid: number;
+    plan_id: number;
+    current_installment: number;
+    installment_amount: number;
+    due_date: string;
+    days_until_due: number;
+    status: string;
+    status_text: string;
+    plan: {
+      uid: number;
+      total_installments: number;
+      student: { uid: number; name: string; phone: string } | null;
+    } | null;
+  }[]> {
+    return apiCall(
+      baseClient.get('/installments/upcoming', { params: { days: String(days) } })
+    );
+  }
+
+  /**
+   * 更新分期状态（简洁版，不创建交易记录）
+   */
+  static async updateInstallmentStatus(
+    installmentUid: number,
+    status: InstallmentStatus
+  ): Promise<{
+    uid: number;
+    status: string;
+    plan: { uid: number; status: string } | null;
+  }> {
+    return apiCall(
+      baseClient.patch(`/installments/${installmentUid}/status`, { status })
+    );
+  }
+
+  /**
    * 获取分期计划详情
    */
   static async getInstallmentPlan(planId: number): Promise<{
