@@ -8,7 +8,6 @@ import { InstallmentsApiService } from './installmentsApi';
 import { StatsApiService, type StatsPeriod } from './statsApi';
 import { MembershipApiService, type MembershipStats } from './membershipApi';
 import { AdapterApiService, type HealthStatus, type AdapterInfo } from './adapterApi';
-import { AuthApiService } from './authApi';
 import { handleApiOperation } from '../utils/errorHandler';
 import type {
   Student,
@@ -29,24 +28,6 @@ import type {
   InstallmentStatus,
 } from '../types/api';
 
-import type {
-  LoginCredentials,
-  User,
-  LoginResponse,
-  RefreshTokenResponse,
-  RegisterData,
-  ChangePasswordData
-} from '../types/api';
-
-// 重新导出认证相关类型
-export type {
-  LoginCredentials,
-  User,
-  LoginResponse,
-  RefreshTokenResponse,
-  RegisterData,
-  ChangePasswordData
-} from '../types/api';
 
 /**
  * 统一的 API 服务类
@@ -331,7 +312,8 @@ export class ApiService {
     total_installments: number;
     frequency: string;
     custom_days?: number | null;
-    start_date?: string;
+    start_date: string;
+    due_date: string;
   }): Promise<Transaction>;
   /**
    * 新增分期交易（多参数 - 向后兼容）
@@ -342,7 +324,8 @@ export class ApiService {
     note: string | null,
     total_installments: number,
     frequency: string,
-    start_date?: string | null
+    start_date: string,
+    due_date: string
   ): Promise<Transaction>;
   static async addInstallmentTransaction(
     dataOrStudentId: any,
@@ -350,10 +333,11 @@ export class ApiService {
     note?: string | null,
     total_installments?: number,
     frequency?: string,
-    start_date?: string | null
+    start_date?: string | null,
+    due_date?: string | null
   ): Promise<Transaction> {
     let installmentData: any;
-    
+
     if (typeof dataOrStudentId === 'object' && dataOrStudentId !== null && 'frequency' in dataOrStudentId) {
       // 对象参数调用
       installmentData = dataOrStudentId;
@@ -365,10 +349,11 @@ export class ApiService {
         note: note || null,
         total_installments: total_installments!,
         frequency: frequency!,
-        start_date: start_date || undefined,
+        start_date: start_date || '',
+        due_date: due_date || '',
       };
     }
-    
+
     return handleApiOperation(
       () => TransactionApiService.addInstallmentTransaction(installmentData),
       '新增分期交易',
@@ -730,91 +715,6 @@ export class ApiService {
       () => MembershipApiService.batchSetMembership(studentIds, membershipType, startFromToday),
       '批量设置会员',
       { retryable: false, context: { studentIds, membershipType, startFromToday } }
-    );
-  }
-
-  // ============================================================================
-  // 认证接口
-  // ============================================================================
-
-  /**
-   * 用户登录
-   */
-  static async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    return handleApiOperation(
-      () => AuthApiService.login(credentials),
-      '用户登录',
-      { retryable: false, context: { username: credentials.username } }
-    );
-  }
-
-  /**
-   * 用户登出
-   */
-  static async logout(): Promise<void> {
-    return handleApiOperation(
-      () => AuthApiService.logout(),
-      '用户登出',
-      { retryable: false }
-    );
-  }
-
-  /**
-   * 刷新访问令牌
-   */
-  static async refreshToken(refreshToken: string): Promise<any> {
-    return handleApiOperation(
-      () => AuthApiService.refreshToken(refreshToken),
-      '刷新令牌',
-      { retryable: true, context: { refreshToken: '***' } }
-    );
-  }
-
-  /**
-   * 获取当前用户信息
-   */
-  static async getCurrentUser(): Promise<User> {
-    return handleApiOperation(
-      () => AuthApiService.getCurrentUser(),
-      '获取用户信息',
-      { retryable: true }
-    );
-  }
-
-  /**
-   * 更新用户信息
-   */
-  static async updateUser(userData: Partial<User>): Promise<User> {
-    return handleApiOperation(
-      () => AuthApiService.updateUser(userData),
-      '更新用户信息',
-      { retryable: false, context: { userData } }
-    );
-  }
-
-  /**
-   * 修改密码
-   */
-  static async changePassword(data: {
-    currentPassword: string;
-    newPassword: string;
-    confirmPassword: string;
-  }): Promise<void> {
-    return handleApiOperation(
-      () => AuthApiService.changePassword(data),
-      '修改密码',
-      { retryable: false }
-    );
-  }
-
-  /**
-   * 检查用户名是否可用
-   */
-  static async checkUsernameAvailability(username: string): Promise<{ available: boolean }> {
-    return handleApiOperation(
-      () => AuthApiService.checkUsernameAvailability(username),
-      '检查用户名可用性',
-      { retryable: true, context: { username } }
     );
   }
 

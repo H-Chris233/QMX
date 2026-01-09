@@ -7,6 +7,7 @@ import installmentRoutes from '@/routes/installmentRoutes';
 import statsRoutes from '@/routes/statsRoutes';
 import membershipRoutes from '@/routes/membershipRoutes';
 import adapterRoutes from '@/routes/adapterRoutes';
+import authRoutes from '@/routes/authRoutes';
 import testRoutes from '@/routes/testRoutes';
 import healthRoutes from '@/routes/healthRoutes';
 
@@ -41,6 +42,7 @@ router.use('/membership', membershipRoutes);
 router.use('/dashboard', statsRoutes);
 router.use('/stats', statsRoutes); // 统计API别名
 router.use('/adapter', adapterRoutes); // 数据库适配器路由
+router.use('/auth', authRoutes); // 简单密码认证路由
 router.use('/health', healthRoutes); // 健康检查路由
 
 // 测试路由 - 仅在测试环境启用

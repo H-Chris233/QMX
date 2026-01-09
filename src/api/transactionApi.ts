@@ -110,7 +110,8 @@ export class TransactionApiService {
     total_installments: number;
     frequency: string;
     custom_days?: number | null;
-    start_date?: string;
+    start_date: string;
+    due_date: string;
   }): Promise<Transaction> {
     return apiCall<Transaction>(
       baseClient.post('/transactions/installment', data)

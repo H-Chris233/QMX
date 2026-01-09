@@ -98,12 +98,10 @@ export const ApiAliases = {
   },
   // 认证相关
   auth: {
-    login: 'login',
-    logout: 'logout',
-    refresh: 'refreshToken',
-    currentUser: 'getCurrentUser',
-    updateUser: 'updateUser',
-    changePassword: 'changePassword',
+    status: 'getStatus',
+    setup: 'setupPassword',
+    verify: 'verifyPassword',
+    change: 'changePassword',
   },
   // 适配器相关
   adapter: {

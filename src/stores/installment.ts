@@ -135,7 +135,8 @@ export const useInstallmentStore = defineStore('installment', () => {
         total_installments: data.total_installments,
         frequency: String(data.frequency),
         custom_days: data.custom_days,
-        start_date: data.start_date
+        start_date: data.start_date,
+        due_date: data.start_date
       });
 
       // 刷新分期列表以获取最新数据

@@ -570,7 +570,8 @@ const saveTransaction = async () => {
         total_installments: formData.total_installments!,
         frequency: String(formData.frequency!),
         custom_days: formData.frequency === PaymentFrequency.CUSTOM ? formData.custom_days : null,
-        start_date: formData.due_date || undefined,
+        start_date: formData.due_date || '',
+        due_date: formData.due_date || '',
         note: formData.note ? formData.note : null,
       });
       showSuccess('分期付款已创建');

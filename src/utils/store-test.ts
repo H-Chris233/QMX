@@ -49,11 +49,10 @@ export function testAuthStore() {
 
   // 测试权限检查
   console.log('✅ 管理员权限:', authStore.isAdmin);
-  console.log('✅ 学生管理权限:', authStore.canManageStudents);
+  console.log('✅ 是否有密码:', authStore.hasPassword);
 
-  // 跳过登录测试，因为在开发模式下 isAuthenticated 直接返回 true
-  console.log('✅ 开发模式下认证状态:', authStore.isAuthenticated);
-  console.log('✅ 跳过实际登录测试（开发阶段已绕过认证）');
+  // 测试错误状态
+  console.log('✅ 错误状态:', authStore.error);
 
   console.log('✅ Auth Store 测试完成\n');
 }
