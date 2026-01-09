@@ -15,7 +15,7 @@ QMX项目的完整测试文档，包含前端、后端和E2E测试的详细指�
   - Jest + Supertest
   - API测试
   - 服务层测试
-  - MongoDB Memory Server
+  - PostgreSQL Memory Server
 
 - **[E2E测试指南](./e2e-testing.md)**
   - Playwright
@@ -55,9 +55,10 @@ npm run e2e:core       # 核心测试
 |------|--------|------|---------|
 | 后端API | 90%+ | ✅ 优秀 | 95%+ |
 | 后端服务层 | 90%+ | ✅ 优秀 | 95%+ |
+| 后端仓储层 | 85%+ | ✅ 良好 | 90%+ |
 | 前端工具函数 | 80%+ | ✅ 良好 | 85%+ |
-| 前端组件 | 30%- | ⚠️ 需改进 | 70%+ |
-| E2E | 基础覆盖 | ⚠️ 需改进 | 完整覆盖 |
+| 前端组件 | 60%+ | ✅ 改进中 | 80%+ |
+| E2E | 完整覆盖 | ✅ 良好 | 持续维护 |
 
 ## 🏗️ 测试架构
 
@@ -79,7 +80,7 @@ MSW (Mock Service Worker)
 ```
 Jest (测试框架)
 ├── Supertest (HTTP测试)
-├── MongoDB Memory Server (内存数据库)
+├── PostgreSQL Memory Server (内存数据库)
 └── Jest配置
 
 测试辅助
@@ -266,9 +267,9 @@ Timeout - Async callback was not invoked
 
 #### 数据库连接失败
 ```
-MongooseError: Connection refused
+Error: Connection refused to PostgreSQL
 ```
-**解决**: 确保MongoDB Memory Server正确启动
+**解决**: 确保PostgreSQL Memory Server正确启动
 
 #### 端口冲突
 ```
@@ -285,17 +286,17 @@ Jest did not exit one second after the test run
 ## 📈 改进计划
 
 ### 短期目标 (1-2周)
-- [ ] 提升前端组件测试覆盖率至60%+
-- [ ] 修复剩余36个失败测试
+- [ ] 提升前端组件测试覆盖率至70%+
+- [ ] 修复剩余失败测试
 - [ ] 添加更多边界情况测试
 
 ### 中期目标 (1个月)
-- [ ] 总体测试覆盖率达到85%+
-- [ ] 实现完整的E2E测试套件
+- [ ] 总体测试覆盖率达到90%+
+- [ ] 完善E2E测试套件
 - [ ] 建立测试性能基准
 
 ### 长期目标 (3个月)
-- [ ] 测试覆盖率达到90%+
+- [ ] 测试覆盖率达到95%+
 - [ ] 实现视觉回归测试
 - [ ] 自动化性能测试
 
@@ -315,5 +316,5 @@ Jest did not exit one second after the test run
 
 ---
 
-**最后更新**: 2025-01-06
+**最后更新**: 2025-01-09
 **维护者**: H-Chris233

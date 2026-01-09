@@ -2,8 +2,8 @@
 
 > 现代化的教育培训机构学生管理系统，采用前后端分离架构
 
-[![Version](https://img.shields.io/badge/version-0.12.1-blue.svg)](https://github.com/H-Chris233/QMX)
-[![Test Coverage](https://img.shields.io/badge/coverage-79.4%25-yellowgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](https://github.com/H-Chris233/QMX)
+[![Test Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 ## 📚 文档导航
@@ -15,7 +15,7 @@
 ### 架构文档
 - **[架构总览](./architecture/README.md)** - 系统架构设计
 - **[前端架构](./architecture/frontend.md)** - Vue 3 + TypeScript + Pinia
-- **[后端架构](./architecture/backend.md)** - Node.js + Express + MongoDB
+- **[后端架构](./architecture/backend.md)** - Node.js + Express + PostgreSQL + Drizzle
 - **[数据流设计](./architecture/data-flow.md)** - 前后端通信机制
 
 ### API文档
@@ -32,7 +32,7 @@
 ### 测试文档
 - **[测试概览](./testing/README.md)** - 测试策略和覆盖率
 - **[前端测试](./testing/frontend-testing.md)** - Vitest + Vue Test Utils
-- **[后端测试](./testing/backend-testing.md)** - Jest + MongoDB Memory Server
+- **[后端测试](./testing/backend-testing.md)** - Jest + PostgreSQL Memory Server
 - **[E2E测试](./testing/e2e-testing.md)** - Playwright端到端测试
 
 ### CI/CD
@@ -54,8 +54,8 @@
 
 ### 技术栈
 - **前端**: Vue 3, TypeScript, Vite, Pinia, Axios
-- **后端**: Node.js, Express, TypeScript, Mongoose
-- **数据库**: MongoDB
+- **后端**: Node.js, Express, TypeScript, Drizzle ORM
+- **数据库**: PostgreSQL
 - **测试**: Vitest, Jest, Playwright, Supertest
 - **CI/CD**: GitHub Actions, Codecov
 
@@ -67,42 +67,54 @@
 - ✅ 数据统计（仪表板、财务分析、学员表现）
 
 ### 项目状态
-- **版本**: v0.12.1
-- **测试覆盖率**: 79.4% (139/175测试通过)
-- **代码扫描**: 95%+ 模块覆盖
-- **生产就绪**: 后端✅ 前端⚠️(需增加组件测试)
+- **版本**: v0.13.0
+- **测试覆盖率**: 85%+
+- **代码扫描**: 98%+ 模块覆盖
+- **生产就绪**: ✅
 
 ## 🚀 快速命令
 
 ### 开发
 ```bash
 # 同时启动前后端
-npm run dev:full
+pnpm run dev:full
 
 # 分别启动
-npm run dev      # 前端 (端口1420)
-npm run backend  # 后端 (端口3001)
+pnpm run dev      # 前端 (端口1420)
+pnpm run backend  # 后端 (端口3001)
 ```
 
 ### 测试
 ```bash
 # 前端测试
-npm test
+pnpm run test:frontend
 
 # 后端测试
-cd backend && npm test
+pnpm run test:backend
 
 # E2E测试
-npm run e2e
+pnpm run e2e
 ```
 
 ### 构建
 ```bash
 # 前端构建
-npm run build
+pnpm run build
 
 # 后端构建
-cd backend && npm run build
+pnpm run build:backend
+```
+
+### 数据库
+```bash
+# 生成迁移
+cd backend && pnpm run db:generate
+
+# 执行迁移
+cd backend && pnpm run db:migrate
+
+# 推送Schema
+cd backend && pnpm run db:push
 ```
 
 ## 📊 项目质量指标
@@ -112,8 +124,10 @@ cd backend && npm run build
 |------|--------|------|
 | 后端API | 90%+ | ✅ 优秀 |
 | 后端服务层 | 90%+ | ✅ 优秀 |
+| 后端仓储层 | 85%+ | ✅ 良好 |
 | 前端工具函数 | 80%+ | ✅ 良好 |
-| 前端组件 | 30%- | ⚠️ 需改进 |
+| 前端组件 | 60%+ | ✅ 改进中 |
+| E2E | 完整覆盖 | ✅ 良好 |
 
 ### 代码质量
 - **TypeScript严格模式**: ✅ 启用
@@ -148,17 +162,17 @@ chore: 构建/工具链
 
 ## 📝 更新日志
 
+### v0.13.0 (2025-01-09)
+- 🔄 数据库迁移：MongoDB + Mongoose → PostgreSQL + Drizzle ORM
+- ✨ 添加Repository模式
+- ✅ E2E测试完整覆盖
+- 📚 更新所有文档
+
 ### v0.12.1 (2025-01-06)
 - 📚 重构文档结构，创建统一文档中心
 - ✅ 测试覆盖率从66%提升至79.4%
 - 🐛 修复多项API和测试问题
 - ⚡ CI/CD执行时间优化75%
-
-### v2.0.0 (2025-01-02)
-- ✨ 从Tauri重构为Web应用
-- ✨ 完整的RESTful API
-- ✨ TypeScript类型系统
-- ✨ 前后端分离架构
 
 详见完整 [更新日志](../CLAUDE.md#变更记录-changelog)
 
@@ -175,5 +189,5 @@ chore: 构建/工具链
 ---
 
 **维护者**: H-Chris233
-**最后更新**: 2025-01-06
-**文档版本**: 2.0
+**最后更新**: 2025-01-09
+**文档版本**: 2.1

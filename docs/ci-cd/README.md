@@ -74,7 +74,7 @@ setup (15min)
 
 ### E2E流程
 ```
-依赖安装 → Playwright安装 → MongoDB启动 →
+依赖安装 → Playwright安装 → PostgreSQL启动 →
 服务启动 → 测试执行 → 清理
 ```
 
@@ -96,13 +96,13 @@ setup (15min)
 
 ### 常见问题
 
-#### MongoDB连接失败
+#### PostgreSQL连接失败
 ```bash
-# 启动MongoDB容器
-docker run -d -p 27017:27017 mongo:7-alpine
+# 启动PostgreSQL容器
+docker run -d -p 5432:5432 postgres:15-alpine
 
 # 验证连接
-docker exec mongodb-test mongosh --eval "db.adminCommand('ping')"
+docker exec postgres-test psql -U postgres -c "SELECT 1"
 ```
 
 #### 端口被占用
@@ -148,5 +148,5 @@ pnpm install
 
 ---
 
-**最后更新**: 2025-01-06
+**最后更新**: 2025-01-09
 **维护者**: H-Chris233

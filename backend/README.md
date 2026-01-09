@@ -6,12 +6,13 @@ QMX学生管理系统的后端服务，提供完整的RESTful API支持。
 
 - **Node.js** + **TypeScript** - 运行时和编程语言
 - **Express.js** - Web框架
-- **Mongoose** - MongoDB ODM
-- **MongoDB** - NoSQL数据库
+- **Drizzle ORM** - PostgreSQL ORM
+- **PostgreSQL** - 关系型数据库
 - **Joi** - 数据验证
 - **Winston** - 日志管理
 - **JWT** - 身份认证
 - **Helmet/CORS** - 安全中间件
+- **rate-limiter-flexible** - 速率限制
 
 ## 快速开始
 
@@ -19,7 +20,7 @@ QMX学生管理系统的后端服务，提供完整的RESTful API支持。
 
 ```bash
 cd backend
-npm install
+pnpm install
 ```
 
 ### 环境配置
@@ -29,26 +30,38 @@ cp .env.example .env
 # 编辑 .env 文件配置数据库连接等参数
 ```
 
+### 数据库设置
+
+```bash
+# 确保PostgreSQL已启动
+# 创建数据库
+createdb qmx
+
+# 运行迁移
+pnpm run db:migrate
+
+# 或开发环境推送Schema
+pnpm run db:push
+```
+
 ### 开发模式
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ### 生产模式
 
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 ### 启动流程概览
 
 1. **加载环境变量**：`src/config/index.ts` 会通过 `dotenv` 读取 `.env`，同时调用 `validateConfig()` 校验必填项。
-2. **连接数据库**：`src/config/database.ts` 中的 `connectDatabase()` 在应用启动前建立 MongoDB 连接，如连接失败会立即退出。
+2. **连接数据库**：`src/config/database.ts` 中的 `connectDatabase()` 在应用启动前建立 PostgreSQL 连接，如连接失败会立即退出。
 3. **启动应用**：`src/index.ts` 引导 `app` 实例监听端口，并输出健康检查、环境等启动日志。
-
-> 待相关模型补齐后，可运行 `npm run build` 确认编译通过。
 
 ## API文档
 
@@ -57,11 +70,12 @@ npm start
 - **基础URL**: `http://localhost:3001/api/v1`
 - **认证方式**: JWT Bearer Token
 - **数据格式**: JSON
+- **健康检查**: `http://localhost:3001/health`
 
 ### 主要端点
 
 #### 学生管理
-- `GET /students` - 获取学生列表
+- `GET /students` - 获取学生列表（支持分页、搜索）
 - `POST /students` - 创建新学生
 - `GET /students/:id` - 获取学生详情
 - `PUT /students/:id` - 更新学生信息
@@ -76,14 +90,27 @@ npm start
 #### 财务管理
 - `GET /transactions` - 获取交易记录
 - `POST /transactions` - 创建交易记录
+- `GET /transactions/:id` - 获取交易详情
 - `DELETE /transactions/:id` - 删除交易记录
 
-> 💡 **金额单位说明**：现金交易在数据库中以“分”为单位存储（整数），API 响应则统一转换为“元”（保留两位小数）。在服务层创建或更新现金记录时，请使用 `cashBuilder` / `cashUpdater` 进行金额校验与单位转换，避免直接操作 `cash` 字段。
+#### 分期付款
+- `GET /installments` - 获取分期列表
+- `POST /installments/plans` - 创建分期计划
+- `GET /installments/plans/:id` - 获取分期计划详情
+- `POST /installments/plans/:id/pay` - 支付分期
+
+#### 会员管理
+- `GET /memberships` - 获取会员列表
+- `PUT /memberships/:id` - 更新会员信息
 
 #### 统计数据
 - `GET /dashboard/stats` - 获取仪表板统计
+- `GET /dashboard/financial-stats` - 财务统计
+- `GET /dashboard/students/:id/stats` - 学员统计数据
 
-> 💡 **统计服务说明**：`backend/src/services/statsService.ts` 会以“分”为单位聚合现金、分期等数据，控制器层统一转换为“元”（保留两位小数），并复用与 Rust 版本一致的汇总逻辑，确保金额精度与字段含义完全对齐。
+> **金额单位说明**：现金交易在数据库中以"分"为单位存储（整数），API 响应则统一转换为"元"（保留两位小数）。在服务层创建或更新现金记录时，请使用 `cashBuilder` / `cashUpdater` 进行金额校验与单位转换，避免直接操作 `amount` 字段。
+
+> **统计服务说明**：`backend/src/services/statsService.ts` 会以"分"为单位聚合现金、分期等数据，控制器层统一转换为"元"（保留两位小数），并复用与 Rust 版本一致的汇总逻辑，确保金额精度与字段含义完全对齐。
 
 ##### 仪表盘字段（`/dashboard/stats`）
 - `total_students`：学员总数
@@ -150,19 +177,43 @@ npm start
 ```
 backend/
 ├── src/
-│   ├── config/         # 配置文件
-│   ├── controllers/    # 控制器
-│   ├── middleware/     # 中间件
-│   ├── models/         # 数据模型
-│   ├── routes/         # 路由定义
-│   ├── types/          # TypeScript类型定义
-│   ├── utils/          # 工具函数
-│   └── index.ts        # 应用入口
-├── data/              # 数据库文件
-├── logs/              # 日志文件
-├── uploads/           # 上传文件
-└── dist/              # 编译输出
+│   ├── config/              # 配置文件
+│   ├── controllers/         # 控制器
+│   ├── db/
+│   │   ├── schema/          # Drizzle Schema定义
+│   │   ├── repositories/    # 数据仓储层
+│   │   └── index.ts         # 数据库连接
+│   ├── middleware/          # 中间件
+│   ├── routes/              # 路由定义
+│   ├── services/            # 业务逻辑层
+│   ├── types/               # TypeScript类型定义
+│   ├── utils/               # 工具函数
+│   ├── app.ts               # Express应用
+│   └── index.ts             # 应用入口
+├── drizzle/                 # Drizzle配置和迁移
+├── logs/                    # 日志文件
+└── dist/                    # 编译输出
 ```
+
+### 架构模式
+
+本项目采用多种设计模式：
+
+- **Repository模式** - 数据访问封装
+  - `db/repositories/studentRepository.ts`
+  - `db/repositories/cashRepository.ts`
+  - `db/repositories/installmentRepository.ts`
+
+- **Builder模式** - 复杂对象构建
+  - `services/studentBuilder.ts`
+  - `services/cashBuilder.ts`
+
+- **Updater模式** - 更新操作封装
+  - `services/studentUpdater.ts`
+  - `services/cashUpdater.ts`
+
+- **Presenter模式** - 数据格式化输出
+  - `services/studentPresenter.ts`
 
 ## 环境变量
 
@@ -170,7 +221,11 @@ backend/
 |--------|------|--------|
 | PORT | 服务端口 | 3001 |
 | NODE_ENV | 运行环境 | development |
-| MONGODB_URI | MongoDB连接URI | mongodb://localhost:27017/qmx |
+| POSTGRES_HOST | PostgreSQL主机 | localhost |
+| POSTGRES_PORT | PostgreSQL端口 | 5432 |
+| POSTGRES_USER | 数据库用户 | postgres |
+| POSTGRES_PASSWORD | 数据库密码 | - |
+| POSTGRES_DB | 数据库名 | qmx |
 | JWT_SECRET | JWT密钥 | - |
 | CORS_ORIGIN | CORS源 | http://localhost:1420 |
 | LOG_LEVEL | 日志级别 | info |
@@ -179,50 +234,60 @@ backend/
 
 ### 添加新的API端点
 
-1. 在`models/`中定义数据模型
-2. 在`controllers/`中实现业务逻辑
-3. 在`routes/`中定义路由
-4. 在`middleware/validation.ts`中添加验证规则
+1. 在 `db/schema/` 中定义数据表Schema
+2. 在 `db/repositories/` 中创建Repository
+3. 在 `services/` 中实现业务逻辑
+4. 在 `controllers/` 中实现控制器
+5. 在 `routes/` 中定义路由
+6. 在 `middleware/validation.ts` 中添加验证规则
 
-### 数据库初始化
+### 数据库迁移
 
 ```bash
-npm run seed
+# 生成迁移文件
+pnpm run db:generate
+
+# 执行迁移
+pnpm run db:migrate
+
+# 推送Schema变更（开发环境）
+pnpm run db:push
+
+# 打开Drizzle Studio
+pnpm run db:studio
 ```
 
 ### 运行测试
 
-本项目使用 Jest 和 mongodb-memory-server 进行自动化测试，测试覆盖：
+本项目使用 Jest 进行自动化测试，测试覆盖：
+
 - 学生服务：创建、更新、查询、成绩管理、会员管理
 - 现金交易：收入/支出创建、金额校验、分页搜索、删除
 - 分期付款：计划创建、期票生成、逾期检测、支付更新
 - 统计服务：仪表盘统计、学员统计、财务统计
 - API集成：学生API、交易API、分期API、统计API
+- 仓储层：数据访问操作
 
 运行所有测试：
 
 ```bash
-# 使用 npm
-npm test
-
-# 或使用 pnpm
+# 使用 pnpm
 pnpm test
 
 # 运行带覆盖率的测试
-npm test -- --coverage
+pnpm test -- --coverage
 ```
 
 **环境要求**：
-- 测试使用内存数据库，无需外部依赖
+- 测试使用内存PostgreSQL，无需外部依赖
 - 建议 Node.js >= 18.0.0
-- 首次运行会下载 mongodb-memory-server 二进制文件（约50MB）
 
 **测试结构**：
 ```
 backend/src/__tests__/
-├── helpers/           # 测试辅助工具
-│   └── testSetup.ts  # 数据库设置、测试数据创建
-├── api/              # API集成测试
+├── helpers/              # 测试辅助工具
+│   └── testSetup.ts     # 数据库设置、测试数据创建
+├── api/                  # API集成测试
 │   ├── students.api.spec.ts
 │   ├── transactions.api.spec.ts
 │   ├── installments.api.spec.ts
@@ -231,13 +296,14 @@ backend/src/__tests__/
 ├── installments.spec.ts   # 分期付款测试
 ├── studentServices.spec.ts # 学生服务测试
 ├── statsService.spec.ts    # 统计服务测试
+├── repositories.spec.ts    # 仓储层测试
 ├── errorHandling.spec.ts   # 错误处理测试
-└── counter.spec.ts         # 计数器工具测试
+└── builders.spec.ts        # Builder模式测试
 ```
 
 ### 日志管理
 
-日志文件位于`logs/`目录：
+日志文件位于 `logs/` 目录：
 - `app.log` - 应用日志
 - `app-error.log` - 错误日志
 - `app-exceptions.log` - 异常日志

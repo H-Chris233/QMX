@@ -423,8 +423,8 @@ const phone = randomPhoneNumber();
 // 随机邮箱
 const email = randomEmail();
 
-// MongoDB ObjectId
-const objectId = generateObjectId();
+// UUID
+const uuid = generateUUID();
 ```
 
 ## 断言助手
@@ -744,7 +744,7 @@ const expiredStudent = StudentFactory.create()
 
 ## 更新日志
 
-### v1.0.0 (2024-01-15)
+### v1.1.0 (2025-01-09)
 
 - ✨ 初始版本发布
 - 🎉 支持Student、Transaction、Installment、Plan、Stats工厂
