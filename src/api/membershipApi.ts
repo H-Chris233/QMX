@@ -32,7 +32,7 @@ export class MembershipApiService {
     };
 
     return apiCall<Student>(
-      baseClient.post(`/membership/students/${studentId}/membership`, payload)
+      baseClient.post(`/students/${studentId}/membership`, payload)
     );
   }
 
@@ -41,7 +41,7 @@ export class MembershipApiService {
    */
   static async clearStudentMembership(studentId: number): Promise<Student> {
     return apiCall<Student>(
-      baseClient.delete(`/membership/students/${studentId}/membership`)
+      baseClient.delete(`/students/${studentId}/membership`)
     );
   }
 
@@ -57,7 +57,7 @@ export class MembershipApiService {
 
     return apiCall<Student>(
       baseClient.post(
-        `/membership/students/${studentId}/membership/type`,
+        `/students/${studentId}/membership/type`,
         payload
       )
     );
@@ -75,7 +75,7 @@ export class MembershipApiService {
 
     return apiCall<Student>(
       baseClient.post(
-        `/membership/students/${studentId}/membership/renew`,
+        `/students/${studentId}/membership/renew`,
         payload
       )
     );
