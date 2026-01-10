@@ -108,14 +108,11 @@ export class StatsApiService {
   }
 
   /**
-   * 获取财务统计数据
+   * 获取财务统计数据（已废弃，请使用 getGlobalFinancialStats）
+   * @deprecated 请使用 getGlobalFinancialStats
    */
   static async getFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {
-    const params = parsePeriodParams(period);
-
-    return apiCall<FinancialStats>(
-      baseClient.get('/stats/financial', { params })
-    );
+    return this.getGlobalFinancialStats(period);
   }
 
   /**

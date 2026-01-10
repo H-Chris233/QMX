@@ -44,8 +44,9 @@ router.get('/dashboard', statsController.getDashboardStats);
 
 /**
  * @route GET /api/v1/stats/financial
- * @desc 获取财务统计（支持周期选择）
+ * @desc 获取财务统计（支持周期选择，已废弃，使用 /stats/global-financial-stats）
  * @access Public
+ * @deprecated 请使用 /stats/global-financial-stats
  */
 router.get('/financial',
   validateQuery(financialStatsSchema),
