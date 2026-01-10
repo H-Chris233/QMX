@@ -4,6 +4,12 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-01-10 - 认证系统更新
+- 更新认证状态管理文档
+- 记录简单密码认证系统实现
+- 添加auth store完整接口文档
+- 补全installment.ts和stats.ts文档
+
 ### 2025-11-06T11:37:40+0000
 - 完成Pinia状态管理架构文档
 - 记录从provide/inject到Pinia的迁移完成
@@ -96,20 +102,66 @@ interface TransactionState {
 - updateFilterState()             // 更新过滤状态
 ```
 
-**auth.ts** - 认证状态管理
+**auth.ts** - 简单密码认证状态管理
 ```typescript
 interface AuthState {
-  user: User | null;              // 当前用户
-  token: string | null;           // 访问令牌
-  isAuthenticated: boolean;        // 认证状态
-  permissions: string[];          // 权限列表
+  isAuthenticated: boolean;       // 认证状态
+  isLoading: boolean;             // 加载状态
+  error: string | null;           // 错误信息
+  isFirstVisit: boolean;          // 首次访问
+  isAdmin: boolean;               // 管理员状态
 }
 
 // 主要方法：
-- login() / logout()              // 登录/登出
-- refreshToken()                  // 刷新令牌
-- checkPermissions()              // 权限检查
-- updateUserInfo()                // 更新用户信息
+- fetchStatus()                   // 获取认证状态
+- setPassword(password: string)   // 设置站点密码（首次）
+- verifyPassword(password: string) // 验证密码
+- logout()                        // 退出登录
+- clearError()                    // 清除错误
+
+// Getters：
+- hasPassword: boolean            // 是否有密码
+- isNetworkError: boolean         // 是否为网络错误
+
+// 特点：
+// - 管理员密码通过环境变量 VITE_ADMIN_PASSWORD_HASH 配置
+// - 普通用户密码存储在后端数据库
+// - 强制后端验证，不能绕过前端安全检查
+```
+
+**installment.ts** - 分期付款管理
+```typescript
+interface InstallmentState {
+  plans: InstallmentPlan[];       // 分期计划列表
+  currentPlan: InstallmentPlan | null;
+  installments: Installment[];    // 分期记录
+  loading: boolean;               // 加载状态
+}
+
+// 主要方法：
+- fetchPlans()                    // 获取分期计划
+- fetchPlanDetail(planId: number) // 获取计划详情
+- createPlan(data: CreatePlanData) // 创建分期计划
+- updatePayment(installmentUid: number, data: PaymentData) // 更新支付
+- payNextInstallment(planId: number) // 支付下一期
+- cancelPlan(planId: number)      // 取消计划
+```
+
+**stats.ts** - 统计数据管理
+```typescript
+interface StatsState {
+  dashboard: DashboardStats | null;
+  financial: FinancialStats | null;
+  student: StudentStats | null;
+  loading: boolean;               // 加载状态
+  period: StatsPeriod;            // 统计周期
+}
+
+// 主要方法：
+- fetchDashboardStats(period?)   // 获取仪表盘统计
+- fetchFinancialStats(period?)   // 获取财务统计
+- fetchStudentStats(studentId, period?) // 获取学员统计
+- setPeriod(period: StatsPeriod) // 设置统计周期
 ```
 
 ## 关键依赖与配置
@@ -365,4 +417,5 @@ src/stores/
 
 ---
 
-**最后更新**: 2025-11-06T11:37:40+0000
+**最后更新**: 2026-01-10
+**维护者**: H-Chris233

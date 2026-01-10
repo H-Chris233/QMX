@@ -2,6 +2,13 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-01-10
+- 补全文档：添加 backend/src/db/ 模块 CLAUDE.md
+- 补全文档：添加 backend/src/utils/ 模块 CLAUDE.md
+- 补全文档：更新 stores 模块文档（auth, installment, stats）
+- 更新模块索引，添加数据库和工具模块
+- 文档覆盖率提升至 100%
+
 ### 2025-01-10
 - 实现简单密码认证系统替代复杂 JWT 认证
 - 前端：创建 Login.vue 登录组件，简化 auth store
@@ -117,11 +124,13 @@ graph TD
 | `src/stores/` | Pinia状态管理，全局状态和业务逻辑 | app.ts, student.ts, transaction.ts, auth.ts | TypeScript | 活跃 |
 | `backend/src/routes/` | 后端路由定义，API端点映射 | studentRoutes.ts, cashRoutes.ts, statsRoutes.ts | TypeScript | 活跃 |
 | `backend/src/controllers/` | 请求处理器，业务逻辑入口 | studentController.ts, cashController.ts, statsController.ts | TypeScript | 活跃 |
+| `backend/src/db/` | 数据库层，PostgreSQL + Drizzle ORM | index.ts, schema/, repositories/ | TypeScript | 活跃 |
 | `backend/src/db/schema/` | Drizzle数据库Schema定义 | students.ts, cash.ts, installments.ts | TypeScript | 活跃 |
 | `backend/src/db/repositories/` | 数据仓储层，数据库操作封装 | studentRepository.ts, cashRepository.ts | TypeScript | 活跃 |
 | `backend/src/services/` | 业务逻辑层，复杂操作封装 | studentBuilder.ts, cashBuilder.ts, statsService.ts | TypeScript | 活跃 |
 | `backend/src/middleware/` | Express中间件，请求拦截处理 | errorHandler.ts, validation.ts, rateLimiter.ts | TypeScript | 活跃 |
 | `backend/src/config/` | 配置管理，环境变量和数据库连接 | index.ts, database.ts | TypeScript | 活跃 |
+| `backend/src/utils/` | 后端工具函数，错误处理和日志 | errors.ts, logger.ts, money.ts | TypeScript | 活跃 |
 | `backend/src/__tests__/` | 后端测试套件 | api/, services.spec.ts, repositories.spec.ts | TypeScript | 活跃 |
 
 ## 运行与开发
@@ -477,7 +486,7 @@ htpasswd -nbB your_password
 
 ---
 
-**最后更新**: 2025-01-10
+**最后更新**: 2026-01-10
 **维护者**: H-Chris233
-**版本**: 0.14.0
-**扫描覆盖率**: 98%+ (重新扫描)
+**版本**: 0.15.0
+**文档覆盖率**: 100% (所有模块已文档化)
