@@ -38,12 +38,6 @@
           </div>
           <div v-else class="skeleton-line h-8 w-2/3"></div>
 
-          <div class="stat-trend positive" v-if="!loading">
-            <TrendingUp :size="14" />
-            <span>较上月增长 12%</span>
-            <!-- 示例数据，可视情况对接真实环比 -->
-          </div>
-          <div v-else class="skeleton-line h-4 w-1/2 mt-2"></div>
         </div>
       </div>
 
@@ -61,11 +55,6 @@
           </div>
           <div v-else class="skeleton-line h-8 w-1/2"></div>
 
-          <div class="stat-trend neutral" v-if="!loading">
-            <Activity :size="14" />
-            <span>本周新增 3 人</span>
-          </div>
-          <div v-else class="skeleton-line h-4 w-1/3 mt-2"></div>
         </div>
       </div>
 
@@ -217,8 +206,6 @@ import {
   Wallet,
   Users,
   Award,
-  TrendingUp,
-  Activity,
   Clock,
   Calendar,
   CheckCircle2,
