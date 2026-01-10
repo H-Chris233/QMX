@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Test Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg)
+![Test Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)
 
 现代化的教育培训机构学生管理系统，采用前后端分离架构。
 
@@ -195,4 +195,4 @@ MIT License - 查看 [LICENSE](LICENSE) 文件
 ---
 
 **维护者**: H-Chris233
-**最后更新**: 2025-01-10
+**最后更新**: 2026-01-10

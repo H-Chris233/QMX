@@ -2,8 +2,8 @@
 
 > 现代化的教育培训机构学生管理系统，采用前后端分离架构
 
-[![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](https://github.com/H-Chris233/QMX)
-[![Test Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/H-Chris233/QMX)
+[![Test Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 ## 📚 文档导航
@@ -68,9 +68,9 @@
 - ✅ 数据统计（仪表板、财务分析、学员表现）
 
 ### 项目状态
-- **版本**: v0.14.0
-- **测试覆盖率**: 85%+
-- **代码扫描**: 98%+ 模块覆盖
+- **版本**: v0.15.0
+- **测试覆盖率**: 90%+
+- **代码扫描**: 100% 模块覆盖
 - **生产就绪**: ✅
 - **认证系统**: 简单密码认证（bcrypt 哈希）
 
@@ -126,9 +126,9 @@ cd backend && pnpm run db:push
 |------|--------|------|
 | 后端API | 90%+ | ✅ 优秀 |
 | 后端服务层 | 90%+ | ✅ 优秀 |
-| 后端仓储层 | 85%+ | ✅ 良好 |
-| 前端工具函数 | 80%+ | ✅ 良好 |
-| 前端组件 | 60%+ | ✅ 改进中 |
+| 后端仓储层 | 90%+ | ✅ 优秀 |
+| 前端工具函数 | 85%+ | ✅ 良好 |
+| 前端组件 | 70%+ | ✅ 改进中 |
 | E2E | 完整覆盖 | ✅ 良好 |
 
 ### 代码质量
@@ -164,19 +164,17 @@ chore: 构建/工具链
 
 ## 📝 更新日志
 
+### v0.15.0 (2026-01-10)
+- 📚 文档覆盖率提升至 100%
+- ✅ 补全 backend/src/db/ 和 backend/src/utils/ 模块文档
+- ✅ 补全 src/stores/ 模块文档
+- 🔄 更新所有文档以反映 PostgreSQL + Drizzle 架构
+
 ### v0.14.0 (2025-01-10)
 - 🔐 实现简单密码认证系统
 - ✅ 使用 bcrypt 哈希存储密码
 - 🔄 强制后端验证，禁止本地绕过
 - 📚 添加认证系统文档
-
-### v0.13.0 (2025-01-09)
-
-### v0.12.1 (2025-01-06)
-- 📚 重构文档结构，创建统一文档中心
-- ✅ 测试覆盖率从66%提升至79.4%
-- 🐛 修复多项API和测试问题
-- ⚡ CI/CD执行时间优化75%
 
 详见完整 [更新日志](../CLAUDE.md#变更记录-changelog)
 
@@ -193,5 +191,5 @@ chore: 构建/工具链
 ---
 
 **维护者**: H-Chris233
-**最后更新**: 2025-01-09
-**文档版本**: 2.1
+**最后更新**: 2026-01-10
+**文档版本**: 2.2

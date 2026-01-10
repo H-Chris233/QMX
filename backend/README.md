@@ -10,7 +10,7 @@ QMX学生管理系统的后端服务，提供完整的RESTful API支持。
 - **PostgreSQL** - 关系型数据库
 - **Joi** - 数据验证
 - **Winston** - 日志管理
-- **JWT** - 身份认证
+- **bcryptjs** - 密码哈希
 - **Helmet/CORS** - 安全中间件
 - **rate-limiter-flexible** - 速率限制
 
@@ -68,7 +68,7 @@ pnpm start
 ### 基础信息
 
 - **基础URL**: `http://localhost:3001/api/v1`
-- **认证方式**: JWT Bearer Token
+- **认证方式**: 简单密码认证（bcrypt）
 - **数据格式**: JSON
 - **健康检查**: `http://localhost:3001/health`
 
@@ -226,7 +226,7 @@ backend/
 | POSTGRES_USER | 数据库用户 | postgres |
 | POSTGRES_PASSWORD | 数据库密码 | - |
 | POSTGRES_DB | 数据库名 | qmx |
-| JWT_SECRET | JWT密钥 | - |
+| QMX_ADMIN_PASSWORD_HASH | 管理员密码（bcrypt哈希） | - |
 | CORS_ORIGIN | CORS源 | http://localhost:1420 |
 | LOG_LEVEL | 日志级别 | info |
 
