@@ -2,6 +2,14 @@
 
 ## 变更记录 (Changelog)
 
+### 2025-01-10
+- 实现简单密码认证系统替代复杂 JWT 认证
+- 前端：创建 Login.vue 登录组件，简化 auth store
+- 后端：创建 authRoutes.ts，使用 bcrypt 哈希存储密码
+- 强制后端验证，禁止本地绕过
+- 在设置页面添加账户管理和退出登录功能
+- 更新文档，添加认证系统配置说明
+
 ### 2025-01-09
 - 数据库架构迁移：MongoDB + Mongoose → PostgreSQL + Drizzle ORM
 - 更新前端模块文档，添加新的API端点和组件
@@ -400,9 +408,76 @@ Vue组件单元测试已添加：
 - **覆盖组件**: ErrorModal, StudentForm, StudentManagement
 - **测试策略**: 组件交互、Props验证、Emits测试
 
+### 简单密码认证系统（2025-01）
+实现简化的访问控制机制：
+- **首次访问**：设置站点密码
+- **后续访问**：输入密码验证
+- **管理员密码**：通过环境变量 bcrypt 哈希配置
+- **密码存储**：数据库 bcrypt 哈希（不可逆）
+- **强制验证**：所有认证必须经过后端，不能绕过
+
+## 认证系统配置
+
+### 环境变量配置
+
+```bash
+# 后端 - 管理员密码（必须是 bcrypt 哈希）
+QMX_ADMIN_PASSWORD_HASH="$2a$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# 前端 - 管理员密码哈希（与后端相同）
+VITE_ADMIN_PASSWORD_HASH="$2a$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+### 生成 bcrypt 哈希
+
+```bash
+# 方法1：使用 Node.js
+cd backend && node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('your_password', 10));"
+
+# 方法2：使用 htpasswd
+htpasswd -nbB your_password
+```
+
+### 认证流程
+
+1. **首次访问**：
+   - 前端调用 `GET /auth/status` 获取状态
+   - 后端返回 `isFirstVisit: true`
+   - 用户设置密码，前端调用 `POST /auth/setup`
+   - 后端使用 bcrypt 哈希密码并存储
+   - 登录成功
+
+2. **后续访问**：
+   - 前端调用 `GET /auth/status` 获取状态
+   - 用户输入密码，前端调用 `POST /auth/verify`
+   - 后端使用 bcrypt.compare() 验证
+   - 验证成功返回 `success: true`
+
+3. **管理员登录**：
+   - 设置 `QMX_ADMIN_PASSWORD_HASH` 环境变量
+   - 用户输入管理员密码
+   - 后端优先验证管理员哈希
+
+### 安全措施
+
+| 措施 | 说明 |
+|------|------|
+| 密码哈希 | bcrypt (cost=10)，不可逆 |
+| 强制后端验证 | 不能绕过前端直接访问 |
+| 无本地密码存储 | 前端不存储密码明文 |
+| HTTPS 必需 | 生产环境必须启用 HTTPS |
+
+### 注意事项
+
+1. **必须配置 HTTPS** - 否则密码在传输过程中可能被截获
+2. **环境变量密码必须是哈希** - 不能是明文密码
+3. **后端不可用时无法登录** - 这是预期的安全行为
+4. **密码最小长度 4 位** - 前端和后端都有验证
+5. **退出登录清除状态** - 设置页面提供退出按钮
+
 ---
 
-**最后更新**: 2025-01-09
+**最后更新**: 2025-01-10
 **维护者**: H-Chris233
-**版本**: 0.13.0
+**版本**: 0.14.0
 **扫描覆盖率**: 98%+ (重新扫描)

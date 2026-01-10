@@ -34,6 +34,7 @@ QMX（启明星）是一个现代化的教育培训机构学生管理系统，�
 - [x] 财务管理（收支记录、分期付款）
 - [x] 会员管理（期限设置、状态跟踪、到期提醒）
 - [x] 数据统计（仪表板、财务分析、学员表现）
+- [x] **访问控制**（密码认证、管理员模式）
 
 ## 快速开始
 
@@ -155,9 +156,29 @@ cd backend && pnpm start
 ## 文档
 
 - [完整文档](./docs/README.md)
+- [认证系统](./docs/auth.md)
 - [CLAUDE.md](./CLAUDE.md) - AI开发指南
 - [后端文档](./backend/README.md)
 - [测试文档](./docs/testing/README.md)
+
+## 访问控制
+
+系统采用简单密码认证机制保护系统访问。
+
+### 首次访问配置
+
+```bash
+# 生成 bcrypt 哈希密码
+cd backend && node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('your_password', 10));"
+
+# 后端环境变量 (.env)
+QMX_ADMIN_PASSWORD_HASH="$2a$10$xxxxxxxxxx"
+
+# 前端环境变量 (.env)
+VITE_ADMIN_PASSWORD_HASH="$2a$10$xxxxxxxxxx"
+```
+
+详细配置说明请参阅 [认证系统文档](./docs/auth.md)。
 
 ## 更新日志
 
@@ -174,4 +195,4 @@ MIT License - 查看 [LICENSE](LICENSE) 文件
 ---
 
 **维护者**: H-Chris233
-**最后更新**: 2025-01-09
+**最后更新**: 2025-01-10

@@ -1,5 +1,10 @@
 <template>
   <div :class="['main-app', appStore.theme + '-theme']">
+    <!-- 未登录状态：显示登录页面 -->
+    <Login v-if="!authStore.isAuthenticated" />
+
+    <!-- 已登录状态：显示主应用 -->
+    <template v-else>
     <!-- 顶部导航栏 -->
     <nav class="navbar">
       <!-- 移动端：品牌标题 + 侧边栏触发按钮 -->
@@ -118,20 +123,22 @@
       @confirm="appStore.handleConfirm"
       @cancel="appStore.handleCancel"
     />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import { useAppStore } from './stores/app';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Wallet, 
-  GraduationCap, 
-  Settings, 
-  Menu, 
-  X, 
+import { useAuthStore } from './stores/auth';
+import {
+  LayoutDashboard,
+  Users,
+  Wallet,
+  GraduationCap,
+  Settings,
+  Menu,
+  X,
   FlaskConical,
   Sparkles
 } from 'lucide-vue-next';
@@ -144,8 +151,10 @@ import GradeManagement from './components/GradeManagement.vue';
 import Dashboard from './components/Dashboard.vue';
 import SettingsComp from './components/Settings.vue'; // 重命名避免冲突
 import ConfirmModal from './components/ConfirmModal.vue';
+import Login from './components/Login.vue';
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const isDev = import.meta.env.DEV;
 
 // 状态管理
@@ -210,9 +219,12 @@ const testConfirmModal = (): void => {
 // 响应式与事件清理
 let cleanupFunctions: (() => void)[] = [];
 
-onMounted(() => {
+onMounted(async () => {
   // 初始化主题
   appStore.initTheme();
+
+  // 初始化认证状态
+  await authStore.fetchStatus();
 
   // 点击外部关闭侧边栏
   const handleOutsideClick = (e: Event): void => {

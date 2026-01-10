@@ -8,7 +8,35 @@
 
     <!-- 设置网格 -->
     <div class="settings-grid">
-      
+
+      <!-- 账户管理 -->
+      <section class="setting-card">
+        <div class="card-header">
+          <div class="header-icon">
+            <User :size="20" />
+          </div>
+          <h3>账户管理</h3>
+        </div>
+
+        <div class="card-content">
+          <div class="account-info">
+            <div class="account-badge" :class="{ admin: authStore.isAdmin }">
+              <Shield :size="16" v-if="authStore.isAdmin" />
+              <User :size="16" v-else />
+              <span>{{ authStore.isAdmin ? '管理员' : '普通用户' }}</span>
+            </div>
+          </div>
+
+          <div class="logout-section">
+            <button class="logout-btn" @click="handleLogout">
+              <LogOut :size="18" />
+              <span>退出登录</span>
+            </button>
+            <p class="logout-hint">退出后需要重新输入密码才能访问系统</p>
+          </div>
+        </div>
+      </section>
+
       <!-- 外观设置 -->
       <section class="setting-card">
         <div class="card-header">
@@ -17,14 +45,14 @@
           </div>
           <h3>外观偏好</h3>
         </div>
-        
+
         <div class="card-content">
           <div class="setting-row">
             <div class="setting-meta">
               <label>界面主题</label>
               <p class="desc">切换深色或浅色模式以适应环境光线</p>
             </div>
-            
+
             <!-- 主题切换器 (Segmented Control 风格) -->
             <div class="theme-switcher">
               <button
@@ -56,7 +84,7 @@
           </div>
           <h3>通用行为</h3>
         </div>
-        
+
         <div class="card-content">
           <div class="setting-row">
             <div class="setting-meta">
@@ -69,7 +97,7 @@
                 <span class="highlight-text">此策略由系统管理员强制开启。</span>
               </p>
             </div>
-            
+
             <div class="setting-control">
               <!-- 样式化的 Switch -->
               <label class="switch-wrapper">
@@ -134,6 +162,7 @@
 <script setup lang="ts">
 import { ref, type Ref } from 'vue';
 import { useAppStore } from '../stores/app';
+import { useAuthStore } from '../stores/auth';
 import {
   Palette,
   Sun,
@@ -141,11 +170,19 @@ import {
   Sliders,
   Lock,
   Info,
-  Sparkles
+  Sparkles,
+  User,
+  Shield,
+  LogOut
 } from 'lucide-vue-next';
 
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const autoSave: Ref<boolean> = ref(true);
+
+function handleLogout() {
+  authStore.logout();
+}
 </script>
 
 <style scoped>
@@ -155,6 +192,61 @@ const autoSave: Ref<boolean> = ref(true);
   padding-bottom: 2rem;
   animation: fade-in 0.4s ease;
 }
+
+/* 账户管理样式 */
+.account-info {
+  margin-bottom: 1.5rem;
+}
+
+.account-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-app);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.account-badge.admin {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--primary-color);
+}
+
+.logout-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 1.5rem;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.875rem;
+  background: transparent;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.logout-hint {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0.75rem 0 0;
+}
+
 
 /* Header */
 .settings-header {

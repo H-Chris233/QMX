@@ -1,13 +1,12 @@
 import express from 'express';
 import type { Router } from 'express';
-import { db } from '@/db';
-import { systemConfigs } from '@/db/schema/config';
-import { eq } from 'drizzle-orm';
+import { db, systemConfigs } from '@/db';
+import bcrypt from 'bcryptjs';
 
 const router: Router = express.Router();
 
-// 简单的密码验证中间件
-const adminPassword = process.env.QMX_ADMIN_PASSWORD || '';
+// 管理员密码（环境变量）- 使用 bcrypt 比较
+const adminPasswordHash = process.env.QMX_ADMIN_PASSWORD_HASH || '';
 
 /**
  * 获取当前站点密码状态
@@ -15,18 +14,16 @@ const adminPassword = process.env.QMX_ADMIN_PASSWORD || '';
 router.get('/status', async (_req, res) => {
   try {
     // 检查是否已设置密码
-    const [result] = await db
-      .select()
-      .from(systemConfigs)
-      .where(eq(systemConfigs.key, 'site_password'))
-      .limit(1);
+    const result = await db.query.systemConfigs.findFirst({
+      where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+    });
 
     res.json({
       success: true,
       data: {
-        hasPassword: !!result?.value,
-        isFirstVisit: !result?.value,
-        adminConfigured: !!adminPassword,
+        hasPassword: !!result,
+        isFirstVisit: !result,
+        adminConfigured: !!adminPasswordHash,
       }
     });
   } catch (error) {
@@ -38,7 +35,7 @@ router.get('/status', async (_req, res) => {
 });
 
 /**
- * 设置站点密码（第一次访问时）
+ * 设置站点密码（第一次访问时）- 哈希存储
  */
 router.post('/setup', async (req, res) => {
   const { password } = req.body;
@@ -52,11 +49,9 @@ router.post('/setup', async (req, res) => {
 
   try {
     // 检查是否已存在密码
-    const [existing] = await db
-      .select()
-      .from(systemConfigs)
-      .where(eq(systemConfigs.key, 'site_password'))
-      .limit(1);
+    const existing = await db.query.systemConfigs.findFirst({
+      where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+    });
 
     if (existing) {
       return res.status(400).json({
@@ -65,20 +60,28 @@ router.post('/setup', async (req, res) => {
       });
     }
 
-    // 保存密码
-    await db.insert(systemConfigs).values({
-      key: 'site_password',
-      value: password,
-      description: '站点访问密码',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    // 使用 bcrypt 哈希密码
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // 保存哈希到数据库
+    await db.insert(systemConfigs)
+      .values({
+        key: 'site_password_hash',
+        value: passwordHash, // 存储 bcrypt 哈希
+        description: '站点访问密码（bcrypt哈希）',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing()
+      .execute();
 
     res.json({
       success: true,
       message: '密码设置成功'
     });
   } catch (error) {
+    console.error('设置密码错误:', error);
     res.status(500).json({
       success: false,
       error: '设置密码失败'
@@ -99,27 +102,33 @@ router.post('/verify', async (req, res) => {
     });
   }
 
-  // 优先验证环境变量中的管理员密码
-  if (adminPassword && password === adminPassword) {
-    return res.json({
-      success: true,
-      data: { isAdmin: true }
-    });
-  }
-
   try {
-    // 验证数据库中存储的密码
-    const [result] = await db
-      .select()
-      .from(systemConfigs)
-      .where(eq(systemConfigs.key, 'site_password'))
-      .limit(1);
+    // 优先验证环境变量中的管理员密码
+    if (adminPasswordHash) {
+      const adminMatch = await bcrypt.compare(password, adminPasswordHash);
+      if (adminMatch) {
+        return res.json({
+          success: true,
+          data: { isAdmin: true }
+        });
+      }
+    }
 
-    if (result && result.value === password) {
-      return res.json({
-        success: true,
-        data: { isAdmin: false }
-      });
+    // 验证数据库中存储的密码哈希
+    const result = await db.query.systemConfigs.findFirst({
+      where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+    });
+
+    if (result) {
+      const storedHash = result.value as string;
+      const match = await bcrypt.compare(password, storedHash);
+
+      if (match) {
+        return res.json({
+          success: true,
+          data: { isAdmin: false }
+        });
+      }
     }
 
     res.status(401).json({
@@ -127,6 +136,7 @@ router.post('/verify', async (req, res) => {
       error: '密码错误'
     });
   } catch (error) {
+    console.error('验证密码错误:', error);
     res.status(500).json({
       success: false,
       error: '验证失败'
@@ -147,70 +157,68 @@ router.post('/change', async (req, res) => {
     });
   }
 
-  // 验证管理员环境变量
-  if (adminPassword && oldPassword === adminPassword) {
-    // 管理员可以更改密码（仅影响数据库中的密码）
-    try {
-      // 使用 upsert 逻辑
-      const [existing] = await db
-        .select()
-        .from(systemConfigs)
-        .where(eq(systemConfigs.key, 'site_password'))
-        .limit(1);
+  try {
+    let isAdminUser = false;
 
-      if (existing) {
-        await db
-          .update(systemConfigs)
-          .set({ value: newPassword, updatedAt: new Date() })
-          .where(eq(systemConfigs.key, 'site_password'));
-      } else {
-        await db.insert(systemConfigs).values({
-          key: 'site_password',
-          value: newPassword,
-          description: '站点访问密码',
-          createdAt: new Date(),
-          updatedAt: new Date(),
+    // 验证管理员密码
+    if (adminPasswordHash) {
+      const adminMatch = await bcrypt.compare(oldPassword, adminPasswordHash);
+      if (adminMatch) {
+        isAdminUser = true;
+      }
+    }
+
+    // 验证旧密码（如果是普通用户）
+    if (!isAdminUser) {
+      const result = await db.query.systemConfigs.findFirst({
+        where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+      });
+
+      if (!result) {
+        return res.status(401).json({
+          success: false,
+          error: '未设置密码'
         });
       }
 
-      return res.json({
-        success: true,
-        message: '密码更改成功'
-      });
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        error: '更改密码失败'
-      });
-    }
-  }
+      const storedHash = result.value as string;
+      const match = await bcrypt.compare(oldPassword, storedHash);
 
-  try {
-    // 验证旧密码
-    const [result] = await db
-      .select()
-      .from(systemConfigs)
-      .where(eq(systemConfigs.key, 'site_password'))
-      .limit(1);
-
-    if (!result || result.value !== oldPassword) {
-      return res.status(401).json({
-        success: false,
-        error: '原密码错误'
-      });
+      if (!match) {
+        return res.status(401).json({
+          success: false,
+          error: '原密码错误'
+        });
+      }
     }
+
+    // 使用 bcrypt 哈希新密码
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
     // 更新密码
-    await db
-      .update(systemConfigs)
-      .set({ value: newPassword, updatedAt: new Date() })
-      .where(eq(systemConfigs.key, 'site_password'));
+    await db.insert(systemConfigs)
+      .values({
+        key: 'site_password_hash',
+        value: newPasswordHash,
+        description: '站点访问密码（bcrypt哈希）',
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: systemConfigs.key,
+        set: {
+          value: newPasswordHash,
+          updatedAt: new Date(),
+        }
+      })
+      .execute();
 
     res.json({
       success: true,
       message: '密码更改成功'
     });
   } catch (error) {
+    console.error('更改密码错误:', error);
     res.status(500).json({
       success: false,
       error: '更改密码失败'
