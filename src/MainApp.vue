@@ -96,11 +96,18 @@
 
     <!-- 主内容区域 -->
     <main class="main-content" data-testid="main-content">
-      <transition name="fade-slide" mode="out-in">
-        <div :key="activeTab" class="content-wrapper">
-          <component :is="currentTabComponent" />
-        </div>
-      </transition>
+      <!-- ErrorBoundary 包裹内容，防止组件错误导致整个应用崩溃 -->
+      <ErrorBoundary
+        :fallback-title="`${activeTabLabel}加载失败`"
+        fallback-message="该功能遇到问题，请尝试切换到其他页面或刷新浏览器"
+        @error="handleComponentError"
+      >
+        <transition name="fade-slide" mode="out-in">
+          <div :key="activeTab" class="content-wrapper">
+            <component :is="currentTabComponent" />
+          </div>
+        </transition>
+      </ErrorBoundary>
     </main>
 
     <!-- 弹窗组件 -->
@@ -147,6 +154,7 @@ import {
 import ErrorModal from './components/ErrorModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import Login from './components/Login.vue';
+import ErrorBoundary from './components/ErrorBoundary.vue';
 
 // 页面组件懒加载（按需加载，提升首屏性能）
 import { defineAsyncComponent } from 'vue';
@@ -218,6 +226,24 @@ const menuItems = shallowRef([
 const currentTabComponent = computed(() => {
   return menuItems.value.find(item => item.id === activeTab.value)?.component || Dashboard;
 });
+
+// 获取当前标签名称
+const activeTabLabel = computed(() => {
+  return menuItems.value.find(item => item.id === activeTab.value)?.label || '页面';
+});
+
+// 处理组件错误
+function handleComponentError(error: Error, info: string): void {
+  console.error('组件错误被ErrorBoundary捕获:', { error, info });
+
+  // 记录到 appStore（可选）
+  appStore.addError({
+    message: `${activeTabLabel.value}加载失败`,
+    context: error.message,
+    type: 'component_error',
+    timestamp: Date.now()
+  });
+}
 
 // 侧边栏逻辑
 const toggleSidebar = (): void => {
