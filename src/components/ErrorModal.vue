@@ -141,7 +141,7 @@ const copyDetails = async () => {
     try {
       await navigator.clipboard.writeText(props.details);
     } catch (err) {
-      console.error('复制失败', err);
+      // 复制失败静默处理
     }
   }
 };

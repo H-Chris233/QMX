@@ -1,5 +1,6 @@
 // 标准化错误处理工具
 import { ref } from 'vue';
+import { logger } from './logger';
 
 // 错误优先级定义
 export enum ErrorPriority {
@@ -79,7 +80,7 @@ export function createError(
 // 添加错误到全局状态（已简化）
 export function addError(error: AppError): void {
   // 简化错误处理，移除全局状态管理，只记录到控制台
-  console.log('Error recorded (global error state removed):', error);
+  logger.log('Error recorded (global error state removed):', error);
 }
 
 // 清除所有错误
@@ -139,7 +140,7 @@ export async function handleApiOperation<T>(
       });
       window.dispatchEvent(event);
     } else {
-      console.error(`${displayTitle}: ${displayMessage}`, {
+      logger.error(`${displayTitle}: ${displayMessage}`, {
         operation: operationName,
         context: options.context,
         originalError: errorMessage,
@@ -183,7 +184,7 @@ export function handleValidationError(
     });
     window.dispatchEvent(event);
   } else {
-    console.error(`${displayTitle} - ${field}: ${displayMessage}`, { field, value });
+    logger.error(`${displayTitle} - ${field}: ${displayMessage}`, { field, value });
   }
   // 不抛出异常，只显示错误
 }
@@ -229,13 +230,13 @@ export function handleNetworkError(
     });
     window.dispatchEvent(event);
   } else {
-    console.error(`${displayTitle}: ${displayMessage}`, {
+    logger.error(`${displayTitle}: ${displayMessage}`, {
       operation: operationName,
       error: errorMessage,
       timestamp: new Date().toISOString()
     });
   }
-  
+
   throw new Error(`网络错误: ${errorMessage}`);
 }
 
@@ -306,6 +307,6 @@ export function testErrorHandling(): void {
   addError(mediumPriorityError);
   addError(highPriorityError);
   addError(criticalPriorityError);
-  
-  console.log('错误处理测试完成，已添加4个测试错误到全局状态');
+
+  logger.log('错误处理测试完成，已添加4个测试错误到全局状态');
 }

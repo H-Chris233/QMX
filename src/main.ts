@@ -2,6 +2,7 @@ import { createApp, defineAsyncComponent } from 'vue';
 import { createPinia } from 'pinia';
 import MainApp from './MainApp.vue';
 import pinia from './stores';
+import { logger } from './utils/logger';
 
 const KEY_AGREED = 'qmx_agreed_to_terms';
 
@@ -12,7 +13,7 @@ const KEY_AGREED = 'qmx_agreed_to_terms';
 function setupGlobalErrorHandler(app: ReturnType<typeof createApp>): void {
   // Vue 组件错误处理
   app.config.errorHandler = (err, instance, info) => {
-    console.error('🔴 Vue组件错误:', {
+    logger.error('🔴 Vue组件错误:', {
       error: err,
       component: instance?.$options.name || 'Unknown',
       errorInfo: info,
@@ -30,14 +31,14 @@ function setupGlobalErrorHandler(app: ReturnType<typeof createApp>): void {
       });
     } catch (storeError) {
       // 如果 store 也失败，至少在控制台显示
-      console.error('无法记录错误到 store:', storeError);
+      logger.error('无法记录错误到 store:', storeError);
     }
   };
 
   // Vue 警告处理（开发环境）
   if (import.meta.env.DEV) {
     app.config.warnHandler = (msg, instance, trace) => {
-      console.warn('⚠️ Vue警告:', {
+      logger.warn('⚠️ Vue警告:', {
         message: msg,
         component: instance?.$options.name || 'Unknown',
         trace
@@ -52,7 +53,7 @@ function setupGlobalErrorHandler(app: ReturnType<typeof createApp>): void {
 function setupGlobalUncaughtHandlers(): void {
   // 捕获未处理的 Promise 拒绝
   window.addEventListener('unhandledrejection', (event) => {
-    console.error('🔴 未处理的Promise拒绝:', {
+    logger.error('🔴 未处理的Promise拒绝:', {
       reason: event.reason,
       promise: event.promise,
       timestamp: new Date().toISOString()
@@ -70,13 +71,13 @@ function setupGlobalUncaughtHandlers(): void {
         timestamp: Date.now()
       });
     } catch (err) {
-      console.error('无法记录Promise拒绝到store:', err);
+      logger.error('无法记录Promise拒绝到store:', err);
     }
   });
 
   // 捕获全局JavaScript错误
   window.addEventListener('error', (event) => {
-    console.error('🔴 全局JavaScript错误:', {
+    logger.error('🔴 全局JavaScript错误:', {
       message: event.message,
       filename: event.filename,
       lineno: event.lineno,
@@ -101,7 +102,7 @@ function setupGlobalUncaughtHandlers(): void {
         timestamp: Date.now()
       });
     } catch (err) {
-      console.error('无法记录全局错误到store:', err);
+      logger.error('无法记录全局错误到store:', err);
     }
   });
 }

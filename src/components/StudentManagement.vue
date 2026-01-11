@@ -238,7 +238,7 @@ const performSearch = async (): Promise<void> => {
   try {
     await fetchStudents(1);
   } catch (error) {
-    console.error('搜索学员失败:', error);
+    // 错误已由errorHandler统一处理
     appStore.errorHandler.showError('无法搜索学员，请稍后重试');
   }
 };

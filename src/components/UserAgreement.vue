@@ -54,6 +54,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed, type Ref } from 'vue';
 import { useAppStore } from '../stores/app';
+import { logger } from '../utils/logger';
 
 interface Section {
   title: string;
@@ -218,11 +219,11 @@ const openMainWindow = async (): Promise<void> => {
       const { getCurrentWindow } = (window as any).__TAURI__.window;
       await getCurrentWindow().close();
     } else {
-      console.log('感谢您的同意！即将进入启明星管理软件主界面');
+      logger.log('感谢您的同意！即将进入启明星管理软件主界面');
       location.reload();
     }
   } catch (error) {
-    if (import.meta.env?.MODE !== 'production') console.error('打开主窗口失败:', error);
+    if (import.meta.env?.MODE !== 'production') logger.error('打开主窗口失败:', error);
     // 在Web环境下使用页面内通知替代alert
     const notice = document.createElement('div');
     notice.textContent = '感谢您的同意！主应用启动失败，请重试。';

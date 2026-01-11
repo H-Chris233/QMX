@@ -2,6 +2,7 @@ import express from 'express';
 import type { Router } from 'express';
 import { db, systemConfigs } from '@/db';
 import bcrypt from 'bcryptjs';
+import logger from '@/utils/logger';
 
 const router: Router = express.Router();
 
@@ -81,7 +82,7 @@ router.post('/setup', async (req, res) => {
       message: '密码设置成功'
     });
   } catch (error) {
-    console.error('设置密码错误:', error);
+    logger.error('设置密码错误:', error);
     res.status(500).json({
       success: false,
       error: '设置密码失败'
@@ -136,7 +137,7 @@ router.post('/verify', async (req, res) => {
       error: '密码错误'
     });
   } catch (error) {
-    console.error('验证密码错误:', error);
+    logger.error('验证密码错误:', error);
     res.status(500).json({
       success: false,
       error: '验证失败'
@@ -218,7 +219,7 @@ router.post('/change', async (req, res) => {
       message: '密码更改成功'
     });
   } catch (error) {
-    console.error('更改密码错误:', error);
+    logger.error('更改密码错误:', error);
     res.status(500).json({
       success: false,
       error: '更改密码失败'

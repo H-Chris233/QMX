@@ -8,7 +8,7 @@ import logger from './utils/logger';
 try {
   validateConfig();
 } catch (error) {
-  console.error('配置验证失败:', error);
+  logger.error('配置验证失败', error);
   process.exit(1);
 }
 

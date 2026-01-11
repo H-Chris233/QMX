@@ -230,7 +230,7 @@ export async function cachedApiCall<T>(
     if (!forceRefresh) {
       const expiredData = apiCache.get<T>(endpoint, params);
       if (expiredData !== null) {
-        console.warn('API调用失败，返回过期缓存数据:', error);
+        // 返回过期缓存数据，错误已由拦截器记录
         return expiredData;
       }
     }

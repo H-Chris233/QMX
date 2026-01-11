@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { logger } from '@/utils/logger';
 
 export interface LoadingState {
   global: boolean;
@@ -118,7 +119,7 @@ export const useAppStore = defineStore('app', () => {
 
     // 在开发环境打印错误
     if (import.meta.env.DEV) {
-      console.error('App Error:', errorInfo);
+      logger.error('App Error:', errorInfo);
     }
   }
 
@@ -178,7 +179,7 @@ export const useAppStore = defineStore('app', () => {
     showSuccess: (message: string) => {
       // 可以添加成功提示逻辑
       if (import.meta.env.DEV) {
-        console.log('Success:', message);
+        logger.log('Success:', message);
       }
     },
 

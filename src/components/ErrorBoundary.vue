@@ -31,6 +31,7 @@
 
 <script setup lang="ts">
 import { ref, onErrorCaptured, provide } from 'vue';
+import { logger } from '@/utils/logger';
 
 /**
  * ErrorBoundary 组件 - Vue 3 错误边界
@@ -61,7 +62,7 @@ const isDev = import.meta.env.DEV;
 
 // 捕获子组件错误
 onErrorCaptured((err: Error, instance, info: string) => {
-  console.error('🔴 ErrorBoundary捕获到错误:', {
+  logger.error('🔴 ErrorBoundary捕获到错误:', {
     error: err,
     component: instance?.$options.name || 'Unknown',
     errorInfo: info,

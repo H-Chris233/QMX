@@ -138,6 +138,7 @@
 import { ref, computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import { useAppStore } from './stores/app';
 import { useAuthStore } from './stores/auth';
+import { logger } from './utils/logger';
 import {
   LayoutDashboard,
   Users,
@@ -234,7 +235,7 @@ const activeTabLabel = computed(() => {
 
 // 处理组件错误
 function handleComponentError(error: Error, info: string): void {
-  console.error('组件错误被ErrorBoundary捕获:', { error, info });
+  logger.error('组件错误被ErrorBoundary捕获:', { error, info });
 
   // 记录到 appStore（可选）
   appStore.addError({
@@ -278,7 +279,7 @@ const testConfirmModal = (): void => {
     confirmText: '确认',
     cancelText: '取消',
     confirmType: 'primary',
-    onConfirm: () => console.log('Confirmed'),
+    onConfirm: () => logger.log('Confirmed'),
   });
 };
 

@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
+import logger from '@/utils/logger';
 
 // 创建连接池
 const pool = new Pool({
@@ -25,7 +26,7 @@ export async function testConnection() {
     console.log('✅ PostgreSQL 连接成功:', result.rows[0].now);
     return true;
   } catch (error) {
-    console.error('❌ PostgreSQL 连接失败:', error);
+    logger.error('PostgreSQL 连接失败', error);
     return false;
   }
 }
@@ -33,7 +34,7 @@ export async function testConnection() {
 // 优雅关闭数据库连接
 export async function closeDatabase() {
   await pool.end();
-  console.log('✅ 数据库连接已关闭');
+  logger.info('数据库连接已关闭');
 }
 
 // 优雅关闭处理

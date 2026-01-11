@@ -9,6 +9,8 @@ export class ApiError extends Error {
   }
 }
 
+import { logger } from './logger';
+
 export class ValidationError extends Error {
   constructor(
     message: string,
@@ -21,12 +23,12 @@ export class ValidationError extends Error {
 }
 
 export function handleApiError(error: unknown, context: string): never {
-  console.error(`❌ [${context}] 调用失败:`, error);
-  
+  logger.error(`❌ [${context}] 调用失败:`, error);
+
   if (error instanceof Error) {
     throw new ApiError(`${context}失败: ${error.message}`, undefined, error);
   }
-  
+
   throw new ApiError(`${context}失败: 未知错误`, undefined, error);
 }
 

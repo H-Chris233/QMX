@@ -3,6 +3,7 @@
  * 为所有 Pinia store action 提供标准化的错误处理逻辑
  */
 import type { ApiError } from '../api/baseClient';
+import { logger } from './logger';
 
 /**
  * Store Action 错误处理选项
@@ -51,26 +52,26 @@ export async function storeActionWrapper<T>(
 
   try {
     const result = await action();
-    console.debug(`✅ ${operationName} 成功完成`, context);
+    logger.debug(`✅ ${operationName} 成功完成`, context);
     return result;
   } catch (error) {
     const errorMessage = getErrorMessage(error);
     const operationId = `${operationName}_${Date.now()}`;
 
     // 记录错误详情
-    console.group(`🚨 ${operationName} 失败 [${operationId}]`);
-    console.error('错误信息:', errorMessage);
-    console.error('原始错误:', error);
-    console.error('上下文:', context);
-    console.error('可重试:', retryable);
-    console.groupEnd();
+    logger.error(`🚨 ${operationName} 失败 [${operationId}]`, {
+      错误信息: errorMessage,
+      原始错误: error,
+      上下文: context,
+      可重试: retryable
+    });
 
     // 自定义错误处理
     if (customErrorHandler) {
       try {
         customErrorHandler(error);
       } catch (handlerError) {
-        console.error('自定义错误处理失败:', handlerError);
+        logger.error('自定义错误处理失败:', handlerError);
       }
     }
 
@@ -201,10 +202,11 @@ function showUserError(
   }
 
   // 降级到控制台输出
-  console.group('🚨 用户错误提示');
-  console.error(`${operationName}失败:`, errorMessage);
-  console.error('详细信息:', errorDetail);
-  console.groupEnd();
+  logger.error('🚨 用户错误提示', {
+    操作: `${operationName}失败`,
+    错误信息: errorMessage,
+    详细信息: errorDetail
+  });
 }
 
 /**
@@ -233,7 +235,7 @@ export async function batchStoreActionWrapper<T>(
   const results: T[] = [];
   const errors: Array<{ index: number; error: unknown }> = [];
 
-  console.debug(`🔄 开始批量操作: ${operationName} (${actions.length}项)`);
+  logger.debug(`🔄 开始批量操作: ${operationName} (${actions.length}项)`);
 
   for (let i = 0; i < actions.length; i++) {
     try {
@@ -254,7 +256,7 @@ export async function batchStoreActionWrapper<T>(
   }
 
   if (errors.length > 0) {
-    console.warn(`${operationName} 批量操作部分失败:`, {
+    logger.warn(`${operationName} 批量操作部分失败:`, {
       total: actions.length,
       success: results.length,
       failed: errors.length,
@@ -325,7 +327,7 @@ export async function retryOperation<T>(
         break;
       }
 
-      console.warn(`操作失败，${delay}ms后进行第${attempt + 1}次重试:`, error);
+      logger.warn(`操作失败，${delay}ms后进行第${attempt + 1}次重试:`, error);
       await new Promise(resolve => setTimeout(resolve, delay * attempt));
     }
   }

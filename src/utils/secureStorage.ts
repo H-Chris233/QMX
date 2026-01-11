@@ -2,6 +2,7 @@
  * 安全存储工具类
  * 用于加密存储敏感数据如Token、用户信息等
  */
+import { logger } from './logger';
 
 /**
  * 简单的XOR加密/解密函数
@@ -38,7 +39,7 @@ function xorDecipher(encryptedText: string, key: string): string {
 
     return new TextDecoder().decode(result);
   } catch (error) {
-    console.error('Decryption failed:', error);
+    logger.error('Decryption failed:', error);
     return '';
   }
 }
@@ -86,7 +87,7 @@ export class SecureStorage {
       const storage = useSession ? sessionStorage : localStorage;
       storage.setItem(key, encrypted);
     } catch (error) {
-      console.error(`Failed to encrypt and store ${key}:`, error);
+      logger.error(`Failed to encrypt and store ${key}:`, error);
       // 降级到普通存储
       const storage = useSession ? sessionStorage : localStorage;
       storage.setItem(key, value);
@@ -113,7 +114,7 @@ export class SecureStorage {
 
       return decrypted;
     } catch (error) {
-      console.error(`Failed to decrypt and retrieve ${key}:`, error);
+      logger.error(`Failed to decrypt and retrieve ${key}:`, error);
       // 降级到普通获取
       const storage = useSession ? sessionStorage : localStorage;
       return storage.getItem(key);

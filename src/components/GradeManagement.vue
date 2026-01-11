@@ -346,6 +346,7 @@ import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
 import { validateScoreInput, safeParseNumber } from '../utils/dataTransformers';
 import DatePicker from './DatePicker.vue';
+import { logger } from '../utils/logger';
 
 // 引入图标
 import { 
@@ -428,9 +429,9 @@ const errorHandler = inject<ErrorHandler>('errorHandler');
 interface RefreshSystem { refreshTriggers: { grades: number; }; }
 const refreshSystem = inject<RefreshSystem>('refreshSystem');
 
-const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => { console.error(title, message, details); });
+const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => { logger.error(title, message, details); });
 const showConfirm = errorHandler?.showConfirm || ((options: any) => { if (confirm(options.message)) options.onConfirm(); });
-const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => { console.log(title, message); });
+const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => { logger.log(title, message); });
 
 // Computed Props
 const recentScores = computed(() => selectedStudentData.value ? selectedStudentData.value.rings.slice(-20) : []);
