@@ -16,10 +16,6 @@ export interface Config {
     connectionTimeout: number;
     idleTimeout: number;
   };
-  // MongoDB 配置（保留用于历史数据迁移，已废弃）
-  mongodb?: {
-    uri?: string;
-  };
   security: {
     jwtSecret: string;
     jwtExpiresIn: string;
@@ -28,6 +24,7 @@ export interface Config {
   logging: {
     level: string;
     file: string;
+    useStdout: boolean;  // 是否使用标准输出（Docker友好）
   };
   rateLimit: {
     windowMs: number;
@@ -62,11 +59,6 @@ export const config: Config = {
     idleTimeout: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
   },
 
-  // MongoDB 配置（保留用于历史数据迁移，已废弃）
-  mongodb: {
-    uri: process.env.MONGODB_URI || process.env.MONGODB_URL || process.env.mongodburl || process.env.mongodb_uri,
-  },
-
   // 安全配置
   security: {
     jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
@@ -77,7 +69,8 @@ export const config: Config = {
   // 日志配置
   logging: {
     level: process.env.LOG_LEVEL || 'info',
-    file: process.env.LOG_FILE || './logs/app.log',
+    file: process.env.LOG_FILE || '/var/log/qmx/app.log',  // 默认使用标准路径
+    useStdout: process.env.LOG_STDOUT === 'true' || process.env.NODE_ENV === 'production',  // 生产环境默认标准输出
   },
 
   // 速率限制配置

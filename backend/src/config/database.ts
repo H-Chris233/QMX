@@ -54,11 +54,7 @@ export const disconnectDatabase = async (): Promise<void> => {
   }
 };
 
-// 检查是否使用PostgreSQL的函数（用于适配器兼容）
-export function isUsingMongoDB(): boolean {
-  return false;
-}
-
+// 检查数据库类型（PostgreSQL）
 export function isUsingPostgreSQL(): boolean {
   return true;
 }
