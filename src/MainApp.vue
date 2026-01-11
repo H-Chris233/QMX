@@ -143,15 +143,55 @@ import {
   Sparkles
 } from 'lucide-vue-next';
 
-// 组件导入
+// 全局组件导入（需要立即可用）
 import ErrorModal from './components/ErrorModal.vue';
-import StudentManagement from './components/StudentManagement.vue';
-import FinancialStatistics from './components/FinancialStatistics.vue';
-import GradeManagement from './components/GradeManagement.vue';
-import Dashboard from './components/Dashboard.vue';
-import SettingsComp from './components/Settings.vue'; // 重命名避免冲突
 import ConfirmModal from './components/ConfirmModal.vue';
 import Login from './components/Login.vue';
+
+// 页面组件懒加载（按需加载，提升首屏性能）
+import { defineAsyncComponent } from 'vue';
+
+// 加载占位组件
+const LoadingPlaceholder = {
+  template: `
+    <div class="loading-placeholder">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">加载中...</p>
+    </div>
+  `
+};
+
+// 懒加载配置
+const asyncComponentConfig = {
+  loadingComponent: LoadingPlaceholder,
+  delay: 200, // 200ms 后才显示加载状态，避免闪烁
+  timeout: 10000 // 10秒超时
+};
+
+const Dashboard = defineAsyncComponent({
+  loader: () => import('./components/Dashboard.vue'),
+  ...asyncComponentConfig
+});
+
+const StudentManagement = defineAsyncComponent({
+  loader: () => import('./components/StudentManagement.vue'),
+  ...asyncComponentConfig
+});
+
+const FinancialStatistics = defineAsyncComponent({
+  loader: () => import('./components/FinancialStatistics.vue'),
+  ...asyncComponentConfig
+});
+
+const GradeManagement = defineAsyncComponent({
+  loader: () => import('./components/GradeManagement.vue'),
+  ...asyncComponentConfig
+});
+
+const SettingsComp = defineAsyncComponent({
+  loader: () => import('./components/Settings.vue'),
+  ...asyncComponentConfig
+});
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
@@ -539,6 +579,36 @@ onUnmounted(() => cleanupFunctions.forEach(fn => fn()));
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* ========== 组件懒加载占位符 ========== */
+.loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
 }
 
 /* ========== 响应式 ========== */

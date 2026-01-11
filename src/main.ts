@@ -1,6 +1,5 @@
-import { createApp } from 'vue';
+import { createApp, defineAsyncComponent } from 'vue';
 import { createPinia } from 'pinia';
-import UserAgreement from './components/UserAgreement.vue';
 import MainApp from './MainApp.vue';
 import pinia from './stores';
 
@@ -16,6 +15,8 @@ if (agreedToTerms === 'true') {
   app.use(pinia);
   app.mount('#app');
 } else {
+  // UserAgreement 懒加载（首次访问时才加载）
+  const UserAgreement = defineAsyncComponent(() => import('./components/UserAgreement.vue'));
   const app = createApp(UserAgreement);
   app.use(createPinia()); // 为协议页面也创建Pinia实例
   app.mount('#app');
