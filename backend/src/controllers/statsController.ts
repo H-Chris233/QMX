@@ -9,6 +9,7 @@ import {
 } from "../db/repositories/installmentRepository";
 import StatsService from "@/services/statsService";
 import { PaymentFrequency } from "@/types";
+import { withCache, CacheKeys, CacheTTL } from "@/utils/cacheHelper";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -21,10 +22,15 @@ const formatCurrency = (cents: number): number => {
 
 // 统计控制器 - 统一使用 PostgreSQL 数据源
 export class StatsController {
-  // 获取仪表板统计数据
+  // 获取仪表板统计数据（带缓存）
   public getDashboardStats = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const stats = await StatsService.buildDashboardStats();
+      // 使用缓存包装器，5分钟有效期
+      const stats = await withCache(
+        CacheKeys.DASHBOARD_STATS,
+        () => StatsService.buildDashboardStats(),
+        CacheTTL.DASHBOARD_STATS
+      );
 
       // 返回 camelCase 格式（与测试期望一致）
       const responseData = {
@@ -96,13 +102,19 @@ export class StatsController {
     }
   );
 
-  // 获取财务统计
+  // 获取财务统计（带缓存）
   public getFinancialStats = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const rawPeriod =
         typeof req.query.period === "string" ? req.query.period : undefined;
 
-      const stats = await StatsService.buildFinancialStats(rawPeriod);
+      // 使用缓存包装器，10分钟有效期，按周期分别缓存
+      const stats = await withCache(
+        CacheKeys.FINANCIAL_STATS,
+        () => StatsService.buildFinancialStats(rawPeriod),
+        CacheTTL.FINANCIAL_STATS,
+        { period: rawPeriod }
+      );
 
       // 返回 camelCase 格式（与测试期望一致）
       const responseData = {
@@ -253,7 +265,7 @@ export class StatsController {
     }
   );
 
-  // 获取即将到期的会员
+  // 获取即将到期的会员（带缓存）
   public getMembershipExpiringSoon = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const { days = 30 } = req.query;
@@ -261,8 +273,12 @@ export class StatsController {
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() + Number(days));
 
-      const expiringStudents = await StudentRepository.findExpiringMemberships(
-        Number(days)
+      // 使用缓存包装器，15分钟有效期
+      const expiringStudents = await withCache(
+        CacheKeys.MEMBERSHIP_ALERTS,
+        () => StudentRepository.findExpiringMemberships(Number(days)),
+        CacheTTL.MEMBERSHIP_ALERTS,
+        { days }
       );
 
       const responseData = expiringStudents.map((student) => {

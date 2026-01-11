@@ -16,6 +16,14 @@ export interface Config {
     connectionTimeout: number;
     idleTimeout: number;
   };
+  // Redis 缓存配置
+  redis: {
+    enabled: boolean;
+    host: string;
+    port: number;
+    password?: string;
+    db: number;
+  };
   security: {
     jwtSecret: string;
     jwtExpiresIn: string;
@@ -57,6 +65,15 @@ export const config: Config = {
     poolSize: parseInt(process.env.DB_POOL_SIZE || '10', 10),
     connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000', 10),
     idleTimeout: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
+  },
+
+  // Redis 缓存配置
+  redis: {
+    enabled: process.env.REDIS_ENABLED !== 'false',  // 默认启用（可设置REDIS_ENABLED=false禁用）
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: parseInt(process.env.REDIS_DB || '0', 10),
   },
 
   // 安全配置

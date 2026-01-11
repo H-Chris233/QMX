@@ -2,6 +2,7 @@ import type { Server } from 'http';
 import app from './app';
 import { config, validateConfig } from './config';
 import { connectDatabase, disconnectDatabase } from './config/database';
+import { redis } from './utils/redis';
 import logger from './utils/logger';
 
 // 验证配置
@@ -19,6 +20,9 @@ const startServer = async (): Promise<void> => {
   try {
     // 连接数据库
     await connectDatabase();
+
+    // 连接Redis缓存
+    await redis.connect();
 
     // 启动HTTP服务器
     server = app.listen(config.server.port, () => {
@@ -51,10 +55,14 @@ const startServer = async (): Promise<void> => {
         disconnectDatabase()
           .then(() => {
             logger.info('数据库连接已关闭');
+            return redis.disconnect();
+          })
+          .then(() => {
+            logger.info('Redis连接已关闭');
             process.exit(0);
           })
-          .catch((dbError) => {
-            logger.error('关闭数据库连接时出错:', dbError);
+          .catch((error) => {
+            logger.error('关闭连接时出错:', error);
             process.exit(1);
           });
       });
