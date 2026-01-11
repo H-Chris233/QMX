@@ -13,6 +13,7 @@ export interface ErrorInfo {
   code?: string | number;
   timestamp: Date;
   context?: string;
+  type?: string;
 }
 
 export interface SystemInfo {

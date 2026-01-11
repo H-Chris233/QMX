@@ -241,8 +241,7 @@ function handleComponentError(error: Error, info: string): void {
   appStore.addError({
     message: `${activeTabLabel.value}加载失败`,
     context: error.message,
-    type: 'component_error',
-    timestamp: Date.now()
+    type: 'component_error'
   });
 }
 
