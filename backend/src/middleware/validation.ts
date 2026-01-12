@@ -23,12 +23,17 @@ const OPTIONAL_AMOUNT_MESSAGES = {
 const createAmountSchema = (options?: { required?: boolean; allowNull?: boolean; disallowZero?: boolean }) => {
   const { required = true, allowNull = false, disallowZero = true } = options ?? {};
   let schema = Joi.number()
-    .precision(2)
+    // 注意：不要用 .precision()，它会四舍五入导致精度验证失效
+    // 自定义验证器在类型转换后检查小数位数
     .custom((value: number, helpers) => {
-      // 检查是否最多2位小数
-      const decimalPart = value.toString().split('.')[1];
-      if (decimalPart && decimalPart.length > 2) {
-        return helpers.error('amount.precision');
+      // 先转换为字符串精确检查
+      const strValue = value.toString();
+      const decimalIndex = strValue.indexOf('.');
+      if (decimalIndex !== -1) {
+        const decimalPart = strValue.slice(decimalIndex + 1);
+        if (decimalPart.length > 2) {
+          return helpers.error('amount.precision');
+        }
       }
       return value;
     }, '小数位验证')

@@ -18,9 +18,9 @@ process.env.LOG_LEVEL = 'error';
 // 检查数据库连接
 export async function setupTestDatabase(): Promise<void> {
   try {
-    // 测试数据库连接
-    const [result] = await db.select({ val: sql`1` });
-    if (result.val !== 1) {
+    // 测试数据库连接 - 使用 query 方法避免类型问题
+    const result = await db.execute(sql`SELECT 1 as val`);
+    if (result[0]?.val !== 1) {
       throw new Error('Database connection test failed');
     }
     console.log('🧪 测试数据库连接已建立');
@@ -180,6 +180,11 @@ export class TestDataFactory {
   ) {
     const { InstallmentPlanRepository } = await import('../src/db/repositories/installmentRepository');
 
+    // 将 Date 转换为 ISO 字符串日期
+    const startDateStr = startDate instanceof Date
+      ? startDate.toISOString().split('T')[0]
+      : startDate;
+
     return await InstallmentPlanRepository.create({
       studentId: overrides.studentId ?? null,
       totalAmount: totalAmount * 100, // 转换为分
@@ -187,7 +192,7 @@ export class TestDataFactory {
       totalInstallments,
       frequency,
       customDays: overrides.customDays,
-      startDate,
+      startDate: startDateStr,
       note: undefined,
     });
   }
@@ -203,12 +208,17 @@ export class TestDataFactory {
   ) {
     const { InstallmentRepository } = await import('../src/db/repositories/installmentRepository');
 
+    // 将 Date 转换为 ISO 字符串日期
+    const dueDateStr = dueDate instanceof Date
+      ? dueDate.toISOString().split('T')[0]
+      : dueDate;
+
     return await InstallmentRepository.create({
       planId,
       studentId,
       installmentNumber,
       installmentAmount: amount * 100, // 转换为分
-      dueDate,
+      dueDate: dueDateStr,
       status,
       note: undefined,
     });
