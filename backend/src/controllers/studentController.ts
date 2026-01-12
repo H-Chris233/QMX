@@ -64,10 +64,10 @@ const applyUpdaterFromPayload = async (
     updateData.phone = payload.phone;
   }
   if (payload.class !== undefined) {
-    updateData.classType = payload.class;
+    updateData.classType = payload.class?.toUpperCase() as ClassType;
   }
   if (payload.subject !== undefined) {
-    updateData.subject = payload.subject;
+    updateData.subject = payload.subject?.toUpperCase() as SubjectType;
   }
   if (payload.lesson_left !== undefined || payload.lessonLeft !== undefined) {
     updateData.lessonLeft = payload.lesson_left ?? payload.lessonLeft === null ? null : Number(payload.lessonLeft);
@@ -151,10 +151,10 @@ export class StudentController {
       name: payload.name,
       age: payload.age === null || payload.age === undefined ? null : Number(payload.age),
       phone: payload.phone,
-      classType: payload.class as ClassType ?? 'TEN_TRY',
-      subject: payload.subject as SubjectType ?? 'SHOOTING',
+      classType: (payload.class?.toUpperCase() ?? 'TEN_TRY') as ClassType,
+      subject: (payload.subject?.toUpperCase() ?? 'SHOOTING') as SubjectType,
       note: payload.note ?? '',
-      lessonLeft: payload.lesson_left ?? payload.lessonLeft === null ? null : Number(payload.lesson_left ?? payload.lessonLeft),
+      lessonLeft: (payload.lesson_left == null && payload.lessonLeft == null) ? 0 : Number(payload.lesson_left ?? payload.lessonLeft),
       rings: Array.isArray(payload.rings) ? payload.rings : [],
       membershipStartDate: payload.membership_start_date ?? payload.membershipStartDate
         ? (typeof (payload.membership_start_date ?? payload.membershipStartDate) === 'string'

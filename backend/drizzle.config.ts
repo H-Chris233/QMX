@@ -10,12 +10,12 @@ export default {
   // 迁移文件输出目录
   out: './drizzle',
 
-  // 数据库驱动
-  driver: 'pg',
+  // 数据库方言 (新版本使用 dialect 替代 driver)
+  dialect: 'postgresql',
 
   // 数据库连接
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL!,
+    url: process.env.DATABASE_URL!,
   },
 
   // 输出详细日志
@@ -23,7 +23,4 @@ export default {
 
   // 严格模式
   strict: true,
-
-  // 使用 .env 文件中的变量
-  envPrefix: 'DB_',
 } satisfies Config;

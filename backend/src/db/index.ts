@@ -7,8 +7,23 @@ import logger from '@/utils/logger';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,                      // 最大连接数
-  idleTimeoutMillis: 30000,      // 空闲超时 30 秒
-  connectionTimeoutMillis: 2000, // 连接超时 2 秒
+  idleTimeoutMillis: 60000,      // 空闲超时 60 秒
+  connectionTimeoutMillis: 5000, // 连接超时 5 秒
+  keepAlive: true,               // 启用 TCP 保活
+  keepAliveInitialDelayMillis: 10000, // 保活初始延迟 10 秒
+});
+
+// 连接池错误监听
+pool.on('error', (err) => {
+  logger.error('PostgreSQL 连接池错误', err);
+});
+
+pool.on('connect', () => {
+  logger.debug('PostgreSQL 新连接已建立');
+});
+
+pool.on('remove', () => {
+  logger.debug('PostgreSQL 连接已移除');
 });
 
 // 创建 Drizzle 实例
