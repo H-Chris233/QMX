@@ -105,8 +105,6 @@ export class StudentRepository {
     const orderBy = this.buildOrderBy(options.sortBy, options.sortOrder);
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    console.log('[DEBUG] findWithPagination 查询参数:', { page, limit, offset, conditions: conditions.length });
-
     // 查询数据
     const data = await db
       .select()
@@ -116,19 +114,13 @@ export class StudentRepository {
       .limit(limit)
       .offset(offset);
 
-    console.log('[DEBUG] findWithPagination 查询结果:', { dataLength: data.length, firstItem: data[0] });
-
     // 查询总数
     const countResultArray = await db
       .select({ count: count() })
       .from(students)
       .where(whereClause);
 
-    console.log('[DEBUG] countResultArray:', JSON.stringify(countResultArray, null, 2));
     const [countResult] = countResultArray;
-    console.log('[DEBUG] countResult:', JSON.stringify(countResult, null, 2));
-    console.log('[DEBUG] countResult.count type:', typeof countResult?.count, 'value:', countResult?.count);
-
     const total = countResult?.count ? Number(countResult.count) : 0;
 
     return {
@@ -165,8 +157,6 @@ export class StudentRepository {
   // 构建查询条件
   private static buildConditions(options: StudentSearchOptions) {
     const conditions = [];
-
-    console.log('[DEBUG] buildConditions options:', JSON.stringify(options, null, 2));
 
     if (options.nameContains) {
       conditions.push(like(students.name, `%${options.nameContains}%`));

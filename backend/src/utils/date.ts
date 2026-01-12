@@ -118,7 +118,22 @@ export function addMonths(date: Date | string, months: number): Date {
 export function addYears(date: Date | string, years: number): Date {
   const d = toUTCDate(date);
   const result = new Date(d);
-  result.setUTCFullYear(result.getUTCFullYear() + years);
+
+  // 获取原始日期信息
+  const originalDay = result.getUTCDate();
+  const originalMonth = result.getUTCMonth();
+
+  // 设置目标年份
+  const targetYear = result.getUTCFullYear() + years;
+  result.setUTCFullYear(targetYear);
+
+  // 处理闰年日期溢出（例如2024-02-29 + 1年 = 2025-02-28）
+  // 如果日期变了（因为目标年份该月没有这一天），调整到该月最后一天
+  if (result.getUTCDate() !== originalDay) {
+    // 设置为该月的最后一天
+    result.setUTCDate(0); // 0 表示上个月的最后一天
+  }
+
   return result;
 }
 
@@ -143,15 +158,28 @@ export function isDateInRange(
 
 /**
  * 判断日期是否过期
+ * 注意：比较时会将日期时间都设置为 00:00:00.000Z，只比较日期部分
  * @param date - 待检查的日期
- * @param referenceDate - 参考日期，默认为当前时间
+ * @param referenceDate - 参考日期，默认为今天的开始
  * @returns 是否过期
  */
 export function isExpired(date: Date | string, referenceDate?: Date | string): boolean {
   const d = toUTCDate(date);
-  const ref = referenceDate ? toUTCDate(referenceDate) : new Date();
-  
-  return d < ref;
+  let ref: Date;
+
+  if (referenceDate) {
+    ref = toUTCDate(referenceDate);
+  } else {
+    // 默认使用今天的开始时间，这样今天不会过期
+    const now = new Date();
+    ref = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  }
+
+  // 重置时间部分到 00:00:00.000Z，只比较日期
+  const dDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const refDate = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate()));
+
+  return dDate < refDate;
 }
 
 /**
@@ -172,13 +200,27 @@ export function daysBetween(date1: Date | string, date2: Date | string): number 
  * 解析 YYYY-MM-DD 格式字符串为 Date 对象
  * @param dateStr - YYYY-MM-DD格式字符串
  * @returns Date对象
+ * @throws 如果格式无效或日期语义不正确
  */
 export function parseYYYYMMDD(dateStr: string): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     throw new Error('Invalid date format: expected YYYY-MM-DD');
   }
-  
-  return new Date(dateStr + 'T00:00:00.000Z');
+
+  const date = new Date(dateStr + 'T00:00:00.000Z');
+
+  // 验证日期语义有效性
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('Invalid date format: invalid date values');
+  }
+
+  // 验证解析后的日期与原字符串一致，防止无效日期如 2024-13-45
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
+    throw new Error('Invalid date format: invalid date values');
+  }
+
+  return date;
 }
 
 /**

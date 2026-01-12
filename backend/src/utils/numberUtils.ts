@@ -34,6 +34,14 @@ export function normalizePositiveInteger(
  * @returns True if value is a positive integer
  */
 export function isPositiveInteger(value: unknown): value is number {
+  // null, undefined, objects, arrays return NaN, so must be a valid number type first
+  if (value === null || value === undefined) {
+    return false;
+  }
+  // Reject objects and arrays early
+  if (typeof value === 'object' || Array.isArray(value)) {
+    return false;
+  }
   const num = Number(value);
   return Number.isInteger(num) && num > 0;
 }
@@ -44,6 +52,14 @@ export function isPositiveInteger(value: unknown): value is number {
  * @returns True if value is a non-negative integer
  */
 export function isNonNegativeInteger(value: unknown): value is number {
+  // null, undefined, objects, arrays return NaN, so must be a valid number type first
+  if (value === null || value === undefined) {
+    return false;
+  }
+  // Reject objects and arrays early
+  if (typeof value === 'object' || Array.isArray(value)) {
+    return false;
+  }
   const num = Number(value);
   return Number.isInteger(num) && num >= 0;
 }
