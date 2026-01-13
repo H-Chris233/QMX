@@ -8,7 +8,7 @@
  */
 
 import { CashBuilder, convertAmountToCents } from '@/services/cashBuilder';
-import { setupTestDatabase, clearAllData, createTestStudent } from './fixtures';
+import { setupTestDatabase, clearAllData, createTestStudent } from './helpers/testSetup';
 
 describe('CashBuilder', () => {
   beforeAll(async () => {

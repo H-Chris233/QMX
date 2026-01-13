@@ -10,7 +10,7 @@
 import { StudentQuery } from '@/services/studentQuery';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { ClassType, SubjectType } from '@/types';
-import { setupTestDatabase, clearAllData, createTestStudent } from './fixtures';
+import { setupTestDatabase, clearAllCollections, createTestStudent } from './helpers/testSetup';
 
 describe('StudentQuery', () => {
   beforeAll(async () => {
@@ -18,7 +18,7 @@ describe('StudentQuery', () => {
   });
 
   afterEach(async () => {
-    await clearAllData();
+    await clearAllCollections();
   });
 
   describe('静态工厂方法', () => {

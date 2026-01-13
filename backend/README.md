@@ -279,27 +279,54 @@ pnpm test -- --coverage
 ```
 
 **环境要求**：
-- 测试使用内存PostgreSQL，无需外部依赖
+- 测试使用 PostgreSQL 数据库，需要运行中的数据库实例
+- 设置 `DATABASE_URL` 环境变量指向测试数据库
 - 建议 Node.js >= 18.0.0
 
 **测试结构**：
 ```
 backend/src/__tests__/
 ├── helpers/              # 测试辅助工具
-│   └── testSetup.ts     # 数据库设置、测试数据创建
+│   └── testSetup.ts     # 数据库设置、测试数据工厂
 ├── api/                  # API集成测试
 │   ├── students.api.spec.ts
 │   ├── transactions.api.spec.ts
 │   ├── installments.api.spec.ts
 │   └── dashboard.api.spec.ts
 ├── cash.spec.ts          # 现金交易测试
-├── installments.spec.ts   # 分期付款测试
-├── studentServices.spec.ts # 学生服务测试
-├── statsService.spec.ts    # 统计服务测试
-├── repositories.spec.ts    # 仓储层测试
-├── errorHandling.spec.ts   # 错误处理测试
-└── builders.spec.ts        # Builder模式测试
+├── cashBuilder.spec.ts   # 交易构建器测试
+├── installments.spec.ts  # 分期付款测试
+├── studentBuilder.spec.ts # 学生构建器测试
+├── studentQuery.spec.ts  # 学生查询测试
+├── studentPresenter.spec.ts # 数据展示测试
+├── updaters.spec.ts      # 更新器测试
+├── statsService.spec.ts  # 统计服务测试
+├── serviceIntegration.spec.ts # 服务集成测试
+├── boundary.spec.ts      # 边界条件测试
+├── repositories.spec.ts  # 仓储层测试
+├── errorHandling.spec.ts # 错误处理测试
+└── middleware.spec.ts    # 中间件测试
 ```
+
+**PostgreSQL 测试特性**：
+- 使用真实的 PostgreSQL 数据库（需要配置 DATABASE_URL）
+- 测试间数据隔离：通过 `clearAllCollections()` 清理数据
+- 序列管理：PostgreSQL SERIAL 自动管理，无需手动重置
+- 日期处理：统一使用 UTC 时区
+- 金额处理：数据库存储分（整数），API 返回元（两位小数）
+
+**测试数据工厂**：
+测试使用统一的数据工厂函数创建测试数据：
+- `createTestStudent(overrides)` - 创建测试学员
+- `createTestStudents(count, baseName)` - 批量创建学员
+- `createTestCashTransaction(amount, studentId?, note?)` - 创建交易
+- `createTestInstallmentPlan(totalAmount, totalInstallments, frequency, startDate, studentId?)` - 创建分期计划
+- `createTestInstallment(planId, studentId, installmentNumber, totalInstallments, amount, dueDate, status)` - 创建分期
+- `createCompleteTestDataset()` - 创建完整的测试数据集
+
+**覆盖率目标**：
+- 整体覆盖率 >= 65%
+- 核心模块（Student、Cash、Installment）覆盖率 >= 85%
 
 ### 日志管理
 

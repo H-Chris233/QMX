@@ -7,7 +7,7 @@
 import { presentStudent } from '@/services/studentPresenter';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { ClassType, SubjectType, MembershipStatus } from '@/types';
-import { setupTestDatabase, clearAllData, createTestStudent } from './fixtures';
+import { setupTestDatabase, clearAllCollections, createTestStudent } from './helpers/testSetup';
 
 describe('StudentPresenter', () => {
   beforeAll(async () => {
@@ -15,7 +15,7 @@ describe('StudentPresenter', () => {
   });
 
   afterEach(async () => {
-    await clearAllData();
+    await clearAllCollections();
   });
 
   describe('数据格式转换', () => {

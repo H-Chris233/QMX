@@ -39,10 +39,10 @@ const config: Config = {
   // 当前设置为实际水平，逐步提升至目标
   coverageThreshold: {
     global: {
-      statements: 50,
-      branches: 40,
-      functions: 45,
-      lines: 50,
+      statements: 65,
+      branches: 55,
+      functions: 60,
+      lines: 65,
     },
   },
   

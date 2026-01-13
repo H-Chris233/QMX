@@ -17,8 +17,16 @@ import { ClassType, SubjectType, MembershipStatus, PaymentFrequencyValues, Insta
 import { StudentRepository } from '@/db/repositories/studentRepository';
 import { CashRepository } from '@/db/repositories/cashRepository';
 import { InstallmentPlanRepository, InstallmentRepository } from '@/db/repositories/installmentRepository';
-import { setupTestDatabase, clearAllData, createTestStudent, createTestTransaction, createTestInstallmentPlan, createTestInstallment } from './fixtures';
-import { addMonths } from './fixtures/date';
+import {
+  setupTestDatabase,
+  clearAllCollections,
+  createTestStudent,
+  createTestCashTransaction,
+  createTestInstallmentPlan,
+  createTestInstallment,
+  addDays,
+  addMonths,
+} from './helpers/testSetup';
 
 describe('Service Integration - 复杂业务场景', () => {
   beforeAll(async () => {
@@ -26,7 +34,7 @@ describe('Service Integration - 复杂业务场景', () => {
   });
 
   afterEach(async () => {
-    await clearAllData();
+    await clearAllCollections();
   });
 
   describe('学员全生命周期', () => {
@@ -130,8 +138,8 @@ describe('Service Integration - 复杂业务场景', () => {
       const student = await createTestStudent({ name: 'Payment Test' });
 
       // 多次支付
-      await createTestTransaction(500, { studentId: student.uid, note: 'First Payment' });
-      await createTestTransaction(300, { studentId: student.uid, note: 'Second Payment' });
+      await createTestCashTransaction(500, student.uid, 'First Payment');
+      await createTestCashTransaction(300, student.uid, 'Second Payment');
 
       // 查询学员交易
       const transactions = await CashRepository.findByStudentId(student.uid);
@@ -142,8 +150,8 @@ describe('Service Integration - 复杂业务场景', () => {
     it('财务统计与交易一致', async () => {
       const student = await createTestStudent({ name: 'Stats Test' });
 
-      await createTestTransaction(1000, { studentId: student.uid, note: 'Income' });
-      await createTestTransaction(-200, { note: 'Expense' });
+      await createTestCashTransaction(1000, student.uid, 'Income');
+      await createTestCashTransaction(-200, null, 'Expense');
 
       const stats = await CashRepository.getFinancialStats();
 
@@ -270,8 +278,8 @@ describe('Service Integration - 复杂业务场景', () => {
       const student2 = await createTestStudent({ name: 'Student 2' });
 
       // 为两个学员创建交易
-      await createTestTransaction(100, { studentId: student1.uid, note: 'Pay 1' });
-      await createTestTransaction(200, { studentId: student2.uid, note: 'Pay 2' });
+      await createTestCashTransaction(100, student1.uid, 'Pay 1');
+      await createTestCashTransaction(200, student2.uid, 'Pay 2');
 
       // 删除 student1
       await StudentRepository.deleteByUid(student1.uid);

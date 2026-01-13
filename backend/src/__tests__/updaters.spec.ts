@@ -10,7 +10,13 @@ import { StudentUpdater } from '@/services/studentUpdater';
 import { CashUpdater } from '@/services/cashUpdater';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { ClassType, SubjectType } from '@/types';
-import { setupTestDatabase, clearAllData, createTestStudent, createTestTransaction } from './fixtures';
+import {
+  setupTestDatabase,
+  clearAllCollections,
+  clearAllData,
+  createTestStudent,
+  createTestCashTransaction,
+} from './helpers/testSetup';
 
 describe('StudentUpdater', () => {
   beforeAll(async () => {
@@ -18,7 +24,7 @@ describe('StudentUpdater', () => {
   });
 
   afterEach(async () => {
-    await clearAllData();
+    await clearAllCollections();
   });
 
   describe('静态工厂方法', () => {
@@ -284,14 +290,14 @@ describe('CashUpdater', () => {
 
   describe('静态工厂方法', () => {
     it('fromDocument() 从现有交易创建更新器', async () => {
-      const transaction = await createTestTransaction(100, { studentId: null, note: 'Original Note' });
+      const transaction = await createTestCashTransaction(100, null, 'Original Note');
       const updater = CashUpdater.fromDocument(transaction as any);
       expect(updater).toBeDefined();
     });
 
     it('for() 通过UID创建更新器', async () => {
-      const transaction = await createTestTransaction(100, { studentId: null, note: 'Test' });
-      const updater = await CashUpdater.for(transaction.uid!);
+      const transaction = await createTestCashTransaction(100, null, 'Test');
+      const updater = await CashUpdater.for(transaction.uid);
       expect(updater).toBeDefined();
     });
 
@@ -304,7 +310,7 @@ describe('CashUpdater', () => {
 
   describe('备注更新', () => {
     it('更新备注内容', async () => {
-      const transaction = await createTestTransaction(100, { studentId: null, note: 'Old Note' });
+      const transaction = await createTestCashTransaction(100, null, 'Old Note');
       const updater = CashUpdater.fromDocument(transaction as any);
       updater.note('New Note');
       const updated = await updater.commit();
@@ -313,7 +319,7 @@ describe('CashUpdater', () => {
     });
 
     it('空白备注转换为null', async () => {
-      const transaction = await createTestTransaction(100, { studentId: null, note: 'Test Note' });
+      const transaction = await createTestCashTransaction(100, null, 'Test Note');
       const updater = CashUpdater.fromDocument(transaction as any);
       updater.note('   ');
       const updated = await updater.commit();
@@ -324,7 +330,7 @@ describe('CashUpdater', () => {
 
   describe('金额更新', () => {
     it('更新金额', async () => {
-      const transaction = await createTestTransaction(100, { studentId: null, note: 'Test' });
+      const transaction = await createTestCashTransaction(100, null, 'Test');
       const updater = CashUpdater.fromDocument(transaction as any);
       updater.amount(200);
       const updated = await updater.commit();
@@ -336,7 +342,7 @@ describe('CashUpdater', () => {
   describe('学员ID更新', () => {
     it('更新关联学员', async () => {
       const student = await createTestStudent({ name: 'Target Student' });
-      const transaction = await createTestTransaction(100, { studentId: null, note: 'Test' });
+      const transaction = await createTestCashTransaction(100, null, 'Test');
 
       const updater = CashUpdater.fromDocument(transaction as any);
       updater.studentId(student.uid);
@@ -347,7 +353,7 @@ describe('CashUpdater', () => {
 
     it('设置为null', async () => {
       const student = await createTestStudent();
-      const transaction = await createTestTransaction(100, { studentId: student.uid, note: 'Test' });
+      const transaction = await createTestCashTransaction(100, student.uid, 'Test');
 
       const updater = CashUpdater.fromDocument(transaction as any);
       updater.studentId(null);

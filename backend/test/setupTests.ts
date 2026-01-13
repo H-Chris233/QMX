@@ -8,6 +8,11 @@
 // 确保测试环境使用 UTC 时区
 process.env.TZ = 'UTC';
 
+// 强制使用 stdout 日志输出，避免文件权限问题
+process.env.LOG_STDOUT = 'true';
+process.env.NODE_ENV = 'test';
+process.env.LOG_LEVEL = 'error';
+
 import {
   setupTestDatabase,
   cleanupTestDatabase,
