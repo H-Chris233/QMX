@@ -10,12 +10,15 @@ describe('Database Connection', () => {
   it('should have valid database connection', async () => {
     // 使用 execute 而非 select，避免 Drizzle 类型问题
     const result = await db.execute(sql`SELECT 1 as val`);
-    expect(result[0]?.val).toBe(1);
+    // Drizzle execute() 返回 { rows: [...] } 对象
+    const rows = (result as any).rows || result;
+    expect(rows[0]?.val).toBe(1);
   });
 
   it('should be able to query students table', async () => {
     // 使用 execute 执行查询
     const result = await db.execute(sql`SELECT 1 as count`);
-    expect(result[0]?.count).toBeDefined();
+    const rows = (result as any).rows || result;
+    expect(rows[0]?.count).toBeDefined();
   });
 });

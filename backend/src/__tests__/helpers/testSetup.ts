@@ -194,9 +194,19 @@ export async function createTestInstallmentPlan(
   customDays?: number
 ) {
   const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
-    
+
+  // 如果没有提供 studentId，创建一个测试学员
+  let finalStudentId = studentId;
+  if (finalStudentId === null || finalStudentId === undefined) {
+    const testStudent = await createTestStudent({
+      name: 'Test Student for Installment',
+      phone: `1380000${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+    });
+    finalStudentId = testStudent.uid;
+  }
+
   return await InstallmentPlanRepository.create({
-    studentId: studentId ?? null,
+    studentId: finalStudentId,
     totalAmount: totalAmount * 100, // 转换为分
     downPayment: 0,
     totalInstallments,
@@ -220,14 +230,24 @@ export async function createTestInstallment(
   status: keyof typeof InstallmentStatusValues = 'PENDING'
 ) {
   const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
-  
+
+  // 如果没有提供 studentId，创建一个测试学员
+  let finalStudentId = studentId;
+  if (finalStudentId === null || finalStudentId === undefined) {
+    const testStudent = await createTestStudent({
+      name: 'Test Student for Installment',
+      phone: `1380000${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+    });
+    finalStudentId = testStudent.uid;
+  }
+
   const statusValue = typeof status === 'string'
     ? InstallmentStatusValues[status as keyof typeof InstallmentStatusValues]
     : status;
 
   return await InstallmentRepository.create({
     planId,
-    studentId,
+    studentId: finalStudentId,
     installmentNumber,
     installmentAmount: amount * 100, // 转换为分
     dueDate: dueDate.toISOString().split('T')[0],

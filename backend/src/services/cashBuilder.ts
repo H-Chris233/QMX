@@ -1,5 +1,5 @@
 import { CashRepository } from '../db/repositories/cashRepository';
-import { NewCashTransaction, InstallmentSnapshot } from '../db/schema/cash';
+import { NewCashTransaction, CashTransaction, InstallmentSnapshot } from '../db/schema/cash';
 import { StudentRepository } from '../db/repositories/studentRepository';
 import { PaymentFrequency } from '@/types';
 
@@ -82,6 +82,9 @@ export class CashBuilder {
     if (!Number.isInteger(cents)) {
       throw new Error('金额必须保留最多两位小数');
     }
+    if (cents === 0) {
+      throw new Error('交易金额不能为0');
+    }
     this.payload.amount = cents;
     return this;
   }
@@ -142,7 +145,7 @@ export class CashBuilder {
     };
   }
 
-  async build(): Promise<NewCashTransaction> {
+  async build(): Promise<CashTransaction> {
     // 验证金额
     if (this.payload.amount === undefined || this.payload.amount === null) {
       throw new Error('金额不能为空');

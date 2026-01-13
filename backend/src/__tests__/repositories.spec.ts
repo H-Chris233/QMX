@@ -156,7 +156,7 @@ describe('StudentRepository', () => {
       await StudentBuilder.create()
         .name('Active Member')
         .phone('13800000001')
-        .class(ClassType.MONTH)
+        .classType(ClassType.MONTH)
         .subject(SubjectType.SHOOTING)
         .membership(start, end)
         .build();
@@ -182,7 +182,7 @@ describe('StudentRepository', () => {
       const student = await StudentBuilder.create()
         .name('Score Test')
         .phone('13800000001')
-        .class(ClassType.MONTH)
+        .classType(ClassType.MONTH)
         .subject(SubjectType.SHOOTING)
         .rings([8, 9, 7])
         .build();
@@ -195,7 +195,7 @@ describe('StudentRepository', () => {
       const student = await StudentBuilder.create()
         .name('Delete Score Test')
         .phone('13800000002')
-        .class(ClassType.MONTH)
+        .classType(ClassType.MONTH)
         .subject(SubjectType.SHOOTING)
         .rings([8, 9, 7])
         .build();
@@ -429,7 +429,7 @@ describe('InstallmentRepository', () => {
       const updated = await InstallmentRepository.updateByUid(installment.uid, {
         status: InstallmentStatusValues.PAID,
         paidAmount: 25000,
-        paidDate: new Date(),
+        paidDate: new Date().toISOString().split('T')[0],
       });
 
       expect(updated?.status).toBe(InstallmentStatusValues.PAID);

@@ -36,6 +36,7 @@ export interface PresentedStudent {
   classType: string;
   subject: string;
   rings: number[];
+  averageScore: number;
   note: string;
   lessonLeft: number | null;
   membershipStartDate: string | null;
@@ -148,6 +149,11 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
   // 处理 rings - 可能是数组或 undefined
   const rings = Array.isArray(json.rings) ? json.rings : [];
 
+  // 计算平均分
+  const averageScore = rings.length > 0
+    ? Math.round((rings.reduce((sum, score) => sum + score, 0) / rings.length) * 10) / 10
+    : 0;
+
   return {
     uid: json.uid ?? 0,
     name: json.name ?? '',
@@ -157,6 +163,7 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     classType: json.class ?? '',
     subject: json.subject ?? '',
     rings,
+    averageScore,
     note: json.note ?? '',
     lessonLeft,
     membershipStartDate: membershipStartDate ?? null,

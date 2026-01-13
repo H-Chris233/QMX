@@ -232,9 +232,20 @@ export function isValidYYYYMMDD(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return false;
   }
-  
+
   const date = new Date(dateStr + 'T00:00:00.000Z');
-  return !Number.isNaN(date.getTime());
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  // 验证日期没有被JavaScript自动修正
+  // 例如 2024-02-30 会被转换为 2024-03-01
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 && // 月份从0开始
+    date.getUTCDate() === day
+  );
 }
 
 /**
