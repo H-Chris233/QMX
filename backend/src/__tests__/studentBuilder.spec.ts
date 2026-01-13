@@ -9,7 +9,7 @@
 
 import { StudentBuilder } from '@/services/studentBuilder';
 import { ClassType, SubjectType } from '@/types';
-import { setupTestDatabase, clearAllData, createTestStudent } from './fixtures';
+import { setupTestDatabase, clearAllData, createTestStudent } from './helpers/testSetup';
 
 describe('StudentBuilder', () => {
   beforeAll(async () => {

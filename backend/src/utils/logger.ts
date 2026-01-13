@@ -23,8 +23,14 @@ const consoleFormat = winston.format.combine(
 // 创建日志传输器
 const transports: winston.transport[] = [];
 
-// 如果使用标准输出（Docker/生产环境）
-if (config.logging.useStdout) {
+// 检查是否应该使用标准输出（测试环境、Docker、生产环境）
+const useStdout = config.logging.useStdout || 
+  process.env.NODE_ENV === 'test' || 
+  process.env.LOG_STDOUT === 'true' ||
+  !fs.existsSync(path.dirname(config.logging.file));
+
+if (useStdout) {
+  // 使用标准输出（测试环境、Docker友好）
   transports.push(
     new winston.transports.Console({
       format: consoleFormat,
@@ -35,27 +41,38 @@ if (config.logging.useStdout) {
   // 确保日志目录存在
   const logDir = path.dirname(config.logging.file);
   if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+    try {
+      fs.mkdirSync(logDir, { recursive: true });
+    } catch (error) {
+      // 如果创建失败，回退到标准输出
+      transports.push(
+        new winston.transports.Console({
+          format: consoleFormat,
+        })
+      );
+    }
   }
 
-  // 错误日志文件
-  transports.push(
-    new winston.transports.File({
-      filename: config.logging.file.replace('.log', '-error.log'),
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
+  if (transports.length === 0) {
+    // 错误日志文件
+    transports.push(
+      new winston.transports.File({
+        filename: config.logging.file.replace('.log', '-error.log'),
+        level: 'error',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      })
+    );
 
-  // 所有日志文件
-  transports.push(
-    new winston.transports.File({
-      filename: config.logging.file,
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    })
-  );
+    // 所有日志文件
+    transports.push(
+      new winston.transports.File({
+        filename: config.logging.file,
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      })
+    );
+  }
 }
 
 // 创建logger实例
@@ -67,14 +84,14 @@ export const logger = winston.createLogger({
 });
 
 // 开发环境额外输出到控制台（如果不是使用标准输出模式）
-if (config.server.nodeEnv !== 'production' && !config.logging.useStdout) {
+if (config.server.nodeEnv !== 'production' && !useStdout) {
   logger.add(new winston.transports.Console({
     format: consoleFormat,
   }));
 }
 
 // 生产环境错误处理（仅在文件模式下）
-if (config.server.nodeEnv === 'production' && !config.logging.useStdout) {
+if (config.server.nodeEnv === 'production' && !useStdout) {
   logger.exceptions.handle(
     new winston.transports.File({
       filename: config.logging.file.replace('.log', '-exceptions.log'),

@@ -1,15 +1,55 @@
+/**
+ * Test Setup Helpers for PostgreSQL/Drizzle ORM
+ *
+ * Unified test utilities for all test files.
+ * Replaces MongoDB Memory Server setup with PostgreSQL testing support.
+ */
+
 import { db } from '@/db';
 import { students } from '@/db/schema/students';
 import { cashTransactions } from '@/db/schema/cash';
 import { installmentPlans, installments, InstallmentStatus } from '@/db/schema/installments';
-import { sql } from 'drizzle-orm';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
-import { ClassType, SubjectType, PaymentFrequencyValues } from '@/types';
+import { ClassType, SubjectType, PaymentFrequencyValues, InstallmentStatusValues, InstallmentPlanStatusValues } from '@/types';
 
-export interface TestContext {
-  db: typeof db;
+// Types for test data factory
+export interface TestStudentOverrides {
+  name?: string;
+  phone?: string;
+  class?: ClassType;
+  classType?: ClassType;
+  subject?: SubjectType;
+  rings?: number[];
+  membership?: { startDate: Date; endDate: Date } | null;
+  age?: number | null;
+  lessonLeft?: number;
+  note?: string;
 }
+
+export interface TestCashTransactionOverrides {
+  studentId?: number | null;
+  note?: string;
+  transactionDate?: Date;
+}
+
+export interface TestInstallmentPlanOverrides {
+  studentId?: number | null;
+  customDays?: number;
+  downPayment?: number;
+  note?: string;
+}
+
+export interface TestInstallmentOverrides {
+  studentId?: number | null;
+  paidAmount?: number;
+  paidDate?: Date;
+  note?: string;
+}
+
+// ============================================
+// Database Setup Functions
+// ============================================
 
 export async function setupTestDatabase(): Promise<void> {
   // PostgreSQL 不需要特殊设置，连接已在 db/index.ts 中配置
@@ -33,26 +73,26 @@ export async function clearAllCollections(): Promise<void> {
   }
 }
 
+// Alias for backward compatibility
+export const clearAllData = clearAllCollections;
+
 export async function resetAllSequences(): Promise<void> {
   // PostgreSQL 使用 serial/identity，不需要手动重置序列
 }
 
+// ============================================
+// Test Data Factory Functions
+// ============================================
+
+/**
+ * Creates a test student with optional overrides
+ */
 export async function createTestStudent(
-  overrides: {
-    name?: string;
-    phone?: string;
-    class?: ClassType;
-    classType?: ClassType;
-    subject?: SubjectType;
-    rings?: number[];
-    membership?: { startDate: Date; endDate: Date } | null;
-    age?: number | null;
-    lessonLeft?: number;
-  } = {}
+  overrides: TestStudentOverrides = {}
 ) {
   const builder = StudentBuilder.create()
     .name(overrides.name || 'Test Student')
-    .phone(overrides.phone || '13800138000')
+    .phone(overrides.phone || `13800138${String(Date.now()).slice(-4)}`)
     .classType(overrides.classType || overrides.class || ClassType.MONTH)
     .subject(overrides.subject || SubjectType.SHOOTING);
 
@@ -72,9 +112,33 @@ export async function createTestStudent(
     builder.membership(overrides.membership.startDate, overrides.membership.endDate);
   }
 
+  if (overrides.note) {
+    builder.note(overrides.note);
+  }
+
   return await builder.build();
 }
 
+/**
+ * Creates multiple test students at once
+ */
+export async function createTestStudents(
+  count: number,
+  baseName: string = 'Student'
+): Promise<Awaited<ReturnType<typeof createTestStudent>>[]> {
+  const students: Awaited<ReturnType<typeof createTestStudent>>[] = [];
+  for (let i = 0; i < count; i++) {
+    students.push(await createTestStudent({
+      name: `${baseName} ${i + 1}`,
+      phone: `13800138${String(i).padStart(4, '0')}`,
+    }));
+  }
+  return students;
+}
+
+/**
+ * Creates a test cash transaction with optional overrides
+ */
 export async function createTestCashTransaction(
   amount: number,
   studentId?: number | null,
@@ -93,6 +157,24 @@ export async function createTestCashTransaction(
   return await builder.build();
 }
 
+/**
+ * Creates multiple test cash transactions at once
+ */
+export async function createTestCashTransactions(
+  amount: number,
+  count: number,
+  studentId?: number | null
+): Promise<Awaited<ReturnType<typeof createTestCashTransaction>>[]> {
+  const transactions: Awaited<ReturnType<typeof createTestCashTransaction>>[] = [];
+  for (let i = 0; i < count; i++) {
+    transactions.push(await createTestCashTransaction(amount, studentId, `Transaction ${i + 1}`));
+  }
+  return transactions;
+}
+
+/**
+ * Creates a test installment plan with optional overrides
+ */
 export async function createTestInstallmentPlan(
   totalAmount: number,
   totalInstallments: number,
@@ -102,18 +184,22 @@ export async function createTestInstallmentPlan(
   customDays?: number
 ) {
   const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
+    
   return await InstallmentPlanRepository.create({
     studentId: studentId ?? null,
     totalAmount: totalAmount * 100, // 转换为分
     downPayment: 0,
     totalInstallments,
-    frequency: PaymentFrequencyValues[frequency as keyof typeof PaymentFrequencyValues],
+    frequency: PaymentFrequencyValues[frequency],
     customDays,
     startDate: startDate.toISOString().split('T')[0],
     note: undefined,
   });
 }
 
+/**
+ * Creates a test installment with optional overrides
+ */
 export async function createTestInstallment(
   planId: number,
   studentId: number | null,
@@ -121,19 +207,80 @@ export async function createTestInstallment(
   totalInstallments: number,
   amount: number,
   dueDate: Date,
-  status: keyof typeof InstallmentStatus = 'PENDING'
+  status: keyof typeof InstallmentStatusValues = 'PENDING'
 ) {
   const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
+  
+  const statusValue = typeof status === 'string'
+    ? InstallmentStatusValues[status as keyof typeof InstallmentStatusValues]
+    : status;
+
   return await InstallmentRepository.create({
     planId,
     studentId,
     installmentNumber,
     installmentAmount: amount * 100, // 转换为分
     dueDate: dueDate.toISOString().split('T')[0],
-    status,
+    status: statusValue,
     note: undefined,
   });
 }
+
+/**
+ * Creates a complete installment plan with all installments
+ */
+export async function createCompleteInstallmentPlan(
+  totalAmount: number,
+  totalInstallments: number,
+  frequency: keyof typeof PaymentFrequencyValues,
+  startDate: Date,
+  studentId?: number | null
+) {
+  const plan = await createTestInstallmentPlan(
+    totalAmount,
+    totalInstallments,
+    frequency,
+    startDate,
+    studentId
+  );
+
+  const installmentAmount = totalAmount / totalInstallments;
+  const installments: Awaited<ReturnType<typeof createTestInstallment>>[] = [];
+
+  for (let i = 0; i < totalInstallments; i++) {
+    const dueDate = new Date(startDate);
+    
+    switch (frequency) {
+      case 'WEEKLY':
+        dueDate.setDate(dueDate.getDate() + i * 7);
+        break;
+      case 'MONTHLY':
+        dueDate.setMonth(dueDate.getMonth() + i);
+        break;
+      case 'CUSTOM':
+        // Use customDays from plan if available, default to 15
+        const customDays = 15;
+        dueDate.setDate(dueDate.getDate() + i * customDays);
+        break;
+    }
+    
+    installments.push(await createTestInstallment(
+      plan.uid,
+      studentId ?? null,
+      i + 1,
+      totalInstallments,
+      installmentAmount,
+      dueDate,
+      'PENDING'
+    ));
+  }
+
+  return { plan, installments };
+}
+
+// ============================================
+// Date Utility Functions
+// ============================================
 
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
@@ -146,3 +293,175 @@ export function addMonths(date: Date, months: number): Date {
   result.setMonth(result.getMonth() + months);
   return result;
 }
+
+export function addYears(date: Date, years: number): Date {
+  const result = new Date(date);
+  result.setFullYear(result.getFullYear() + years);
+  return result;
+}
+
+// ============================================
+// Random Data Generators
+// ============================================
+
+export function randomPhone(): string {
+  return `138${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`;
+}
+
+export function randomName(): string {
+  const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];
+  return `${names[Math.floor(Math.random() * names.length)]}${Date.now() % 1000}`;
+}
+
+export function randomAmount(min: number = 10, max: number = 1000): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+export function randomDate(start: Date = new Date('2024-01-01'), end: Date = new Date()): Date {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
+// ============================================
+// Complete Test Dataset Factory
+// ============================================
+
+/**
+ * Creates a complete test dataset for integration testing
+ * Useful for stats service and dashboard tests
+ */
+export interface CompleteTestDataset {
+  students: {
+    activeStudent: Awaited<ReturnType<typeof createTestStudent>>;
+    trialStudent: Awaited<ReturnType<typeof createTestStudent>>;
+    expiredStudent: Awaited<ReturnType<typeof createTestStudent>>;
+  };
+  transactions: {
+    income1: Awaited<ReturnType<typeof createTestCashTransaction>>;
+    income2: Awaited<ReturnType<typeof createTestCashTransaction>>;
+    income3: Awaited<ReturnType<typeof createTestCashTransaction>>;
+    expense1: Awaited<ReturnType<typeof createTestCashTransaction>>;
+    expense2: Awaited<ReturnType<typeof createTestCashTransaction>>;
+  };
+  installmentPlan: Awaited<ReturnType<typeof createTestInstallmentPlan>>;
+  installments: Awaited<ReturnType<typeof createTestInstallment>>[];
+}
+
+export async function createCompleteTestDataset(): Promise<CompleteTestDataset> {
+  // Create students
+  const activeStudent = await createTestStudent({
+    name: 'Alice Active',
+    phone: '13800000001',
+    classType: ClassType.MONTH,
+    subject: SubjectType.SHOOTING,
+    rings: [9.1, 8.5],
+    membership: {
+      startDate: addDays(new Date(), -7),
+      endDate: addDays(new Date(), 23),
+    },
+  });
+
+  const trialStudent = await createTestStudent({
+    name: 'Tom Trial',
+    phone: '13800000002',
+    classType: ClassType.TEN_TRY,
+    subject: SubjectType.ARCHERY,
+    rings: [7.5, 8.0],
+  });
+
+  const expiredStudent = await createTestStudent({
+    name: 'Expired Student',
+    phone: '13800000003',
+    classType: ClassType.YEAR,
+    subject: SubjectType.SHOOTING,
+    membership: {
+      startDate: addDays(new Date(), -60),
+      endDate: addDays(new Date(), -30),
+    },
+  });
+
+  // Create transactions
+  const income1 = await createTestCashTransaction(500, activeStudent.uid, 'Tuition payment');
+  const income2 = await createTestCashTransaction(300, trialStudent.uid, 'Trial lesson');
+  const income3 = await createTestCashTransaction(150, activeStudent.uid, 'Additional payment');
+  const expense1 = await createTestCashTransaction(-100, null, 'Office supplies');
+  const expense2 = await createTestCashTransaction(-200, null, 'Equipment');
+
+  // Create installment plan and installments
+  const installmentPlan = await createTestInstallmentPlan(
+    800, // 800元 total
+    4, // 4 installments
+    'MONTHLY',
+    addDays(new Date(), -30),
+    activeStudent.uid
+  );
+
+  const installments: Awaited<ReturnType<typeof createTestInstallment>>[] = [];
+
+  // Create installments with different statuses
+  for (let i = 0; i < 4; i++) {
+    const dueDate = addDays(new Date(), -30 + i * 30);
+    const status = i < 2 ? 'PAID' : (i === 2 ? 'PENDING' : 'PENDING');
+    const paidAmount = i < 2 ? 200 : 0;
+
+    installments.push(await createTestInstallment(
+      installmentPlan.uid,
+      activeStudent.uid,
+      i + 1,
+      4,
+      200,
+      dueDate,
+      status
+    ));
+  }
+
+  return {
+    students: {
+      activeStudent,
+      trialStudent,
+      expiredStudent,
+    },
+    transactions: {
+      income1,
+      income2,
+      income3,
+      expense1,
+      expense2,
+    },
+    installmentPlan,
+    installments,
+  };
+}
+
+// ============================================
+// Export all utilities
+// ============================================
+
+export default {
+  // Database setup
+  setupTestDatabase,
+  cleanupTestDatabase,
+  clearAllCollections,
+  clearAllData,
+  resetAllSequences,
+  
+  // Data factory
+  createTestStudent,
+  createTestStudents,
+  createTestCashTransaction,
+  createTestCashTransactions,
+  createTestInstallmentPlan,
+  createTestInstallment,
+  createCompleteInstallmentPlan,
+  createCompleteTestDataset,
+  
+  // Date utilities
+  addDays,
+  addMonths,
+  addYears,
+  
+  // Random generators
+  randomPhone,
+  randomName,
+  randomAmount,
+  randomDate,
+};
