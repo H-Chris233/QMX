@@ -1,5 +1,5 @@
 import { StudentRepository } from '../db/repositories/studentRepository';
-import { NewStudent } from '../db/schema/students';
+import { Student, NewStudent } from '../db/schema/students';
 
 export class StudentBuilder {
   private payload: Partial<NewStudent> = {};
@@ -75,7 +75,7 @@ export class StudentBuilder {
     return this;
   }
 
-  async build(): Promise<NewStudent> {
+  async build(): Promise<Student> {
     this.validate();
     return await StudentRepository.create(this.payload as NewStudent);
   }

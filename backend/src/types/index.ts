@@ -2,29 +2,29 @@
  * 学员相关类型定义
  */
 
-// 班级类型枚举
+// 班级类型枚举 (与数据库 schema/students.ts 一致)
 export enum ClassType {
-  TEN_TRY = 'TenTry',
-  MONTH = 'Month', 
-  YEAR = 'Year',
-  OTHERS = 'Others',
+  TEN_TRY = 'TEN_TRY',
+  MONTH = 'MONTH',
+  YEAR = 'YEAR',
+  OTHERS = 'OTHERS',
 }
 
-// 科目类型枚举
+// 科目类型枚举 (与数据库 schema/students.ts 一致)
 export enum SubjectType {
-  SHOOTING = 'Shooting',
-  ARCHERY = 'Archery',
-  OTHERS = 'Others',
+  SHOOTING = 'SHOOTING',
+  ARCHERY = 'ARCHERY',
+  OTHERS = 'OTHERS',
 }
 
 // 兼容旧类型名
 export type Subject = SubjectType;
 
 export enum MembershipStatus {
-  NONE = 'None',
-  ACTIVE = 'Active',
-  EXPIRED = 'Expired',
-  UPCOMING = 'Upcoming',
+  NONE = 'NONE',
+  ACTIVE = 'ACTIVE',
+  EXPIRED = 'EXPIRED',
+  UPCOMING = 'UPCOMING',
 }
 
 // 分期付款状态类型 (与数据库一致)
