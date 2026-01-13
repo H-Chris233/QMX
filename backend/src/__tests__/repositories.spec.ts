@@ -134,7 +134,7 @@ describe('StudentRepository', () => {
   describe('Pagination', () => {
     it('paginates results correctly', async () => {
       for (let i = 0; i < 25; i++) {
-        await createTestStudent({ name: `Page Student ${i}`, phone: `13800000${i.toString().padStart(2, '0')}` });
+        await createTestStudent({ name: `Page Student ${i}`, phone: `138${String(i).padStart(8, '0')}` });
       }
 
       const page1 = await StudentRepository.findWithPagination({ page: 1, limit: 10 });

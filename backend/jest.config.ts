@@ -9,7 +9,11 @@ const config: Config = {
   },
   clearMocks: true,
   
-  // 覆盖率配置 - 统一标准
+  // Global setup and teardown for PostgreSQL test database
+  globalSetup: '<rootDir>/test/globalSetup.ts',
+  globalTeardown: '<rootDir>/test/globalTeardown.ts',
+  
+  // 覆盖率配置 - 提升覆盖率标准
   collectCoverage: false, // 默认关闭，通过 --coverage 或 test:coverage 启用
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -35,14 +39,13 @@ const config: Config = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html', 'json', 'json-summary'],
   
-  // 覆盖率阈值 - 后端标准 ≥75% (目标)
-  // 当前设置为实际水平，逐步提升至目标
+  // 覆盖率阈值 - 目标 90%
   coverageThreshold: {
     global: {
-      statements: 65,
-      branches: 55,
-      functions: 60,
-      lines: 65,
+      statements: 90,
+      branches: 85,
+      functions: 90,
+      lines: 90,
     },
   },
   

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: qmx-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qmx_test
+      POSTGRES_PASSWORD: qmx_test_password
+      POSTGRES_DB: qmx_test
+    ports:
+      - "5433:5432"  # 使用 5433 避免与开发环境冲突
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qmx_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_test_data:
