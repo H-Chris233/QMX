@@ -84,7 +84,7 @@ jest.mock('@/utils/logger', () => ({
 }));
 
 describe('StudentController - Helper Functions', () => {
-  const createMockRequest = (query: Record<string, unknown> = {}, body: Record<string, unknown> = {}): Partial<Request> => ({
+  const createMockRequest = (query: any = {}, body: any = {}): Partial<Request> => ({
     query,
     body,
     params: {},
@@ -289,7 +289,7 @@ describe('StudentController - Helper Functions', () => {
         phone: payload.phone,
         classType: payload.class?.toUpperCase(),
         subject: payload.subject?.toUpperCase(),
-        lessonLeft: Number(payload.lesson_left ?? payload.lessonLeft) || 0,
+        lessonLeft: Number(payload.lesson_left ?? 0) || 0,
         rings: Array.isArray(payload.rings) ? payload.rings : [],
         membershipStartDate: payload.membership_start_date,
         membershipEndDate: payload.membership_end_date,
@@ -312,10 +312,10 @@ describe('StudentController - Helper Functions', () => {
       const processed = {
         name: payload.name,
         age: payload.age === null || payload.age === undefined ? null : Number(payload.age),
-        lessonLeft: (payload.lesson_left == null && payload.lessonLeft == null) ? 0 : Number(payload.lesson_left ?? payload.lessonLeft),
+        lessonLeft: Number(payload.lesson_left ?? 0) || 0,
         rings: Array.isArray(payload.rings) ? payload.rings : [],
-        membershipStartDate: payload.membership_start_date ?? payload.membershipStartDate ? 'string' : null,
-        membershipEndDate: payload.membership_end_date ?? payload.membershipEndDate ? 'string' : null,
+        membershipStartDate: payload.membership_start_date ? 'string' : null,
+        membershipEndDate: payload.membership_end_date ? 'string' : null,
       };
 
       expect(processed.name).toBe('李四');

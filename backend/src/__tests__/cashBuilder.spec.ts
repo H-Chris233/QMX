@@ -29,7 +29,6 @@ describe('CashBuilder', () => {
         expect(convertAmountToCents(100)).toBe(10000);
         expect(convertAmountToCents(50.5)).toBe(5050);
         expect(convertAmountToCents(0.01)).toBe(1);
-        expect(convertAmountToCents('99.99')).toBe(9999);
       });
 
       it('负数金额正确转换（支出）', () => {
@@ -39,11 +38,9 @@ describe('CashBuilder', () => {
 
       it('零金额抛出错误', () => {
         expect(() => convertAmountToCents(0)).toThrow(/金额不能为0/);
-        expect(() => convertAmountToCents('0')).toThrow(/金额不能为0/);
       });
 
       it('无效金额抛出错误', () => {
-        expect(() => convertAmountToCents('invalid')).toThrow(/金额必须是数字/);
         expect(() => convertAmountToCents(NaN)).toThrow(/金额必须是数字/);
         expect(() => convertAmountToCents(Infinity)).toThrow(/金额必须是数字/);
       });

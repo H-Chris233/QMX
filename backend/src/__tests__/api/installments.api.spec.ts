@@ -1,6 +1,5 @@
 import request from "supertest";
-import { PaymentFrequency, InstallmentStatus } from "@/types";
-import { InstallmentPlanStatus } from "@/types";
+import { PaymentFrequencyValues, InstallmentStatusValues, InstallmentPlanStatusValues } from "@/types";
 import {
   setupTestDatabase,
   cleanupTestDatabase,
@@ -41,7 +40,7 @@ describe("Installment API Integration Tests", () => {
           student_id: student.uid,
           total_amount: 1200,
           total_installments: 4,
-          frequency: PaymentFrequency.MONTHLY,
+          frequency: PaymentFrequencyValues.MONTHLY,
           start_date: startDate.toISOString(),
           note: "Annual course",
         })
@@ -52,7 +51,7 @@ describe("Installment API Integration Tests", () => {
       expect(response.body.data.plan.student_id).toBe(student.uid);
       expect(response.body.data.plan.total_amount).toBe(120000);
       expect(response.body.data.plan.total_installments).toBe(4);
-      expect(response.body.data.plan.frequency).toBe(PaymentFrequency.MONTHLY);
+      expect(response.body.data.plan.frequency).toBe(PaymentFrequencyValues.MONTHLY);
       expect(response.body.data.installments).toHaveLength(4);
     });
 
@@ -64,12 +63,12 @@ describe("Installment API Integration Tests", () => {
         .send({
           total_amount: 400,
           total_installments: 4,
-          frequency: PaymentFrequency.WEEKLY,
+          frequency: PaymentFrequencyValues.WEEKLY,
           start_date: startDate.toISOString(),
         })
         .expect(201);
 
-      expect(response.body.data.plan.frequency).toBe(PaymentFrequency.WEEKLY);
+      expect(response.body.data.plan.frequency).toBe(PaymentFrequencyValues.WEEKLY);
       expect(response.body.data.installments).toHaveLength(4);
 
       const installments = response.body.data.installments;
@@ -85,13 +84,13 @@ describe("Installment API Integration Tests", () => {
         .send({
           total_amount: 600,
           total_installments: 3,
-          frequency: PaymentFrequency.CUSTOM,
+          frequency: PaymentFrequencyValues.CUSTOM,
           custom_days: 15,
           start_date: startDate.toISOString(),
         })
         .expect(201);
 
-      expect(response.body.data.plan.frequency).toBe(PaymentFrequency.CUSTOM);
+      expect(response.body.data.plan.frequency).toBe(PaymentFrequencyValues.CUSTOM);
       expect(response.body.data.plan.custom_days).toBe(15);
     });
 
@@ -124,7 +123,7 @@ describe("Installment API Integration Tests", () => {
         .send({
           total_amount: 1000,
           total_installments: 4,
-          frequency: PaymentFrequency.CUSTOM,
+          frequency: PaymentFrequencyValues.CUSTOM,
           start_date: new Date().toISOString(),
         })
         .expect(400);
@@ -145,21 +144,21 @@ describe("Installment API Integration Tests", () => {
       await TestDataFactory.createInstallmentPlan(
         1000,
         4,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         student1.uid
       );
       await TestDataFactory.createInstallmentPlan(
         2000,
         3,
-        PaymentFrequency.WEEKLY,
+        PaymentFrequencyValues.WEEKLY,
         new Date(),
         student1.uid
       );
       await TestDataFactory.createInstallmentPlan(
         1500,
         5,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         student2.uid
       );
@@ -209,7 +208,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         3,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         student.uid
       );
@@ -238,7 +237,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         student.uid
       );
@@ -251,7 +250,7 @@ describe("Installment API Integration Tests", () => {
         2,
         300,
         overdueDueDate,
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const futureDueDate = dateUtils.addDays(new Date(), 10);
@@ -262,7 +261,7 @@ describe("Installment API Integration Tests", () => {
         2,
         300,
         futureDueDate,
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const response = await request(app)
@@ -280,7 +279,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         null
       );
@@ -293,7 +292,7 @@ describe("Installment API Integration Tests", () => {
         2,
         300,
         overdueDueDate,
-        InstallmentStatus.PAID
+        InstallmentStatusValues.PAID
       );
 
       const response = await request(app)
@@ -310,7 +309,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         student.uid
       );
@@ -322,20 +321,20 @@ describe("Installment API Integration Tests", () => {
         2,
         300,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const response = await request(app)
         .put(`/api/v1/installments/${installment.uid}/payment`)
         .send({
-          status: InstallmentStatus.PAID,
+          status: InstallmentStatusValues.PAID,
           amount: 300,
         })
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.installment.status).toBe(
-        InstallmentStatus.PAID
+        InstallmentStatusValues.PAID
       );
       expect(response.body.data.installment.paid_amount).toBe(30000);
       expect(response.body.data.cashTransaction).toBeDefined();
@@ -346,7 +345,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         student.uid
       );
@@ -358,13 +357,13 @@ describe("Installment API Integration Tests", () => {
         2,
         300,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const response = await request(app)
         .put(`/api/v1/installments/${installment.uid}/payment`)
         .send({
-          status: InstallmentStatus.PAID,
+          status: InstallmentStatusValues.PAID,
           amount: 300,
         })
         .expect(200);
@@ -381,7 +380,7 @@ describe("Installment API Integration Tests", () => {
       const response = await request(app)
         .put("/api/v1/installments/99999/payment")
         .send({
-          status: InstallmentStatus.PAID,
+          status: InstallmentStatusValues.PAID,
           amount: 100,
         })
         .expect(404);
@@ -397,7 +396,7 @@ describe("Installment API Integration Tests", () => {
         2,
         300,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const response = await request(app)
@@ -417,7 +416,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         null
       );
@@ -449,7 +448,7 @@ describe("Installment API Integration Tests", () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         null
       );
@@ -480,7 +479,7 @@ describe("Installment API Integration Tests", () => {
         .send({
           total_amount: 500,
           total_installments: 1,
-          frequency: PaymentFrequency.MONTHLY,
+          frequency: PaymentFrequencyValues.MONTHLY,
           start_date: new Date().toISOString(),
         })
         .expect(201);
@@ -495,7 +494,7 @@ describe("Installment API Integration Tests", () => {
         .send({
           total_amount: 12000,
           total_installments: 12,
-          frequency: PaymentFrequency.MONTHLY,
+          frequency: PaymentFrequencyValues.MONTHLY,
           start_date: new Date().toISOString(),
         })
         .expect(201);

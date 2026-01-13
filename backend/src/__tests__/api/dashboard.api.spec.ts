@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
+import { ClassType, SubjectType, PaymentFrequencyValues, InstallmentStatusValues } from '@/types';
 import { StudentUpdater } from '@/services/studentUpdater';
 import { 
   setupTestDatabase,
@@ -61,7 +61,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         { studentId: activeStudent.uid }
       );
@@ -74,7 +74,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         300,
         overdueDueDate,
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       await TestDataFactory.createInstallment(
@@ -84,7 +84,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         300,
         new Date(),
-        InstallmentStatus.PAID
+        InstallmentStatusValues.PAID
       );
     });
 
@@ -148,7 +148,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         { studentId: student.uid }
       );
@@ -160,7 +160,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         300,
         new Date(),
-        InstallmentStatus.PAID
+        InstallmentStatusValues.PAID
       );
 
       const response = await request(app)
@@ -218,7 +218,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         3,
-        PaymentFrequency.MONTHLY,
+        PaymentFrequencyValues.MONTHLY,
         new Date(),
         { studentId: student1.uid }
       );
@@ -230,7 +230,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         3,
         400,
         new Date(),
-        InstallmentStatus.PAID
+        InstallmentStatusValues.PAID
       );
 
       await TestDataFactory.createInstallment(
@@ -240,7 +240,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         3,
         400,
         dateUtils.addDays(new Date(), 30),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
     });
 

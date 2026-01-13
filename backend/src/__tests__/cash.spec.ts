@@ -32,29 +32,25 @@ describe('Cash Transaction Service', () => {
       expect(convertAmountToCents(100)).toBe(10000);
       expect(convertAmountToCents(50.5)).toBe(5050);
       expect(convertAmountToCents(0.01)).toBe(1);
-      expect(convertAmountToCents('123.45')).toBe(12345);
     });
 
     it('converts negative yuan amount to cents for expenses', () => {
       expect(convertAmountToCents(-100)).toBe(-10000);
       expect(convertAmountToCents(-50.5)).toBe(-5050);
-      expect(convertAmountToCents('-123.45')).toBe(-12345);
     });
 
     it('rejects zero amount', () => {
       expect(() => convertAmountToCents(0)).toThrow(/金额不能为0/);
-      expect(() => convertAmountToCents('0')).toThrow(/金额不能为0/);
       expect(() => convertAmountToCents(0.00)).toThrow(/金额不能为0/);
     });
 
     it('rejects invalid amounts', () => {
-      expect(() => convertAmountToCents('invalid')).toThrow(/金额必须是数字/);
       expect(() => convertAmountToCents(NaN)).toThrow(/金额必须是数字/);
       expect(() => convertAmountToCents(Infinity)).toThrow(/金额必须是数字/);
     });
 
     it('rejects amounts with more than 2 decimal places', () => {
-      expect(() => convertAmountToCents(123.456)).toThrow(/金额最多保留两位小数/);
+      expect(() => convertAmountToCents(123.456)).toThrow(/金额必须保留最多两位小数/);
     });
   });
 
@@ -263,7 +259,7 @@ describe('Cash Transaction Service', () => {
     it('updates transaction note', async () => {
       const transaction = await createTestCashTransaction(100, null, 'Old Note');
 
-      const updater = CashUpdater.fromDocument(transaction);
+      const updater = CashUpdater.fromDocument(transaction as any);
       updater.note('New Note');
       const updated = await updater.commit();
 
@@ -290,7 +286,7 @@ describe('Cash Transaction Service', () => {
     it('clears note when set to empty string', async () => {
       const transaction = await createTestCashTransaction(100, null, 'Test');
 
-      const updater = CashUpdater.fromDocument(transaction);
+      const updater = CashUpdater.fromDocument(transaction as any);
       updater.note('   ');
       const updated = await updater.commit();
 

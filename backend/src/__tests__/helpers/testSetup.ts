@@ -5,7 +5,7 @@ import { installmentPlans, installments, InstallmentStatus } from '@/db/schema/i
 import { sql } from 'drizzle-orm';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
-import { ClassType, SubjectType, PaymentFrequency } from '@/types';
+import { ClassType, SubjectType, PaymentFrequencyValues } from '@/types';
 
 export interface TestContext {
   db: typeof db;
@@ -96,7 +96,7 @@ export async function createTestCashTransaction(
 export async function createTestInstallmentPlan(
   totalAmount: number,
   totalInstallments: number,
-  frequency: PaymentFrequency,
+  frequency: keyof typeof PaymentFrequencyValues,
   startDate: Date,
   studentId?: number | null,
   customDays?: number
@@ -107,7 +107,7 @@ export async function createTestInstallmentPlan(
     totalAmount: totalAmount * 100, // 转换为分
     downPayment: 0,
     totalInstallments,
-    frequency,
+    frequency: PaymentFrequencyValues[frequency as keyof typeof PaymentFrequencyValues],
     customDays,
     startDate: startDate.toISOString().split('T')[0],
     note: undefined,

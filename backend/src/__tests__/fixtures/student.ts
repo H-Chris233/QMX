@@ -12,7 +12,8 @@ import {
   ClassType,
   SubjectType,
   PaymentFrequency,
-  InstallmentStatus,
+  PaymentFrequencyValues,
+  InstallmentStatusValues,
 } from '@/types';
 import { addDays, addMonths } from './date';
 
@@ -115,7 +116,7 @@ export async function createTestInstallment(
   totalInstallments: number,
   amount: number,           // 单位：元
   dueDate: Date,
-  status: keyof typeof InstallmentStatus = 'PENDING'
+  status: string = 'PENDING'
 ) {
   return await InstallmentRepository.create({
     planId,
@@ -175,7 +176,7 @@ export async function createCompleteTestDataset() {
   const plan = await createTestInstallmentPlan(
     800, // 总金额（元）
     4,   // 期数
-    PaymentFrequency.MONTHLY,
+    PaymentFrequencyValues.MONTHLY,
     new Date(),
     { studentId: activeStudent.uid }
   );
