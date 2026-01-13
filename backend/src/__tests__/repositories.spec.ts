@@ -10,7 +10,7 @@ import { CashRepository } from '@/db/repositories/cashRepository';
 import { InstallmentPlanRepository, InstallmentRepository } from '@/db/repositories/installmentRepository';
 import { StudentBuilder } from '@/services/studentBuilder';
 import { CashBuilder } from '@/services/cashBuilder';
-import { ClassType, SubjectType, PaymentFrequency, InstallmentStatus } from '@/types';
+import { ClassType, SubjectType, PaymentFrequencyValues, InstallmentStatusValues } from '@/types';
 import {
   setupTestDatabase,
   cleanupTestDatabase,
@@ -311,14 +311,14 @@ describe('InstallmentPlanRepository', () => {
 
   describe('CRUD Operations', () => {
     it('creates installment plan with uid', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
 
       expect(plan.uid).toBeGreaterThan(0);
       expect(plan.totalAmount).toBe(100000); // Converted to cents
     });
 
     it('updates installment plan', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
 
       const updated = await InstallmentPlanRepository.updateByUid(plan.uid, {
         note: 'Updated note',
@@ -328,7 +328,7 @@ describe('InstallmentPlanRepository', () => {
     });
 
     it('deletes installment plan', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
 
       const deleted = await InstallmentPlanRepository.deleteByUid(plan.uid);
       expect(deleted).toBe(true);
@@ -341,15 +341,15 @@ describe('InstallmentPlanRepository', () => {
   describe('Plan Queries', () => {
     it('finds plans by student id', async () => {
       const student = await createTestStudent();
-      await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date(), student.uid);
-      await createTestInstallmentPlan(2000, 4, PaymentFrequency.MONTHLY, new Date(), student.uid);
+      await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date(), student.uid);
+      await createTestInstallmentPlan(2000, 4, PaymentFrequencyValues.MONTHLY, new Date(), student.uid);
 
       const plans = await InstallmentPlanRepository.findByStudentId(student.uid);
       expect(plans.length).toBe(2);
     });
 
     it('finds active plans', async () => {
-      await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
 
       const activePlans = await InstallmentPlanRepository.findActivePlans();
       expect(activePlans.length).toBeGreaterThan(0);
@@ -359,7 +359,7 @@ describe('InstallmentPlanRepository', () => {
     });
 
     it('counts active plans', async () => {
-      await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
 
       const count = await InstallmentPlanRepository.countActivePlans();
       expect(count).toBeGreaterThanOrEqual(1);
@@ -368,7 +368,7 @@ describe('InstallmentPlanRepository', () => {
 
   describe('toResponse', () => {
     it('converts plan to API response format', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
 
       const response = InstallmentPlanRepository.toResponse(plan);
 
@@ -399,7 +399,7 @@ describe('InstallmentRepository', () => {
 
   describe('CRUD Operations', () => {
     it('creates installment with uid', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
       const installment = await createTestInstallment(
         plan.uid,
         null,
@@ -407,7 +407,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       expect(installment.uid).toBeGreaterThan(0);
@@ -415,7 +415,7 @@ describe('InstallmentRepository', () => {
     });
 
     it('updates installment', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
       const installment = await createTestInstallment(
         plan.uid,
         null,
@@ -423,20 +423,20 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const updated = await InstallmentRepository.updateByUid(installment.uid, {
-        status: InstallmentStatus.PAID,
+        status: InstallmentStatusValues.PAID,
         paidAmount: 25000,
         paidDate: new Date(),
       });
 
-      expect(updated?.status).toBe(InstallmentStatus.PAID);
+      expect(updated?.status).toBe(InstallmentStatusValues.PAID);
     });
 
     it('deletes installment', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
       const installment = await createTestInstallment(
         plan.uid,
         null,
@@ -444,7 +444,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const deleted = await InstallmentRepository.deleteByUid(installment.uid);
@@ -457,9 +457,9 @@ describe('InstallmentRepository', () => {
 
   describe('Installment Queries', () => {
     it('finds installments by plan id', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
-      await createTestInstallment(plan.uid, null, 1, 4, 250, new Date(), InstallmentStatus.PENDING);
-      await createTestInstallment(plan.uid, null, 2, 4, 250, addDays(new Date(), 30), InstallmentStatus.PENDING);
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
+      await createTestInstallment(plan.uid, null, 1, 4, 250, new Date(), InstallmentStatusValues.PENDING);
+      await createTestInstallment(plan.uid, null, 2, 4, 250, addDays(new Date(), 30), InstallmentStatusValues.PENDING);
 
       const installments = await InstallmentRepository.findByPlanId(plan.uid);
       expect(installments.length).toBe(2);
@@ -469,7 +469,7 @@ describe('InstallmentRepository', () => {
 
     it('finds overdue installments', async () => {
       const overdueDate = addDays(new Date(), -10);
-      await createTestInstallment(1, null, 1, 4, 250, overdueDate, InstallmentStatus.PENDING);
+      await createTestInstallment(1, null, 1, 4, 250, overdueDate, InstallmentStatusValues.PENDING);
 
       const overdue = await InstallmentRepository.findOverdue();
       expect(overdue.length).toBeGreaterThan(0);
@@ -477,13 +477,13 @@ describe('InstallmentRepository', () => {
     });
 
     it('finds installments by status', async () => {
-      await createTestInstallment(1, null, 1, 4, 250, new Date(), InstallmentStatus.PENDING);
-      await createTestInstallment(1, null, 2, 4, 250, new Date(), InstallmentStatus.PAID);
+      await createTestInstallment(1, null, 1, 4, 250, new Date(), InstallmentStatusValues.PENDING);
+      await createTestInstallment(1, null, 2, 4, 250, new Date(), InstallmentStatusValues.PAID);
 
-      const pending = await InstallmentRepository.findByStatus(InstallmentStatus.PENDING);
+      const pending = await InstallmentRepository.findByStatus(InstallmentStatusValues.PENDING);
       expect(pending.length).toBeGreaterThan(0);
       pending.forEach((i) => {
-        expect(i.status).toBe(InstallmentStatus.PENDING);
+        expect(i.status).toBe(InstallmentStatusValues.PENDING);
       });
     });
   });
@@ -498,7 +498,7 @@ describe('InstallmentRepository', () => {
         installmentAmount: 25000,
         paidAmount: 0,
         dueDate: addDays(new Date(), -5).toISOString().split('T')[0],
-        status: InstallmentStatus.PENDING,
+        status: InstallmentStatusValues.PENDING,
       };
 
       const future: any = {
@@ -509,7 +509,7 @@ describe('InstallmentRepository', () => {
         installmentAmount: 25000,
         paidAmount: 0,
         dueDate: addDays(new Date(), 5).toISOString().split('T')[0],
-        status: InstallmentStatus.PENDING,
+        status: InstallmentStatusValues.PENDING,
       };
 
       expect(InstallmentRepository.isOverdue(overdue)).toBe(true);
@@ -536,7 +536,7 @@ describe('InstallmentRepository', () => {
 
   describe('toResponse', () => {
     it('converts installment to API response format', async () => {
-      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequency.MONTHLY, new Date());
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
       const installment = await createTestInstallment(
         plan.uid,
         null,
@@ -544,7 +544,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatus.PENDING
+        InstallmentStatusValues.PENDING
       );
 
       const response = InstallmentRepository.toResponse(installment);

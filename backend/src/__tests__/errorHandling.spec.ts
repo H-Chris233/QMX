@@ -79,7 +79,7 @@ describe('Domain error handling alignment', () => {
     const updater2 = StudentUpdater.fromDocument(reloaded!);
     expect(() => {
       // 尝试删除不存在的索引
-      updater2.removeRingAt(5);
+      updater2.removeRing(5);
     }).toThrow(/成绩索引超出范围/);
   });
 });

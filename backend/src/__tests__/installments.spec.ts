@@ -288,7 +288,7 @@ describe('Installment Service', () => {
       const updatedInstallment = await InstallmentRepository.updateByUid(installment.uid, {
         status: InstallmentStatusValues.PAID,
         paidAmount: 10000,
-        paidDate: new Date(),
+        paidDate: new Date().toISOString().split('T')[0],
       });
 
       expect(updatedInstallment).not.toBeNull();

@@ -304,7 +304,15 @@ describe('StudentController - Helper Functions', () => {
     });
 
     it('handles optional fields correctly', () => {
-      const payload = {
+      const payload: Partial<{
+        name: string;
+        phone: string;
+        age?: number | null;
+        lesson_left?: number;
+        rings?: number[];
+        membership_start_date?: string;
+        membership_end_date?: string;
+      }> = {
         name: '李四',
         phone: '13900139000',
       };
@@ -383,11 +391,11 @@ describe('CashController - Helper Functions', () => {
     });
 
     it('handles empty query', () => {
-      const query = {};
+      const query: Record<string, never> = {};
 
-      const options: any = {};
-      if (query.page !== undefined && query.page !== null && query.page !== '') {
-        options.page = Number(query.page);
+      const options: Record<string, unknown> = {};
+      if ((query as Record<string, unknown>).page !== undefined && (query as Record<string, unknown>).page !== null && (query as Record<string, unknown>).page !== '') {
+        options.page = Number((query as Record<string, unknown>).page);
       }
 
       expect(options).toEqual({});
@@ -754,7 +762,11 @@ describe('Response Format Validation', () => {
     });
 
     it('formats delete response with message', () => {
-      const response = {
+      const response: {
+        success: boolean;
+        message: string;
+        data?: undefined;
+      } = {
         success: true,
         message: '学员删除成功',
       };
