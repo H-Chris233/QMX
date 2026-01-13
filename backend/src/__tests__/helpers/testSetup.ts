@@ -86,13 +86,21 @@ export async function resetAllSequences(): Promise<void> {
 
 /**
  * Creates a test student with optional overrides
+ * 注意：手机号必须符合正则 /^1[3-9]\d{9}$/（11位，以1开头，第二位3-9）
  */
 export async function createTestStudent(
   overrides: TestStudentOverrides = {}
 ) {
+  // 生成符合格式的测试手机号：11位标准手机号
+  const generatePhone = (): string => {
+    const prefix = '138'; // 中国移动 prefix
+    const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+    return prefix + suffix; // 3 + 8 = 11 位
+  };
+
   const builder = StudentBuilder.create()
     .name(overrides.name || 'Test Student')
-    .phone(overrides.phone || `13800138${String(Date.now()).slice(-4)}`)
+    .phone(overrides.phone || generatePhone())
     .classType(overrides.classType || overrides.class || ClassType.MONTH)
     .subject(overrides.subject || SubjectType.SHOOTING);
 
@@ -128,9 +136,11 @@ export async function createTestStudents(
 ): Promise<Awaited<ReturnType<typeof createTestStudent>>[]> {
   const students: Awaited<ReturnType<typeof createTestStudent>>[] = [];
   for (let i = 0; i < count; i++) {
+    // 生成 11 位手机号：138 + 8 位序号
+    const phone = `138${String(i).padStart(8, '0')}`;
     students.push(await createTestStudent({
       name: `${baseName} ${i + 1}`,
-      phone: `13800138${String(i).padStart(4, '0')}`,
+      phone,
     }));
   }
   return students;
@@ -305,7 +315,11 @@ export function addYears(date: Date, years: number): Date {
 // ============================================
 
 export function randomPhone(): string {
-  return `138${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`;
+  // 生成符合正则 /^1[3-9]\d{9}$/ 的随机手机号（11位）
+  // 第1位固定为1，第2位为3-9，后面跟8位随机数字
+  const secondDigit = String(Math.floor(Math.random() * 7) + 3); // 3-9
+  const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0'); // 8位
+  return '1' + secondDigit + suffix; // 1 + 1 + 8 = 11 位
 }
 
 export function randomName(): string {
