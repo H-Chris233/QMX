@@ -27,12 +27,12 @@ export class MembershipApiService {
     membership: MembershipData
   ): Promise<Student> {
     const payload = {
-      startDate: membership.startDate,
-      endDate: membership.endDate,
+      membership_start_date: membership.startDate,
+      membership_end_date: membership.endDate,
     };
 
     return apiCall<Student>(
-      baseClient.post(`/students/${studentId}/membership`, payload)
+      baseClient.patch(`/membership/students/${studentId}/membership`, payload)
     );
   }
 
@@ -41,7 +41,7 @@ export class MembershipApiService {
    */
   static async clearStudentMembership(studentId: number): Promise<Student> {
     return apiCall<Student>(
-      baseClient.delete(`/students/${studentId}/membership`)
+      baseClient.delete(`/membership/students/${studentId}/membership`)
     );
   }
 
@@ -53,11 +53,14 @@ export class MembershipApiService {
     membershipType: MembershipType,
     startFromToday: boolean = true
   ): Promise<Student> {
-    const payload = { membershipType, startFromToday };
+    const payload = {
+      membership_type: membershipType,
+      start_from_today: startFromToday,
+    };
 
     return apiCall<Student>(
       baseClient.post(
-        `/students/${studentId}/membership/type`,
+        `/membership/students/${studentId}/membership/type`,
         payload
       )
     );
@@ -71,11 +74,14 @@ export class MembershipApiService {
     membershipType: MembershipType,
     extendFromCurrent: boolean = true
   ): Promise<Student> {
-    const payload = { membershipType, extendFromCurrent };
+    const payload = {
+      membership_type: membershipType,
+      extend_from_current: extendFromCurrent,
+    };
 
     return apiCall<Student>(
       baseClient.post(
-        `/students/${studentId}/membership/renew`,
+        `/membership/students/${studentId}/membership/renew`,
         payload
       )
     );
@@ -93,14 +99,21 @@ export class MembershipApiService {
    */
   static async batchSetMembership(
     studentIds: number[],
-    membershipType: MembershipType,
+    membershipType: MembershipType | MembershipData,
     startFromToday: boolean = true
   ): Promise<{ success: number; failed: number }> {
-    const payload = {
-      studentIds,
-      membershipType,
-      startFromToday,
-    };
+    const payload =
+      typeof membershipType === 'string'
+        ? {
+            student_ids: studentIds,
+            membership_type: membershipType,
+            start_from_today: startFromToday,
+          }
+        : {
+            student_ids: studentIds,
+            membership_start_date: membershipType.startDate,
+            membership_end_date: membershipType.endDate,
+          };
 
     return apiCall(baseClient.post("/membership/batch", payload));
   }

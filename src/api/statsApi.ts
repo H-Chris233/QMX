@@ -28,16 +28,15 @@ function parsePeriodParams(period?: StatsPeriod): Record<string, string> {
   }
 
   if (typeof period === 'string') {
-    // 转换为首字母大写以匹配后端期望的格式
-    const normalized = period.charAt(0).toUpperCase() + period.slice(1).toLowerCase();
-    // 特殊处理：today -> Today, week -> ThisWeek, month -> ThisMonth, year -> ThisYear
-    const periodMap: Record<string, string> = {
-      'Today': 'Today',
-      'Week': 'ThisWeek',
-      'Month': 'ThisMonth',
-      'Year': 'ThisYear',
+    const normalized = period.trim();
+    const lowered = normalized.toLowerCase();
+    const shorthandMap: Record<string, string> = {
+      thisweek: 'week',
+      thismonth: 'month',
+      thisyear: 'year',
     };
-    return { period: periodMap[normalized] || normalized };
+
+    return { period: shorthandMap[lowered] || lowered };
   }
 
   // 自定义日期范围 - 支持两种格式
@@ -112,7 +111,11 @@ export class StatsApiService {
    * @deprecated 请使用 getGlobalFinancialStats
    */
   static async getFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {
-    return this.getGlobalFinancialStats(period);
+    const params = parsePeriodParams(period);
+
+    return apiCall<FinancialStats>(
+      baseClient.get('/stats/financial', { params })
+    );
   }
 
   /**

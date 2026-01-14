@@ -105,10 +105,39 @@ export const useStudentStore = defineStore("student", () => {
       return await storeActionWrapper(
         async () => {
           const mergedParams = { ...searchParams.value, ...params };
-          const response = await ApiService.getAllStudents(
-            mergedParams,
-            forceRefresh
-          );
+          const apiParams: Record<string, unknown> = {
+            page: mergedParams.page,
+            limit: mergedParams.limit,
+          };
+
+          const nameContains = (mergedParams as any).name_contains ?? mergedParams.keyword;
+          if (nameContains !== undefined && nameContains !== null && nameContains !== '') {
+            apiParams.name_contains = nameContains;
+          }
+
+          const subject = (mergedParams as any).subject;
+          if (subject !== undefined && subject !== null && subject !== '') {
+            apiParams.subject = subject;
+          }
+
+          const classType = (mergedParams as any).class_type ?? (mergedParams as any).class;
+          if (classType !== undefined && classType !== null && classType !== '') {
+            apiParams.class_type = classType;
+          }
+
+          const membershipStatus = (mergedParams as any).membership_status;
+          if (membershipStatus !== undefined && membershipStatus !== null && membershipStatus !== '') {
+            apiParams.membership_status = membershipStatus;
+          }
+
+          const hasMembership = (mergedParams as any).has_membership;
+          if (hasMembership !== undefined && hasMembership !== null && hasMembership !== '') {
+            apiParams.has_membership = hasMembership;
+          }
+
+          const response = forceRefresh
+            ? await ApiService.getAllStudents(apiParams as any, true)
+            : await ApiService.getAllStudents(apiParams as any);
 
           students.value = response.students;
           // 转换分页格式

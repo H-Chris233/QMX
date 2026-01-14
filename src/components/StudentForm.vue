@@ -6,13 +6,13 @@
       <section class="form-section">
         <div class="section-header">
           <User :size="18" class="section-icon" />
-          <h3>基本资料</h3>
+          <h3 class="section-title">基本资料</h3>
         </div>
         
         <div class="form-grid">
           <!-- 姓名 (全宽) -->
           <div class="form-group full-width">
-            <label for="name" class="label-required">学员姓名</label>
+            <label for="name" class="label-required required">学员姓名</label>
             <div class="input-wrapper">
               <User :size="16" class="input-icon" />
               <input
@@ -36,7 +36,7 @@
                 v-model.number="formData.age"
                 type="number"
                 min="0"
-                max="100"
+                max="150"
                 placeholder="岁"
                 class="form-input"
               />
@@ -124,7 +124,7 @@
       <section class="form-section">
         <div class="section-header">
           <Crown :size="18" class="section-icon text-warning" />
-          <h3>会员权益</h3>
+          <h3 class="section-title">会员权益</h3>
         </div>
         
         <div class="membership-panel">
@@ -159,10 +159,10 @@
 
       <!-- 底部操作栏 -->
       <div class="form-footer">
-        <button type="button" @click="handleCancel" class="btn btn-secondary">
+        <button type="button" @click="handleCancel" class="btn btn-secondary btn-cancel">
           取消
         </button>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary btn-submit">
           <Save :size="18" />
           保存信息
         </button>
@@ -241,16 +241,20 @@ watch(() => props.modelValue, (student) => {
 
 const handleSubmit = () => {
   const trimmedNote = formData.value.note.trim();
+  const ageValue = formData.value.age;
+  const lessonLeftValue = formData.value.lesson_left;
+  const membershipStart = formData.value.membership_start_date;
+  const membershipEnd = formData.value.membership_end_date;
   const apiData: CurrentStudentInput = {
     name: formData.value.name.trim(),
-    age: formData.value.age ?? null,
+    age: ageValue === null ? null : ageValue,
     phone: formData.value.phone.trim(),
     class: formData.value.class,
     subject: formData.value.subject,
     note: trimmedNote || undefined,
-    lesson_left: formData.value.lesson_left ?? undefined,
-    membership_start_date: (!formData.value.membership_start_date) ? undefined : formData.value.membership_start_date,
-    membership_end_date: (!formData.value.membership_end_date) ? undefined : formData.value.membership_end_date,
+    lesson_left: lessonLeftValue === null ? undefined : lessonLeftValue,
+    membership_start_date: membershipStart === null ? undefined : membershipStart,
+    membership_end_date: membershipEnd === null ? undefined : membershipEnd,
   };
   emit('save', apiData);
 };

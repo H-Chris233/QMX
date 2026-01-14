@@ -57,11 +57,11 @@
 
       <!-- 右侧：操作按钮 -->
       <div class="toolbar-right">
-        <button @click="exportStudents" class="btn btn-secondary" data-testid="export-students-btn" title="导出 CSV">
+        <button @click="exportStudents" class="btn btn-secondary export-btn" data-testid="export-students-btn" title="导出 CSV">
           <Download :size="18" />
           <span class="btn-text">导出</span>
         </button>
-        <button @click="showAddStudentForm = true" class="btn btn-primary" data-testid="add-student-btn">
+        <button @click="showAddStudentForm = true" class="btn btn-primary add-student-btn" data-testid="add-student-btn">
           <UserPlus :size="18" />
           <span>添加学员</span>
         </button>
@@ -102,6 +102,11 @@
             <span class="info-val">{{ getSubjectName(student.subject) }}</span>
           </div>
           <div class="info-row">
+            <User :size="14" class="info-icon" />
+            <span class="info-label">年龄</span>
+            <span class="info-val">{{ student.age ?? '未设置' }}</span>
+          </div>
+          <div class="info-row">
             <Phone :size="14" class="info-icon" />
             <span class="info-label">电话</span>
             <span class="info-val font-mono">{{ student.phone }}</span>
@@ -118,16 +123,21 @@
               剩余 {{ student.membership_days_remaining }} 天
             </span>
           </div>
+          <div class="info-row">
+            <Calendar :size="14" class="info-icon" />
+            <span class="info-label">会员</span>
+            <span class="info-val">{{ getMembershipRangeText(student) }}</span>
+          </div>
         </div>
 
         <!-- 卡片底部：操作栏 -->
         <div class="card-footer">
-          <button @click.stop="editStudent(student)" class="card-btn edit" :data-testid="`edit-student-${student.uid}`">
+          <button @click.stop="editStudent(student)" class="card-btn edit edit-btn" :data-testid="`edit-student-${student.uid}`">
             <Edit3 :size="16" />
             编辑
           </button>
           <div class="divider-vertical"></div>
-          <button @click.stop="deleteStudent(student.uid)" class="card-btn delete" :data-testid="`delete-student-${student.uid}`">
+          <button @click.stop="deleteStudent(student.uid)" class="card-btn delete delete-btn" :data-testid="`delete-student-${student.uid}`">
             <Trash2 :size="16" />
             删除
           </button>
@@ -136,25 +146,25 @@
     </div>
 
     <!-- 分页控件 -->
-    <div class="pagination-wrapper" v-if="totalPages > 1" data-testid="student-pagination">
+    <div class="pagination-wrapper pagination" v-if="totalPages > 1" data-testid="student-pagination">
       <button
         @click="changePage(currentPage - 1)"
         :disabled="currentPage === 1"
-        class="page-nav-btn"
+        class="page-nav-btn page-btn"
         data-testid="prev-page-btn"
       >
         <ChevronLeft :size="18" />
         上一页
       </button>
 
-      <span class="page-indicator" data-testid="page-info">
-        Page <b>{{ currentPage }}</b> of {{ totalPages }}
+      <span class="page-indicator page-info" data-testid="page-info">
+        {{ currentPage }} / {{ totalPages }} (共 {{ totalStudents }} 人)
       </span>
 
       <button
         @click="changePage(currentPage + 1)"
         :disabled="currentPage === totalPages"
-        class="page-nav-btn"
+        class="page-nav-btn page-btn"
         data-testid="next-page-btn"
       >
         下一页
@@ -198,6 +208,8 @@ import type { Student, CurrentStudentInput } from '../types/api';
 import {
   Search,
   Download,
+  User,
+  Calendar,
   UserPlus,
   ChevronDown,
   Target,
@@ -213,19 +225,31 @@ import {
 
 const appStore = useAppStore();
 const studentStore = useStudentStore();
-const { students, pagination, currentStudent } = storeToRefs(studentStore);
+const { students, pagination, currentStudent: currentStudentRef } = storeToRefs(studentStore);
 
 // 响应式数据
 const searchQuery = ref('');
 const searchFilters = ref({
   subject: '',
   classType: '',
-  membershipStatus: ''
+  membershipStatus: '',
+  hasMembership: ''
+});
+
+const currentStudent = computed({
+  get: () => currentStudentRef.value,
+  set: (value) => studentStore.setCurrentStudent(value)
 });
 
 // Computed properties for pagination
-const currentPage = computed(() => pagination.value.currentPage);
+const currentPage = computed({
+  get: () => pagination.value.currentPage,
+  set: (value) => {
+    pagination.value.currentPage = value;
+  }
+});
 const totalPages = computed(() => pagination.value.totalPages);
+const totalStudents = computed(() => pagination.value.totalItems);
 
 const selectedStudent = ref<Student | null>(null);
 
@@ -250,6 +274,9 @@ const fetchStudents = async (page: number = 1): Promise<void> => {
     if (searchFilters.value.subject) params.subject = searchFilters.value.subject;
     if (searchFilters.value.classType) params.class_type = searchFilters.value.classType;
     if (searchFilters.value.membershipStatus) params.membership_status = searchFilters.value.membershipStatus;
+    if (searchFilters.value.hasMembership) {
+      params.has_membership = searchFilters.value.hasMembership === 'true';
+    }
 
     await studentStore.fetchStudents(params);
   } catch (error) {
@@ -282,10 +309,14 @@ const handleSave = async (data: CurrentStudentInput): Promise<void> => {
   }
 };
 
+const saveStudent = async (data: CurrentStudentInput): Promise<void> => {
+  await handleSave(data);
+};
+
 const deleteStudent = async (uid: number): Promise<void> => {
   appStore.showConfirm({
     title: '确认删除',
-    message: '删除后无法恢复，是否继续？',
+    message: '确定要删除这个学员吗？删除后无法恢复。',
     confirmText: '确认删除',
     confirmType: 'danger',
     onConfirm: async () => {
@@ -302,12 +333,32 @@ const deleteStudent = async (uid: number): Promise<void> => {
   });
 };
 
+const formatDate = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${year}-${month}-${day}`;
+};
+
+const getMembershipRangeText = (student: Student) => {
+  const start = formatDate(student.membership_start_date);
+  const end = formatDate(student.membership_end_date);
+
+  if (start && end) {
+    return `${start} 至 ${end}`;
+  }
+
+  return '无会员';
+};
+
 const exportStudents = async (): Promise<void> => {
   try {
     const headers = ['ID', '姓名', '年龄', '电话', '课程', '科目', '剩余课时', '会员开始', '会员结束', '状态', '备注'];
     const rows = students.value.map(s => {
-      const start = s.membership_start_date ? new Date(s.membership_start_date).toLocaleDateString() : '';
-      const end = s.membership_end_date ? new Date(s.membership_end_date).toLocaleDateString() : '';
+      const start = formatDate(s.membership_start_date);
+      const end = formatDate(s.membership_end_date);
       const status = s.is_membership_active ? '激活' : '未激活';
       return [
         s.uid, `"${s.name}"`, s.age || '', `"${s.phone}"`, `"${s.class}"`,
@@ -326,9 +377,9 @@ const exportStudents = async (): Promise<void> => {
   }
 };
 
-const changePage = (page: number) => {
+const changePage = async (page: number) => {
   if (page < 1 || page > totalPages.value) return;
-  fetchStudents(page);
+  await fetchStudents(page);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 

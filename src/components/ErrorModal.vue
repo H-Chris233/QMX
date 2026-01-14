@@ -1,10 +1,10 @@
 <template>
   <!-- Teleport 确保弹窗挂载到 body，不受父组件 overflow/z-index 限制 -->
-  <Teleport to="body">
+  <Teleport to="body" :disabled="disableTeleport">
     <Transition name="modal-fade">
       <div
         v-if="show"
-        class="modal-overlay"
+        class="modal-overlay error-modal-overlay"
         :class="{ 'is-critical': resolvedPriority === 'critical' }"
         @click="closeOnOverlayClick ? closeModal() : null"
         role="alertdialog"
@@ -12,7 +12,7 @@
         :style="{ zIndex: 9999 }" 
       >
         <div 
-          class="error-card" 
+          class="error-card error-modal" 
           :class="[priorityClass, { 'shake-anim': resolvedPriority === 'critical' }]" 
           @click.stop
         >
@@ -34,7 +34,7 @@
             <p class="error-message">{{ message }}</p>
 
             <!-- 技术细节 (仿终端样式) -->
-            <div v-if="details" class="technical-details">
+            <div v-if="details" class="technical-details error-details">
               <details>
                 <summary>
                   <Terminal :size="14" />
@@ -53,11 +53,11 @@
 
           <!-- 底部操作栏 -->
           <div class="card-footer">
-            <button v-if="showRetry" class="btn btn-secondary" @click="retry">
+            <button v-if="showRetry" class="btn btn-secondary error-btn secondary" @click="retry">
               <RefreshCcw :size="16" />
               重试
             </button>
-            <button class="btn btn-primary" @click="closeModal">
+            <button class="btn btn-primary error-btn primary" @click="closeModal">
               确定
             </button>
           </div>
@@ -106,6 +106,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<Emits>();
+
+const disableTeleport = (import.meta as { env?: { MODE?: string } }).env?.MODE === 'test';
 
 // === 优先级逻辑处理 ===
 const normalizePriority = (priority?: ErrorPriorityLevel): ErrorPriority => {

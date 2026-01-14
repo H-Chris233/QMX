@@ -100,17 +100,22 @@ export class StudentApiService {
    */
   static async addStudent(student: CurrentStudentInput): Promise<Student> {
     // 确保字段命名正确
-    const payload = {
+    const payload: Record<string, unknown> = {
       name: student.name,
       age: student.age,
       phone: student.phone,
       class: student.class, // 后端期望的字段名
       subject: student.subject,
-      note: student.note || "",
-      lesson_left: student.lesson_left,
-      membership_start_date: student.membership_start_date,
-      membership_end_date: student.membership_end_date,
     };
+
+    if (student.note !== undefined) payload.note = student.note;
+    if (student.lesson_left !== undefined) payload.lesson_left = student.lesson_left;
+    if (student.membership_start_date !== undefined) {
+      payload.membership_start_date = student.membership_start_date;
+    }
+    if (student.membership_end_date !== undefined) {
+      payload.membership_end_date = student.membership_end_date;
+    }
 
     return apiCall<Student>(baseClient.post("/students", payload));
   }
@@ -206,7 +211,7 @@ export class StudentApiService {
     scores: number[]
   ): Promise<number[]> {
     const response = await apiCall<{ rings: number[]; scores?: number[] }>(
-      baseClient.post(`/students/${uid}/scores/batch`, { scores })
+      baseClient.put(`/students/${uid}/scores/batch`, { scores })
     );
 
     return response.rings || response.scores || [];

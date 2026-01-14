@@ -51,7 +51,7 @@ export class InstallmentsApiService {
   /**
    * 获取即将到期的分期
    */
-  static async getUpcomingInstallments(days: number = 7): Promise<{
+  static async getUpcomingInstallments(days?: number): Promise<{
     uid: number;
     plan_id: number;
     current_installment: number;
@@ -66,8 +66,10 @@ export class InstallmentsApiService {
       student: { uid: number; name: string; phone: string } | null;
     } | null;
   }[]> {
+    const params = days === undefined ? undefined : { days: String(days) };
+
     return apiCall(
-      baseClient.get('/installments/upcoming', { params: { days: String(days) } })
+      baseClient.get('/installments/upcoming', { params })
     );
   }
 

@@ -511,7 +511,7 @@ export class ApiService {
   /**
    * 获取即将到期的分期
    */
-  static async getUpcomingInstallments(days: number = 7): Promise<{
+  static async getUpcomingInstallments(days?: number): Promise<{
     uid: number;
     plan_id: number;
     current_installment: number;
@@ -708,13 +708,23 @@ export class ApiService {
    */
   static async batchSetMembership(
     studentIds: number[],
-    membershipType: MembershipType,
+    membership: MembershipData
+  ): Promise<{ success: number; failed: number }>;
+  static async batchSetMembership(
+    studentIds: number[],
+    membershipType: MembershipType | MembershipData,
     startFromToday: boolean = true
   ): Promise<{ success: number; failed: number }> {
     return handleApiOperation(
       () => MembershipApiService.batchSetMembership(studentIds, membershipType, startFromToday),
       '批量设置会员',
-      { retryable: false, context: { studentIds, membershipType, startFromToday } }
+      {
+        retryable: false,
+        context:
+          typeof membershipType === 'string'
+            ? { studentIds, membershipType, startFromToday }
+            : { studentIds, membership: membershipType }
+      }
     );
   }
 
