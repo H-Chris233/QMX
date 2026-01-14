@@ -48,49 +48,50 @@ export const test = base.extend({
     }
   },
   
-  // 测试数据 fixture
+  // 测试数据 fixture - 使用 PostgreSQL Schema 格式
   testData: async ({}, use) => {
     const data = {
-      // 示例学生数据
+      // 示例学生数据（PostgreSQL Schema 格式）
       students: [
         {
-          name: '张三',
-          phone: '13800138000',
-          email: 'zhangsan@example.com',
-          idCard: '110101199001011234',
-          gender: '男',
-          birthday: '1990-01-01',
-          address: '北京市朝阳区',
+          name: '测试学生1',
+          phone: '13800138001',
+          age: 25,
+          classType: 'TEN_TRY', // 枚举: TEN_TRY, MONTH, YEAR, OTHERS
+          subject: 'SHOOTING', // 枚举: SHOOTING, ARCHERY, OTHERS
+          lessonLeft: 10,
+          note: '测试学生1',
         },
         {
-          name: '李四',
-          phone: '13900139000',
-          email: 'lisi@example.com',
-          idCard: '110101199002021234',
-          gender: '女',
-          birthday: '1990-02-02',
-          address: '北京市海淀区',
+          name: '测试学生2',
+          phone: '13800138002',
+          age: 30,
+          classType: 'MONTH',
+          subject: 'ARCHERY',
+          lessonLeft: 20,
+          note: '测试学生2',
         },
       ],
-      
+
       // 示例财务数据
       transactions: [
         {
-          type: 'income',
-          amount: 10000,
-          category: '学费',
-          description: '张三学费缴纳',
-          studentId: 'student001',
+          amount: 10000, // 单位：分
+          note: '测试学生1学费缴纳',
         },
         {
-          type: 'expense',
-          amount: 500,
-          category: '办公用品',
-          description: '购买教学用品',
+          amount: -500, // 单位：分，负数表示支出
+          note: '测试办公用品购买',
         },
       ],
+
+      // 班级类型枚举
+      classTypes: ['TEN_TRY', 'MONTH', 'YEAR', 'OTHERS'],
+
+      // 科目枚举
+      subjects: ['SHOOTING', 'ARCHERY', 'OTHERS'],
     };
-    
+
     await use(data);
   },
   

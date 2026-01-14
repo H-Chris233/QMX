@@ -175,11 +175,16 @@ BASE_URL=http://localhost:1420
 # API基础URL（默认: http://localhost:3001/api/v1）
 VITE_API_BASE_URL=http://localhost:3001/api/v1
 
+# PostgreSQL 数据库连接（必须配置）
+# 格式: postgresql://username:password@host:port/database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/qmx_test
+
 # CI环境
 CI=true
 
 # 测试环境
 NODE_ENV=test
+TEST_DATA_CLEANUP=true
 ```
 
 ## 📊 测试报告

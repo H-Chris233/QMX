@@ -51,7 +51,8 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: {
         NODE_ENV: 'test',
-        MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/qmx_test',
+        // PostgreSQL 配置 - 使用 DATABASE_URL
+        DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/qmx_test',
         TEST_DATA_CLEANUP: 'true',
       },
     },
