@@ -93,10 +93,19 @@ export class InstallmentController {
 
     // 获取所有计划（不分页，需要完整统计）
     const plans = await InstallmentPlanRepository.findAll();
+    const filteredPlans = plans.filter((plan) => {
+      if (filter.studentId !== undefined && plan.studentId !== filter.studentId) {
+        return false;
+      }
+      if (filter.status !== undefined && plan.status !== filter.status) {
+        return false;
+      }
+      return true;
+    });
 
     // 计算所有计划的统计信息
     const enrichedPlans = await Promise.all(
-      plans.map(async (plan) => {
+      filteredPlans.map(async (plan) => {
         const installments =
           await InstallmentRepository.findByPlanId(plan.uid);
         const student = plan.studentId
@@ -364,11 +373,12 @@ export class InstallmentController {
     } = req.body;
 
     // 输入验证
-    if (student_id !== undefined && student_id !== null) {
-      const student = await StudentRepository.findByUid(Number(student_id));
-      if (!student) {
-        throw AppError.notFound("指定的学员不存在");
-      }
+    if (student_id === undefined || student_id === null) {
+      throw AppError.invalidInput("学员不能为空");
+    }
+    const student = await StudentRepository.findByUid(Number(student_id));
+    if (!student) {
+      throw AppError.notFound("指定的学员不存在");
     }
 
     const normalizedFrequency = this.normalizeFrequency(frequency);
@@ -571,7 +581,10 @@ export class InstallmentController {
 
     res.status(201).json({
       success: true,
-      data: responseData,
+      data: {
+        plan: responseData,
+        installments: responseData.installments ?? [],
+      },
       message: "分期计划创建成功",
     });
   });
@@ -739,6 +752,7 @@ export class InstallmentController {
         plan: plan
           ? await this.buildPlanResponse(plan)
           : null,
+        cashTransaction: result.cash ? CashRepository.toResponse(result.cash) : null,
       },
       message: "分期付款状态更新成功",
     });
@@ -1441,14 +1455,19 @@ export class InstallmentController {
         ? { uid: student.uid, name: student.name, phone: student.phone }
         : null,
       total_amount: this.formatAmount(plan.totalAmount),
+      totalAmount: this.formatAmount(plan.totalAmount),
       totalAmountInCents: plan.totalAmount,
       installment_amount: this.formatAmount(plan.totalAmount / plan.totalInstallments),
       total_installments: plan.totalInstallments,
+      totalInstallments: plan.totalInstallments,
       frequency: plan.frequency,
       custom_days: plan.customDays,
       start_date: typeof plan.startDate === "string" ? plan.startDate : new Date(plan.startDate).toISOString().split('T')[0],
+      startDate: typeof plan.startDate === "string" ? plan.startDate : new Date(plan.startDate).toISOString().split('T')[0],
       status: plan.status,
       status_text: this.getStatusText(plan.status),
+      is_active: plan.status === InstallmentPlanStatus.ACTIVE,
+      isActive: plan.status === InstallmentPlanStatus.ACTIVE,
       frequency_text: this.getFrequencyText(plan.frequency, plan.customDays),
       progress,
       paid_count: stats.paidCount,

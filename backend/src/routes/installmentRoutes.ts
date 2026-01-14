@@ -22,7 +22,10 @@ router.use(apiRateLimitMiddleware);
 
 // 验证规则
 const createInstallmentPlanSchema = Joi.object({
-  student_id: Joi.number().integer().min(1).optional().allow(null),
+  student_id: Joi.number().integer().min(1).required().messages({
+    "any.required": "学员不能为空",
+    "number.min": "学员编号必须大于0",
+  }),
   total_amount: Joi.number().positive().required().messages({
     "number.positive": "总金额必须大于0",
     "any.required": "总金额不能为空",
@@ -54,10 +57,6 @@ const createInstallmentPlanSchema = Joi.object({
   start_date: Joi.date().iso().required().messages({
     "date.format": "开始日期格式不正确",
     "any.required": "开始日期不能为空",
-  }),
-  due_date: Joi.date().iso().required().messages({
-    "date.format": "到期日期格式不正确",
-    "any.required": "到期日期不能为空",
   }),
 });
 

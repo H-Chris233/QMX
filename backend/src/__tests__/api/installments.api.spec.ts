@@ -49,18 +49,20 @@ describe("Installment API Integration Tests", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.plan).toBeDefined();
       expect(response.body.data.plan.student_id).toBe(student.uid);
-      expect(response.body.data.plan.total_amount).toBe(120000);
+      expect(response.body.data.plan.totalAmountInCents).toBe(120000);
       expect(response.body.data.plan.total_installments).toBe(4);
       expect(response.body.data.plan.frequency).toBe(PaymentFrequencyValues.MONTHLY);
       expect(response.body.data.installments).toHaveLength(4);
     });
 
     it("creates weekly installment plan", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Weekly Plan Student" });
       const startDate = new Date();
 
       const response = await request(app)
         .post("/api/v1/installments")
         .send({
+          student_id: student.uid,
           total_amount: 400,
           total_installments: 4,
           frequency: PaymentFrequencyValues.WEEKLY,
@@ -72,16 +74,18 @@ describe("Installment API Integration Tests", () => {
       expect(response.body.data.installments).toHaveLength(4);
 
       const installments = response.body.data.installments;
-      expect(installments[0].installment_amount).toBe(10000);
+      expect(installments[0].installment_amount_in_cents).toBe(10000);
       expect(installments[1].current_installment).toBe(2);
     });
 
     it("creates custom frequency installment plan", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Custom Plan Student" });
       const startDate = new Date();
 
       const response = await request(app)
         .post("/api/v1/installments")
         .send({
+          student_id: student.uid,
           total_amount: 600,
           total_installments: 3,
           frequency: PaymentFrequencyValues.CUSTOM,
@@ -104,9 +108,11 @@ describe("Installment API Integration Tests", () => {
     });
 
     it("rejects plan with invalid frequency", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Invalid Frequency Student" });
       const response = await request(app)
         .post("/api/v1/installments")
         .send({
+          student_id: student.uid,
           total_amount: 1000,
           total_installments: 4,
           frequency: "INVALID",
@@ -118,9 +124,11 @@ describe("Installment API Integration Tests", () => {
     });
 
     it("rejects custom frequency without custom_days", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Missing Custom Days Student" });
       const response = await request(app)
         .post("/api/v1/installments")
         .send({
+          student_id: student.uid,
           total_amount: 1000,
           total_installments: 4,
           frequency: PaymentFrequencyValues.CUSTOM,
@@ -133,8 +141,10 @@ describe("Installment API Integration Tests", () => {
   });
 
   describe("GET /api/v1/installments", () => {
+    let student1: Awaited<ReturnType<typeof TestDataFactory.createStudent>>;
+
     beforeEach(async () => {
-      const student1 = await TestDataFactory.createStudent({
+      student1 = await TestDataFactory.createStudent({
         name: "Student 1",
       });
       const student2 = await TestDataFactory.createStudent({
@@ -175,18 +185,14 @@ describe("Installment API Integration Tests", () => {
     });
 
     it("filters plans by student", async () => {
-      const student = await TestDataFactory.createStudent({
-        name: "Student 1",
-      });
-
       const response = await request(app)
         .get("/api/v1/installments")
-        .query({ student_id: student.uid })
+        .query({ student_id: student1.uid })
         .expect(200);
 
       expect(response.body.data).toHaveLength(2);
       response.body.data.forEach((plan: any) => {
-        expect(plan.student_id).toBe(student.uid);
+        expect(plan.student_id).toBe(student1.uid);
       });
     });
 
@@ -269,25 +275,27 @@ describe("Installment API Integration Tests", () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.length).toBeGreaterThan(0);
-      response.body.data.forEach((inst: any) => {
+      const overdueInstallments = response.body.data.overdue_installments;
+      expect(overdueInstallments.length).toBeGreaterThan(0);
+      overdueInstallments.forEach((inst: any) => {
         expect(inst.is_overdue || inst.isOverdue).toBe(true);
       });
     });
 
     it("excludes paid installments from overdue list", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Paid Exclude Student" });
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        student.uid
       );
 
       const overdueDueDate = dateUtils.addDays(new Date(), -10);
-      await TestDataFactory.createInstallment(
+      const paidInstallment = await TestDataFactory.createInstallment(
         plan.uid,
-        null,
+        student.uid,
         1,
         2,
         300,
@@ -299,7 +307,11 @@ describe("Installment API Integration Tests", () => {
         .get("/api/v1/installments/overdue")
         .expect(200);
 
-      expect(response.body.data.length).toBe(0);
+      const overdueInstallments = response.body.data.overdue_installments;
+      overdueInstallments.forEach((inst: any) => {
+        expect(inst.uid).not.toBe(paidInstallment.uid);
+        expect(inst.status).not.toBe(InstallmentStatusValues.PAID);
+      });
     });
   });
 
@@ -389,9 +401,17 @@ describe("Installment API Integration Tests", () => {
     });
 
     it("rejects invalid payment status", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Invalid Status Student" });
+      const plan = await TestDataFactory.createInstallmentPlan(
+        600,
+        2,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        student.uid
+      );
       const installment = await TestDataFactory.createInstallment(
-        1,
-        null,
+        plan.uid,
+        student.uid,
         1,
         2,
         300,
@@ -413,12 +433,13 @@ describe("Installment API Integration Tests", () => {
 
   describe("DELETE /api/v1/installments/:id", () => {
     it("deletes installment plan", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Delete Plan Student" });
       const plan = await TestDataFactory.createInstallmentPlan(
         600,
         2,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        student.uid
       );
 
       const response = await request(app)
@@ -445,12 +466,13 @@ describe("Installment API Integration Tests", () => {
 
   describe("Installment Plan Response Format", () => {
     it("includes all required fields", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Response Fields Student" });
       const plan = await TestDataFactory.createInstallmentPlan(
         1200,
         4,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        student.uid
       );
 
       const response = await request(app)
@@ -474,9 +496,11 @@ describe("Installment API Integration Tests", () => {
 
   describe("Edge Cases", () => {
     it("handles single installment plan", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Single Installment Student" });
       const response = await request(app)
         .post("/api/v1/installments")
         .send({
+          student_id: student.uid,
           total_amount: 500,
           total_installments: 1,
           frequency: PaymentFrequencyValues.MONTHLY,
@@ -489,9 +513,11 @@ describe("Installment API Integration Tests", () => {
     });
 
     it("handles large number of installments", async () => {
+      const student = await TestDataFactory.createStudent({ name: "Large Installment Student" });
       const response = await request(app)
         .post("/api/v1/installments")
         .send({
+          student_id: student.uid,
           total_amount: 12000,
           total_installments: 12,
           frequency: PaymentFrequencyValues.MONTHLY,

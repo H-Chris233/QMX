@@ -433,7 +433,7 @@ export async function createCompleteTestDataset(): Promise<CompleteTestDataset> 
 
   // Create installments with different statuses
   for (let i = 0; i < 4; i++) {
-    const dueDate = addDays(new Date(), -30 + i * 30);
+    const dueDate = addDays(new Date(), -30 + i * 5);
     const status = i < 2 ? 'PAID' : (i === 2 ? 'PENDING' : 'PENDING');
     const paidAmount = i < 2 ? 200 : 0;
 

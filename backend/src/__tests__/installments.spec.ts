@@ -49,19 +49,20 @@ describe('Installment Service', () => {
     });
 
     it('creates weekly installment plan', async () => {
+      const student = await createTestStudent({ name: 'Weekly Plan Student' });
       const startDate = new Date();
       const plan = await createTestInstallmentPlan(
         500,
         8,
         PaymentFrequencyValues.WEEKLY,
         startDate,
-        null
+        student.uid
       );
 
       expect(plan.totalAmount).toBe(50000);
       expect(plan.totalInstallments).toBe(8);
       expect(plan.frequency).toBe(PaymentFrequencyValues.WEEKLY);
-      expect(plan.studentId).toBeNull();
+      expect(plan.studentId).toBe(student.uid);
     });
 
     it('creates custom frequency installment plan', async () => {
@@ -422,8 +423,15 @@ describe('Installment Service', () => {
 
   describe('Installment Deletion', () => {
     it('deletes installment', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const installment = await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,

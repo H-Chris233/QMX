@@ -21,6 +21,7 @@ import {
   isNotNull,
   inArray,
 } from 'drizzle-orm';
+import { AppError } from '@/utils/errors';
 
 export interface DashboardStatsData {
   totalStudents: number;
@@ -36,11 +37,15 @@ export interface DashboardStatsData {
 }
 
 export interface FinancialPeriod {
-  type: 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear';
+  type: 'Today' | 'ThisWeek' | 'ThisMonth' | 'ThisYear' | 'All';
 }
 
 export interface FinancialStatsData {
   period: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
   totals: {
     incomeCents: number;
     expenseCents: number;
@@ -164,7 +169,10 @@ export class StatsService {
       }
 
       if (student.classType && student.classType !== 'OTHERS') {
-        activeCourses.add(student.classType);
+        const endDate = student.membershipEndDate ? new Date(student.membershipEndDate) : null;
+        if (!endDate || endDate >= new Date()) {
+          activeCourses.add(student.classType);
+        }
       }
 
       // 检查会员有效性
@@ -208,7 +216,7 @@ export class StatsService {
       .limit(1);
 
     if (!student) {
-      throw new Error('学员不存在');
+      throw AppError.notFound('学员不存在');
     }
 
     // 学员收入统计
@@ -415,6 +423,10 @@ export class StatsService {
 
     return {
       period: normalizedPeriod,
+      dateRange: {
+        start: dateRange.start.toISOString(),
+        end: dateRange.end.toISOString(),
+      },
       totals: {
         incomeCents,
         expenseCents,
@@ -436,7 +448,7 @@ export class StatsService {
    * 归一化财务周期
    */
   private static normalizeFinancialPeriod(period?: string | null): string {
-    const validPeriods = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear'] as const;
+    const validPeriods = ['Today', 'ThisWeek', 'ThisMonth', 'ThisYear', 'All'] as const;
     if (period && (validPeriods as readonly string[]).includes(period)) {
       return period;
     }
@@ -452,6 +464,12 @@ export class StatsService {
     let end: Date;
 
     switch (period) {
+      case 'All':
+        start = new Date(0);
+        end = new Date();
+        end.setDate(end.getDate() + 1);
+        break;
+
       case 'Today':
         start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         end = new Date(start);

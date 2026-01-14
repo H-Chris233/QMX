@@ -188,6 +188,16 @@ export class TestDataFactory {
     overrides: any = {}
   ) {
     const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
+    const normalizedOverrides = overrides ?? {};
+    const inferredStudentId = typeof normalizedOverrides === 'number' ? normalizedOverrides : normalizedOverrides.studentId;
+
+    let studentId = inferredStudentId;
+    if (studentId === null || studentId === undefined) {
+      const student = await this.createStudent({
+        name: 'Test Student for Installment Plan',
+      });
+      studentId = student.uid;
+    }
 
     // 将 Date 转换为 ISO 字符串日期
     const startDateStr = startDate instanceof Date
@@ -195,12 +205,12 @@ export class TestDataFactory {
       : startDate;
 
     return await InstallmentPlanRepository.create({
-      studentId: overrides.studentId ?? null,
+      studentId,
       totalAmount: totalAmount * 100, // 转换为分
       downPayment: 0,
       totalInstallments,
       frequency,
-      customDays: overrides.customDays,
+      customDays: typeof normalizedOverrides === 'object' ? normalizedOverrides.customDays : undefined,
       startDate: startDateStr,
       note: undefined,
     });
@@ -215,7 +225,16 @@ export class TestDataFactory {
     dueDate: Date,
     status: any
   ) {
-    const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
+    const { InstallmentRepository, InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
+
+    let resolvedStudentId = studentId;
+    if (resolvedStudentId === null || resolvedStudentId === undefined) {
+      const plan = await InstallmentPlanRepository.findByUid(planId);
+      if (!plan) {
+        throw new Error('分期计划不存在，无法创建分期记录');
+      }
+      resolvedStudentId = plan.studentId;
+    }
 
     // 将 Date 转换为 ISO 字符串日期
     const dueDateStr = dueDate instanceof Date
@@ -224,7 +243,7 @@ export class TestDataFactory {
 
     return await InstallmentRepository.create({
       planId,
-      studentId,
+      studentId: resolvedStudentId,
       installmentNumber,
       installmentAmount: amount * 100, // 转换为分
       dueDate: dueDateStr,

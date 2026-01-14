@@ -13,10 +13,10 @@ router.use(apiRateLimitMiddleware);
 // 验证规则
 const financialStatsSchema = Joi.object({
   period: Joi.string()
-    .valid('Today', 'ThisWeek', 'ThisMonth', 'ThisYear')
+    .valid('Today', 'ThisWeek', 'ThisMonth', 'ThisYear', 'All')
     .default('ThisMonth')
     .messages({
-      'any.only': '无效的统计周期，支持: Today, ThisWeek, ThisMonth, ThisYear',
+      'any.only': '无效的统计周期，支持: Today, ThisWeek, ThisMonth, ThisYear, All',
     }),
 });
 
