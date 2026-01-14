@@ -185,9 +185,16 @@ describe('Installment Service', () => {
 
   describe('Overdue Detection', () => {
     it('detects overdue installment', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const overdueDueDate = addDays(new Date(), -10);
       const installment = await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,
@@ -201,9 +208,16 @@ describe('Installment Service', () => {
     });
 
     it('does not mark future installment as overdue', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const futureDueDate = addDays(new Date(), 10);
       const installment = await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,
@@ -217,9 +231,16 @@ describe('Installment Service', () => {
     });
 
     it('does not mark paid installment as overdue', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const overdueDueDate = addDays(new Date(), -10);
       const installment = await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,
@@ -232,12 +253,19 @@ describe('Installment Service', () => {
     });
 
     it('finds all overdue installments', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const today = new Date();
       const pastDate = addDays(today, -5);
       const futureDate = addDays(today, 5);
 
       await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,
@@ -246,7 +274,7 @@ describe('Installment Service', () => {
         InstallmentStatusValues.PENDING
       );
       await createTestInstallment(
-        1,
+        plan.uid,
         null,
         2,
         3,
@@ -255,7 +283,7 @@ describe('Installment Service', () => {
         InstallmentStatusValues.PENDING
       );
       await createTestInstallment(
-        1,
+        plan.uid,
         null,
         3,
         3,
@@ -275,8 +303,15 @@ describe('Installment Service', () => {
 
   describe('Payment Processing', () => {
     it('marks installment as paid and records amount', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const installment = await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,
@@ -299,8 +334,15 @@ describe('Installment Service', () => {
     });
 
     it('tracks paid amount', async () => {
+      const plan = await createTestInstallmentPlan(
+        300,
+        3,
+        PaymentFrequencyValues.MONTHLY,
+        new Date(),
+        null
+      );
       const installment = await createTestInstallment(
-        1,
+        plan.uid,
         null,
         1,
         3,

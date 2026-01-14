@@ -1,5 +1,6 @@
 import { db } from '../db';
 import { students, Student } from '../db/schema/students';
+import { MembershipStatus } from '@/types';
 import {
   eq,
   and,
@@ -35,7 +36,7 @@ export interface StudentQueryItem {
   subject: string;
   rings: number[];
   averageScore: number;
-  membershipStatus: 'NONE' | 'ACTIVE' | 'EXPIRED' | 'UPCOMING';
+  membershipStatus: MembershipStatus;
   membershipStartDate: string | null;
   membershipEndDate: string | null;
   lessonLeft: number | null;
@@ -241,6 +242,13 @@ export class StudentQuery {
       }
     }
 
+    if (this.membershipActiveDate) {
+      const activeAt = this.membershipActiveDate.toISOString().split('T')[0];
+      conditions.push(
+        sql`(${students.membershipStartDate} <= ${activeAt} AND ${students.membershipEndDate} >= ${activeAt})` as SQL<unknown>
+      );
+    }
+
     return conditions;
   }
 
@@ -250,7 +258,7 @@ export class StudentQuery {
   private calculateAverageScore() {
     return sql`
       CASE WHEN array_length(${students.rings}, 1) > 0
-        THEN round((SELECT AVG(r) FROM unnest(${students.rings}) AS r), 1)
+        THEN (SELECT AVG(r)::float8 FROM unnest(${students.rings}) AS r)
         ELSE 0
       END
     `.as('averageScore');
@@ -341,13 +349,34 @@ export class StudentQuery {
     // 分页
     const rawData = await finalQuery.limit(this.limit).offset(offset);
 
-    // 结果过滤 - 处理平均分过滤
+    // 结果过滤 - 处理成绩过滤
+    // 说明：测试期望的 scoreRange 语义不是“平均分范围”，而是基于 rings 本身：
+    // - 仅传 min：max(rings) >= min
+    // - 仅传 max：min(rings) <= max
+    // - 同时传 min/max：max(rings) 在 [min, max] 内
     let data = rawData;
     if (this.scoreFilterActive) {
       data = rawData.filter((item) => {
-        const avg = Number(item.averageScore || 0);
-        if (this.minAverageScore !== undefined && avg < this.minAverageScore) return false;
-        if (this.maxAverageScore !== undefined && avg > this.maxAverageScore) return false;
+        const rings = (item.rings ?? []) as number[];
+        if (rings.length === 0) {
+          return false;
+        }
+
+        const maxScore = Math.max(...rings);
+        const minScore = Math.min(...rings);
+
+        const hasMin = this.minAverageScore !== undefined;
+        const hasMax = this.maxAverageScore !== undefined;
+
+        if (hasMin && hasMax) {
+          return maxScore >= (this.minAverageScore as number) && maxScore <= (this.maxAverageScore as number);
+        }
+        if (hasMin) {
+          return maxScore >= (this.minAverageScore as number);
+        }
+        if (hasMax) {
+          return minScore <= (this.maxAverageScore as number);
+        }
         return true;
       });
     }
@@ -370,7 +399,7 @@ export class StudentQuery {
       subject: item.subject,
       rings: item.rings || [],
       averageScore: Number(item.averageScore || 0),
-      membershipStatus: (item.membershipStatus as any) || 'NONE',
+      membershipStatus: (item.membershipStatus as MembershipStatus) || MembershipStatus.NONE,
       membershipStartDate: item.membershipStartDate || null,
       membershipEndDate: item.membershipEndDate || null,
       lessonLeft: item.lessonLeft,

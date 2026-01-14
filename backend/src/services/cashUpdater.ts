@@ -1,6 +1,6 @@
 import { CashRepository } from '../db/repositories/cashRepository';
 import { StudentRepository } from '../db/repositories/studentRepository';
-import { CashTransaction } from '../db/schema/cash';
+import { CashTransaction, NewCashTransaction } from '../db/schema/cash';
 import type { ICashInstallmentSnapshot } from '@/types';
 import { AppError } from '@/utils/errors';
 import { convertAmountToCents, normalizeNote, sanitizeInstallmentSnapshot } from './cashBuilder';
@@ -101,12 +101,22 @@ export class CashUpdater {
       this.cashData.installmentSnapshot = this.pendingInstallment ?? null;
     }
 
-    const updated = await CashRepository.updateByUid(uid, {
-      amount: this.cashData.amount ?? undefined,
-      studentId: this.cashData.studentId ?? undefined,
-      note: this.cashData.note ?? undefined,
-      installmentSnapshot: this.cashData.installmentSnapshot ?? undefined,
-    });
+    const updates: Partial<NewCashTransaction> = {};
+
+    if (this.cashData.amount !== undefined) {
+      updates.amount = this.cashData.amount;
+    }
+    if (this.cashData.studentId !== undefined) {
+      updates.studentId = this.cashData.studentId;
+    }
+    if (this.cashData.note !== undefined) {
+      updates.note = this.cashData.note;
+    }
+    if (this.cashData.installmentSnapshot !== undefined) {
+      updates.installmentSnapshot = this.cashData.installmentSnapshot;
+    }
+
+    const updated = await CashRepository.updateByUid(uid, updates);
 
     if (!updated) {
       throw new Error('更新交易记录失败');

@@ -125,6 +125,28 @@ describe('Student API Integration Tests', () => {
   });
 
   describe('GET /api/v1/students', () => {
+    beforeEach(async () => {
+      // 为列表/筛选/分页用例准备固定种子数据
+      await TestDataFactory.createStudent({
+        name: 'Alice',
+        class: ClassType.MONTH,
+        phone: '13800138010',
+        subject: SubjectType.SHOOTING,
+      });
+      await TestDataFactory.createStudent({
+        name: 'Bob',
+        class: ClassType.TEN_TRY,
+        phone: '13800138011',
+        subject: SubjectType.SHOOTING,
+      });
+      await TestDataFactory.createStudent({
+        name: 'Charlie',
+        class: ClassType.YEAR,
+        phone: '13800138012',
+        subject: SubjectType.SHOOTING,
+      });
+    });
+
     it('basic API connectivity test', async () => {
       // 最基本的API连接测试
       try {
@@ -197,7 +219,7 @@ describe('Student API Integration Tests', () => {
         .expect(404);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('不存在');
+      expect(response.body.error.message).toContain('不存在');
     });
 
     it('returns 400 for invalid id', async () => {

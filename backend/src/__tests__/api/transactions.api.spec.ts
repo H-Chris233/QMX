@@ -74,7 +74,7 @@ describe('Transaction API Integration Tests', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('金额不能为0');
+      expect(response.body.error.message).toContain('金额不能为0');
     });
 
     it('rejects transaction with missing amount', async () => {
@@ -114,9 +114,12 @@ describe('Transaction API Integration Tests', () => {
   });
 
   describe('GET /api/v1/transactions', () => {
+    let student1: any;
+    let student2: any;
+
     beforeEach(async () => {
-      const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
-      const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
+      student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
+      student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
 
       await TestDataFactory.createCashTransaction(100, { studentId: student1.uid, note: 'Payment 1' });
       await TestDataFactory.createCashTransaction(200, { studentId: student1.uid, note: 'Payment 2' });
@@ -136,16 +139,14 @@ describe('Transaction API Integration Tests', () => {
     });
 
     it('filters transactions by student', async () => {
-      const student = await TestDataFactory.createStudent({ name: 'Student 1' });
-
       const response = await request(app)
         .get('/api/v1/transactions')
-        .query({ student_id: student.uid })
+        .query({ student_id: student1.uid })
         .expect(200);
 
       expect(response.body.data).toHaveLength(2);
       response.body.data.forEach((tx: any) => {
-        expect(tx.student_id).toBe(student.uid);
+        expect(tx.student_id).toBe(student1.uid);
       });
     });
 

@@ -19,6 +19,7 @@ import {
   desc,
   asc,
   isNotNull,
+  inArray,
 } from 'drizzle-orm';
 
 export interface DashboardStatsData {
@@ -241,7 +242,7 @@ export class StatsService {
           .select()
           .from(installments)
           .where(
-            sql`${installments.planId} = ANY(${planIds})`
+            inArray(installments.planId, planIds)
           )
       : [];
 
@@ -352,7 +353,7 @@ export class StatsService {
       const studentDocs = await db
         .select({ uid: students.uid, name: students.name })
         .from(students)
-        .where(sql`${students.uid} = ANY(${studentIds})`);
+        .where(inArray(students.uid, studentIds));
 
       for (const doc of studentDocs) {
         studentMap.set(doc.uid, doc.name);
@@ -384,7 +385,7 @@ export class StatsService {
           .select()
           .from(installments)
           .where(
-            sql`${installments.planId} = ANY(${planIds2})`
+            inArray(installments.planId, planIds2)
           )
       : [];
 

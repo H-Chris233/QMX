@@ -506,7 +506,9 @@ export class InstallmentRepository {
     }
     const ref = new Date(referenceDate);
     const due = new Date(installment.dueDate);
-    return due.getTime() < ref.getTime();
+    const refMidnight = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+    const dueMidnight = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+    return dueMidnight.getTime() < refMidnight.getTime();
   }
 
   // 计算逾期天数

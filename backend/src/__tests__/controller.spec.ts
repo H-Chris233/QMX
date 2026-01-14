@@ -372,7 +372,11 @@ describe('CashController - Helper Functions', () => {
         min_amount: Math.round(Number(query.minAmount) * 100),
         max_amount: Math.round(Number(query.maxAmount) * 100),
         is_income: query.isIncome === 'true',
-        has_installment: query.hasInstallment === 'false',
+        has_installment: query.hasInstallment === 'true'
+          ? true
+          : query.hasInstallment === 'false'
+            ? false
+            : undefined,
         date_from: query.dateFrom,
         date_to: query.dateTo,
         page: Number(query.page),

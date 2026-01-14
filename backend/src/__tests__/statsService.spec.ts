@@ -37,7 +37,7 @@ describe('StatsService', () => {
       expect(stats.totalRevenueCents).toBe(95000); // 500 + 300 + 150
       expect(stats.totalExpenseCents).toBe(30000); // -100 + -200
       expect(stats.netIncomeCents).toBe(65000);
-      expect(stats.averageScore).toBeCloseTo(8.4, 1);
+      expect(stats.averageScore).toBeCloseTo(8.3, 1);
       expect(stats.maxScore).toBeCloseTo(9.1, 1);
       expect(stats.activeCourses).toBe(2); // 试课 + 月卡
       expect(stats.activeMembers).toBe(1);

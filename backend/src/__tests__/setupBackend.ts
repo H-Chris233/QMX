@@ -18,9 +18,12 @@ process.env.LOG_LEVEL = 'error';
 // 检查数据库连接
 export async function setupTestDatabase(): Promise<void> {
   try {
-    // 测试数据库连接 - 使用 query 方法避免类型问题
+    // 测试数据库连接：兼容 drizzle/pg 的不同返回形态（rows 或数组）
     const result = await db.execute(sql`SELECT 1 as val`);
-    if (result[0]?.val !== 1) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = Array.isArray(result) ? result : (result as any)?.rows;
+    const val = rows?.[0]?.val;
+    if (Number(val) !== 1) {
       throw new Error('Database connection test failed');
     }
     console.log('🧪 测试数据库连接已建立');
@@ -141,7 +144,13 @@ export class TestDataFactory {
     }
 
     if (overrides.membership) {
-      builder.membership(overrides.membership);
+      const membership = overrides.membership;
+      // 兼容 { startDate, endDate } 结构
+      if (membership && typeof membership === 'object' && ('startDate' in membership || 'endDate' in membership)) {
+        builder.membership(membership.startDate ?? null, membership.endDate ?? null);
+      } else {
+        builder.membership(null, null);
+      }
     }
 
     if (overrides.age !== undefined) {

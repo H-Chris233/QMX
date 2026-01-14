@@ -78,7 +78,13 @@ describe('Service Integration - 复杂业务场景', () => {
     });
 
     it('会员续费流程', async () => {
-      const student = await createTestStudent({ name: 'Extend Test' });
+      const student = await createTestStudent({
+        name: 'Extend Test',
+        membership: {
+          startDate: addDays(new Date(), -10),
+          endDate: addDays(new Date(), 20),
+        },
+      });
 
       const originalEnd = student.membershipEndDate;
 

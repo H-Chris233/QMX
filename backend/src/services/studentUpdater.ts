@@ -1,6 +1,7 @@
 import { StudentRepository } from '../db/repositories/studentRepository';
 import { Student } from '../db/schema/students';
 import { NewStudent } from '../db/schema/students';
+import { normalizeStudentPhoneOrThrow } from './studentPhone';
 
 const SCORE_MIN = 0;
 const SCORE_MAX = 10;
@@ -46,14 +47,7 @@ export class StudentUpdater {
   }
 
   phone(phone: string): this {
-    if (phone.length > 20) {
-      throw new Error('手机号长度不能超过20字符');
-    }
-    const phoneRegex = /^1[3-9]\d{9}$/;
-    if (!phoneRegex.test(phone) && phone !== '未填写') {
-      throw new Error('手机号格式不正确');
-    }
-    this.updates.phone = phone;
+    this.updates.phone = normalizeStudentPhoneOrThrow(phone);
     return this;
   }
 
@@ -78,6 +72,10 @@ export class StudentUpdater {
     return this;
   }
 
+  private getCurrentRings(): number[] {
+    return (this.updates.rings ?? this.student.rings ?? []) as number[];
+  }
+
   addRing(score: number): this {
     if (typeof score !== 'number' || Number.isNaN(score)) {
       throw new Error('成绩必须是数字');
@@ -85,13 +83,13 @@ export class StudentUpdater {
     if (score < SCORE_MIN || score > SCORE_MAX) {
       throw new Error(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
     }
-    const newRings = [...(this.student.rings || []), score];
+    const newRings = [...this.getCurrentRings(), score];
     this.updates.rings = newRings;
     return this;
   }
 
   removeRing(index: number): this {
-    const rings = this.student.rings || [];
+    const rings = this.getCurrentRings();
     if (index < 0 || index >= rings.length) {
       throw new Error('成绩索引超出范围');
     }
@@ -107,7 +105,7 @@ export class StudentUpdater {
     if (score < SCORE_MIN || score > SCORE_MAX) {
       throw new Error(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
     }
-    const rings = this.student.rings || [];
+    const rings = this.getCurrentRings();
     if (index < 0 || index >= rings.length) {
       throw new Error('成绩索引超出范围');
     }
@@ -134,6 +132,9 @@ export class StudentUpdater {
   }
 
   membership(startDate?: string | Date | null, endDate?: string | Date | null): this {
+    if (startDate === undefined && endDate === undefined) {
+      return this;
+    }
     const formatDate = (d?: string | Date | null): string | null => {
       if (d === null || d === undefined) return null;
       const date = typeof d === 'string' ? new Date(d) : d;
@@ -154,8 +155,9 @@ export class StudentUpdater {
       throw new Error('会员开始日期不能晚于结束日期');
     }
 
-    this.updates.membershipStartDate = formattedStart ?? undefined;
-    this.updates.membershipEndDate = formattedEnd ?? undefined;
+    // 重要：清空会员时必须显式写入 null（不能用 undefined，否则 update 会跳过字段）
+    this.updates.membershipStartDate = formattedStart;
+    this.updates.membershipEndDate = formattedEnd;
 
     return this;
   }

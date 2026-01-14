@@ -6,6 +6,7 @@ interface StudentJson {
   age?: number | null;
   phone?: string;
   class?: string;
+  classType?: string;
   subject?: string;
   rings?: number[];
   note?: string;
@@ -124,6 +125,19 @@ const hasMembership = (
 export const presentStudent = (student: StudentPresentable): PresentedStudent => {
   const json = student as StudentJson;
 
+  const resolvedClassType =
+    json.classType
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ?? (student as any).classType
+    ?? json.class
+    ?? '';
+  const resolvedClass = json.class ?? resolvedClassType;
+  const resolvedSubject =
+    json.subject
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ?? (student as any).subject
+    ?? '';
+
   const lessonLeft = json.lessonLeft ?? json.lesson_left ?? null;
   const membershipStartDate = formatDateOnly(
     json.membershipStartDate ?? json.membership_start_date ?? student.membershipStartDate ?? null
@@ -159,9 +173,9 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     name: json.name ?? '',
     age: json.age ?? null,
     phone: json.phone ?? '',
-    class: json.class ?? '',
-    classType: json.class ?? '',
-    subject: json.subject ?? '',
+    class: resolvedClass,
+    classType: resolvedClassType,
+    subject: resolvedSubject,
     rings,
     averageScore,
     note: json.note ?? '',

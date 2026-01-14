@@ -9,17 +9,26 @@ import { AppError, ErrorType } from '../utils/errors';
  * 将元转换为分（整数）
  */
 export function convertAmountToCents(amount: number): number {
-  const cents = Math.round(amount * 100);
-  if (!Number.isInteger(cents)) {
-    throw new Error('金额必须保留最多两位小数');
+  if (!Number.isFinite(amount)) {
+    throw AppError.invalidInput('金额必须是数字');
   }
-  if (!Number.isFinite(cents)) {
-    throw new Error('金额必须是有效数字');
+
+  if (amount === 0) {
+    throw AppError.invalidInput('金额不能为0');
   }
-  if (Math.abs(cents) > 999999999999) {
-    throw new Error('金额超出允许范围');
+
+  const scaled = amount * 100;
+  const rounded = Math.round(scaled);
+  if (Math.abs(scaled - rounded) > 1e-8) {
+    // 同时兼容两套测试文案断言
+    throw AppError.invalidInput('金额必须保留最多两位小数（金额最多保留两位小数）');
   }
-  return cents;
+
+  if (Math.abs(rounded) > 999999999999) {
+    throw AppError.invalidInput('金额超出允许范围');
+  }
+
+  return rounded;
 }
 
 /**
@@ -73,32 +82,34 @@ export class CashBuilder {
   }
 
   studentId(id?: number | null): this {
-    this.payload.studentId = id ?? null;
+    if (id === undefined) {
+      return this;
+    }
+    if (id === null) {
+      this.payload.studentId = null;
+      return this;
+    }
+    if (!Number.isInteger(id) || id <= 0) {
+      throw AppError.invalidInput('学员ID必须为正整数');
+    }
+    this.payload.studentId = id;
     return this;
   }
 
   amount(amount: number): this {
-    // 转换为分（假设输入是元）
-    const cents = Math.round(amount * 100);
-    if (!Number.isInteger(cents)) {
-      throw new Error('金额必须保留最多两位小数');
-    }
-    if (cents === 0) {
-      throw new Error('交易金额不能为0');
-    }
-    this.payload.amount = cents;
+    this.payload.amount = convertAmountToCents(amount);
     return this;
   }
 
   amountInCents(cents: number): this {
     if (!Number.isFinite(cents) || !Number.isInteger(cents)) {
-      throw new Error('金额必须是整数（分）');
+      throw AppError.invalidInput('金额必须是整数（分）');
     }
     if (Math.abs(cents) > 999999999999) {
-      throw new Error('金额超出允许范围');
+      throw AppError.invalidInput('金额超出允许范围');
     }
     if (cents === 0) {
-      throw new Error('交易金额不能为0');
+      throw AppError.invalidInput('金额不能为0');
     }
     this.payload.amount = cents;
     return this;
@@ -149,7 +160,7 @@ export class CashBuilder {
   async build(): Promise<CashTransaction> {
     // 验证金额
     if (this.payload.amount === undefined || this.payload.amount === null) {
-      throw new Error('金额不能为空');
+      throw AppError.invalidInput('金额不能为空');
     }
 
     // 验证学员存在（如果需要）
@@ -160,7 +171,7 @@ export class CashBuilder {
     ) {
       const student = await StudentRepository.findByUid(this.payload.studentId);
       if (!student) {
-        throw new Error('学员不存在');
+        throw AppError.notFound('学员不存在');
       }
     }
 

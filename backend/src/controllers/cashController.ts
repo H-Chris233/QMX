@@ -546,9 +546,11 @@ export class CashController {
       student_name: null as string | null,
       student: null as Record<string, unknown> | null,
       cash: transaction.amount,
+      cashInCents: transaction.amount,
       amount_in_cents: transaction.amount,
       amountInCents: transaction.amount,
-      amount: amountYuan,
+      // amount 对外保持“绝对值”（配合 isIncome/isExpense 与 formatted_amount 表达方向）
+      amount: Math.abs(amountYuan),
       description: this.getTransactionDescription(transaction),
       note: transaction.note,
       is_income: isIncome,
@@ -573,7 +575,7 @@ export class CashController {
 
   // 私有辅助方法：获取交易描述
   private getTransactionDescription(transaction: CashTransaction): string {
-    const amountYuan = transaction.amount / 100;
+    const amountYuan = Math.abs(transaction.amount / 100);
     const prefix = transaction.amount > 0 ? "收入" : "支出";
     return `${prefix} ¥${amountYuan.toFixed(2)}`;
   }

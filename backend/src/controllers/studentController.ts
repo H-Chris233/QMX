@@ -117,24 +117,17 @@ export class StudentController {
       sort_order = "DESC",
     } = req.query;
 
-    // 构建查询选项
-    const options = {
-      page: Number(page),
-      limit: Number(limit),
-      nameContains: name_contains as string | undefined,
-      minAge: parseNumber(min_age),
-      maxAge: parseNumber(max_age),
-      minScore: parseNumber(min_score),
-      maxScore: parseNumber(max_score),
-      classType: class_type as ClassType | undefined,
-      subject: subject as SubjectType | undefined,
-      hasMembership: parseBoolean(has_membership),
-      membershipActiveAt: membership_active_at as string | undefined,
-      sortBy: sort_by as string | undefined,
-      sortOrder: sort_order as "ASC" | "DESC",
-    };
-
-    const result = await StudentRepository.findWithPagination(options);
+    const result = await StudentQuery.create()
+      .nameContains(name_contains as string | undefined)
+      .ageRange(parseNumber(min_age), parseNumber(max_age))
+      .classType(class_type as ClassType | undefined)
+      .subject(subject as SubjectType | undefined)
+      .hasMembership(parseBoolean(has_membership))
+      .membershipActiveAt(membership_active_at as string | undefined)
+      .scoreRange(parseNumber(min_score), parseNumber(max_score))
+      .sort(sort_by as string | undefined, (sort_order as "ASC" | "DESC") ?? "DESC")
+      .paginate(Number(page), Number(limit))
+      .execute();
 
     res.json({
       success: true,
@@ -146,15 +139,21 @@ export class StudentController {
   public addStudent = catchAsync(async (req: Request, res: Response) => {
     const payload = req.body;
 
+    const classType = (payload.class?.toUpperCase() ?? 'TEN_TRY') as ClassType;
+    const lessonLeftInput = payload.lesson_left ?? payload.lessonLeft;
+
     // 构建学员数据
     const newStudent = {
       name: payload.name,
       age: payload.age === null || payload.age === undefined ? null : Number(payload.age),
       phone: payload.phone,
-      classType: (payload.class?.toUpperCase() ?? 'TEN_TRY') as ClassType,
+      classType,
       subject: (payload.subject?.toUpperCase() ?? 'SHOOTING') as SubjectType,
       note: payload.note ?? '',
-      lessonLeft: (payload.lesson_left == null && payload.lessonLeft == null) ? 0 : Number(payload.lesson_left ?? payload.lessonLeft),
+      // TEN_TRY 默认 10 节课，其它类型默认 0（与 StudentBuilder 行为保持一致）
+      lessonLeft: lessonLeftInput == null
+        ? (classType === 'TEN_TRY' ? 10 : 0)
+        : Number(lessonLeftInput),
       rings: Array.isArray(payload.rings) ? payload.rings : [],
       membershipStartDate: payload.membership_start_date ?? payload.membershipStartDate
         ? (typeof (payload.membership_start_date ?? payload.membershipStartDate) === 'string'
@@ -248,23 +247,17 @@ export class StudentController {
       sort_order = "DESC",
     } = req.query;
 
-    const options = {
-      page: Number(page),
-      limit: Number(limit),
-      nameContains: name_contains as string | undefined,
-      minAge: parseNumber(min_age),
-      maxAge: parseNumber(max_age),
-      minScore: parseNumber(min_score),
-      maxScore: parseNumber(max_score),
-      classType: class_type as ClassType | undefined,
-      subject: subject as SubjectType | undefined,
-      hasMembership: parseBoolean(has_membership),
-      membershipActiveAt: membership_active_at as string | undefined,
-      sortBy: sort_by as string | undefined,
-      sortOrder: sort_order as "ASC" | "DESC",
-    };
-
-    const result = await StudentRepository.findWithPagination(options);
+    const result = await StudentQuery.create()
+      .nameContains(name_contains as string | undefined)
+      .ageRange(parseNumber(min_age), parseNumber(max_age))
+      .classType(class_type as ClassType | undefined)
+      .subject(subject as SubjectType | undefined)
+      .hasMembership(parseBoolean(has_membership))
+      .membershipActiveAt(membership_active_at as string | undefined)
+      .scoreRange(parseNumber(min_score), parseNumber(max_score))
+      .sort(sort_by as string | undefined, (sort_order as "ASC" | "DESC") ?? "DESC")
+      .paginate(Number(page), Number(limit))
+      .execute();
 
     res.json({
       success: true,

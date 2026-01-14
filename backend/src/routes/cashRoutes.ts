@@ -12,19 +12,10 @@ const router: Router = express.Router();
 router.use(apiRateLimitMiddleware);
 
 // 验证规则
-const amountMessages = {
-  'number.base': '金额必须是数字',
-  'number.precision': '金额最多保留两位小数',
-  'any.invalid': '金额不能为0',
-  'any.required': '金额不能为空',
-};
-
-const amountSchema = Joi.number().precision(2).invalid(0).required().messages(amountMessages);
-
-const optionalAmountSchema = Joi.number().precision(2).optional().allow(null).empty('').messages({
-  'number.base': '金额必须是数字',
-  'number.precision': '金额最多保留两位小数',
-});
+// 注意：不要使用 Joi.number().precision()，它会四舍五入导致“多于两位小数”的输入无法被拒绝。
+// 统一复用 commonValidations.amount / commonValidations.optionalAmount 的自定义精度校验。
+const amountSchema = commonValidations.amount;
+const optionalAmountSchema = commonValidations.optionalAmount;
 
 const addCashTransactionSchema = Joi.object({
   student_id: commonValidations.optionalId.allow(null),

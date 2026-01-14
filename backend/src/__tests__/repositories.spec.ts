@@ -468,8 +468,9 @@ describe('InstallmentRepository', () => {
     });
 
     it('finds overdue installments', async () => {
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
       const overdueDate = addDays(new Date(), -10);
-      await createTestInstallment(1, null, 1, 4, 250, overdueDate, InstallmentStatusValues.PENDING);
+      await createTestInstallment(plan.uid, null, 1, 4, 250, overdueDate, InstallmentStatusValues.PENDING);
 
       const overdue = await InstallmentRepository.findOverdue();
       expect(overdue.length).toBeGreaterThan(0);
@@ -477,8 +478,9 @@ describe('InstallmentRepository', () => {
     });
 
     it('finds installments by status', async () => {
-      await createTestInstallment(1, null, 1, 4, 250, new Date(), InstallmentStatusValues.PENDING);
-      await createTestInstallment(1, null, 2, 4, 250, new Date(), InstallmentStatusValues.PAID);
+      const plan = await createTestInstallmentPlan(1000, 4, PaymentFrequencyValues.MONTHLY, new Date());
+      await createTestInstallment(plan.uid, null, 1, 4, 250, new Date(), InstallmentStatusValues.PENDING);
+      await createTestInstallment(plan.uid, null, 2, 4, 250, new Date(), InstallmentStatusValues.PAID);
 
       const pending = await InstallmentRepository.findByStatus(InstallmentStatusValues.PENDING);
       expect(pending.length).toBeGreaterThan(0);
