@@ -122,16 +122,6 @@ jobs:
           pnpx playwright install --with-deps chromium
         timeout-minutes: 10
 
-      # 安装系统依赖（确保所有必需库都已安装）
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-            libcups2 libxkbcommon0 libatspi2.0-0 libxcomposite1 \
-            libxdamage1 libxfixes3 libxrandr2 libgbm1 libcairo2 \
-            libpango-1.0-0 libasound2
-
       # 设置测试环境
       - name: Setup test environment
         shell: bash
