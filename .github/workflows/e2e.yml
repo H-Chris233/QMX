@@ -220,8 +220,7 @@ jobs:
         run: |
           pnpm run e2e \
             --project=${{ matrix.browser }} \
-            --reporter=html,json \
-            --output-file=test-results/results-${{ matrix.browser }}.json
+            --reporter=html,json
         timeout-minutes: 12
         env:
           CI: true
