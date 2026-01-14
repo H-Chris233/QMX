@@ -14,6 +14,23 @@ env:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: qmx
+          POSTGRES_PASSWORD: qmx_password
+          POSTGRES_DB: qmx_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U qmx -d qmx_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://qmx:qmx_password@localhost:5432/qmx_test
+      REDIS_ENABLED: 'false'
     
     strategy:
       matrix:
@@ -94,6 +111,10 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: 0
 
+      - name: Run backend migrations
+        run: pnpm run --filter qmx-backend db:migrate
+        timeout-minutes: 5
+
       # 安装Playwright浏览器及系统依赖
       - name: Install Playwright browsers and dependencies
         shell: bash
@@ -121,27 +142,8 @@ jobs:
           echo "TZ=UTC" >> $GITHUB_ENV
           echo "BASE_URL=http://localhost:1420" >> $GITHUB_ENV
           echo "VITE_API_BASE_URL=http://localhost:3001/api/v1" >> $GITHUB_ENV
-
-      # 启动MongoDB容器
-      - name: Start MongoDB
-        run: |
-          docker run -d \
-            --name mongodb-test \
-            -p 27017:27017 \
-            -e MONGO_INITDB_DB=qmx_test \
-            mongo:7-alpine
-          
-          echo "Waiting for MongoDB to be ready..."
-          for i in {1..30}; do
-            if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
-              echo "✓ MongoDB is ready"
-              break
-            fi
-            echo "MongoDB not ready yet ($i/30)..."
-            sleep 1
-          done
-          
-          echo "MONGODB_URI=mongodb://localhost:27017/qmx_test" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgresql://qmx:qmx_password@localhost:5432/qmx_test" >> $GITHUB_ENV
+          echo "REDIS_ENABLED=false" >> $GITHUB_ENV
 
       # 启动服务（后端和前端）
       - name: Start backend and frontend services
@@ -199,7 +201,8 @@ jobs:
           CI: true
           NODE_ENV: test
           TZ: UTC
-          MONGODB_URI: mongodb://localhost:27017/qmx_test
+          DATABASE_URL: postgresql://qmx:qmx_password@localhost:5432/qmx_test
+          REDIS_ENABLED: 'false'
 
       # 测试数据初始化
       - name: Initialize test data
@@ -291,8 +294,6 @@ jobs:
         shell: bash
         run: |
           echo "Cleaning up..."
-          docker stop mongodb-test 2>/dev/null || true
-          docker rm mongodb-test 2>/dev/null || true
           pkill -f "pnpm run dev:full" 2>/dev/null || true
           pkill -f "vite" 2>/dev/null || true
           echo "Cleanup completed"
