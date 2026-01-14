@@ -111,8 +111,8 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: 0
 
-      - name: Run backend migrations
-        run: pnpm run --filter qmx-backend db:migrate
+      - name: Sync backend schema
+        run: pnpm run --filter qmx-backend db:push
         timeout-minutes: 5
 
       # 安装Playwright浏览器及系统依赖
