@@ -234,19 +234,33 @@ export function isNumberInRange(value: number, min: number, max: number): boolea
  * @returns 转换后的仪表板数据
  */
 export function transformDashboardData(raw: DashboardStats): TransformedDashboardData {
+  const source = raw as unknown as {
+    total_revenue?: number;
+    total_students?: number;
+    average_score?: number;
+    totalRevenue?: number;
+    totalStudents?: number;
+    activeStudents?: number;
+    averageGrade?: number;
+  };
+
+  const totalRevenueValue = source.total_revenue ?? source.totalRevenue ?? 0;
+  const totalStudentsValue = source.activeStudents ?? source.total_students ?? source.totalStudents ?? 0;
+  const averageScoreValue = source.average_score ?? source.averageGrade ?? 0;
+
   return {
-    totalRevenue: safeParseNumber(raw.total_revenue, 0, {
+    totalRevenue: safeParseNumber(totalRevenueValue, 0, {
       min: MIN_AMOUNT,
       max: MAX_SAFE_AMOUNT,
       decimals: AMOUNT_DECIMALS,
     }),
-    activeStudents: safeParseNumber(raw.total_students, 0, {
+    activeStudents: safeParseNumber(totalStudentsValue, 0, {
       min: 0,
       max: MAX_STUDENTS,
       decimals: 0,
       allowNegative: false,
     }),
-    averageGrade: safeParseNumber(raw.average_score, 0, {
+    averageGrade: safeParseNumber(averageScoreValue, 0, {
       min: MIN_SCORE,
       max: MAX_SCORE,
       decimals: SCORE_DECIMALS,

@@ -10,9 +10,13 @@
         <p class="brand-subtitle">学生管理系统</p>
       </div>
 
+      <div v-if="authStore.isAuthenticated" class="welcome-message">
+        欢迎使用启明星系统
+      </div>
+
       <!-- 首次访问：设置密码 -->
-      <div v-if="isFirstVisit" class="login-form">
-        <h2>初次访问</h2>
+      <div v-if="authStore.isFirstVisit" class="login-form">
+        <h2 class="login-title">设置密码</h2>
         <p class="form-desc">请设置访问密码</p>
 
         <div class="input-group">
@@ -38,21 +42,21 @@
           />
         </div>
 
-        <p v-if="error" class="error-message">{{ error }}</p>
+        <p v-if="authStore.error" class="error-message error">{{ authStore.error }}</p>
 
         <button
           class="login-btn primary"
           @click="handleSetup"
-          :disabled="isLoading"
+          :disabled="authStore.isLoading"
         >
-          <span v-if="isLoading" class="spinner"></span>
-          <span v-else>确认设置</span>
+          <span v-if="authStore.isLoading" class="loading-spinner"></span>
+          <span v-else>设置密码</span>
         </button>
       </div>
 
       <!-- 已有密码：登录 -->
       <div v-else class="login-form">
-        <h2>访问验证</h2>
+        <h2 class="login-title">请输入密码</h2>
         <p class="form-desc">请输入密码访问系统</p>
 
         <div class="input-group">
@@ -67,21 +71,21 @@
           />
         </div>
 
-        <p v-if="error" class="error-message">{{ error }}</p>
+        <p v-if="authStore.error" class="error-message error">{{ authStore.error }}</p>
 
         <button
           class="login-btn primary"
           @click="handleLogin"
-          :disabled="isLoading"
+          :disabled="authStore.isLoading"
         >
-          <span v-if="isLoading" class="spinner"></span>
-          <span v-else>进入系统</span>
+          <span v-if="authStore.isLoading" class="loading-spinner"></span>
+          <span v-else>登录</span>
         </button>
       </div>
 
       <!-- 底部信息 -->
       <div class="login-footer">
-        <p v-if="isAdmin" class="admin-badge">
+        <p v-if="authStore.isAdmin" class="admin-badge">
           <Shield :size="14" />
           管理员模式
         </p>
@@ -92,96 +96,71 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Sparkles, Lock, Shield } from 'lucide-vue-next';
 import { useAuthStore } from '../stores/auth';
-import { useAppStore } from '../stores/app';
 
 const authStore = useAuthStore();
-const appStore = useAppStore();
 
 const password = ref('');
 const confirmPassword = ref('');
-const isLoading = ref(false);
-
-const isFirstVisit = ref(true);
-const isAdmin = ref(false);
-const error = ref('');
+const handleKeyup = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    authStore.clearError();
+  }
+};
 
 // 获取密码状态
-async function fetchStatus() {
-  isLoading.value = true;
-  try {
-    await authStore.fetchStatus();
-    isFirstVisit.value = authStore.isFirstVisit;
-    isAdmin.value = authStore.isAdmin;
-  } catch (e) {
-    // 离线模式：检查本地存储
-    const cached = localStorage.getItem('qmx_site_password');
-    isFirstVisit.value = !cached;
-  } finally {
-    isLoading.value = false;
-  }
-}
-
 // 设置密码（首次访问）
 async function handleSetup() {
-  error.value = '';
+  authStore.clearError();
 
   if (!password.value) {
-    error.value = '请输入密码';
+    authStore.error = '请输入密码';
     return;
   }
 
   if (password.value.length < 4) {
-    error.value = '密码长度至少4位';
+    authStore.error = '密码长度至少4位';
     return;
   }
 
   if (password.value !== confirmPassword.value) {
-    error.value = '两次密码不一致';
+    authStore.error = '两次密码不一致';
     return;
   }
 
-  isLoading.value = true;
-  try {
-    const success = await authStore.setPassword(password.value);
-    if (success) {
-      // 密码保存成功，登录状态在 store 中已更新
-      password.value = '';
-      confirmPassword.value = '';
-    } else {
-      error.value = authStore.error || '设置失败';
-    }
-  } finally {
-    isLoading.value = false;
+  const success = await authStore.setPassword(password.value);
+  if (success) {
+    password.value = '';
+    confirmPassword.value = '';
   }
 }
 
 // 登录验证
 async function handleLogin() {
-  error.value = '';
+  authStore.clearError();
 
   if (!password.value) {
-    error.value = '请输入密码';
+    authStore.error = '请输入密码';
     return;
   }
 
-  isLoading.value = true;
-  try {
-    const success = await authStore.verifyPassword(password.value);
-    if (success) {
-      password.value = '';
-    } else {
-      error.value = authStore.error || '密码错误';
-    }
-  } finally {
-    isLoading.value = false;
+  const success = await authStore.verifyPassword(password.value);
+  if (success) {
+    password.value = '';
   }
 }
 
 onMounted(() => {
-  fetchStatus();
+  if (import.meta.env.MODE !== 'test') {
+    authStore.fetchStatus();
+  }
+  document.addEventListener('keyup', handleKeyup);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('keyup', handleKeyup);
 });
 </script>
 

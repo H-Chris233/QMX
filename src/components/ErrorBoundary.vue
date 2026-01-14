@@ -49,9 +49,10 @@ interface Props {
   onRetry?: () => void;
 }
 
+const defaultFallbackMessage = '抱歉，该功能遇到了问题。请尝试刷新页面或联系管理员。';
 const props = withDefaults(defineProps<Props>(), {
   fallbackTitle: '组件加载失败',
-  fallbackMessage: '抱歉，该功能遇到了问题。请尝试刷新页面或联系管理员。'
+  fallbackMessage: defaultFallbackMessage
 });
 
 const hasError = ref(false);
@@ -59,9 +60,14 @@ const errorTitle = ref(props.fallbackTitle);
 const errorMessage = ref(props.fallbackMessage);
 const errorDetails = ref('');
 const isDev = import.meta.env.DEV;
+const suppressNextError = ref(false);
 
 // 捕获子组件错误
 onErrorCaptured((err: Error, instance, info: string) => {
+  if (suppressNextError.value) {
+    suppressNextError.value = false;
+    return false;
+  }
   logger.error('🔴 ErrorBoundary捕获到错误:', {
     error: err,
     component: instance?.$options.name || 'Unknown',
@@ -72,7 +78,15 @@ onErrorCaptured((err: Error, instance, info: string) => {
   // 设置错误状态
   hasError.value = true;
   errorTitle.value = props.fallbackTitle || '组件加载失败';
-  errorMessage.value = err.message || props.fallbackMessage;
+  const useCustomMessage = props.fallbackMessage !== defaultFallbackMessage;
+  const errorText = err?.message || (err ? String(err) : '');
+  if (useCustomMessage) {
+    errorMessage.value = props.fallbackMessage;
+  } else if (errorText) {
+    errorMessage.value = `${props.fallbackMessage} ${errorText}`.trim();
+  } else {
+    errorMessage.value = props.fallbackMessage;
+  }
   errorDetails.value = `错误信息: ${err.message}\n\n错误位置: ${info}\n\n堆栈:\n${err.stack || '无堆栈信息'}`;
 
   // 调用错误回调
@@ -88,6 +102,7 @@ onErrorCaptured((err: Error, instance, info: string) => {
 function handleRetry(): void {
   hasError.value = false;
   errorDetails.value = '';
+  suppressNextError.value = true;
 
   if (props.onRetry) {
     props.onRetry();

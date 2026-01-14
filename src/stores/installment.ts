@@ -98,8 +98,9 @@ export const useInstallmentStore = defineStore('installment', () => {
 
     try {
       const mergedParams = { ...searchParams.value, ...params };
-      const studentId = mergedParams.studentId;
-      if (!studentId || typeof studentId !== 'number') {
+      const rawStudentId = mergedParams.studentId;
+      const studentId = typeof rawStudentId === 'string' ? Number(rawStudentId) : rawStudentId;
+      if (!studentId || Number.isNaN(studentId)) {
         throw new Error('学生ID无效');
       }
 
@@ -140,7 +141,7 @@ export const useInstallmentStore = defineStore('installment', () => {
       });
 
       // 刷新分期列表以获取最新数据
-      await fetchInstallments({}, true);
+      await fetchInstallments({ studentId: data.student_id }, true);
 
       return transaction;
     } catch (error) {
@@ -255,6 +256,7 @@ export const useInstallmentStore = defineStore('installment', () => {
     searchParams,
     pagination,
     lastFetched,
+    cacheExpiry,
 
     // Getters
     installmentsById,

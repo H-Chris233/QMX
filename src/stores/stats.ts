@@ -263,6 +263,7 @@ export const useStatsStore = defineStore('stats', () => {
     financialStats,
     membershipStats,
     lastFetched,
+    cacheExpiry,
     loading,
 
     // Getters

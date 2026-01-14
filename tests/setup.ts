@@ -152,8 +152,9 @@ beforeAll(() => {
   const restoreConsole = suppressConsoleNoise();
   
   // 启动 MSW 服务器
-  mswServer.listen({ 
-    onUnhandledRequest: 'error',
+  // 注意：使用 'warn' 而不是 'error'，因为组件测试可能不会 mock 所有API调用
+  mswServer.listen({
+    onUnhandledRequest: 'warn',
   });
   
   // 初始化 Pinia

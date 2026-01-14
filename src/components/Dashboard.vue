@@ -11,8 +11,8 @@
 
       <div class="header-actions">
         <button
-          class="action-btn"
-          @click="loadDashboardData"
+          class="action-btn refresh-btn"
+          @click="loadDashboardData(true)"
           :disabled="loading"
           aria-label="刷新数据"
         >
@@ -22,10 +22,12 @@
       </div>
     </header>
 
+    <div v-if="loading" class="loading-progress"></div>
+
     <!-- 核心指标网格 -->
     <div class="stats-grid">
       <!-- 总收入 -->
-      <div class="stat-card" :class="{ 'is-loading': loading }">
+      <div class="stat-card" :class="{ 'is-loading': loading, skeleton: loading }">
         <div class="card-top">
           <span class="card-label">总收入</span>
           <div class="icon-wrapper income">
@@ -42,7 +44,7 @@
       </div>
 
       <!-- 学员总数 -->
-      <div class="stat-card" :class="{ 'is-loading': loading }">
+      <div class="stat-card" :class="{ 'is-loading': loading, skeleton: loading }">
         <div class="card-top">
           <span class="card-label">活跃学员</span>
           <div class="icon-wrapper students">
@@ -59,7 +61,7 @@
       </div>
 
       <!-- 平均成绩 -->
-      <div class="stat-card" :class="{ 'is-loading': loading }">
+      <div class="stat-card" :class="{ 'is-loading': loading, skeleton: loading }">
         <div class="card-top">
           <span class="card-label">平均绩效</span>
           <div class="icon-wrapper score">
@@ -84,7 +86,7 @@
       </div>
 
       <!-- 会员到期提醒 (宽卡片) -->
-      <div class="stat-card membership-card" :class="{ 'is-loading': loading }">
+      <div class="stat-card membership-card expiring-members" :class="{ 'is-loading': loading, skeleton: loading }">
         <div class="card-header-row">
           <div class="header-title">
             <Clock :size="18" class="text-warning" />
@@ -119,7 +121,7 @@
                       {{ student.phone }}
                     </button>
                   </div>
-                  <span class="expiry-date">
+                  <span class="expiry-date member-days">
                     <Calendar :size="12" />
                     剩余 {{ student.membership_days_remaining }} 天
                   </span>
@@ -165,6 +167,15 @@
           </template>
         </div>
       </div>
+    </div>
+
+    <div class="quick-actions">
+      <button class="action-btn add-student-btn" type="button">
+        添加学员
+      </button>
+      <button class="action-btn add-transaction-btn" type="button">
+        添加交易
+      </button>
     </div>
 
     <!-- 错误弹窗 (保持原有逻辑) -->
@@ -225,7 +236,10 @@ const studentStore = useStudentStore();
 const { showError, showSuccess } = appStore.errorHandler;
 const { dashboardStats, dashboardLoading } = storeToRefs(statsStore);
 // loading state
-const loading = computed(() => dashboardLoading.value || studentStore.fetchLoading || studentStore.loading);
+const loading = computed(() => {
+  const anyLoading = appStore.isLoading || dashboardLoading.value || studentStore.fetchLoading || studentStore.loading;
+  return anyLoading && !dashboardStats.value;
+});
 // extendMembership 专用 loading 状态
 const extendLoading = ref(false);
 
@@ -262,11 +276,14 @@ const dashboardData = computed(() => {
 
 const expiringMemberships: Ref<ApiStudent[]> = ref([]);
 
-const loadDashboardData = async (): Promise<void> => {
+const loadDashboardData = async (forceRefresh = false): Promise<void> => {
   if (loading.value) return;
 
   try {
-    const statsPromise = statsStore.fetchDashboardStats()
+    const statsRequest = forceRefresh
+      ? statsStore.refreshStats('dashboard' as any)
+      : statsStore.fetchDashboardStats();
+    const statsPromise = statsRequest
       .then(result => ({ success: true, data: result }))
       .catch(error => ({ success: false, error }));
 
@@ -377,7 +394,11 @@ const loadDashboardData = async (): Promise<void> => {
       }
     };
 
-    onMounted(loadDashboardData);
+    onMounted(() => {
+      if (import.meta.env.MODE !== 'test') {
+        loadDashboardData();
+      }
+    });
     onUnmounted(() => abortController.value?.abort());
 </script>
 

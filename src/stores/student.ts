@@ -59,19 +59,21 @@ export const useStudentStore = defineStore("student", () => {
   };
 
   const activeStudents = computed(() => {
-    return students.value.filter(
-      (student) =>
-        !student.membership_end_date ||
-        new Date(student.membership_end_date) > new Date()
-    );
+    return students.value.filter((student) => {
+      if (typeof student.is_membership_active === 'boolean') {
+        return student.is_membership_active;
+      }
+      return !student.membership_end_date || new Date(student.membership_end_date) > new Date();
+    });
   });
 
   const inactiveStudents = computed(() => {
-    return students.value.filter(
-      (student) =>
-        student.membership_end_date &&
-        new Date(student.membership_end_date) <= new Date()
-    );
+    return students.value.filter((student) => {
+      if (typeof student.is_membership_active === 'boolean') {
+        return !student.is_membership_active;
+      }
+      return Boolean(student.membership_end_date) && new Date(student.membership_end_date as string) <= new Date();
+    });
   });
 
   const studentsByClass = computed(() => {
@@ -110,7 +112,7 @@ export const useStudentStore = defineStore("student", () => {
             limit: mergedParams.limit,
           };
 
-          const nameContains = (mergedParams as any).name_contains ?? mergedParams.keyword;
+          const nameContains = (mergedParams as any).name_contains ?? (mergedParams as any).keyword;
           if (nameContains !== undefined && nameContains !== null && nameContains !== '') {
             apiParams.name_contains = nameContains;
           }
@@ -120,17 +122,17 @@ export const useStudentStore = defineStore("student", () => {
             apiParams.subject = subject;
           }
 
-          const classType = (mergedParams as any).class_type ?? (mergedParams as any).class;
+          const classType = (mergedParams as any).class_type ?? (mergedParams as any).classType ?? (mergedParams as any).class;
           if (classType !== undefined && classType !== null && classType !== '') {
             apiParams.class_type = classType;
           }
 
-          const membershipStatus = (mergedParams as any).membership_status;
+          const membershipStatus = (mergedParams as any).membership_status ?? (mergedParams as any).membershipStatus;
           if (membershipStatus !== undefined && membershipStatus !== null && membershipStatus !== '') {
             apiParams.membership_status = membershipStatus;
           }
 
-          const hasMembership = (mergedParams as any).has_membership;
+          const hasMembership = (mergedParams as any).has_membership ?? (mergedParams as any).hasMembership;
           if (hasMembership !== undefined && hasMembership !== null && hasMembership !== '') {
             apiParams.has_membership = hasMembership;
           }
@@ -138,6 +140,29 @@ export const useStudentStore = defineStore("student", () => {
           const response = forceRefresh
             ? await ApiService.getAllStudents(apiParams as any, true)
             : await ApiService.getAllStudents(apiParams as any);
+
+          if (!response) {
+            const emptyResponse = {
+              students: [],
+              pagination: {
+                page: apiParams.page as number,
+                limit: apiParams.limit as number,
+                total: 0,
+                total_pages: 1,
+              },
+            };
+            students.value = emptyResponse.students;
+            pagination.value = {
+              currentPage: emptyResponse.pagination.page,
+              totalPages: emptyResponse.pagination.total_pages,
+              totalItems: emptyResponse.pagination.total,
+              itemsPerPage: emptyResponse.pagination.limit,
+              hasNextPage: false,
+              hasPrevPage: emptyResponse.pagination.page > 1,
+            };
+            searchParams.value = mergedParams;
+            return emptyResponse;
+          }
 
           students.value = response.students;
           // 转换分页格式
@@ -343,6 +368,16 @@ export const useStudentStore = defineStore("student", () => {
   }
 
   /**
+   * 跳转到指定页码
+   */
+  async function goToPage(page: number) {
+    if (page < 1 || page > pagination.value.totalPages) {
+      return;
+    }
+    await fetchStudents({ page });
+  }
+
+  /**
    * 设置当前学生
    */
   function setCurrentStudent(student: Student | null) {
@@ -416,5 +451,6 @@ export const useStudentStore = defineStore("student", () => {
     resetSearchParams,
     clearStudents,
     refresh,
+    goToPage
   };
 });

@@ -24,7 +24,7 @@
     <!-- 普通交易：收支类型 -->
     <div v-if="!modelValue.is_installment" class="form-group-inline mb-4">
       <div class="type-selector">
-        <label class="radio-label income" :class="{ active: !modelValue.is_expense }">
+        <label class="radio-label income" :class="{ active: !modelValue.is_expense }" @click="setIncomeExpense(false)">
           <input 
             type="radio" 
             name="type" 
@@ -35,7 +35,7 @@
           <TrendingUp :size="16" />
           <span>收入</span>
         </label>
-        <label class="radio-label expense" :class="{ active: modelValue.is_expense }">
+        <label class="radio-label expense" :class="{ active: modelValue.is_expense }" @click="setIncomeExpense(true)">
           <input 
             type="radio" 
             name="type" 
@@ -59,7 +59,7 @@
         <select
           :value="modelValue.student_id"
           @change="onStudentChange"
-          class="form-select"
+          class="form-select student-select"
         >
           <option :value="null">-- 不关联学员 --</option>
           <option
@@ -153,7 +153,7 @@
               <select
                 :value="modelValue.frequency"
                 @change="onFrequencyChange"
-                class="form-select pl-9"
+                class="form-select frequency-select pl-9"
               >
                 <option :value="PaymentFrequency.WEEKLY">每周</option>
                 <option :value="PaymentFrequency.MONTHLY">每月</option>

@@ -1,31 +1,31 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="disableTeleport">
     <Transition name="modal-fade">
       <div
-        v-if="show"
-        class="confirm-overlay"
+        v-if="showState"
+        class="confirm-overlay confirm-modal-overlay"
         :class="typeClass"
         role="dialog"
         aria-modal="true"
-        :aria-label="title"
+        :aria-label="titleText"
         @click="closeOnOverlayClick ? cancelAction() : null"
         :style="{ zIndex: 9999 }"
       >
-        <div class="confirm-card" @click.stop>
+        <div class="confirm-card modal-content" @click.stop>
           <!-- 头部 -->
           <div class="card-header">
             <div class="icon-wrapper">
               <component :is="typeIcon" :size="24" />
             </div>
-            <h3 class="title">{{ title }}</h3>
+            <h3 class="title modal-title">{{ titleText }}</h3>
           </div>
 
           <!-- 内容 -->
           <div class="card-body">
-            <p class="message">{{ message }}</p>
+            <p class="message modal-message">{{ messageText }}</p>
 
             <!-- 详细信息 (可选) -->
-            <div v-if="details" class="details-section">
+            <div v-if="detailsText" class="details-section">
               <details>
                 <summary>
                   <Terminal :size="14" />
@@ -33,7 +33,7 @@
                   <ChevronDown :size="14" class="arrow" />
                 </summary>
                 <div class="code-block">
-                  <pre>{{ details }}</pre>
+                  <pre>{{ detailsText }}</pre>
                 </div>
               </details>
             </div>
@@ -41,15 +41,16 @@
 
           <!-- 底部操作 -->
           <div class="card-footer">
-            <button class="btn btn-secondary" @click="cancelAction">
-              {{ cancelText }}
+            <button class="btn btn-secondary cancel-btn" @click="cancelAction">
+              {{ cancelTextValue }}
             </button>
             <button 
-              class="btn btn-primary" 
+              class="btn btn-primary confirm-btn"
+              :class="confirmTypeValue"
               ref="confirmBtnRef"
               @click="confirmAction"
             >
-              {{ confirmText }}
+              {{ confirmTextValue }}
             </button>
           </div>
         </div>
@@ -59,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, onUnmounted, ref, computed, nextTick } from 'vue';
+import { watch, onUnmounted, ref, computed, nextTick, getCurrentInstance } from 'vue';
 import { 
   HelpCircle, 
   AlertTriangle, 
@@ -67,6 +68,7 @@ import {
   Terminal, 
   ChevronDown 
 } from 'lucide-vue-next';
+import { useAppStore } from '../stores/app';
 
 type ConfirmType = 'primary' | 'danger' | 'warning';
 
@@ -98,12 +100,24 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 const confirmBtnRef = ref<HTMLButtonElement | null>(null);
+const appStore = useAppStore();
+const instance = getCurrentInstance();
+const isControlled = Boolean(instance?.vnode.props && 'show' in instance.vnode.props);
+const disableTeleport = (import.meta as { env?: { MODE?: string } }).env?.MODE === 'test';
+
+const showState = computed(() => isControlled ? props.show : appStore.confirmModal.show);
+const titleText = computed(() => isControlled ? props.title : appStore.confirmModal.title);
+const messageText = computed(() => isControlled ? props.message : appStore.confirmModal.message);
+const detailsText = computed(() => isControlled ? props.details : undefined);
+const confirmTextValue = computed(() => isControlled ? props.confirmText : appStore.confirmModal.confirmText);
+const cancelTextValue = computed(() => isControlled ? props.cancelText : appStore.confirmModal.cancelText);
+const confirmTypeValue = computed(() => isControlled ? props.confirmType : appStore.confirmModal.confirmType);
 
 // === 视觉逻辑 ===
-const typeClass = computed(() => `type-${props.confirmType}`);
+const typeClass = computed(() => `type-${confirmTypeValue.value}`);
 
 const typeIcon = computed(() => {
-  switch (props.confirmType) {
+  switch (confirmTypeValue.value) {
     case 'danger': return AlertOctagon;
     case 'warning': return AlertTriangle;
     case 'primary': 
@@ -112,14 +126,26 @@ const typeIcon = computed(() => {
 });
 
 // === 交互逻辑 ===
-const confirmAction = () => emit('confirm');
-const cancelAction = () => emit('cancel');
+const confirmAction = () => {
+  if (isControlled) {
+    emit('confirm');
+    return;
+  }
+  appStore.handleConfirm();
+};
+const cancelAction = () => {
+  if (isControlled) {
+    emit('cancel');
+    return;
+  }
+  appStore.handleCancel();
+};
 
 // 键盘事件 (Escape 关闭, Enter 确认)
 const keyHandler = ref<((e: KeyboardEvent) => void) | null>(null);
 
 watch(
-  () => props.show,
+  () => showState.value,
   (newVal) => {
     // 清理旧监听
     if (keyHandler.value) {

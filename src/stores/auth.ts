@@ -13,17 +13,20 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = ref<boolean>(false);
   const isLoading = ref<boolean>(false);
   const error = ref<string | null>(null);
-  const isFirstVisit = ref<boolean>(false);
+  const isFirstVisit = ref<boolean>(true);
   const isAdmin = ref<boolean>(false);
+  const isNetworkError = computed({
+    get: () => Boolean(error.value && (error.value.includes('网络错误') || error.value.includes('无法连接'))),
+    set: (val: boolean) => {
+      if (!val) return;
+      error.value = '无法连接到服务器，请检查网络连接';
+    }
+  });
 
-  // 管理员密码哈希（环境变量）
-  const adminPasswordHash = import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
+  const getAdminPasswordHash = () => import.meta.env.VITE_ADMIN_PASSWORD_HASH || '';
 
   // Getters
   const hasPassword = computed(() => !isFirstVisit.value);
-  const isNetworkError = computed(() =>
-    error.value?.includes('网络错误') || error.value?.includes('无法连接')
-  );
 
   // Actions
 
@@ -44,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated.value = false;
       }
       // 如果有管理员密码，尝试验证
-      else if (adminPasswordHash) {
+      else if (getAdminPasswordHash()) {
         // 提示用户需要输入管理员密码
         error.value = '请输入管理员密码';
       }
@@ -52,7 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
       error.value = '无法连接到服务器，请检查网络连接';
       // 后端不可用且不是首次访问，无法登录
-      if (!adminPasswordHash) {
+      if (!getAdminPasswordHash()) {
         isFirstVisit.value = true;
       }
     } finally {
@@ -105,7 +108,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       // 优先尝试验证管理员密码
-      if (adminPasswordHash) {
+      if (getAdminPasswordHash()) {
         const adminResult = await AuthApiService.verifyPassword(password);
         if (adminResult.success) {
           isAuthenticated.value = true;
