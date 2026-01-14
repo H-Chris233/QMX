@@ -5,7 +5,7 @@ import {
   NewCashTransaction,
   InstallmentSnapshot,
 } from '../schema/cash';
-import { eq, and, gte, lte, gt, lt, isNull, isNotNull, desc, asc, count, sum } from 'drizzle-orm';
+import { eq, and, gte, lte, gt, lt, isNull, isNotNull, desc, asc, count, sum, sql } from 'drizzle-orm';
 import { PaginationResult } from './studentRepository';
 
 export interface CashSearchOptions {
@@ -150,16 +150,10 @@ export class CashRepository {
 
     const [result] = await db
       .select({
-        totalIncome: sum(
-          // 使用 sql 模板
-          // @ts-expect-error - 动态 SQL 表达式
-          sql`CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END`
-        ),
-        totalExpense: sum(
-          // @ts-expect-error - 动态 SQL 表达式
-          sql`CASE WHEN ${cashTransactions.amount} < 0 THEN ABS(${cashTransactions.amount}) ELSE 0 END`
-        ),
-        transactionCount: count(),
+        // 使用 COALESCE 处理 NULL 值，用 amount 正负区分收入和支出
+        totalIncome: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END), 0)::numeric`,
+        totalExpense: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ABS(${cashTransactions.amount}) ELSE 0 END), 0)::numeric`,
+        transactionCount: sql<number>`COUNT(*)::int`
       })
       .from(cashTransactions)
       .where(conditions.length > 0 ? and(...conditions) : undefined);

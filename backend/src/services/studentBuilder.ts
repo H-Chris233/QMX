@@ -28,6 +28,12 @@ export class StudentBuilder {
       throw new Error(`无效的班级类型: ${classType}`);
     }
     this.payload.classType = classType;
+
+    // 试课班级默认10节课
+    if (classType === 'TEN_TRY' && this.payload.lessonLeft === undefined) {
+      this.payload.lessonLeft = 10;
+    }
+
     return this;
   }
 
@@ -62,15 +68,16 @@ export class StudentBuilder {
       return date.toISOString().split('T')[0];
     };
 
-    this.payload.membershipStartDate = formatDate(startDate);
-    this.payload.membershipEndDate = formatDate(endDate);
+    const start = formatDate(startDate);
+    const end = formatDate(endDate);
 
-    // 验证会员日期
-    if (this.payload.membershipStartDate && this.payload.membershipEndDate) {
-      if (this.payload.membershipStartDate > this.payload.membershipEndDate) {
-        throw new Error('会员开始日期不能晚于结束日期');
-      }
+    // 验证日期顺序（赋值前检查）
+    if (start && end && start > end) {
+      throw new Error('会员开始日期不能晚于结束日期');
     }
+
+    this.payload.membershipStartDate = start;
+    this.payload.membershipEndDate = end;
 
     return this;
   }
@@ -81,6 +88,20 @@ export class StudentBuilder {
   }
 
   private validate(): void {
+    // 首先验证手机号（如果提供）
+    if (this.payload.phone) {
+      const phoneStr = String(this.payload.phone);
+      if (phoneStr.length > 20) {
+        throw new Error('手机号长度不能超过20字符');
+      }
+      // 验证手机号格式
+      const phoneRegex = /^1[3-9]\d{9}$/;
+      if (!phoneRegex.test(phoneStr) && phoneStr !== '未填写') {
+        throw new Error('手机号格式不正确');
+      }
+    }
+
+    // 验证姓名
     if (!this.payload.name) {
       throw new Error('学员姓名不能为空');
     }
@@ -88,23 +109,10 @@ export class StudentBuilder {
       throw new Error('学员姓名长度不能超过50字符');
     }
 
-    if (!this.payload.phone) {
-      throw new Error('手机号不能为空');
-    }
-    if (this.payload.phone.length > 20) {
-      throw new Error('手机号长度不能超过20字符');
-    }
-
-    // 验证手机号格式
-    const phoneRegex = /^1[3-9]\d{9}$/;
-    if (!phoneRegex.test(this.payload.phone) && this.payload.phone !== '未填写') {
-      throw new Error('手机号格式不正确');
-    }
-
-    // 验证年龄
-    if (this.payload.age !== undefined && this.payload.age !== null) {
-      if (this.payload.age < 0 || this.payload.age > 120) {
-        throw new Error('年龄必须在0-120之间');
+    // 验证会员日期
+    if (this.payload.membershipStartDate && this.payload.membershipEndDate) {
+      if (this.payload.membershipStartDate > this.payload.membershipEndDate) {
+        throw new Error('会员开始日期不能晚于结束日期');
       }
     }
 

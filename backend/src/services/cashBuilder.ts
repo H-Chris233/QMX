@@ -2,6 +2,7 @@ import { CashRepository } from '../db/repositories/cashRepository';
 import { NewCashTransaction, CashTransaction, InstallmentSnapshot } from '../db/schema/cash';
 import { StudentRepository } from '../db/repositories/studentRepository';
 import { PaymentFrequency } from '@/types';
+import { AppError, ErrorType } from '../utils/errors';
 
 /**
  * 金额转换工具函数
@@ -169,5 +170,79 @@ export class CashBuilder {
   // 获取当前构建的数据
   getPayload(): Partial<NewCashTransaction> {
     return this.payload;
+  }
+}
+
+/**
+ * 交易更新器
+ * 使用流畅 API 模式更新交易记录
+ */
+export class CashUpdater {
+  private updates: Partial<NewCashTransaction> = {};
+
+  constructor(private uid: string) {}
+
+  /**
+   * 创建更新器实例
+   */
+  static for(uid: string): CashUpdater {
+    return new CashUpdater(uid);
+  }
+
+  /**
+   * 设置金额（单位：分）
+   */
+  amount(value: number): this {
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new AppError(
+        '金额必须为正数',
+        ErrorType.InvalidInput,
+        { details: { field: 'amount', value } }
+      );
+    }
+    this.updates.amount = value;
+    return this;
+  }
+
+  /**
+   * 设置备注
+   */
+  note(value: string | null): this {
+    // 空字符串转换为 null
+    this.updates.note = (value === '' || value === null) ? null : value;
+    return this;
+  }
+
+  /**
+   * 设置学员ID
+   */
+  studentId(id: number | null): this {
+    this.updates.studentId = id;
+    return this;
+  }
+
+  /**
+   * 设置分期快照
+   */
+  installment(snapshot: InstallmentSnapshot | null): this {
+    this.updates.installmentSnapshot = snapshot;
+    return this;
+  }
+
+  /**
+   * 提交更新
+   */
+  async save(): Promise<CashTransaction | null> {
+    if (Object.keys(this.updates).length === 0) {
+      return await CashRepository.findByUid(Number(this.uid));
+    }
+    return await CashRepository.updateByUid(Number(this.uid), this.updates);
+  }
+
+  /**
+   * 获取待更新的数据
+   */
+  getUpdates(): Partial<NewCashTransaction> {
+    return { ...this.updates };
   }
 }

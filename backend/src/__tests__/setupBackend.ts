@@ -5,10 +5,10 @@
  * Tests use the real database or test database as configured.
  */
 
-import { db } from '../src/db';
-import { students } from '../src/db/schema/students';
-import { cashTransactions } from '../src/db/schema/cash';
-import { installmentPlans, installments } from '../src/db/schema/installments';
+import { db } from '@/db';
+import { students } from '@/db/schema/students';
+import { cashTransactions } from '@/db/schema/cash';
+import { installmentPlans, installments } from '@/db/schema/installments';
 import { sql } from 'drizzle-orm';
 
 // 全局测试环境变量
@@ -98,10 +98,10 @@ export async function createTestApp() {
         console.log('=== createTestApp: 开始加载实际路由 ===');
 
         // 加载错误处理中间件
-        const { errorHandler } = await import('../src/middleware/errorHandler');
+        const { errorHandler } = await import('@/middleware/errorHandler');
 
         // 加载路由
-        const routes = await import('../src/routes');
+        const routes = await import('@/routes');
         app.use('/api/v1', routes.default);
 
         // 注册错误处理中间件（必须在所有路由之后）
@@ -127,8 +127,8 @@ export async function createTestApp() {
 // 种子数据工厂
 export class TestDataFactory {
   static async createStudent(overrides: any = {}) {
-    const { StudentBuilder } = await import('../src/services/studentBuilder');
-    const { ClassType, SubjectType } = await import('../src/types');
+    const { StudentBuilder } = await import('@/services/studentBuilder');
+    const { ClassType, SubjectType } = await import('@/types');
 
     const builder = StudentBuilder.create()
       .name(overrides.name || 'Test Student')
@@ -156,7 +156,7 @@ export class TestDataFactory {
   }
 
   static async createCashTransaction(amount: number, overrides: any = {}) {
-    const { CashBuilder } = await import('../src/services/cashBuilder');
+    const { CashBuilder } = await import('@/services/cashBuilder');
 
     const builder = CashBuilder.create().amount(amount);
 
@@ -178,7 +178,7 @@ export class TestDataFactory {
     startDate: Date,
     overrides: any = {}
   ) {
-    const { InstallmentPlanRepository } = await import('../src/db/repositories/installmentRepository');
+    const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
 
     // 将 Date 转换为 ISO 字符串日期
     const startDateStr = startDate instanceof Date
@@ -206,7 +206,7 @@ export class TestDataFactory {
     dueDate: Date,
     status: any
   ) {
-    const { InstallmentRepository } = await import('../src/db/repositories/installmentRepository');
+    const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
 
     // 将 Date 转换为 ISO 字符串日期
     const dueDateStr = dueDate instanceof Date

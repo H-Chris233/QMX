@@ -8,7 +8,7 @@ import {
   createTestApp,
   TestDataFactory,
   dateUtils,
-} from "../../../test/setupBackend";
+} from "../setupBackend";
 
 jest.setTimeout(30000);
 
