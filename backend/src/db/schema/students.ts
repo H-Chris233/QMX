@@ -24,7 +24,7 @@ export const students = pgTable('students', {
   uid: serial('uid').primaryKey(),
   name: varchar('name', { length: 50 }).notNull(),
   age: smallint('age'),
-  phone: varchar('phone', { length: 20 }).notNull(),
+  phone: varchar('phone', { length: 11 }).notNull(),
   classType: varchar('class_type', { length: 20 }).notNull().default('TEN_TRY'),
   subject: varchar('subject', { length: 20 }).notNull().default('SHOOTING'),
   lessonLeft: integer('lesson_left').default(0),

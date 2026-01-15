@@ -52,17 +52,17 @@ describe('studentPhone', () => {
       expect(normalizeStudentPhoneOrThrow('1380013800')).toBe('13800138000');
     });
 
-    it('应该截取超过11位的数字', () => {
-      expect(normalizeStudentPhoneOrThrow('138001380001')).toBe('13800138000');
+    it('超过11位纯数字应该抛出错误', () => {
+      expect(() => normalizeStudentPhoneOrThrow('138001380001')).toThrow('手机号长度不能超过11字符');
     });
 
     it('应该接受11位纯数字', () => {
       expect(normalizeStudentPhoneOrThrow('13800138000')).toBe('13800138000');
     });
 
-    it('应该处理12位带种子字符的数字输入', () => {
+    it('12位带种子字符的数字输入应该抛出错误', () => {
       // 测试数据中常见的种子格式：手机号+时间戳后缀
-      expect(normalizeStudentPhoneOrThrow('13800138000123')).toBe('13800138000');
+      expect(() => normalizeStudentPhoneOrThrow('13800138000123')).toThrow('手机号长度不能超过11字符');
     });
   });
 
@@ -108,15 +108,9 @@ describe('studentPhone', () => {
   });
 
   describe('6. 长度限制', () => {
-    it('超过20字符的纯数字应该抛出错误', () => {
-      const longPhone = '1' + '0'.repeat(20);
-      expect(() => normalizeStudentPhoneOrThrow(longPhone)).toThrow('手机号长度不能超过20字符');
-    });
-
-    it('20字符纯数字应该接受', () => {
-      const phone20 = '1' + '0'.repeat(19);
-      const result = normalizeStudentPhoneOrThrow(phone20);
-      expect(result.length).toBe(11); // 会被归一化为11位
+    it('超过11字符的纯数字应该抛出错误', () => {
+      const longPhone = '1' + '0'.repeat(11);
+      expect(() => normalizeStudentPhoneOrThrow(longPhone)).toThrow('手机号长度不能超过11字符');
     });
   });
 
@@ -145,14 +139,17 @@ describe('studentPhone', () => {
   });
 
   describe('8. 测试数据兼容性', () => {
-    it('应该处理测试生成的手机号格式', () => {
+    it('测试生成的手机号格式超过11位时应该抛出错误', () => {
       // 常见测试格式：时间戳后缀
-      expect(normalizeStudentPhoneOrThrow('138001380001703456789')).toBe('13800138000');
+      expect(() => normalizeStudentPhoneOrThrow('138001380001703456789')).toThrow('手机号长度不能超过11字符');
     });
 
-    it('应该处理枚举后缀格式', () => {
+    it('带数字后缀的测试格式应该抛出错误', () => {
       // 常见测试格式：手机号 + _ + 序号
-      expect(normalizeStudentPhoneOrThrow('13800138000_1')).toBe('13800138000');
+      expect(() => normalizeStudentPhoneOrThrow('13800138000_1')).toThrow('手机号长度不能超过11字符');
+    });
+
+    it('带非数字后缀的测试格式应该返回手机号', () => {
       expect(normalizeStudentPhoneOrThrow('13800138000_test')).toBe('13800138000');
     });
   });

@@ -95,13 +95,13 @@ describe('StudentBuilder', () => {
       ).rejects.toThrow(/手机号不能为空/);
     });
 
-    it('手机号超过20字符抛出错误', async () => {
+    it('手机号超过11字符抛出错误', async () => {
       await expect(
         StudentBuilder.create()
           .name('Test Student')
-          .phone('1'.repeat(21))
+          .phone('1'.repeat(12))
           .build()
-      ).rejects.toThrow(/手机号长度不能超过20字符/);
+      ).rejects.toThrow(/手机号长度不能超过11字符/);
     });
 
     it('无效手机格式抛出错误', async () => {
@@ -117,7 +117,7 @@ describe('StudentBuilder', () => {
           .name('Test Student')
           .phone('138123456789') // 12位
           .build()
-      ).rejects.toThrow(/手机号格式不正确/);
+      ).rejects.toThrow(/手机号长度不能超过11字符/);
     });
 
     it('特殊值"未填写"允许', async () => {
@@ -190,9 +190,10 @@ describe('StudentBuilder', () => {
     it('所有有效班级类型正常', async () => {
       const validTypes = [ClassType.TEN_TRY, ClassType.MONTH, ClassType.YEAR, ClassType.OTHERS];
       for (const type of validTypes) {
+        const suffix = `${Date.now()}${validTypes.indexOf(type)}`.slice(-8).padStart(8, '0');
         const student = await StudentBuilder.create()
           .name(`Student ${type}`)
-          .phone(`138${Date.now()}${type}`)
+          .phone(`138${suffix}`)
           .classType(type)
           .subject(SubjectType.SHOOTING)
           .build();
@@ -211,9 +212,10 @@ describe('StudentBuilder', () => {
     it('所有有效科目类型正常', async () => {
       const validSubjects = [SubjectType.SHOOTING, SubjectType.ARCHERY, SubjectType.OTHERS];
       for (const subject of validSubjects) {
+        const suffix = `${Date.now()}${validSubjects.indexOf(subject)}`.slice(-8).padStart(8, '0');
         const student = await StudentBuilder.create()
           .name(`Student ${subject}`)
-          .phone(`138${Date.now()}${subject}`)
+          .phone(`138${suffix}`)
           .classType(ClassType.MONTH)
           .subject(subject)
           .build();

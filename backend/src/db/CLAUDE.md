@@ -73,7 +73,7 @@ export * from './schema';  // 所有 Schema 定义
 - uid: serial (主键)
 - name: varchar(50) (学员姓名)
 - age: smallint (年龄)
-- phone: varchar(20) (手机号)
+- phone: varchar(11) (手机号)
 - classType: enum ('TEN_TRY', 'MONTH', 'YEAR', 'OTHERS')
 - subject: enum ('SHOOTING', 'ARCHERY', 'OTHERS')
 - lessonLeft: integer (剩余课时)
