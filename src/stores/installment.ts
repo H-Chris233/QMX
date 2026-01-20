@@ -104,7 +104,21 @@ export const useInstallmentStore = defineStore('installment', () => {
         throw new Error('学生ID无效');
       }
 
-      const response = await ApiService.getInstallmentPlan(studentId);
+      const planResponse = await ApiService.getAllInstallmentPlans({
+        student_id: studentId,
+        page: mergedParams.page,
+        limit: mergedParams.limit,
+        status: mergedParams.status,
+      });
+      const plans = planResponse?.data || [];
+      const planDetails = await Promise.all(
+        plans.map((plan) => ApiService.getInstallmentPlan(plan.uid))
+      );
+      const mergedInstallments = planDetails.flatMap((detail) => detail.installments || []);
+      const response = {
+        ...planResponse,
+        installments: mergedInstallments,
+      };
 
       installments.value = response.installments || [];
       searchParams.value = mergedParams;

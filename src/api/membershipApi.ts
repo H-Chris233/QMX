@@ -27,12 +27,12 @@ export class MembershipApiService {
     membership: MembershipData
   ): Promise<Student> {
     const payload = {
-      membership_start_date: membership.startDate,
-      membership_end_date: membership.endDate,
+      startDate: membership.startDate,
+      endDate: membership.endDate,
     };
 
     return apiCall<Student>(
-      baseClient.patch(`/membership/students/${studentId}/membership`, payload)
+      baseClient.post(`/membership/students/${studentId}/membership`, payload)
     );
   }
 
@@ -54,8 +54,8 @@ export class MembershipApiService {
     startFromToday: boolean = true
   ): Promise<Student> {
     const payload = {
-      membership_type: membershipType,
-      start_from_today: startFromToday,
+      membershipType,
+      startFromToday,
     };
 
     return apiCall<Student>(
@@ -75,8 +75,8 @@ export class MembershipApiService {
     extendFromCurrent: boolean = true
   ): Promise<Student> {
     const payload = {
-      membership_type: membershipType,
-      extend_from_current: extendFromCurrent,
+      membershipType,
+      extendFromCurrent,
     };
 
     return apiCall<Student>(
@@ -105,14 +105,14 @@ export class MembershipApiService {
     const payload =
       typeof membershipType === 'string'
         ? {
-            student_ids: studentIds,
-            membership_type: membershipType,
-            start_from_today: startFromToday,
+            studentIds,
+            membershipType,
+            startFromToday,
           }
         : {
-            student_ids: studentIds,
-            membership_start_date: membershipType.startDate,
-            membership_end_date: membershipType.endDate,
+            studentIds,
+            startDate: membershipType.startDate,
+            endDate: membershipType.endDate,
           };
 
     return apiCall(baseClient.post("/membership/batch", payload));

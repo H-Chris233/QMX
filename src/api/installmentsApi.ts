@@ -7,11 +7,33 @@ import type {
   InstallmentPlan,
   InstallmentStatus,
 } from '../types/api';
+import {
+  toInstallmentPlanStatus,
+  toInstallmentStatus,
+  toPaymentFrequency,
+  toFrontendInstallmentStatus,
+  toFrontendInstallmentPlanStatus,
+  toFrontendPaymentFrequency,
+} from './paramMappers';
 
 /**
  * 分期付款 API 服务类
  */
 export class InstallmentsApiService {
+  private static normalizePlan(plan: InstallmentPlan): InstallmentPlan {
+    return {
+      ...plan,
+      frequency: (toFrontendPaymentFrequency(String(plan.frequency)) as any) || plan.frequency,
+      status: (toFrontendInstallmentPlanStatus(String(plan.status)) as any) || plan.status,
+    };
+  }
+
+  private static normalizeInstallment(installment: Installment): Installment {
+    return {
+      ...installment,
+      status: (toFrontendInstallmentStatus(String(installment.status)) as any) || installment.status,
+    };
+  }
   /**
    * 获取所有分期计划（支持分页）
    */
@@ -29,9 +51,15 @@ export class InstallmentsApiService {
       total_pages: number;
     };
   }> {
-    return apiCall(
+    const raw = await apiCall<any>(
       baseClient.get('/installments', { params })
     );
+    return {
+      ...raw,
+      data: (raw.data || []).map((plan: InstallmentPlan) =>
+        InstallmentsApiService.normalizePlan(plan)
+      ),
+    };
   }
 
   /**
@@ -84,9 +112,19 @@ export class InstallmentsApiService {
     status: string;
     plan: { uid: number; status: string } | null;
   }> {
-    return apiCall(
-      baseClient.patch(`/installments/${installmentUid}/status`, { status })
+    const response = await apiCall<any>(
+      baseClient.patch(`/installments/${installmentUid}/status`, { status: toInstallmentStatus(String(status)) })
     );
+    return {
+      ...response,
+      status: toFrontendInstallmentStatus(String(response.status)) || response.status,
+      plan: response.plan
+        ? {
+            ...response.plan,
+            status: toFrontendInstallmentPlanStatus(String(response.plan.status)) || response.plan.status,
+          }
+        : null,
+    };
   }
 
   /**
@@ -96,9 +134,15 @@ export class InstallmentsApiService {
     plan: InstallmentPlan;
     installments: Installment[];
   }> {
-    return apiCall(
+    const raw = await apiCall<any>(
       baseClient.get(`/installments/${planId}`)
     );
+    return {
+      plan: InstallmentsApiService.normalizePlan(raw.plan),
+      installments: (raw.installments || []).map((installment: Installment) =>
+        InstallmentsApiService.normalizeInstallment(installment)
+      ),
+    };
   }
 
   /**
@@ -113,9 +157,15 @@ export class InstallmentsApiService {
     custom_days?: number | null;
     start_date: string;
   }): Promise<InstallmentPlan> {
-    return apiCall<InstallmentPlan>(
-      baseClient.post('/installments', data)
+    const payload = {
+      ...data,
+      frequency: toPaymentFrequency(data.frequency) || data.frequency,
+    };
+
+    const plan = await apiCall<InstallmentPlan>(
+      baseClient.post('/installments', payload)
     );
+    return InstallmentsApiService.normalizePlan(plan);
   }
 
   /**
@@ -125,9 +175,15 @@ export class InstallmentsApiService {
     planId: number,
     data: { note?: string; status?: string }
   ): Promise<InstallmentPlan> {
-    return apiCall<InstallmentPlan>(
-      baseClient.put(`/installments/${planId}`, data)
+    const payload = {
+      ...data,
+      status: data.status ? toInstallmentPlanStatus(data.status) : data.status,
+    };
+
+    const plan = await apiCall<InstallmentPlan>(
+      baseClient.put(`/installments/${planId}`, payload)
     );
+    return InstallmentsApiService.normalizePlan(plan);
   }
 
   /**
@@ -140,9 +196,18 @@ export class InstallmentsApiService {
     installment: Installment;
     plan: InstallmentPlan;
   }> {
-    return apiCall(
-      baseClient.put(`/installments/${installmentUid}/payment`, data)
+    const payload = {
+      ...data,
+      status: toInstallmentStatus(String(data.status)) || data.status,
+    };
+
+    const response = await apiCall<any>(
+      baseClient.put(`/installments/${installmentUid}/payment`, payload)
     );
+    return {
+      installment: InstallmentsApiService.normalizeInstallment(response.installment),
+      plan: InstallmentsApiService.normalizePlan(response.plan),
+    };
   }
 
   /**
@@ -155,9 +220,13 @@ export class InstallmentsApiService {
     installment: Installment;
     plan: InstallmentPlan;
   }> {
-    return apiCall(
+    const response = await apiCall<any>(
       baseClient.post(`/installments/${planId}/payments`, data)
     );
+    return {
+      installment: InstallmentsApiService.normalizeInstallment(response.installment),
+      plan: InstallmentsApiService.normalizePlan(response.plan),
+    };
   }
 
   /**
@@ -167,9 +236,13 @@ export class InstallmentsApiService {
     installment: Installment;
     transaction: { uid: number; amount: number; note: string };
   }> {
-    return apiCall(
+    const response = await apiCall<any>(
       baseClient.post(`/installments/${planId}/next`)
     );
+    return {
+      ...response,
+      installment: InstallmentsApiService.normalizeInstallment(response.installment),
+    };
   }
 
   /**
@@ -194,8 +267,12 @@ export class InstallmentsApiService {
     paid_count: number;
     note: string | null;
   }> {
-    return apiCall(
+    const response = await apiCall<any>(
       baseClient.post(`/installments/${planId}/cancel`)
     );
+    return {
+      ...response,
+      status: toFrontendInstallmentPlanStatus(String(response.status)) || response.status,
+    };
   }
 }

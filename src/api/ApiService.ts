@@ -340,18 +340,23 @@ export class ApiService {
 
     if (typeof dataOrStudentId === 'object' && dataOrStudentId !== null && 'frequency' in dataOrStudentId) {
       // 对象参数调用
-      installmentData = dataOrStudentId;
+      installmentData = { ...dataOrStudentId };
     } else {
       // 多参数调用 - 向后兼容
       installmentData = {
         student_id: dataOrStudentId,
-        amount: amount!,
+        total_amount: amount!,
         note: note || null,
         total_installments: total_installments!,
         frequency: frequency!,
         start_date: start_date || '',
         due_date: due_date || '',
       };
+    }
+
+    if ('amount' in installmentData && !('total_amount' in installmentData)) {
+      installmentData.total_amount = installmentData.amount;
+      delete installmentData.amount;
     }
 
     return handleApiOperation(

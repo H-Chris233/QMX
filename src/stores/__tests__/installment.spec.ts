@@ -20,6 +20,7 @@ import { InstallmentStatus } from '../../types/api';
 vi.mock('../../api/ApiService', () => ({
   ApiService: {
     getInstallmentPlan: vi.fn(),
+    getAllInstallmentPlans: vi.fn(),
     addInstallmentTransaction: vi.fn(),
     payNextInstallment: vi.fn(),
     cancelInstallmentPlan: vi.fn()
@@ -189,14 +190,18 @@ describe('useInstallmentStore', () => {
 
     it('应该在缓存过期时获取数据', async () => {
       store.lastFetched = null;
-      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
-        installments: [createMockInstallment({ uid: 1 })],
+      (ApiService.getAllInstallmentPlans as vi.Mock).mockResolvedValue({
+        data: [{ uid: 101 }],
         pagination: { page: 1, limit: 50, total: 1, total_pages: 1 }
+      });
+      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
+        installments: [createMockInstallment({ uid: 1 })]
       });
 
       await store.fetchInstallments({ studentId: '1' });
 
       expect(store.installments).toHaveLength(1);
+      expect(ApiService.getAllInstallmentPlans).toHaveBeenCalled();
       expect(ApiService.getInstallmentPlan).toHaveBeenCalled();
     });
 
@@ -212,14 +217,18 @@ describe('useInstallmentStore', () => {
 
     it('应该在强制刷新时获取新数据', async () => {
       store.lastFetched = new Date();
-      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
-        installments: [createMockInstallment({ uid: 2 })],
+      (ApiService.getAllInstallmentPlans as vi.Mock).mockResolvedValue({
+        data: [{ uid: 202 }],
         pagination: { page: 1, limit: 50, total: 1, total_pages: 1 }
+      });
+      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
+        installments: [createMockInstallment({ uid: 2 })]
       });
 
       await store.fetchInstallments({ studentId: '1' }, true);
 
       expect(store.installments[0].uid).toBe(2);
+      expect(ApiService.getAllInstallmentPlans).toHaveBeenCalled();
       expect(ApiService.getInstallmentPlan).toHaveBeenCalled();
     });
 
@@ -235,9 +244,12 @@ describe('useInstallmentStore', () => {
 
     it('应该成功创建分期计划', async () => {
       (ApiService.addInstallmentTransaction as vi.Mock).mockResolvedValue(createMockInstallment({ uid: 100 }));
-      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
-        installments: [createMockInstallment({ uid: 100 })],
+      (ApiService.getAllInstallmentPlans as vi.Mock).mockResolvedValue({
+        data: [{ uid: 100 }],
         pagination: { page: 1, limit: 50, total: 1, total_pages: 1 }
+      });
+      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
+        installments: [createMockInstallment({ uid: 100 })]
       });
 
       const result = await store.createInstallmentPlan({
@@ -254,9 +266,12 @@ describe('useInstallmentStore', () => {
 
     it('应该在创建后刷新分期列表', async () => {
       (ApiService.addInstallmentTransaction as vi.Mock).mockResolvedValue(createMockInstallment({ uid: 100 }));
-      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
-        installments: [createMockInstallment({ uid: 100 })],
+      (ApiService.getAllInstallmentPlans as vi.Mock).mockResolvedValue({
+        data: [{ uid: 100 }],
         pagination: { page: 1, limit: 50, total: 1, total_pages: 1 }
+      });
+      (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
+        installments: [createMockInstallment({ uid: 100 })]
       });
 
       await store.createInstallmentPlan({

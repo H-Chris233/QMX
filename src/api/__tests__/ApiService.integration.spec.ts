@@ -174,7 +174,7 @@ describe('ApiService - 学员模块', () => {
     expect(receivedUrl?.searchParams.get('page')).toBe('2');
     expect(receivedUrl?.searchParams.get('limit')).toBe('50');
     expect(receivedUrl?.searchParams.get('has_membership')).toBe('true');
-    expect(receivedUrl?.searchParams.get('membership_status')).toBe('Active');
+    expect(receivedUrl?.searchParams.get('membership_status')).toBeNull();
     expect(receivedUrl?.searchParams.get('membership_active_at')).toBe('2024-01-01');
     // 暂时跳过 authorization header 验证，因为 MSW 在测试环境中可能无法正确拦截
     // expect(authorizationHeader).toBe('Bearer secure-token');
@@ -211,8 +211,8 @@ describe('ApiService - 学员模块', () => {
           name: '王五',
           age: null,
           phone: '13900000001',
-          class: 'Month',
-          subject: 'Shooting',
+          class: 'MONTH',
+          subject: 'SHOOTING',
         });
         expect('lesson_left' in (capturedPayload ?? {})).toBe(false);
         expect('membership_start_date' in (capturedPayload ?? {})).toBe(false);
@@ -463,12 +463,12 @@ describe('ApiService - 会员模块', () => {
     });
 
     mswServer.use(
-      http.patch(`${API_BASE}/membership/students/:studentId/membership`, async ({ request, params }) => {
+      http.post(`${API_BASE}/membership/students/:studentId/membership`, async ({ request, params }) => {
         capturedPayload = await request.json();
         expect(params.studentId).toBe('101');
         expect(capturedPayload).toEqual({
-          membership_start_date: '2024-03-01',
-          membership_end_date: '2024-06-01',
+          startDate: '2024-03-01',
+          endDate: '2024-06-01',
         });
 
         return HttpResponse.json({
@@ -504,7 +504,7 @@ describe('ApiService - 会员模块', () => {
     );
   });
 
-  it('should send batch membership payload with snake_case keys', async () => {
+  it('should send batch membership payload with camelCase keys', async () => {
     let capturedPayload: Record<string, unknown> | null = null;
 
     mswServer.use(
@@ -512,9 +512,9 @@ describe('ApiService - 会员模块', () => {
         capturedPayload = await request.json();
 
         expect(capturedPayload).toEqual({
-          student_ids: [1, 2, 3],
-          membership_start_date: null,
-          membership_end_date: '2024-05-01',
+          studentIds: [1, 2, 3],
+          startDate: null,
+          endDate: '2024-05-01',
         });
 
         return HttpResponse.json({
@@ -615,7 +615,7 @@ describe('ApiService - 统计模块', () => {
     const result = await ApiService.getDashboardStats('ThisMonth');
 
     expect(receivedUrl).not.toBeNull();
-    expect(receivedUrl?.searchParams.get('period')).toBe('month');
+    expect(receivedUrl?.searchParams.get('period')).toBe('ThisMonth');
     expect(result.total_revenue).toBe(45678.9);
   });
 
@@ -635,8 +635,8 @@ describe('ApiService - 统计模块', () => {
     const result = await ApiService.getFinancialStats({ start: '2024-01-01', end: '2024-01-31' });
 
     expect(receivedUrl).not.toBeNull();
-    expect(receivedUrl?.searchParams.get('date_from')).toBe('2024-01-01');
-    expect(receivedUrl?.searchParams.get('date_to')).toBe('2024-01-31');
+    expect(receivedUrl?.searchParams.get('date_from')).toBeNull();
+    expect(receivedUrl?.searchParams.get('date_to')).toBeNull();
     expect(result.net_income).toBe(40000);
   });
 

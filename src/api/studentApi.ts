@@ -9,6 +9,13 @@ import type {
   PaginatedResponse,
   CurrentStudentInput,
 } from "../types/api";
+import {
+  toClassType,
+  toSubjectType,
+  toFrontendClassType,
+  toFrontendSubjectType,
+  toFrontendMembershipStatus,
+} from "./paramMappers";
 
 /**
  * 查询参数序列化助手
@@ -42,6 +49,17 @@ export interface StudentListResponse {
  * 学员 API 服务类
  */
 export class StudentApiService {
+  private static normalizeStudent(student: Student): Student {
+    return {
+      ...student,
+      class: toFrontendClassType(String(student.class)) || student.class,
+      subject: toFrontendSubjectType(String(student.subject)) || student.subject,
+      membership_status: student.membership_status
+        ? (toFrontendMembershipStatus(String(student.membership_status)) as any)
+        : student.membership_status,
+    };
+  }
+
   /**
    * 获取所有学员（支持分页和搜索）
    */
@@ -49,7 +67,17 @@ export class StudentApiService {
     params?: StudentSearchOptions,
     forceRefresh = false
   ): Promise<StudentListResponse> {
-    const queryParams = params ? serializeParams(params) : {};
+    const normalizedParams = params ? { ...params } : undefined;
+    if (normalizedParams?.class_type) {
+      normalizedParams.class_type = toClassType(String(normalizedParams.class_type));
+    }
+    if (normalizedParams?.subject) {
+      normalizedParams.subject = toSubjectType(String(normalizedParams.subject));
+    }
+    if (normalizedParams?.membership_status !== undefined) {
+      delete (normalizedParams as Record<string, unknown>).membership_status;
+    }
+    const queryParams = normalizedParams ? serializeParams(normalizedParams) : {};
 
     return apiCall<StudentListResponse>(
       baseClient
@@ -57,9 +85,12 @@ export class StudentApiService {
           params: queryParams,
         })
         .then((response) => {
+          const normalizedStudents = (response.data.data || []).map((student) =>
+            StudentApiService.normalizeStudent(student)
+          );
           // 解包分页数据
           return {
-            students: response.data.data || [],
+            students: normalizedStudents,
             pagination: response.data.pagination,
           };
         }),
@@ -86,12 +117,13 @@ export class StudentApiService {
     uid: number,
     forceRefresh = false
   ): Promise<Student> {
-    return apiCall<Student>(
+    const student = await apiCall<Student>(
       baseClient.get(`/students/${uid}`),
       `/students/${uid}`,
       { uid },
       forceRefresh
     );
+    return StudentApiService.normalizeStudent(student);
   }
 
   /**
@@ -104,8 +136,8 @@ export class StudentApiService {
       name: student.name,
       age: student.age,
       phone: student.phone,
-      class: student.class, // 后端期望的字段名
-      subject: student.subject,
+      class: toClassType(String(student.class)), // 后端期望的字段名
+      subject: toSubjectType(String(student.subject)),
     };
 
     if (student.note !== undefined) payload.note = student.note;
@@ -117,7 +149,8 @@ export class StudentApiService {
       payload.membership_end_date = student.membership_end_date;
     }
 
-    return apiCall<Student>(baseClient.post("/students", payload));
+    const created = await apiCall<Student>(baseClient.post("/students", payload));
+    return StudentApiService.normalizeStudent(created);
   }
 
   /**
@@ -134,8 +167,8 @@ export class StudentApiService {
     if (data.name !== undefined) payload.name = data.name;
     if (data.age !== undefined) payload.age = data.age;
     if (data.phone !== undefined) payload.phone = data.phone;
-    if (data.class !== undefined) payload.class = data.class; // 后端期望的字段名
-    if (data.subject !== undefined) payload.subject = data.subject;
+    if (data.class !== undefined) payload.class = toClassType(String(data.class)); // 后端期望的字段名
+    if (data.subject !== undefined) payload.subject = toSubjectType(String(data.subject));
     if (data.note !== undefined) payload.note = data.note;
     if (data.lesson_left !== undefined) payload.lesson_left = data.lesson_left;
     if (data.membership_start_date !== undefined)
@@ -144,7 +177,8 @@ export class StudentApiService {
       payload.membership_end_date = data.membership_end_date;
     if (data.rings !== undefined) payload.rings = data.rings;
 
-    return apiCall<Student>(baseClient.put(`/students/${uid}`, payload));
+    const updated = await apiCall<Student>(baseClient.put(`/students/${uid}`, payload));
+    return StudentApiService.normalizeStudent(updated);
   }
 
   /**
