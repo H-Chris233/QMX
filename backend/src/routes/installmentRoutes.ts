@@ -22,8 +22,7 @@ router.use(apiRateLimitMiddleware);
 
 // 验证规则
 const createInstallmentPlanSchema = Joi.object({
-  student_id: Joi.number().integer().min(1).required().messages({
-    "any.required": "学员不能为空",
+  student_id: Joi.number().integer().min(1).optional().allow(null).messages({
     "number.min": "学员编号必须大于0",
   }),
   total_amount: Joi.number().positive().required().messages({

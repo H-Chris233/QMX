@@ -38,6 +38,10 @@ const addInstallmentTransactionSchema = Joi.object({
     'any.only': '无效的付款频率',
     'any.required': '付款频率不能为空',
   }),
+  start_date: Joi.date().iso().required().messages({
+    'date.format': '开始日期格式不正确',
+    'any.required': '开始日期不能为空',
+  }),
   due_date: Joi.date().iso().required().messages({
     'date.format': '到期日期格式不正确',
     'any.required': '到期日期不能为空',

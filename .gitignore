@@ -44,3 +44,6 @@ coverage/
 .env.local
 .env.*.local
 .snow/
+
+.gemini/
+.codex/

@@ -245,7 +245,7 @@ export class StudentApiService {
     scores: number[]
   ): Promise<number[]> {
     const response = await apiCall<{ rings: number[]; scores?: number[] }>(
-      baseClient.put(`/students/${uid}/scores/batch`, { scores })
+      baseClient.post(`/students/${uid}/scores/batch`, { scores })
     );
 
     return response.rings || response.scores || [];

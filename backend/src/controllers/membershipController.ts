@@ -287,19 +287,20 @@ export class MembershipController {
   });
 
   public batchSetMembership = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const { studentIds, membershipType, startFromToday = true } = req.body;
+    const { studentIds, membershipType, startFromToday = true, startDate: customStartDate, endDate: customEndDate } = req.body;
 
     if (!Array.isArray(studentIds) || studentIds.length === 0) {
       throw AppError.invalidInput('学员ID列表不能为空');
     }
 
-    if (!['month', 'year'].includes(membershipType)) {
-      throw AppError.invalidInput('会员类型无效，只支持 month 或 year');
+    // 验证：必须提供 membershipType 或 自定义日期
+    const useCustomDates = customStartDate || customEndDate;
+    if (!useCustomDates && !['month', 'year'].includes(membershipType)) {
+      throw AppError.invalidInput('必须指定会员类型或自定义日期');
     }
 
     const results: Array<Record<string, unknown>> = [];
     const now = new Date();
-    const startDate = startFromToday ? now : new Date(now.getFullYear(), now.getMonth(), 1);
 
     for (const studentId of studentIds) {
       const student = await StudentRepository.findByUid(Number(studentId));
@@ -313,7 +314,26 @@ export class MembershipController {
       }
 
       try {
-        const { startDate: periodStart, endDate: periodEnd } = calculateMembershipPeriod(membershipType as MembershipType, startDate);
+        let periodStart: Date;
+        let periodEnd: Date;
+
+        if (useCustomDates) {
+          // 使用自定义日期
+          periodStart = customStartDate ? new Date(customStartDate) : now;
+          periodEnd = customEndDate ? new Date(customEndDate) : new Date(periodStart);
+          if (!customEndDate) {
+            // 如果没有结束日期，默认一个月
+            periodEnd.setMonth(periodEnd.getMonth() + 1);
+            periodEnd.setDate(periodEnd.getDate() - 1);
+          }
+        } else {
+          // 使用会员类型计算日期
+          const baseDate = startFromToday ? now : new Date(now.getFullYear(), now.getMonth(), 1);
+          const period = calculateMembershipPeriod(membershipType as MembershipType, baseDate);
+          periodStart = period.startDate;
+          periodEnd = period.endDate;
+        }
+
         const updatedStudent = await StudentRepository.updateByUid(Number(studentId), {
           membershipStartDate: periodStart.toISOString().split('T')[0],
           membershipEndDate: periodEnd.toISOString().split('T')[0],
@@ -342,13 +362,13 @@ export class MembershipController {
     }
 
     const successCount = results.filter(result => result.success).length;
-    const typeText = membershipType === 'month' ? '月卡' : '年卡';
+    const typeText = useCustomDates ? '自定义日期' : (membershipType === 'month' ? '月卡' : '年卡');
 
     const responseData = {
       processed_count: results.length,
       success_count: successCount,
       failed_count: results.length - successCount,
-      membership_type: membershipType,
+      membership_type: useCustomDates ? 'custom' : membershipType,
       membership_type_text: typeText,
       results,
     };

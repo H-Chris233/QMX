@@ -43,11 +43,20 @@ const batchSetMembershipSchema = Joi.object({
       'array.max': '最多只能选择100个学员',
       'any.required': '学员ID列表不能为空',
     }),
-  membershipType: Joi.string().valid('month', 'year').required().messages({
+  // 方式一：按类型设置（月卡/年卡）
+  membershipType: Joi.string().valid('month', 'year').optional().messages({
     'any.only': '会员类型只能是 month 或 year',
-    'any.required': '会员类型不能为空',
   }),
   startFromToday: Joi.boolean().default(true),
+  // 方式二：自定义日期
+  startDate: Joi.date().iso().optional().allow(null).messages({
+    'date.format': '开始日期格式不正确',
+  }),
+  endDate: Joi.date().iso().optional().allow(null).messages({
+    'date.format': '结束日期格式不正确',
+  }),
+}).or('membershipType', 'startDate').messages({
+  'object.missing': '必须指定会员类型或自定义日期',
 });
 
 // 路由定义
