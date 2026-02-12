@@ -2,6 +2,17 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-02-12
+- **前后端 API 规范统一**
+  - 后端 statsController.ts: 响应字段统一为 snake_case 格式（保留 camelCase 兼容）
+  - 前端 statsApi.ts: mapper 函数优先使用 snake_case 字段
+  - 金额字段命名规范化：使用 `_cents` 后缀明确标注单位（分）
+- **路由清理**
+  - 移除冗余 `/dashboard` 路由挂载，统一使用 `/stats` 前缀
+  - 更新 API 信息端点反映正确路由
+- **废弃 API 标记**
+  - `getFinancialStats()` 添加运行时警告，引导使用 `getGlobalFinancialStats()`
+
 ### 2026-01-10
 - 补全文档：添加 backend/src/db/ 模块 CLAUDE.md
 - 补全文档：添加 backend/src/utils/ 模块 CLAUDE.md

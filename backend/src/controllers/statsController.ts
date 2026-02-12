@@ -32,8 +32,20 @@ export class StatsController {
         CacheTTL.DASHBOARD_STATS
       );
 
-      // 返回 camelCase 格式（与测试期望一致）
+      // 返回 snake_case 格式（前端统一使用）
+      // 金额单位：分（cents），前端负责转换为元
       const responseData = {
+        total_students: stats.totalStudents,
+        total_revenue_cents: stats.totalRevenueCents,
+        total_expense_cents: stats.totalExpenseCents,
+        net_income_cents: stats.netIncomeCents,
+        average_score: stats.averageScore,
+        max_score: stats.maxScore,
+        active_courses: stats.activeCourses,
+        active_members: stats.activeMembers,
+        active_installment_plans: stats.activeInstallmentPlans,
+        overdue_installment_count: stats.overdueInstallmentCount,
+        // 兼容旧字段名（camelCase）
         totalStudents: stats.totalStudents,
         totalRevenueCents: stats.totalRevenueCents,
         totalExpenseCents: stats.totalExpenseCents,
@@ -63,12 +75,15 @@ export class StatsController {
 
       const stats = await StatsService.buildStudentStats(studentUid);
 
-      // 返回 camelCase 格式（与测试期望一致）
+      // 返回 snake_case 格式（前端统一使用）
+      // 金额单位：分（cents），前端负责转换为元
       const responseData = {
-        studentUid: stats.studentUid,
+        student_uid: stats.studentUid,
         payments: {
-          totalAmountCents: stats.payments.totalAmountCents,
+          total_amount_cents: stats.payments.totalAmountCents,
           count: stats.payments.count,
+          // 兼容旧字段
+          totalAmountCents: stats.payments.totalAmountCents,
         },
         scores: {
           average: stats.scores.average,
@@ -78,18 +93,31 @@ export class StatsController {
         },
         membership: {
           status: stats.membership.label,
+          status_code: stats.membership.status,
+          is_active: stats.membership.isActive,
+          days_remaining: stats.membership.daysRemaining,
+          days_until_start: stats.membership.daysUntilStart,
+          // 兼容旧字段
           statusCode: stats.membership.status,
           isActive: stats.membership.isActive,
           daysRemaining: stats.membership.daysRemaining,
           daysUntilStart: stats.membership.daysUntilStart,
         },
         installments: {
+          total_amount_cents: stats.installments.totalAmountCents,
+          paid_amount_cents: stats.installments.paidAmountCents,
+          pending_amount_cents: stats.installments.pendingAmountCents,
+          pending_count: stats.installments.pendingCount,
+          remaining_amount_cents: stats.installments.remainingAmountCents,
+          // 兼容旧字段
           totalAmountCents: stats.installments.totalAmountCents,
           paidAmountCents: stats.installments.paidAmountCents,
           pendingAmountCents: stats.installments.pendingAmountCents,
           pendingCount: stats.installments.pendingCount,
           remainingAmountCents: stats.installments.remainingAmountCents,
         },
+        // 兼容旧字段
+        studentUid: stats.studentUid,
       };
 
       const response = {
@@ -116,22 +144,45 @@ export class StatsController {
         { period: rawPeriod }
       );
 
-      // 返回 camelCase 格式（与测试期望一致）
+      // 返回 snake_case 格式（前端统一使用）
+      // 金额单位：分（cents），前端负责转换为元
       const responseData = {
         period: stats.period,
-        dateRange: stats.dateRange,
+        date_range: stats.dateRange,
         totals: {
+          income_cents: stats.totals.incomeCents,
+          expense_cents: stats.totals.expenseCents,
+          net_income_cents: stats.totals.netIncomeCents,
+          is_profitable: stats.totals.isProfitable,
+          // 兼容旧字段
           incomeCents: stats.totals.incomeCents,
           expenseCents: stats.totals.expenseCents,
           netIncomeCents: stats.totals.netIncomeCents,
           isProfitable: stats.totals.isProfitable,
         },
         installments: {
+          total_cents: stats.installments.totalCents,
+          paid_cents: stats.installments.paidCents,
+          pending_cents: stats.installments.pendingCents,
+          remaining_cents: stats.installments.remainingCents,
+          // 兼容旧字段
           totalCents: stats.installments.totalCents,
           paidCents: stats.installments.paidCents,
           pendingCents: stats.installments.pendingCents,
           remainingCents: stats.installments.remainingCents,
         },
+        transaction_count: stats.transactionCount,
+        student_income: stats.studentIncome.map((entry) => ({
+          student_id: entry.studentId,
+          student_name: entry.studentName,
+          amount_cents: entry.amountCents,
+          // 兼容旧字段
+          studentId: entry.studentId,
+          studentName: entry.studentName,
+          amountCents: entry.amountCents,
+        })),
+        // 兼容旧字段
+        dateRange: stats.dateRange,
         transactionCount: stats.transactionCount,
         studentIncome: stats.studentIncome.map((entry) => ({
           studentId: entry.studentId,

@@ -25,7 +25,7 @@ router.get('/', (_req: Request, res: Response, _next: NextFunction): void => {
       transactions: '/transactions',
       installments: '/installments',
       membership: '/membership',
-      dashboard: '/dashboard',
+      stats: '/stats',
       adapter: '/adapter', // 数据库适配器路由
       health: '/health',
     },
@@ -39,8 +39,7 @@ router.use('/', scoreRoutes); // 成绩路由使用 /students/:id/scores 格式
 router.use('/transactions', cashRoutes);
 router.use('/installments', installmentRoutes);
 router.use('/membership', membershipRoutes);
-router.use('/dashboard', statsRoutes);
-router.use('/stats', statsRoutes); // 统计API别名
+router.use('/stats', statsRoutes); // 统计API（移除了冗余的 /dashboard 挂载）
 router.use('/adapter', adapterRoutes); // 数据库适配器路由
 router.use('/auth', authRoutes); // 简单密码认证路由
 router.use('/health', healthRoutes); // 健康检查路由
