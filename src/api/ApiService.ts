@@ -216,6 +216,17 @@ export class ApiService {
     );
   }
 
+  /**
+   * 清空学员所有成绩
+   */
+  static async clearAllScores(uid: number): Promise<void> {
+    return handleApiOperation(
+      () => StudentApiService.clearAllScores(uid),
+      '清空所有成绩',
+      { retryable: false, context: { uid } }
+    );
+  }
+
   // ============================================================================
   // 交易/财务管理
   // ============================================================================

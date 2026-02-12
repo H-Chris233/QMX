@@ -223,6 +223,13 @@ export class StudentApiService {
   }
 
   /**
+   * 清空学员所有成绩
+   */
+  static async clearAllScores(uid: number): Promise<void> {
+    await apiCall<void>(baseClient.delete(`/students/${uid}/scores`));
+  }
+
+  /**
    * 更新学员成绩
    */
   static async updateScore(
