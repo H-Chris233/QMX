@@ -742,7 +742,7 @@ describe('Response Format Validation', () => {
           page: 1,
           limit: 20,
           total: 100,
-          totalPages: 5,
+          total_pages: 5,
         },
       };
 
@@ -751,7 +751,7 @@ describe('Response Format Validation', () => {
       expect(response.pagination).toHaveProperty('page');
       expect(response.pagination).toHaveProperty('limit');
       expect(response.pagination).toHaveProperty('total');
-      expect(response.pagination).toHaveProperty('totalPages');
+      expect(response.pagination).toHaveProperty('total_pages');
     });
 
     it('formats create response with message', () => {

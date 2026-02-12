@@ -96,7 +96,7 @@ export class CashController {
           page: result.pagination.page,
           limit: result.pagination.limit,
           total: result.pagination.total,
-          totalPages: result.pagination.total_pages,
+          total_pages: result.pagination.total_pages,
         },
       };
 
@@ -364,7 +364,7 @@ export class CashController {
           page: result.pagination.page,
           limit: result.pagination.limit,
           total: result.pagination.total,
-          totalPages: result.pagination.total_pages,
+          total_pages: result.pagination.total_pages,
         },
       };
 
@@ -826,7 +826,7 @@ export class CashController {
           page: result.pagination.page,
           limit: result.pagination.limit,
           total: result.pagination.total,
-          totalPages: result.pagination.total_pages,
+          total_pages: result.pagination.total_pages,
         },
       };
 

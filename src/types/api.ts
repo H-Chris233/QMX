@@ -695,7 +695,8 @@ export type ApiEndpoint =
   | '/transactions/search'
   | '/transactions/:id'
   | '/transactions/installment'
-  | '/installments/statuses'
+  | '/installments'
+  | '/installments/overdue'
   | '/installments/upcoming'
   | '/installments/:transactionUid/status'
   | '/installments/:planId/next'
@@ -865,6 +866,7 @@ export interface InstallmentPlanCreateData {
 
 /**
  * 学员列表响应类型
+ * 与后端 PaginatedResponse 保持一致
  */
 export interface StudentListResponse {
   /** 学员列表 */
@@ -872,22 +874,19 @@ export interface StudentListResponse {
   /** 分页信息 */
   pagination: {
     /** 当前页码 */
-    currentPage: number;
+    page: number;
     /** 每页条数 */
-    itemsPerPage: number;
+    limit: number;
     /** 总记录数 */
-    totalItems: number;
+    total: number;
     /** 总页数 */
-    totalPages: number;
-    /** 是否有下一页 */
-    hasNextPage: boolean;
-    /** 是否有上一页 */
-    hasPrevPage: boolean;
+    total_pages: number;
   };
 }
 
 /**
  * 交易列表响应类型
+ * 与后端 PaginatedResponse 保持一致
  */
 export interface TransactionListResponse {
   /** 交易列表 */
@@ -895,17 +894,13 @@ export interface TransactionListResponse {
   /** 分页信息 */
   pagination: {
     /** 当前页码 */
-    currentPage: number;
+    page: number;
     /** 每页条数 */
-    itemsPerPage: number;
+    limit: number;
     /** 总记录数 */
-    totalItems: number;
+    total: number;
     /** 总页数 */
-    totalPages: number;
-    /** 是否有下一页 */
-    hasNextPage: boolean;
-    /** 是否有上一页 */
-    hasPrevPage: boolean;
+    total_pages: number;
   };
 }
 
@@ -933,10 +928,13 @@ export interface PaginatedResponseLegacy<T> {
 
 // ============================================================================
 // 认证相关类型
+// 注意：以下类型为预留设计，当前后端仅实现简单密码认证
+// 实际使用的认证类型请参考 auth store
 // ============================================================================
 
 /**
  * 用户登录凭证接口
+ * @deprecated 当前后端使用简单密码认证，此类型暂未使用
  */
 export interface LoginCredentials {
   /** 用户名 */

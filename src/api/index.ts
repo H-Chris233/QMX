@@ -89,7 +89,6 @@ export const ApiAliases = {
   },
   // 分期相关
   installments: {
-    statuses: 'getInstallmentStatuses',
     upcoming: 'getUpcomingInstallments',
     updateStatus: 'updateInstallmentStatus',
     payNext: 'payNextInstallment',
