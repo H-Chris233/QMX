@@ -8,6 +8,38 @@ const router = Router();
  * 提供服务健康状态检查
  */
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: 综合健康检查
+ *     description: 检查服务和数据库连接状态，返回详细的健康信息
+ *     responses:
+ *       200:
+ *         description: 服务健康
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthStatus'
+ *       503:
+ *         description: 服务降级或不健康
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   enum: [degraded, unhealthy]
+ *                   example: degraded
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 error:
+ *                   type: string
+ */
 // GET /health - 基础健康检查
 router.get('/', async (req, res) => {
   try {
@@ -61,6 +93,53 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /health/ready:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: 就绪检查
+ *     description: 检查服务是否已准备好接收请求（Kubernetes readiness probe）
+ *     responses:
+ *       200:
+ *         description: 服务就绪
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ready:
+ *                   type: boolean
+ *                   example: true
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 checks:
+ *                   type: object
+ *                   properties:
+ *                     database:
+ *                       type: boolean
+ *                       example: true
+ *                     environment:
+ *                       type: boolean
+ *                       example: true
+ *       503:
+ *         description: 服务未就绪
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ready:
+ *                   type: boolean
+ *                   example: false
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 checks:
+ *                   type: object
+ */
 // GET /health/ready - 就绪检查
 router.get('/ready', async (req, res) => {
   try {
@@ -98,6 +177,37 @@ router.get('/ready', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /health/live:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: 存活检查
+ *     description: 简单的存活检查，只要进程在运行就返回 200（Kubernetes liveness probe）
+ *     responses:
+ *       200:
+ *         description: 服务存活
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 alive:
+ *                   type: boolean
+ *                   example: true
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 uptime:
+ *                   type: number
+ *                   description: 服务运行时间（秒）
+ *                   example: 3600
+ *                 pid:
+ *                   type: integer
+ *                   description: 进程 ID
+ *                   example: 12345
+ */
 // GET /health/live - 存活检查
 router.get('/live', (req, res) => {
   // 简单的存活检查 - 只要进程在运行就返回200

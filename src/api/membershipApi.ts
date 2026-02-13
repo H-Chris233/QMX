@@ -12,7 +12,29 @@ export interface MembershipStats {
   active_members: number;
   expired_members: number;
   expiring_soon: number;
-  upcoming_members: number;
+  activation_rate: number;
+  expiration_rate: number;
+}
+
+/**
+ * 批量设置会员响应类型
+ */
+export interface BatchSetMembershipResult {
+  uid: number;
+  name?: string;
+  success: boolean;
+  error?: string;
+  membership_start_date?: Date;
+  membership_end_date?: Date;
+}
+
+export interface BatchSetMembershipResponse {
+  processed_count: number;
+  success_count: number;
+  failed_count: number;
+  membership_type: string;
+  membership_type_text: string;
+  results: BatchSetMembershipResult[];
 }
 
 /**
@@ -101,7 +123,7 @@ export class MembershipApiService {
     studentIds: number[],
     membershipType: MembershipType | MembershipData,
     startFromToday: boolean = true
-  ): Promise<{ success: number; failed: number }> {
+  ): Promise<BatchSetMembershipResponse> {
     const payload =
       typeof membershipType === 'string'
         ? {
@@ -115,6 +137,6 @@ export class MembershipApiService {
             endDate: membershipType.endDate,
           };
 
-    return apiCall(baseClient.post("/membership/batch", payload));
+    return apiCall<BatchSetMembershipResponse>(baseClient.post("/membership/batch", payload));
   }
 }

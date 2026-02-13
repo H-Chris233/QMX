@@ -60,6 +60,43 @@ const batchSetMembershipSchema = Joi.object({
 });
 
 // 路由定义
+
+/**
+ * @openapi
+ * /membership/stats:
+ *   get:
+ *     tags:
+ *       - Membership
+ *     summary: 获取会员统计
+ *     description: 获取会员统计信息
+ *     responses:
+ *       200:
+ *         description: 会员统计数据
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total_members:
+ *                       type: integer
+ *                       description: 总会员数
+ *                     active_members:
+ *                       type: integer
+ *                       description: 活跃会员数
+ *                     expiring_soon:
+ *                       type: integer
+ *                       description: 即将到期会员数
+ *                     expired:
+ *                       type: integer
+ *                       description: 已过期会员数
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route GET /api/v1/membership/stats
  * @desc 获取会员统计信息
@@ -67,6 +104,68 @@ const batchSetMembershipSchema = Joi.object({
  */
 router.get('/stats', membershipController.getMembershipStats);
 
+/**
+ * @openapi
+ * /membership/batch:
+ *   post:
+ *     tags:
+ *       - Membership
+ *     summary: 批量设置会员
+ *     description: 批量为多个学员设置会员（最多 100 个）
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - studentIds
+ *             properties:
+ *               studentIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 minItems: 1
+ *                 maxItems: 100
+ *                 description: 学员 ID 列表
+ *               membershipType:
+ *                 type: string
+ *                 enum: [month, year]
+ *                 description: 会员类型
+ *               startFromToday:
+ *                 type: boolean
+ *                 default: true
+ *                 description: 是否从今天开始
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 自定义开始日期
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 自定义结束日期
+ *     responses:
+ *       200:
+ *         description: 批量设置成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     success_count:
+ *                       type: integer
+ *                     failed_count:
+ *                       type: integer
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route POST /api/v1/membership/batch
  * @desc 批量设置会员
@@ -77,6 +176,46 @@ router.post('/batch',
   membershipController.batchSetMembership
 );
 
+/**
+ * @openapi
+ * /membership/students/{id}/membership:
+ *   post:
+ *     tags:
+ *       - Membership
+ *     summary: 设置学员会员
+ *     description: 设置学员的会员信息
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 会员开始日期
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 description: 会员结束日期
+ *     responses:
+ *       200:
+ *         description: 设置成功
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route POST /api/v1/students/:id/membership
  * @desc 设置学员会员信息
@@ -89,6 +228,30 @@ router.post('/students/:id/membership',
 );
 
 /**
+ * @openapi
+ * /membership/students/{id}/membership:
+ *   delete:
+ *     tags:
+ *       - Membership
+ *     summary: 清除学员会员
+ *     description: 清除学员的会员信息
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     responses:
+ *       200:
+ *         description: 清除成功
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
  * @route DELETE /api/v1/students/:id/membership
  * @desc 清除学员会员信息
  * @access Public
@@ -98,6 +261,49 @@ router.delete('/students/:id/membership',
   membershipController.clearStudentMembership
 );
 
+/**
+ * @openapi
+ * /membership/students/{id}/membership/type:
+ *   post:
+ *     tags:
+ *       - Membership
+ *     summary: 按类型设置会员
+ *     description: 按类型（月卡/年卡）设置学员会员
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - membershipType
+ *             properties:
+ *               membershipType:
+ *                 type: string
+ *                 enum: [month, year]
+ *                 description: 会员类型
+ *               startFromToday:
+ *                 type: boolean
+ *                 default: true
+ *                 description: 是否从今天开始
+ *     responses:
+ *       200:
+ *         description: 设置成功
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route POST /api/v1/students/:id/membership/type
  * @desc 按类型设置会员（月卡/年卡）
@@ -109,6 +315,49 @@ router.post('/students/:id/membership/type',
   membershipController.setMembershipByType
 );
 
+/**
+ * @openapi
+ * /membership/students/{id}/membership/renew:
+ *   post:
+ *     tags:
+ *       - Membership
+ *     summary: 续费会员
+ *     description: 续费学员的会员
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - membershipType
+ *             properties:
+ *               membershipType:
+ *                 type: string
+ *                 enum: [month, year]
+ *                 description: 续费类型
+ *               extendFromCurrent:
+ *                 type: boolean
+ *                 default: true
+ *                 description: 是否从当前到期日期延续
+ *     responses:
+ *       200:
+ *         description: 续费成功
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route POST /api/v1/students/:id/membership/renew
  * @desc 续费会员

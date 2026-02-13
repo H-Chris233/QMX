@@ -29,7 +29,7 @@ router.get('/', (_req: Request, res: Response, _next: NextFunction): void => {
       adapter: '/adapter', // 数据库适配器路由
       health: '/health',
     },
-    documentation: '/docs',
+    documentation: '/api-docs',
   });
 });
 

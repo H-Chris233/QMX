@@ -36,7 +36,7 @@ export { StudentApiService } from './studentApi';
 export { TransactionApiService } from './transactionApi';
 export { InstallmentsApiService } from './installmentsApi';
 export { StatsApiService } from './statsApi';
-export { MembershipApiService } from './membershipApi';
+export { MembershipApiService, type MembershipStats, type BatchSetMembershipResponse, type BatchSetMembershipResult } from './membershipApi';
 export { AuthApiService } from './authApi';
 export { AdapterApiService } from './adapterApi';
 

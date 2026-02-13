@@ -507,6 +507,15 @@ describe('ApiService - 会员模块', () => {
   it('should send batch membership payload with camelCase keys', async () => {
     let capturedPayload: Record<string, unknown> | null = null;
 
+    const mockResponse = {
+      processed_count: 3,
+      success_count: 3,
+      failed_count: 0,
+      membership_type: 'custom',
+      membership_type_text: '自定义日期',
+      results: [],
+    };
+
     mswServer.use(
       http.post(`${API_BASE}/membership/batch`, async ({ request }) => {
         capturedPayload = await request.json();
@@ -519,7 +528,7 @@ describe('ApiService - 会员模块', () => {
 
         return HttpResponse.json({
           success: true,
-          data: { success: 3, failed: 0 },
+          data: mockResponse,
         });
       })
     );
@@ -530,7 +539,7 @@ describe('ApiService - 会员模块', () => {
     });
 
     expect(capturedPayload).not.toBeNull();
-    expect(result).toEqual({ success: 3, failed: 0 });
+    expect(result).toEqual(mockResponse);
   });
 });
 

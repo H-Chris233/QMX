@@ -33,6 +33,63 @@ const batchAddScoresSchema = Joi.object({
 });
 
 // 路由定义
+
+/**
+ * @openapi
+ * /students/{id}/scores:
+ *   post:
+ *     tags:
+ *       - Scores
+ *     summary: 添加成绩
+ *     description: 为指定学员添加单个成绩
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - score
+ *             properties:
+ *               score:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 10
+ *                 description: 成绩分数（0-10）
+ *                 example: 8.5
+ *     responses:
+ *       201:
+ *         description: 添加成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rings:
+ *                       type: array
+ *                       items:
+ *                         type: number
+ *                       description: 成绩数组
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route POST /api/v1/students/:id/scores
  * @desc 为学员添加单个成绩
@@ -45,6 +102,54 @@ router.post('/:id/scores',
 );
 
 /**
+ * @openapi
+ * /students/{id}/scores:
+ *   get:
+ *     tags:
+ *       - Scores
+ *     summary: 获取学员成绩
+ *     description: 获取指定学员的所有成绩
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     responses:
+ *       200:
+ *         description: 成绩列表
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     student_uid:
+ *                       type: integer
+ *                     rings:
+ *                       type: array
+ *                       items:
+ *                         type: number
+ *                     count:
+ *                       type: integer
+ *                     average:
+ *                       type: number
+ *                     max:
+ *                       type: number
+ *                     min:
+ *                       type: number
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
  * @route GET /api/v1/students/:id/scores
  * @desc 获取学员成绩列表
  * @access Public
@@ -54,6 +159,67 @@ router.get('/:id/scores',
   scoreController.getStudentScores
 );
 
+/**
+ * @openapi
+ * /students/{id}/scores/{scoreIndex}:
+ *   put:
+ *     tags:
+ *       - Scores
+ *     summary: 更新成绩
+ *     description: 更新学员指定索引的成绩
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - name: scoreIndex
+ *         in: path
+ *         required: true
+ *         description: 成绩索引（从 0 开始）
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newScore
+ *             properties:
+ *               newScore:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 10
+ *                 description: 新成绩分数
+ *     responses:
+ *       200:
+ *         description: 更新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rings:
+ *                       type: array
+ *                       items:
+ *                         type: number
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route PUT /api/v1/students/:id/scores/:scoreIndex
  * @desc 更新学员指定索引的成绩
@@ -74,6 +240,46 @@ router.put('/:id/scores/:scoreIndex',
 );
 
 /**
+ * @openapi
+ * /students/{id}/scores/{scoreIndex}:
+ *   delete:
+ *     tags:
+ *       - Scores
+ *     summary: 删除成绩
+ *     description: 删除学员指定索引的成绩
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - name: scoreIndex
+ *         in: path
+ *         required: true
+ *         description: 成绩索引（从 0 开始）
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
  * @route DELETE /api/v1/students/:id/scores/:scoreIndex
  * @desc 删除学员指定索引的成绩
  * @access Public
@@ -92,6 +298,67 @@ router.delete('/:id/scores/:scoreIndex',
 );
 
 /**
+ * @openapi
+ * /students/{id}/scores/batch:
+ *   post:
+ *     tags:
+ *       - Scores
+ *     summary: 批量添加成绩
+ *     description: 为学员批量添加多个成绩（最多 50 个）
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - scores
+ *             properties:
+ *               scores:
+ *                 type: array
+ *                 items:
+ *                   type: number
+ *                   minimum: 0
+ *                   maximum: 10
+ *                 minItems: 1
+ *                 maxItems: 50
+ *                 description: 成绩数组
+ *                 example: [8.5, 9.0, 7.5]
+ *     responses:
+ *       201:
+ *         description: 批量添加成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rings:
+ *                       type: array
+ *                       items:
+ *                         type: number
+ *                     added_count:
+ *                       type: integer
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
  * @route POST /api/v1/students/:id/scores/batch
  * @desc 批量为学员添加成绩
  * @access Public
@@ -102,6 +369,40 @@ router.post('/:id/scores/batch',
   scoreController.batchAddScores
 );
 
+/**
+ * @openapi
+ * /students/{id}/scores:
+ *   delete:
+ *     tags:
+ *       - Scores
+ *     summary: 清空成绩
+ *     description: 清空学员的所有成绩
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: 学员 UID
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     responses:
+ *       200:
+ *         description: 清空成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: 已清空所有成绩
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * @route DELETE /api/v1/students/:id/scores
  * @desc 清空学员所有成绩

@@ -6,7 +6,7 @@ import { StudentApiService, type StudentListResponse } from './studentApi';
 import { TransactionApiService, type TransactionListResponse } from './transactionApi';
 import { InstallmentsApiService } from './installmentsApi';
 import { StatsApiService, type StatsPeriod } from './statsApi';
-import { MembershipApiService, type MembershipStats } from './membershipApi';
+import { MembershipApiService, type MembershipStats, type BatchSetMembershipResponse } from './membershipApi';
 import { AdapterApiService, type HealthStatus, type AdapterInfo } from './adapterApi';
 import { handleApiOperation } from '../utils/errorHandler';
 import type {
@@ -725,12 +725,12 @@ export class ApiService {
   static async batchSetMembership(
     studentIds: number[],
     membership: MembershipData
-  ): Promise<{ success: number; failed: number }>;
+  ): Promise<BatchSetMembershipResponse>;
   static async batchSetMembership(
     studentIds: number[],
     membershipType: MembershipType | MembershipData,
     startFromToday: boolean = true
-  ): Promise<{ success: number; failed: number }> {
+  ): Promise<BatchSetMembershipResponse> {
     return handleApiOperation(
       () => MembershipApiService.batchSetMembership(studentIds, membershipType, startFromToday),
       '批量设置会员',

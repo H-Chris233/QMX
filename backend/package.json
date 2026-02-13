@@ -21,7 +21,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:drop": "drizzle-kit drop"
+    "db:drop": "drizzle-kit drop",
+    "docs:serve": "echo 'API 文档可在 http://localhost:3001/api-docs 访问（运行 pnpm dev 后）'"
   },
   "keywords": [
     "education",
@@ -42,9 +43,12 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.9.1",
     "joi": "^17.13.3",
+    "joi-to-swagger": "^6.2.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3",
     "rate-limiter-flexible": "^5.0.5",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.0",
     "winston": "^3.17.0"
   },
@@ -62,6 +66,8 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.19.3",
     "@types/supertest": "^6.0.3",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",

@@ -10,6 +10,30 @@ const router: Router = express.Router();
 const adminPasswordHash = process.env.QMX_ADMIN_PASSWORD_HASH || '';
 
 /**
+ * @openapi
+ * /auth/status:
+ *   get:
+ *     tags:
+ *       - Auth
+ *     summary: 获取认证状态
+ *     description: 检查站点是否已设置密码，是否为首次访问
+ *     responses:
+ *       200:
+ *         description: 认证状态
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/AuthStatus'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
  * 获取当前站点密码状态
  */
 router.get('/status', async (_req, res) => {
@@ -35,6 +59,58 @@ router.get('/status', async (_req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /auth/setup:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: 设置站点密码
+ *     description: 首次访问时设置站点访问密码（密码使用 bcrypt 哈希存储）
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 minLength: 4
+ *                 description: 站点访问密码（至少 4 位）
+ *                 example: "your_password"
+ *     responses:
+ *       200:
+ *         description: 密码设置成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: 密码设置成功
+ *       400:
+ *         description: 参数无效或密码已设置
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: 密码长度至少4位
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * 设置站点密码（第一次访问时）- 哈希存储
  */
@@ -91,6 +167,52 @@ router.post('/setup', async (req, res) => {
 });
 
 /**
+ * @openapi
+ * /auth/verify:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: 验证密码
+ *     description: 验证用户输入的密码是否正确（优先验证管理员密码）
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 description: 用户输入的密码
+ *                 example: "your_password"
+ *     responses:
+ *       200:
+ *         description: 密码验证成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     isAdmin:
+ *                       type: boolean
+ *                       description: 是否为管理员
+ *                       example: false
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
  * 验证密码
  */
 router.post('/verify', async (req, res) => {
@@ -145,6 +267,54 @@ router.post('/verify', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /auth/change:
+ *   post:
+ *     tags:
+ *       - Auth
+ *     summary: 更改密码
+ *     description: 更改站点访问密码（需要先验证旧密码）
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 description: 当前密码
+ *                 example: "old_password"
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 4
+ *                 description: 新密码（至少 4 位）
+ *                 example: "new_password"
+ *     responses:
+ *       200:
+ *         description: 密码更改成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: 密码更改成功
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 /**
  * 更改密码（需要先验证旧密码）
  */

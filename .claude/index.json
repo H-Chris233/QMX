@@ -1,19 +1,21 @@
 {
-  "timestamp": "2025-11-06T11:37:40+0000",
+  "timestamp": "2026-02-13T12:54:05+0800",
   "project": {
     "name": "QMX 启明星学生管理系统",
     "type": "教育管理系统",
     "architecture": "前后端分离",
-    "version": "0.12.1",
+    "version": "0.15.0",
     "tech_stack": {
-      "frontend": "Vue 3 + TypeScript + Vite + Pinia",
-      "backend": "Node.js + Express + TypeScript + Mongoose",
-      "database": "MongoDB"
+      "frontend": "Vue 3 + TypeScript + Vite + Pinia + Axios",
+      "backend": "Node.js + Express + TypeScript + Drizzle ORM",
+      "database": "PostgreSQL + Drizzle ORM",
+      "testing": "Vitest + Jest + Playwright"
     },
     "recent_changes": [
-      "Pinia状态管理迁移完成",
-      "模块化API客户端架构",
-      "状态管理测试工具"
+      "2026-02-13: AI上下文重新扫描完成",
+      "2026-02-12: 前后端API规范统一(snake_case)",
+      "2026-01-10: 认证系统实现",
+      "2025-01-09: PostgreSQL迁移完成"
     ]
   },
   "modules": [
@@ -21,16 +23,17 @@
       "path": "src/api/",
       "name": "API客户端模块",
       "language": "TypeScript",
-      "entry": "ApiService.ts",
+      "entry": "index.ts",
       "type": "frontend",
       "coverage": {
-        "files_scanned": 8,
-        "total_files": 8,
+        "files_scanned": 12,
+        "total_files": 12,
         "percentage": 100,
-        "has_tests": false,
+        "has_tests": true,
         "interfaces": true,
         "dependencies": true
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "src/components/",
@@ -39,13 +42,14 @@
       "entry": "MainApp.vue",
       "type": "frontend",
       "coverage": {
-        "files_scanned": 13,
-        "total_files": 13,
+        "files_scanned": 15,
+        "total_files": 15,
         "percentage": 100,
-        "has_tests": false,
+        "has_tests": true,
         "interfaces": true,
         "dependencies": true
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "src/types/",
@@ -60,7 +64,8 @@
         "has_tests": false,
         "interfaces": true,
         "dependencies": false
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "src/utils/",
@@ -69,13 +74,14 @@
       "entry": "dataTransformers.ts",
       "type": "frontend",
       "coverage": {
-        "files_scanned": 5,
-        "total_files": 5,
+        "files_scanned": 12,
+        "total_files": 12,
         "percentage": 100,
         "has_tests": true,
         "interfaces": true,
         "dependencies": false
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "src/stores/",
@@ -89,9 +95,9 @@
         "percentage": 100,
         "has_tests": true,
         "interfaces": true,
-        "dependencies": true,
-        "recently_updated": true
-      }
+        "dependencies": true
+      },
+      "claude_md": true
     },
     {
       "path": "backend/src/routes/",
@@ -100,13 +106,14 @@
       "entry": "index.ts",
       "type": "backend",
       "coverage": {
-        "files_scanned": 9,
-        "total_files": 9,
+        "files_scanned": 11,
+        "total_files": 11,
         "percentage": 100,
         "has_tests": true,
         "interfaces": true,
         "dependencies": true
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "backend/src/controllers/",
@@ -115,28 +122,30 @@
       "entry": "studentController.ts",
       "type": "backend",
       "coverage": {
+        "files_scanned": 7,
+        "total_files": 7,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true
+      },
+      "claude_md": true
+    },
+    {
+      "path": "backend/src/db/",
+      "name": "数据库模块",
+      "language": "TypeScript",
+      "entry": "index.ts",
+      "type": "backend",
+      "coverage": {
         "files_scanned": 8,
         "total_files": 8,
         "percentage": 100,
         "has_tests": true,
         "interfaces": true,
         "dependencies": true
-      }
-    },
-    {
-      "path": "backend/src/models/",
-      "name": "数据模型模块",
-      "language": "TypeScript",
-      "entry": "mongo.ts",
-      "type": "backend",
-      "coverage": {
-        "files_scanned": 10,
-        "total_files": 10,
-        "percentage": 100,
-        "has_tests": false,
-        "interfaces": true,
-        "dependencies": true
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "backend/src/services/",
@@ -145,13 +154,14 @@
       "entry": "studentQuery.ts",
       "type": "backend",
       "coverage": {
-        "files_scanned": 7,
-        "total_files": 7,
+        "files_scanned": 8,
+        "total_files": 8,
         "percentage": 100,
         "has_tests": true,
         "interfaces": true,
         "dependencies": true
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "backend/src/middleware/",
@@ -163,10 +173,11 @@
         "files_scanned": 3,
         "total_files": 3,
         "percentage": 100,
-        "has_tests": false,
+        "has_tests": true,
         "interfaces": true,
         "dependencies": true
-      }
+      },
+      "claude_md": true
     },
     {
       "path": "backend/src/config/",
@@ -175,19 +186,52 @@
       "entry": "index.ts",
       "type": "backend",
       "coverage": {
-        "files_scanned": 3,
-        "total_files": 3,
+        "files_scanned": 2,
+        "total_files": 2,
         "percentage": 100,
         "has_tests": false,
         "interfaces": true,
         "dependencies": true
-      }
+      },
+      "claude_md": true
+    },
+    {
+      "path": "backend/src/utils/",
+      "name": "后端工具模块",
+      "language": "TypeScript",
+      "entry": "errors.ts",
+      "type": "backend",
+      "coverage": {
+        "files_scanned": 6,
+        "total_files": 6,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true
+      },
+      "claude_md": true
+    },
+    {
+      "path": "tests/",
+      "name": "测试基础设施",
+      "language": "TypeScript",
+      "entry": "setup.ts",
+      "type": "testing",
+      "coverage": {
+        "files_scanned": 40,
+        "total_files": 40,
+        "percentage": 100,
+        "has_tests": true,
+        "interfaces": true,
+        "dependencies": true
+      },
+      "claude_md": false
     }
   ],
   "coverage": {
-    "total_files": 82,
-    "files_scanned": 77,
-    "coverage_percentage": 94,
+    "total_files": 190,
+    "files_scanned": 186,
+    "coverage_percentage": 98,
     "truncated": false,
     "ignored_patterns": [
       "node_modules/**",
@@ -197,34 +241,26 @@
       "__pycache__/**",
       "*.lock",
       "*.log",
-      "*.bin"
+      "*.bin",
+      "coverage/**",
+      "test-results/**",
+      "playwright-report/**"
     ],
-    "missing_files": [
-      "backend/src/store/",
-      "backend/src/validation/"
-    ],
-    "gaps": [
-      {
-        "module": "backend/src/models/",
-        "missing": "测试覆盖",
-        "impact": "数据模型层缺少单元测试",
-        "priority": "medium"
-      },
-      {
-        "module": "src/components/",
-        "missing": "组件测试",
-        "impact": "前端组件缺少单元测试和集成测试",
-        "priority": "medium"
-      },
-      {
-        "module": "backend/src/middleware/",
-        "missing": "中间件测试",
-        "impact": "中间件缺少单元测试",
-        "priority": "low"
-      }
-    ]
+    "gaps": []
   },
   "architecture_improvements": {
+    "postgresql_migration": {
+      "completed": true,
+      "date": "2025-01-09",
+      "from": "MongoDB + Mongoose",
+      "to": "PostgreSQL + Drizzle ORM",
+      "benefits": [
+        "更好的类型安全",
+        "连接池管理",
+        "关系映射",
+        "迁移工具支持"
+      ]
+    },
     "pinia_migration": {
       "completed": true,
       "date": "2025-11-06",
@@ -234,26 +270,15 @@
         "模块化设计",
         "测试友好",
         "性能优化"
-      ],
-      "files_affected": [
-        "src/stores/index.ts",
-        "src/stores/app.ts",
-        "src/stores/student.ts",
-        "src/main.ts",
-        "src/MainApp.vue"
       ]
     },
-    "api_modularization": {
+    "api_standardization": {
       "completed": true,
-      "benefits": [
-        "统一API入口",
-        "错误处理标准化",
-        "类型安全保证",
-        "模块化架构"
-      ],
-      "key_files": [
-        "src/api/ApiService.ts",
-        "src/utils/errorHandler.ts"
+      "date": "2026-02-12",
+      "changes": [
+        "统一snake_case响应字段",
+        "金额使用_cents后缀",
+        "保留camelCase兼容"
       ]
     }
   },
@@ -269,49 +294,73 @@
     ],
     "testing": {
       "test_file": "src/utils/store-test.ts",
-      "coverage": "所有Store模块",
-      "features": [
-        "开发环境自动测试",
-        "浏览器控制台调试",
-        "Store间数据流测试"
-      ]
+      "coverage": "所有Store模块"
     }
+  },
+  "backend_patterns": {
+    "repository": ["studentRepository", "cashRepository", "installmentRepository"],
+    "builder": ["studentBuilder", "cashBuilder"],
+    "updater": ["studentUpdater", "cashUpdater"],
+    "query": ["studentQuery"],
+    "presenter": ["studentPresenter"],
+    "service": ["statsService"]
   },
   "documentation": {
     "root_claude_md": true,
-    "module_claude_md_count": 11,
-    "last_updated": "2025-11-06T11:37:40+0000",
-    "new_modules": [
-      "src/stores/CLAUDE.md"
-    ],
-    "updated_modules": [
-      "CLAUDE.md (根级)"
-    ]
+    "module_claude_md_count": 12,
+    "last_updated": "2026-02-13T12:54:05+0800",
+    "coverage_percentage": 100
   },
-  "next_steps": [
-    "优先补扫：backend/src/models/ 的测试覆盖情况",
-    "优先补扫：src/components/ 中的关键组件实现细节",
-    "优先补扫：backend/src/services/ 中的复杂业务逻辑",
-    "建议添加：后端配置管理的环境变量验证机制",
-    "建议添加：前端组件的单元测试覆盖"
-  ],
+  "testing_infrastructure": {
+    "frontend": {
+      "framework": "Vitest",
+      "utils": "Vue Test Utils",
+      "location": "src/**/__tests__/"
+    },
+    "backend": {
+      "framework": "Jest",
+      "utils": "Supertest",
+      "location": "backend/src/__tests__/"
+    },
+    "e2e": {
+      "framework": "Playwright",
+      "page_objects": "tests/e2e/page-objects/",
+      "location": "tests/e2e/"
+    },
+    "factories": {
+      "location": "tests/factories/",
+      "factories": ["StudentFactory", "TransactionFactory", "InstallmentFactory", "StatsFactory"]
+    },
+    "mocks": {
+      "framework": "MSW",
+      "location": "tests/mocks/msw/"
+    }
+  },
   "quality_metrics": {
     "type_safety": "优秀",
     "modularity": "优秀",
-    "test_coverage": "良好",
+    "test_coverage": "优秀",
     "documentation": "优秀",
-    "code_organization": "优秀"
+    "code_organization": "优秀",
+    "architecture_patterns": "优秀"
   },
   "development_workflow": {
     "commands": {
-      "dev": "npm run dev:full",
-      "build": "npm run build && cd backend && npm run build",
-      "test": "npm test && cd backend && npm test",
-      "lint": "npm run lint && cd backend && npm run lint"
+      "dev": "pnpm run dev:full",
+      "build": "pnpm run build && pnpm run build:backend",
+      "test": "pnpm run test:frontend && pnpm run test:backend",
+      "e2e": "pnpm run e2e",
+      "lint": "pnpm run lint:frontend && pnpm run lint:backend"
     },
     "ports": {
       "frontend": 1420,
       "backend": 3001
     }
-  }
+  },
+  "next_steps": [
+    "添加API文档自动生成 (OpenAPI/Swagger)",
+    "实现更细粒度的性能监控",
+    "增强安全审计日志",
+    "考虑国际化支持 (i18n)"
+  ]
 }
