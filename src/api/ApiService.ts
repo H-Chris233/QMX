@@ -649,6 +649,85 @@ export class ApiService {
     );
   }
 
+  /**
+   * 获取趋势分析数据
+   */
+  static async getTrendsData(options?: {
+    period?: 'week' | 'month' | 'quarter' | 'year';
+    type?: 'revenue' | 'expense' | 'students' | 'installments';
+  }): Promise<{
+    type: string;
+    period: string;
+    data_points: Array<{ period: string; value: number; date: string }>;
+    total: number;
+    average: number;
+    max: number;
+    min: number;
+  }> {
+    return handleApiOperation(
+      () => StatsApiService.getTrendsData(options || {}),
+      '获取趋势分析',
+      { retryable: true, context: { options } }
+    );
+  }
+
+  /**
+   * 获取课程分布统计
+   */
+  static async getCourseDistribution(): Promise<{
+    class_distribution: Array<{ name: string; count: number; percentage: number }>;
+    subject_distribution: Array<{ name: string; count: number; percentage: number }>;
+    total_students: number;
+  }> {
+    return handleApiOperation(
+      () => StatsApiService.getCourseDistribution(),
+      '获取课程分布',
+      { retryable: true }
+    );
+  }
+
+  /**
+   * 获取成绩分布统计
+   */
+  static async getScoreDistribution(): Promise<{
+    score_ranges: Array<{ label: string; min: number; max: number; count: number; percentage: number }>;
+    average_score: number;
+    total_scores: number;
+    students_with_scores: number;
+  }> {
+    return handleApiOperation(
+      () => StatsApiService.getScoreDistribution(),
+      '获取成绩分布',
+      { retryable: true }
+    );
+  }
+
+  /**
+   * 获取逾期分期付款统计（详细版）
+   */
+  static async getOverdueInstallmentStats(): Promise<{
+    overdue_installments: Array<{
+      uid: number;
+      plan_id: number;
+      current_installment: number;
+      installment_amount: number;
+      due_date: string;
+      days_overdue: number;
+      overdue_amount: number;
+      plan: { frequency: string; frequency_text: string; total_amount: number } | null;
+      student: { uid: number; name: string; phone: string } | null;
+    }>;
+    total_overdue_count: number;
+    total_overdue_amount: number;
+    average_days_overdue: number;
+  }> {
+    return handleApiOperation(
+      () => StatsApiService.getOverdueInstallments(),
+      '获取逾期分期统计',
+      { retryable: true }
+    );
+  }
+
   // ============================================================================
   // 会员管理
   // ============================================================================

@@ -131,8 +131,14 @@ export class StatsController {
   );
 
   // 获取财务统计（带缓存）
+  // @deprecated 请使用 getGlobalFinancialStats()
   public getFinancialStats = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
+      // 运行时废弃警告
+      logger.warn(
+        "[DEPRECATED] GET /stats/financial 已废弃，请使用 GET /stats/global-financial-stats"
+      );
+
       const rawPeriod =
         typeof req.query.period === "string" ? req.query.period : undefined;
 
@@ -522,30 +528,63 @@ export class StatsController {
       const now = new Date();
       const timePoints = createTimePoints(trendPeriod, now);
       const dataPoints: TrendDataPoint[] = [];
+      const cashTransactionsForTrend =
+        trendMetric === "revenue" || trendMetric === "expense"
+          ? await CashRepository.findAll()
+          : null;
+      const studentsForTrend =
+        trendMetric === "students" ? await StudentRepository.findAll() : null;
+      const installmentPlansForTrend =
+        trendMetric === "installments"
+          ? await InstallmentPlanRepository.findAll()
+          : null;
 
       for (const point of timePoints) {
         let rawValue = 0;
 
         switch (trendMetric) {
           case "revenue": {
-            const stats = await CashRepository.getFinancialStats(
-              point.rangeStart.toISOString(),
-              point.rangeEnd.toISOString()
+            rawValue = (cashTransactionsForTrend || []).reduce(
+              (sum, transaction) => {
+                const createdAt = transaction.createdAt
+                  ? new Date(transaction.createdAt)
+                  : null;
+                if (
+                  !createdAt ||
+                  createdAt < point.rangeStart ||
+                  createdAt > point.rangeEnd
+                ) {
+                  return sum;
+                }
+                return transaction.amount > 0 ? sum + transaction.amount : sum;
+              },
+              0
             );
-            rawValue = stats.totalIncome;
             break;
           }
           case "expense": {
-            const stats = await CashRepository.getFinancialStats(
-              point.rangeStart.toISOString(),
-              point.rangeEnd.toISOString()
+            rawValue = (cashTransactionsForTrend || []).reduce(
+              (sum, transaction) => {
+                const createdAt = transaction.createdAt
+                  ? new Date(transaction.createdAt)
+                  : null;
+                if (
+                  !createdAt ||
+                  createdAt < point.rangeStart ||
+                  createdAt > point.rangeEnd
+                ) {
+                  return sum;
+                }
+                return transaction.amount < 0
+                  ? sum + Math.abs(transaction.amount)
+                  : sum;
+              },
+              0
             );
-            rawValue = stats.totalExpense;
             break;
           }
           case "students": {
-            const allStudents = await StudentRepository.findAll();
-            const count = allStudents.filter(student => {
+            const count = (studentsForTrend || []).filter((student) => {
               const createdAt = student.createdAt ? new Date(student.createdAt) : new Date();
               return createdAt >= point.rangeStart && createdAt <= point.rangeEnd;
             }).length;
@@ -553,8 +592,7 @@ export class StatsController {
             break;
           }
           case "installments": {
-            const allPlans = await InstallmentPlanRepository.findAll();
-            const count = allPlans.filter(plan => {
+            const count = (installmentPlansForTrend || []).filter((plan) => {
               const createdAt = plan.createdAt ? new Date(plan.createdAt) : new Date();
               return createdAt >= point.rangeStart && createdAt <= point.rangeEnd;
             }).length;

@@ -3,6 +3,19 @@
 ## 变更记录 (Changelog)
 
 ### 2026-02-13
+- **补全未挂载的统计路由** (Stats API)
+  - 添加 4 个已实现但未挂载的统计端点路由：
+    - `GET /stats/trends` - 趋势分析数据（周/月/季/年维度）
+    - `GET /stats/course-distribution` - 课程分布统计
+    - `GET /stats/score-distribution` - 成绩分布统计
+    - `GET /stats/overdue-installments` - 逾期分期付款统计
+  - 后端 statsController.ts: 添加 `@deprecated` 注释和运行时警告
+  - 前端 statsApi.ts: 添加 4 个新 API 方法
+  - 前端 ApiService.ts: 添加统一入口方法
+  - Stats API 端点数量：6 → 10 个
+- **TypeScript 类型修复**
+  - 修复 `InstallmentSearchParams.studentId` 类型定义（string → string | number）
+  - 修复 `test-utils.ts` 中 `mountWithPinia` 返回类型兼容性问题
 - **OpenAPI/Swagger API 文档自动生成**
   - 添加 `swagger-jsdoc` + `swagger-ui-express` + `joi-to-swagger` 依赖
   - 创建 `backend/src/config/swagger.ts` - OpenAPI 3.0.3 规范配置

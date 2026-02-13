@@ -393,4 +393,267 @@ router.get('/student/:id',
   statsController.getStudentStats
 );
 
+// 趋势分析验证规则
+const trendsSchema = Joi.object({
+  period: Joi.string()
+    .valid('week', 'month', 'quarter', 'year')
+    .default('month')
+    .messages({
+      'any.only': '无效的周期，支持: week, month, quarter, year',
+    }),
+  type: Joi.string()
+    .valid('revenue', 'expense', 'students', 'installments')
+    .default('revenue')
+    .messages({
+      'any.only': '无效的类型，支持: revenue, expense, students, installments',
+    }),
+});
+
+/**
+ * @openapi
+ * /stats/trends:
+ *   get:
+ *     tags:
+ *       - Stats
+ *     summary: 获取趋势分析数据
+ *     description: 获取指定周期和类型的趋势分析数据
+ *     parameters:
+ *       - name: period
+ *         in: query
+ *         description: 统计周期
+ *         schema:
+ *           type: string
+ *           enum: [week, month, quarter, year]
+ *           default: month
+ *       - name: type
+ *         in: query
+ *         description: 统计类型
+ *         schema:
+ *           type: string
+ *           enum: [revenue, expense, students, installments]
+ *           default: revenue
+ *     responses:
+ *       200:
+ *         description: 趋势分析数据
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                       description: 统计类型
+ *                     period:
+ *                       type: string
+ *                       description: 统计周期
+ *                     data_points:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           period:
+ *                             type: string
+ *                           value:
+ *                             type: number
+ *                           date:
+ *                             type: string
+ *                             format: date-time
+ *                     total:
+ *                       type: number
+ *                     average:
+ *                       type: number
+ *                     max:
+ *                       type: number
+ *                     min:
+ *                       type: number
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
+ * @route GET /api/v1/stats/trends
+ * @desc 获取趋势分析数据
+ * @access Public
+ */
+router.get('/trends',
+  validateQuery(trendsSchema),
+  statsController.getTrendsData
+);
+
+/**
+ * @openapi
+ * /stats/course-distribution:
+ *   get:
+ *     tags:
+ *       - Stats
+ *     summary: 获取课程分布统计
+ *     description: 获取学员按班级和科目的分布统计
+ *     responses:
+ *       200:
+ *         description: 课程分布统计数据
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     class_distribution:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                           count:
+ *                             type: integer
+ *                           percentage:
+ *                             type: number
+ *                     subject_distribution:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                           count:
+ *                             type: integer
+ *                           percentage:
+ *                             type: number
+ *                     total_students:
+ *                       type: integer
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
+ * @route GET /api/v1/stats/course-distribution
+ * @desc 获取课程分布统计
+ * @access Public
+ */
+router.get('/course-distribution', statsController.getCourseDistribution);
+
+/**
+ * @openapi
+ * /stats/score-distribution:
+ *   get:
+ *     tags:
+ *       - Stats
+ *     summary: 获取成绩分布统计
+ *     description: 获取学员成绩的分布统计
+ *     responses:
+ *       200:
+ *         description: 成绩分布统计数据
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     score_ranges:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           label:
+ *                             type: string
+ *                           min:
+ *                             type: number
+ *                           max:
+ *                             type: number
+ *                           count:
+ *                             type: integer
+ *                           percentage:
+ *                             type: number
+ *                     average_score:
+ *                       type: number
+ *                     total_scores:
+ *                       type: integer
+ *                     students_with_scores:
+ *                       type: integer
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
+ * @route GET /api/v1/stats/score-distribution
+ * @desc 获取成绩分布统计
+ * @access Public
+ */
+router.get('/score-distribution', statsController.getScoreDistribution);
+
+/**
+ * @openapi
+ * /stats/overdue-installments:
+ *   get:
+ *     tags:
+ *       - Stats
+ *     summary: 获取逾期分期付款统计
+ *     description: 获取所有逾期的分期付款详情和统计
+ *     responses:
+ *       200:
+ *         description: 逾期分期付款统计数据
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     overdue_installments:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           uid:
+ *                             type: integer
+ *                           plan_id:
+ *                             type: integer
+ *                           current_installment:
+ *                             type: integer
+ *                           installment_amount:
+ *                             type: number
+ *                           due_date:
+ *                             type: string
+ *                             format: date
+ *                           days_overdue:
+ *                             type: integer
+ *                           overdue_amount:
+ *                             type: number
+ *                           plan:
+ *                             type: object
+ *                           student:
+ *                             type: object
+ *                     total_overdue_count:
+ *                       type: integer
+ *                     total_overdue_amount:
+ *                       type: number
+ *                     average_days_overdue:
+ *                       type: integer
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+/**
+ * @route GET /api/v1/stats/overdue-installments
+ * @desc 获取逾期分期付款统计
+ * @access Public
+ */
+router.get('/overdue-installments', statsController.getOverdueInstallments);
+
 export default router;

@@ -4,7 +4,7 @@
  * 提供 Vue Test Utils 封装，支持 Pinia 状态管理和常见测试模式
  */
 
-import { mount, type VueWrapper, type ComponentMountingOptions } from '@vue/test-utils';
+import { mount, type ComponentMountingOptions } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { nextTick } from 'vue';
 
@@ -23,7 +23,7 @@ export function createTestPinia(): Pinia {
 export function mountWithPinia<T = any>(
   component: any,
   options: ComponentMountingOptions<T> = {}
-): VueWrapper<T> {
+) {
   const pinia = createTestPinia();
   return mount(component, {
     global: {

@@ -836,8 +836,8 @@ export interface InstallmentSearchParams {
   page: number;
   /** 每页条数 */
   limit: number;
-  /** 学员ID */
-  studentId: string;
+  /** 学员ID (支持 string 或 number) */
+  studentId: string | number;
   /** 分期状态 */
   status?: InstallmentStatus | undefined;
 }
