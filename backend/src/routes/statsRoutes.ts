@@ -11,15 +11,6 @@ const router: Router = express.Router();
 router.use(apiRateLimitMiddleware);
 
 // 验证规则
-const financialStatsSchema = Joi.object({
-  period: Joi.string()
-    .valid('Today', 'ThisWeek', 'ThisMonth', 'ThisYear', 'All')
-    .default('ThisMonth')
-    .messages({
-      'any.only': '无效的统计周期，支持: Today, ThisWeek, ThisMonth, ThisYear, All',
-    }),
-});
-
 const membershipExpiringSchema = Joi.object({
   days: Joi.number()
     .integer()
@@ -66,63 +57,6 @@ const membershipExpiringSchema = Joi.object({
  * @access Public
  */
 router.get('/dashboard', statsController.getDashboardStats);
-
-/**
- * @openapi
- * /stats/financial:
- *   get:
- *     tags:
- *       - Stats
- *     summary: 获取财务统计（已废弃）
- *     description: |
- *       **已废弃** - 请使用 `/stats/global-financial-stats`
- *
- *       获取财务统计数据，支持周期选择
- *     deprecated: true
- *     parameters:
- *       - name: period
- *         in: query
- *         description: 统计周期
- *         schema:
- *           type: string
- *           enum: [Today, ThisWeek, ThisMonth, ThisYear, All]
- *           default: ThisMonth
- *     responses:
- *       200:
- *         description: 财务统计数据
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     total_income_cents:
- *                       type: integer
- *                       description: 总收入（分）
- *                     total_expense_cents:
- *                       type: integer
- *                       description: 总支出（分）
- *                     net_income_cents:
- *                       type: integer
- *                       description: 净收入（分）
- *       500:
- *         $ref: '#/components/responses/ServerError'
- */
-/**
- * @route GET /api/v1/stats/financial
- * @desc 获取财务统计（支持周期选择，已废弃，使用 /stats/global-financial-stats）
- * @access Public
- * @deprecated 请使用 /stats/global-financial-stats
- */
-router.get('/financial',
-  validateQuery(financialStatsSchema),
-  statsController.getFinancialStats
-);
 
 /**
  * @openapi

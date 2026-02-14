@@ -195,8 +195,29 @@ export const useInstallmentStore = defineStore('installment', () => {
     try {
       const response = await ApiService.cancelInstallmentPlan(installmentId);
 
-      // 更新本地状态 - response是InstallmentPlan
-      // 暂时不更新本地状态，因为类型不匹配
+      // 更新本地状态 - response 是 InstallmentPlan，需要更新所有关联的分期
+      // installmentId 实际上是 planId（分期计划ID）
+      const planId = installmentId;
+
+      // 更新该计划下所有分期的状态为已取消
+      installments.value = installments.value.map(inst => {
+        if (inst.plan_id === planId) {
+          return {
+            ...inst,
+            status: InstallmentStatus.CANCELLED
+          };
+        }
+        return inst;
+      });
+
+      // 如果当前选中的分期属于该计划，也更新状态
+      if (currentInstallment.value?.plan_id === planId) {
+        currentInstallment.value = {
+          ...currentInstallment.value,
+          status: InstallmentStatus.CANCELLED
+        };
+      }
+
       return response;
     } catch (error) {
       throw error;

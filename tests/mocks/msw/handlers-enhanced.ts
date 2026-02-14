@@ -400,7 +400,7 @@ export const enhancedHandlers = [
   /**
    * 获取财务统计
    */
-  http.get(`${API_BASE_URL}/stats/financial`, () => {
+  http.get(`${API_BASE_URL}/stats/global-financial-stats`, () => {
     const totalIncome = mockData.transactions
       .filter(t => t.amount > 0)
       .reduce((sum, t) => sum + t.amount, 0);

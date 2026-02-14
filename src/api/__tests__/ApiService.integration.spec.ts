@@ -367,7 +367,7 @@ describe('ApiService - 分期模块', () => {
         requestedPath = request.url;
 
         expect(params.transactionUid).toBe('901');
-        expect(capturedPayload).toEqual({ status: 'Paid' });
+        expect(capturedPayload).toEqual({ status: 'PAID' });
 
         return HttpResponse.json({
           success: true,
@@ -571,8 +571,10 @@ describe('ApiService - 成绩模块', () => {
 
   it('should fallback to scores array when rings field missing', async () => {
     mswServer.use(
-      http.put(`${API_BASE}/students/:uid/scores/batch`, async ({ params }) => {
+      http.post(`${API_BASE}/students/:uid/scores/batch`, async ({ request, params }) => {
         expect(params.uid).toBe('202');
+        const payload = await request.json();
+        expect(payload).toEqual({ scores: [88, 92, 96] });
         return HttpResponse.json({
           success: true,
           data: { scores: [88, 92, 96] },
@@ -632,7 +634,7 @@ describe('ApiService - 统计模块', () => {
     let receivedUrl: URL | null = null;
 
     mswServer.use(
-      http.get(`${API_BASE}/stats/financial`, ({ request }) => {
+      http.get(`${API_BASE}/stats/global-financial-stats`, ({ request }) => {
         receivedUrl = new URL(request.url);
         return HttpResponse.json({
           success: true,
@@ -641,11 +643,11 @@ describe('ApiService - 统计模块', () => {
       })
     );
 
-    const result = await ApiService.getFinancialStats({ start: '2024-01-01', end: '2024-01-31' });
+    const result = await ApiService.getGlobalFinancialStats({ start: '2024-01-01', end: '2024-01-31' });
 
     expect(receivedUrl).not.toBeNull();
-    expect(receivedUrl?.searchParams.get('date_from')).toBeNull();
-    expect(receivedUrl?.searchParams.get('date_to')).toBeNull();
+    expect(receivedUrl?.searchParams.get('date_from')).toBe('2024-01-01');
+    expect(receivedUrl?.searchParams.get('date_to')).toBe('2024-01-31');
     expect(result.net_income).toBe(40000);
   });
 

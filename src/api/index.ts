@@ -73,7 +73,7 @@ export const ApiAliases = {
     dashboard: 'getDashboardStats',
     student: 'getStudentStats',
     students: 'getStudentStats',  // 别名
-    financial: 'getFinancialStats',
+    financial: 'getGlobalFinancialStats',  // 统一使用新API
     globalStudent: 'getGlobalStudentStats',
     globalFinancial: 'getGlobalFinancialStats',
     membershipExpiring: 'getMembershipExpiringSoon',

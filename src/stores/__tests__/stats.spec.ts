@@ -20,7 +20,7 @@ vi.mock('../../api/ApiService', () => ({
   ApiService: {
     getDashboardStats: vi.fn(),
     getStudentStats: vi.fn(),
-    getFinancialStats: vi.fn(),
+    getGlobalFinancialStats: vi.fn(),
     getMembershipStats: vi.fn()
   }
 }));
@@ -264,7 +264,7 @@ describe('useStatsStore', () => {
 
     it('应该正确获取财务统计数据', async () => {
       const mockStats = createMockFinancialStats();
-      (ApiService.getFinancialStats as vi.Mock).mockResolvedValue(mockStats);
+      (ApiService.getGlobalFinancialStats as vi.Mock).mockResolvedValue(mockStats);
 
       const result = await store.fetchFinancialStats();
 
@@ -280,7 +280,7 @@ describe('useStatsStore', () => {
       const result = await store.fetchFinancialStats();
 
       expect(result).toEqual(cachedStats);
-      expect(ApiService.getFinancialStats).not.toHaveBeenCalled();
+      expect(ApiService.getGlobalFinancialStats).not.toHaveBeenCalled();
     });
   });
 
@@ -308,7 +308,7 @@ describe('useStatsStore', () => {
     it('应该并行获取所有统计数据', async () => {
       (ApiService.getDashboardStats as vi.Mock).mockResolvedValue(createMockDashboardStats());
       (ApiService.getStudentStats as vi.Mock).mockResolvedValue(createMockStudentStats());
-      (ApiService.getFinancialStats as vi.Mock).mockResolvedValue(createMockFinancialStats());
+      (ApiService.getGlobalFinancialStats as vi.Mock).mockResolvedValue(createMockFinancialStats());
       (ApiService.getMembershipStats as vi.Mock).mockResolvedValue({ total: 50 });
 
       const result = await store.fetchAllStats();
@@ -319,7 +319,7 @@ describe('useStatsStore', () => {
       expect(result.membership).toBeDefined();
       expect(ApiService.getDashboardStats).toHaveBeenCalled();
       expect(ApiService.getStudentStats).toHaveBeenCalled();
-      expect(ApiService.getFinancialStats).toHaveBeenCalled();
+      expect(ApiService.getGlobalFinancialStats).toHaveBeenCalled();
       expect(ApiService.getMembershipStats).toHaveBeenCalled();
     });
   });
@@ -374,7 +374,7 @@ describe('useStatsStore', () => {
     it('refreshStats 应该刷新所有统计（未指定类型时）', async () => {
       (ApiService.getDashboardStats as vi.Mock).mockResolvedValue(createMockDashboardStats());
       (ApiService.getStudentStats as vi.Mock).mockResolvedValue(createMockStudentStats());
-      (ApiService.getFinancialStats as vi.Mock).mockResolvedValue(createMockFinancialStats());
+      (ApiService.getGlobalFinancialStats as vi.Mock).mockResolvedValue(createMockFinancialStats());
       (ApiService.getMembershipStats as vi.Mock).mockResolvedValue({ total: 50 });
 
       const result = await store.refreshStats();

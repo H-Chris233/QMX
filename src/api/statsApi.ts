@@ -188,20 +188,6 @@ export class StatsApiService {
   }
 
   /**
-   * 获取财务统计数据
-   * @deprecated 已废弃，请使用 getGlobalFinancialStats()。将在下个主版本移除。
-   */
-  static async getFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {
-    console.warn('[statsApi] getFinancialStats() 已废弃，请使用 getGlobalFinancialStats()');
-    const params = typeof period === 'string' ? parsePeriodParams(period) : {};
-
-    const raw = await apiCall<any>(
-      baseClient.get('/stats/financial', { params })
-    );
-    return mapFinancialStats(raw);
-  }
-
-  /**
    * 获取全局财务统计数据
    */
   static async getGlobalFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {

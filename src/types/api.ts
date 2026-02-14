@@ -703,7 +703,6 @@ export type ApiEndpoint =
   | '/installments/:planId/cancel'
   | '/installments/:planId'
   | '/stats/dashboard'
-  | '/stats/financial'
   | '/stats/global-student-stats'
   | '/stats/global-financial-stats'
   | '/stats/membership-expiring'

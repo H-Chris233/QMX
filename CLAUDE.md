@@ -14,6 +14,25 @@
   - 前端 ApiService.ts: 添加统一入口方法
   - Stats API 端点数量：6 → 10 个
 - **TypeScript 类型修复**
+
+### 2026-02-14
+- **移除废弃 API**
+  - 移除后端 `GET /stats/financial` 端点及控制器方法
+  - 移除前端 `getFinancialStats()` 废弃方法
+  - 统一使用 `getGlobalFinancialStats()` 作为财务统计 API
+  - 更新前端 Store、缓存配置、类型定义和测试文件
+  - Stats API 端点数量：10 → 9 个
+- **补全前端表单验证**
+  - 实现 `validateStudentForm()` - 学员表单完整验证（姓名、手机号、年龄、班级、科目等）
+  - 实现 `validateTransactionForm()` - 交易表单完整验证（金额、分期参数等）
+  - 添加通用验证器：`isValidPhone`、`isNonEmptyString`、`isValidNumber` 等
+  - 添加快速验证辅助函数：`validateStudentName`、`validatePhone`、`validateAmount`
+- **修复分期取消状态更新**
+  - 修复 `cancelInstallment()` 取消分期后本地状态不更新问题
+  - 取消成功后自动更新该计划下所有分期的状态为 `CANCELLED`
+
+### 2026-02-13
+- **补全未挂载的统计路由** (Stats API)
   - 修复 `InstallmentSearchParams.studentId` 类型定义（string → string | number）
   - 修复 `test-utils.ts` 中 `mountWithPinia` 返回类型兼容性问题
 - **OpenAPI/Swagger API 文档自动生成**

@@ -470,7 +470,7 @@ export const handlers = [
   /**
    * 获取财务统计
    */
-  http.get(`${API_BASE_URL}/stats/financial`, () => {
+  http.get(`${API_BASE_URL}/stats/global-financial-stats`, () => {
     const stats: FinancialStats = {
       totalIncome: 50000,
       totalExpense: 10000,

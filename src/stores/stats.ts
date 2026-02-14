@@ -117,7 +117,7 @@ export const useStatsStore = defineStore('stats', () => {
     try {
       loading.value.financial = true;
 
-      const stats = await ApiService.getFinancialStats();
+      const stats = await ApiService.getGlobalFinancialStats();
       financialStats.value = stats;
       lastFetched.value.financial = new Date();
 

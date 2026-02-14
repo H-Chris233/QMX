@@ -617,17 +617,6 @@ export class ApiService {
   }
 
   /**
-   * 获取财务统计数据
-   */
-  static async getFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {
-    return handleApiOperation(
-      () => StatsApiService.getFinancialStats(period),
-      '获取财务统计',
-      { retryable: true, context: { period } }
-    );
-  }
-
-  /**
    * 获取全局财务统计数据
    */
   static async getGlobalFinancialStats(period?: StatsPeriod): Promise<FinancialStats> {

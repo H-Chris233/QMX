@@ -41,6 +41,7 @@ function buildCashSearchParams(params?: RawSearchParams): Record<string, any> {
     limit: params.limit,
     min_amount: params.min_amount,
     max_amount: params.max_amount,
+    is_income: params.is_income,
     sort_by: params.sort_by,
     sort_order: params.sort_order,
   };

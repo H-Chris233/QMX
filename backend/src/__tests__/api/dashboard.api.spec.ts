@@ -206,7 +206,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
     });
   });
 
-  describe('GET /api/v1/stats/financial', () => {
+  describe('GET /api/v1/stats/global-financial-stats', () => {
     beforeEach(async () => {
       const student1 = await TestDataFactory.createStudent({ name: 'Student 1' });
       const student2 = await TestDataFactory.createStudent({ name: 'Student 2' });
@@ -244,86 +244,46 @@ describe('Dashboard/Stats API Integration Tests', () => {
       );
     });
 
-    it('returns financial statistics for current month', async () => {
+    it('returns global financial statistics', async () => {
       const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .query({ period: 'ThisMonth' })
+        .get('/api/v1/stats/global-financial-stats')
         .expect(200);
 
       expect(response.body.success).toBe(true);
       const stats = response.body.data;
 
-      expect(stats.period).toBe('ThisMonth');
-      expect(stats.totals.incomeCents).toBeGreaterThan(0);
-      expect(stats.totals.expenseCents).toBeGreaterThan(0);
-      expect(stats.totals.netIncomeCents).toBeGreaterThan(0);
-      expect(stats.transactionCount).toBeGreaterThan(0);
+      expect(stats.total_income).toBeGreaterThan(0);
+      expect(stats.total_expense).toBeGreaterThan(0);
+      expect(stats.net_income).toBeGreaterThan(0);
+      expect(stats.transaction_count).toBeGreaterThan(0);
     });
 
-    it('includes date range information', async () => {
+    it('includes required global financial fields', async () => {
       const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .query({ period: 'ThisMonth' })
+        .get('/api/v1/stats/global-financial-stats')
         .expect(200);
 
       const stats = response.body.data;
-      expect(stats.dateRange).toBeDefined();
-      expect(stats.dateRange.start).toBeDefined();
-      expect(stats.dateRange.end).toBeDefined();
-    });
-
-    it('includes top student income breakdown', async () => {
-      const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .query({ period: 'ThisMonth' })
-        .expect(200);
-
-      const stats = response.body.data;
-      expect(stats.studentIncome).toBeDefined();
-      expect(Array.isArray(stats.studentIncome)).toBe(true);
-      
-      if (stats.studentIncome.length > 0) {
-        const topStudent = stats.studentIncome[0];
-        expect(topStudent).toHaveProperty('studentId');
-        expect(topStudent).toHaveProperty('studentName');
-        expect(topStudent).toHaveProperty('amountCents');
-      }
+      expect(stats).toHaveProperty('total_income');
+      expect(stats).toHaveProperty('total_expense');
+      expect(stats).toHaveProperty('net_income');
+      expect(stats).toHaveProperty('is_profitable');
+      expect(stats).toHaveProperty('transaction_count');
+      expect(stats).toHaveProperty('installment_total');
+      expect(stats).toHaveProperty('installment_paid');
+      expect(stats).toHaveProperty('installment_pending');
+      expect(stats).toHaveProperty('overdue_count');
     });
 
     it('includes installment statistics', async () => {
       const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .query({ period: 'ThisMonth' })
+        .get('/api/v1/stats/global-financial-stats')
         .expect(200);
 
       const stats = response.body.data;
-      expect(stats.installments).toBeDefined();
-      expect(stats.installments.totalCents).toBeGreaterThan(0);
-      expect(stats.installments.paidCents).toBeGreaterThan(0);
-      expect(stats.installments.pendingCents).toBeGreaterThan(0);
-      expect(stats.installments.remainingCents).toBeGreaterThan(0);
-    });
-
-    it('supports different time periods', async () => {
-      const periods = ['ThisWeek', 'ThisMonth', 'ThisYear', 'All'];
-
-      for (const period of periods) {
-        const response = await request(app)
-          .get('/api/v1/stats/financial')
-          .query({ period })
-          .expect(200);
-
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.period).toBe(period);
-      }
-    });
-
-    it('defaults to ThisMonth when period not specified', async () => {
-      const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .expect(200);
-
-      expect(response.body.data.period).toBe('ThisMonth');
+      expect(stats.installment_total).toBeGreaterThan(0);
+      expect(stats.installment_paid).toBeGreaterThan(0);
+      expect(stats.installment_pending).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -374,12 +334,11 @@ describe('Dashboard/Stats API Integration Tests', () => {
       await TestDataFactory.createCashTransaction(-300, { studentId: null, note: 'Expense' });
 
       const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .query({ period: 'ThisMonth' })
+        .get('/api/v1/stats/global-financial-stats')
         .expect(200);
 
       const stats = response.body.data;
-      expect(stats.totals.isProfitable).toBe(true);
+      expect(stats.is_profitable).toBe(true);
     });
 
     it('identifies unprofitable periods', async () => {
@@ -387,12 +346,11 @@ describe('Dashboard/Stats API Integration Tests', () => {
       await TestDataFactory.createCashTransaction(-500, { studentId: null, note: 'Expense' });
 
       const response = await request(app)
-        .get('/api/v1/stats/financial')
-        .query({ period: 'ThisMonth' })
+        .get('/api/v1/stats/global-financial-stats')
         .expect(200);
 
       const stats = response.body.data;
-      expect(stats.totals.isProfitable).toBe(false);
+      expect(stats.is_profitable).toBe(false);
     });
   });
 });
