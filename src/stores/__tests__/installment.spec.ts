@@ -377,6 +377,14 @@ describe('useInstallmentStore', () => {
     it('refresh 应该强制刷新数据', async () => {
       store.searchParams = { studentId: '1' } as any;
       store.installments = [createMockInstallment({ uid: 1 })];
+
+      // Mock getAllInstallmentPlans 返回一个计划
+      (ApiService.getAllInstallmentPlans as vi.Mock).mockResolvedValue({
+        data: [{ uid: 1 }],
+        pagination: { page: 1, limit: 50, total: 1, total_pages: 1 }
+      });
+
+      // Mock getInstallmentPlan 返回空分期列表
       (ApiService.getInstallmentPlan as vi.Mock).mockResolvedValue({
         installments: [],
         pagination: { page: 1, limit: 50, total: 0, total_pages: 0 }
@@ -385,6 +393,7 @@ describe('useInstallmentStore', () => {
       await store.refresh();
 
       expect(store.installments).toEqual([]);
+      expect(ApiService.getAllInstallmentPlans).toHaveBeenCalled();
       expect(ApiService.getInstallmentPlan).toHaveBeenCalled();
     });
 
