@@ -247,7 +247,7 @@ export class TestUtils {
   /**
    * 等待并处理确认弹窗
    */
-  async handleConfirmModal(shouldConfirm: boolean = true): Promise<void> {
+  async handleConfirmModal(shouldConfirm: boolean = true): Promise<boolean> {
     try {
       // 等待确认弹窗出现
       await this.page.waitForSelector('.modal-overlay, .dialog', { timeout: 3000 });
@@ -285,8 +285,10 @@ export class TestUtils {
       
       // 等待弹窗消失
       await this.waitForElementHidden('.modal-overlay, .dialog');
+      return true;
     } catch (error) {
-      console.log('没有确认弹窗或处理失败:', error);
+      // 无弹窗或弹窗处理失败时静默返回，避免污染测试日志
+      return false;
     }
   }
 

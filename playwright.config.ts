@@ -25,6 +25,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'test-results/results.json' }],
     ['junit', { outputFile: 'test-results/results.xml' }],
+    [join(__dirname, 'tests/e2e/reporters/summary-reporter.ts')],
     process.env.CI ? ['github'] : ['list'],
   ],
   

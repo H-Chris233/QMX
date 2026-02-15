@@ -14,7 +14,7 @@ async function globalTeardown(config: FullConfig) {
     // 清理测试数据
     await cleanupTestData();
     
-    // 收集测试结果摘要
+    // 收集测试结果摘要（优先读取 reporter 生成文件）
     await collectTestSummary();
     
     console.log('✅ E2E 测试全局清理完成');
@@ -80,6 +80,23 @@ async function collectTestSummary() {
   console.log('📊 收集测试结果摘要...');
   
   try {
+    // 优先使用 reporter 生成的摘要，避免 teardown 时机过早导致读取到空结果
+    const reporterSummaryExists = await fs
+      .access('test-results/summary.json')
+      .then(() => true)
+      .catch(() => false);
+
+    if (reporterSummaryExists) {
+      const reporterSummary = JSON.parse(await fs.readFile('test-results/summary.json', 'utf-8'));
+      console.log('  ℹ️  将使用 Reporter 生成的摘要文件');
+      console.log(`     - 总测试数: ${reporterSummary.totalTests ?? 0}`);
+      console.log(`     - 通过: ${reporterSummary.passedTests ?? 0}`);
+      console.log(`     - 失败: ${reporterSummary.failedTests ?? 0}`);
+      console.log(`     - 跳过: ${reporterSummary.skippedTests ?? 0}`);
+      console.log(`     - 耗时: ${(((reporterSummary.duration ?? 0) as number) / 1000).toFixed(2)}s`);
+      return;
+    }
+
     let summary = {
       totalTests: 0,
       passedTests: 0,
@@ -126,6 +143,11 @@ async function collectTestSummary() {
       console.log('  ⚠️  无法解析测试结果JSON文件');
     }
     
+    if (summary.totalTests === 0) {
+      console.log('  ℹ️  暂未获取到有效摘要（Reporter 将在测试结束后输出最终统计）');
+      return;
+    }
+
     console.log(`  📈 测试结果摘要:`);
     console.log(`     - 总测试数: ${summary.totalTests}`);
     console.log(`     - 通过: ${summary.passedTests}`);

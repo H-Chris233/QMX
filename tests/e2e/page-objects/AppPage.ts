@@ -123,38 +123,48 @@ export class AppPage {
    */
   private async performLogin(): Promise<void> {
     const visiblePasswordInputs = () => this.page.locator('input[type="password"]:visible');
+    const loginButton = this.page.locator('.login-btn');
+    const mainContent = this.page.locator('[data-testid="main-content"]');
 
-    const initialCount = await visiblePasswordInputs().count();
+    // 登录页在初始化时会发生重渲染；使用多次短重试避免单次操作被 DOM 抖动拖满 30s。
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const inputCount = await visiblePasswordInputs().count();
 
-    if (initialCount >= 2) {
-      // 首次访问：设置密码 + 确认密码
-      await visiblePasswordInputs().first().fill(TEST_PASSWORD, { timeout: 3000 });
+      if (inputCount >= 1) {
+        await visiblePasswordInputs().first().fill(TEST_PASSWORD, { timeout: 2000 });
+      } else {
+        const fallbackInput = this.page.locator('input[type="password"]').first();
+        await fallbackInput.waitFor({ state: 'visible', timeout: 3000 });
+        await fallbackInput.fill(TEST_PASSWORD, { timeout: 2000 });
+      }
 
-      // 输入第一项后页面可能重渲染：仅在确认密码框仍可见时再填写第二项
+      // 首次设置密码场景：确认密码输入框可能在首个输入后才稳定出现。
       const confirmInput = this.page.locator('input[type="password"][placeholder*="确认"]:visible').first();
-      const hasConfirmInput = (await confirmInput.count()) > 0;
-      if (hasConfirmInput) {
-        await confirmInput.fill(TEST_PASSWORD, { timeout: 3000 }).catch(async () => {
-          // 兜底：尝试用可见密码输入框的第二项短超时填写，避免卡满30s
+      if ((await confirmInput.count()) > 0) {
+        await confirmInput.fill(TEST_PASSWORD, { timeout: 2000 }).catch(async () => {
           if ((await visiblePasswordInputs().count()) >= 2) {
             await visiblePasswordInputs().nth(1).fill(TEST_PASSWORD, { timeout: 1000 }).catch(() => {});
           }
         });
       }
-    } else if (initialCount === 1) {
-      // 已有密码：输入密码登录
-      await visiblePasswordInputs().first().fill(TEST_PASSWORD, { timeout: 3000 });
-    } else {
-      // 兜底：极端情况下等待任一密码输入框出现
-      const fallbackInput = this.page.locator('input[type="password"]').first();
-      await fallbackInput.waitFor({ state: 'visible', timeout: 5000 });
-      await fallbackInput.fill(TEST_PASSWORD, { timeout: 3000 });
+
+      await loginButton.click({ timeout: 3000 });
+
+      const loginSucceeded = await mainContent
+        .waitFor({ state: 'visible', timeout: 6000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (loginSucceeded) {
+        return;
+      }
+
+      // 如果仍停留在登录页，等待短暂稳定后重试。
+      await this.page.waitForTimeout(250);
     }
 
-    await this.page.locator('.login-btn').click();
-
-    // 等待登录成功后主内容出现
-    await this.page.locator('[data-testid="main-content"]').waitFor({ state: 'visible', timeout: 15000 });
+    // 最后给出明确失败点，便于定位认证流程异常。
+    await mainContent.waitFor({ state: 'visible', timeout: 8000 });
   }
 
   /**
