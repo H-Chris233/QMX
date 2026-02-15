@@ -27,8 +27,7 @@ function setupGlobalErrorHandler(app: ReturnType<typeof createApp>): void {
       appStore.addError({
         message: '组件加载失败',
         context: err instanceof Error ? err.message : '未知错误',
-        type: 'component_error',
-        timestamp: Date.now()
+        type: 'component_error'
       });
     } catch (storeError) {
       // 如果 store 也失败，至少在控制台显示
@@ -68,8 +67,7 @@ function setupGlobalUncaughtHandlers(): void {
       appStore.addError({
         message: '操作失败',
         context: event.reason instanceof Error ? event.reason.message : String(event.reason),
-        type: 'promise_rejection',
-        timestamp: Date.now()
+        type: 'promise_rejection'
       });
     } catch (err) {
       logger.error('无法记录Promise拒绝到store:', err);
@@ -99,8 +97,7 @@ function setupGlobalUncaughtHandlers(): void {
       appStore.addError({
         message: '系统错误',
         context: event.message,
-        type: 'runtime_error',
-        timestamp: Date.now()
+        type: 'runtime_error'
       });
     } catch (err) {
       logger.error('无法记录全局错误到store:', err);
