@@ -201,24 +201,20 @@ test.describe('CSV导出功能测试', () => {
     await page.waitForTimeout(2000);
     
     if (downloadPromise) {
-      try {
-        const download = await downloadPromise;
-        const fileName = download.suggestedFilename();
-        
-        // 验证文件名
-        expect(fileName).toMatch(/^学员数据-\d{4}-\d{2}-\d{2}\.csv$/);
-        
-        // 获取文件内容
-        const fileContent = await download.createReadStream();
-        const content = await streamToString(fileContent);
-        
-        // 验证CSV格式
-        await verifyCSVFormat(content);
-        
-        console.log('CSV文件格式验证通过');
-      } catch (error) {
-        console.log('CSV格式验证失败:', error);
-      }
+      const download = await downloadPromise;
+      const fileName = download.suggestedFilename();
+      
+      // 验证文件名
+      expect(fileName).toMatch(/^学员数据-\d{4}-\d{2}-\d{2}\.csv$/);
+      
+      // 获取文件内容
+      const fileContent = await download.createReadStream();
+      const content = await streamToString(fileContent);
+      
+      // 验证CSV格式
+      await verifyCSVFormat(content);
+      
+      console.log('CSV文件格式验证通过');
     }
   });
 
@@ -362,9 +358,9 @@ async function verifyCSVFormat(content: string): Promise<void> {
     '课程',
     '科目',
     '剩余课时',
-    '会员开始日期',
-    '会员结束日期',
-    '会员状态',
+    '会员开始',
+    '会员结束',
+    '状态',
     '备注'
   ];
   

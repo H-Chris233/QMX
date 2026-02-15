@@ -80,12 +80,6 @@ async function collectTestSummary() {
   console.log('📊 收集测试结果摘要...');
   
   try {
-    // 检查测试结果文件
-    const resultFiles = [
-      'test-results/results.json',
-      'test-results/results.xml',
-    ];
-    
     let summary = {
       totalTests: 0,
       passedTests: 0,
@@ -99,21 +93,34 @@ async function collectTestSummary() {
       const jsonResultsExists = await fs.access('test-results/results.json').then(() => true).catch(() => false);
       if (jsonResultsExists) {
         const jsonResults = JSON.parse(await fs.readFile('test-results/results.json', 'utf-8'));
-        summary = {
-          totalTests: jsonResults.suites?.reduce((acc: number, suite: any) => 
-            acc + suite.specs?.reduce((specAcc: number, spec: any) => 
-              specAcc + (spec.tests?.length || 0), 0), 0) || 0,
-          passedTests: jsonResults.suites?.reduce((acc: number, suite: any) => 
-            acc + suite.specs?.reduce((specAcc: number, spec: any) => 
-              specAcc + (spec.tests?.filter((test: any) => test.results?.[0]?.status === 'passed').length || 0), 0), 0) || 0,
-          failedTests: jsonResults.suites?.reduce((acc: number, suite: any) => 
-            acc + suite.specs?.reduce((specAcc: number, spec: any) => 
-              specAcc + (spec.tests?.filter((test: any) => test.results?.[0]?.status === 'failed').length || 0), 0), 0) || 0,
-          skippedTests: jsonResults.suites?.reduce((acc: number, suite: any) => 
-            acc + suite.specs?.reduce((specAcc: number, spec: any) => 
-              specAcc + (spec.tests?.filter((test: any) => test.results?.[0]?.status === 'skipped').length || 0), 0), 0) || 0,
-          duration: jsonResults.duration || 0,
+        const accumulateFromSuite = (suite: any): void => {
+          const specs = Array.isArray(suite?.specs) ? suite.specs : [];
+          const childSuites = Array.isArray(suite?.suites) ? suite.suites : [];
+
+          for (const spec of specs) {
+            const tests = Array.isArray(spec?.tests) ? spec.tests : [];
+            summary.totalTests += tests.length;
+
+            for (const t of tests) {
+              const status = t?.results?.[0]?.status ?? t?.status;
+              if (status === 'passed' || status === 'expected') summary.passedTests += 1;
+              else if (status === 'failed' || status === 'unexpected') summary.failedTests += 1;
+              else if (status === 'skipped') summary.skippedTests += 1;
+
+              const duration = Number(t?.results?.[0]?.duration ?? 0);
+              if (Number.isFinite(duration)) summary.duration += duration;
+            }
+          }
+
+          for (const child of childSuites) {
+            accumulateFromSuite(child);
+          }
         };
+
+        const rootSuites = Array.isArray(jsonResults?.suites) ? jsonResults.suites : [];
+        for (const root of rootSuites) {
+          accumulateFromSuite(root);
+        }
       }
     } catch (parseError) {
       console.log('  ⚠️  无法解析测试结果JSON文件');

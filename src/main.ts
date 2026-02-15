@@ -2,6 +2,7 @@ import { createApp, defineAsyncComponent } from 'vue';
 import { createPinia } from 'pinia';
 import MainApp from './MainApp.vue';
 import pinia from './stores';
+import { useAppStore as useAppStoreStore } from './stores/app';
 import { logger } from './utils/logger';
 
 const KEY_AGREED = 'qmx_agreed_to_terms';
@@ -107,10 +108,9 @@ function setupGlobalUncaughtHandlers(): void {
   });
 }
 
-// 延迟导入 useAppStore（避免循环依赖）
+// 统一通过已初始化的 Pinia 获取 store，避免浏览器端使用 require
 function useAppStore() {
-  const { useAppStore: getAppStore } = require('./stores/app');
-  return getAppStore();
+  return useAppStoreStore(pinia);
 }
 
 let agreedToTerms = 'false';

@@ -122,26 +122,33 @@ export class AppPage {
    * 执行登录操作
    */
   private async performLogin(): Promise<void> {
-    const passwordInputs = this.page.locator('input[type="password"]');
-    const count = await passwordInputs.count();
-    const visibleInputIndexes: number[] = [];
+    const visiblePasswordInputs = () => this.page.locator('input[type="password"]:visible');
 
-    for (let i = 0; i < count; i++) {
-      if (await passwordInputs.nth(i).isVisible().catch(() => false)) {
-        visibleInputIndexes.push(i);
-      }
-    }
+    const initialCount = await visiblePasswordInputs().count();
 
-    if (visibleInputIndexes.length >= 2) {
+    if (initialCount >= 2) {
       // 首次访问：设置密码 + 确认密码
-      await passwordInputs.nth(visibleInputIndexes[0]).fill(TEST_PASSWORD);
-      await passwordInputs.nth(visibleInputIndexes[1]).fill(TEST_PASSWORD);
-    } else if (visibleInputIndexes.length === 1) {
+      await visiblePasswordInputs().first().fill(TEST_PASSWORD, { timeout: 3000 });
+
+      // 输入第一项后页面可能重渲染：仅在确认密码框仍可见时再填写第二项
+      const confirmInput = this.page.locator('input[type="password"][placeholder*="确认"]:visible').first();
+      const hasConfirmInput = (await confirmInput.count()) > 0;
+      if (hasConfirmInput) {
+        await confirmInput.fill(TEST_PASSWORD, { timeout: 3000 }).catch(async () => {
+          // 兜底：尝试用可见密码输入框的第二项短超时填写，避免卡满30s
+          if ((await visiblePasswordInputs().count()) >= 2) {
+            await visiblePasswordInputs().nth(1).fill(TEST_PASSWORD, { timeout: 1000 }).catch(() => {});
+          }
+        });
+      }
+    } else if (initialCount === 1) {
       // 已有密码：输入密码登录
-      await passwordInputs.nth(visibleInputIndexes[0]).fill(TEST_PASSWORD);
-    } else if (count > 0) {
-      // 兜底：如果可见性判断异常，至少填充第一个输入框
-      await passwordInputs.first().fill(TEST_PASSWORD);
+      await visiblePasswordInputs().first().fill(TEST_PASSWORD, { timeout: 3000 });
+    } else {
+      // 兜底：极端情况下等待任一密码输入框出现
+      const fallbackInput = this.page.locator('input[type="password"]').first();
+      await fallbackInput.waitFor({ state: 'visible', timeout: 5000 });
+      await fallbackInput.fill(TEST_PASSWORD, { timeout: 3000 });
     }
 
     await this.page.locator('.login-btn').click();

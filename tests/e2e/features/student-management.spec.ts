@@ -248,11 +248,9 @@ test.describe('学生管理功能测试（重构版）', () => {
       expect(formElementsFound).toBeGreaterThan(0);
       
       // 关闭表单（不实际保存）
-      const cancelBtn = studentPage.page.locator('.modal-overlay button:has-text("取消")').first();
-      if (await cancelBtn.isVisible().catch(() => false)) {
-        await cancelBtn.click();
-      } else {
-        await studentPage.page.keyboard.press('Escape');
+      await studentPage.page.keyboard.press('Escape').catch(() => {});
+      if (await studentPage.page.locator('.modal-overlay').isVisible().catch(() => false)) {
+        await studentPage.page.locator('.modal-overlay').click({ position: { x: 8, y: 8 }, force: true }).catch(() => {});
       }
       await studentPage.page.locator('.modal-overlay').waitFor({ state: 'hidden', timeout: 5000 });
       
@@ -307,11 +305,9 @@ test.describe('学生管理功能测试（重构版）', () => {
           }
           
           // 关闭编辑表单
-          const cancelBtn = studentPage.page.locator('.modal-overlay button:has-text("取消")').first();
-          if (await cancelBtn.isVisible().catch(() => false)) {
-            await cancelBtn.click();
-          } else {
-            await studentPage.page.keyboard.press('Escape');
+          await studentPage.page.keyboard.press('Escape').catch(() => {});
+          if (await studentPage.page.locator('.modal-overlay').isVisible().catch(() => false)) {
+            await studentPage.page.locator('.modal-overlay').click({ position: { x: 8, y: 8 }, force: true }).catch(() => {});
           }
           await studentPage.page.locator('.modal-overlay').waitFor({ state: 'hidden', timeout: 5000 });
           
