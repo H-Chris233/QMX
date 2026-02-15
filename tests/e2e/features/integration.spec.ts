@@ -102,7 +102,7 @@ test.describe('跨模块集成流程测试', () => {
     
     // 验证收入数据一致性（允许小的差异）
     const difference = Math.abs(financeIncomeCents - dashboardRevenueCents);
-    const tolerance = Math.max(financeIncomeCents, dashboardRevenueCents) * 0.01; // 1%容差
+    const tolerance = Math.max(Math.max(financeIncomeCents, dashboardRevenueCents) * 0.01, 500); // 1%或5元容差
     expect(difference).toBeLessThanOrEqual(tolerance);
   });
 

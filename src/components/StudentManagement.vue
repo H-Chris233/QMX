@@ -6,6 +6,7 @@
 
       <!-- 左侧：搜索与筛选 -->
       <div class="toolbar-left">
+        <h2 class="page-title mobile-hidden">学员管理</h2>
         <div class="search-wrapper">
           <Search :size="16" class="search-icon-deco" />
           <input
@@ -16,6 +17,14 @@
             data-testid="student-search-input"
             @keyup.enter="performSearch"
           />
+          <button
+            type="button"
+            class="search-submit-btn"
+            data-testid="student-search-button"
+            @click="performSearch"
+          >
+            搜索
+          </button>
         </div>
 
         <div class="filters-group">
@@ -38,6 +47,16 @@
               <option value="Month">📅 月卡</option>
               <option value="Year">🗓️ 年卡</option>
               <option value="Others">📦 其他</option>
+            </select>
+            <ChevronDown :size="14" class="select-arrow" />
+          </div>
+
+          <!-- 会员状态 -->
+          <div class="select-wrapper">
+            <select v-model="searchFilters.hasMembership" @change="performSearch" data-testid="filter-has-membership">
+              <option value="">💳 会员筛选</option>
+              <option value="true">✅ 仅会员</option>
+              <option value="false">🚫 非会员</option>
             </select>
             <ChevronDown :size="14" class="select-arrow" />
           </div>
@@ -85,7 +104,7 @@
             </div>
             <div class="student-identity">
               <h3 class="student-name">{{ student.name }}</h3>
-              <span class="student-uid">UID: {{ student.uid }}</span>
+              <span class="student-uid student-id">UID: {{ student.uid }}</span>
             </div>
           </div>
           <!-- 状态徽章 -->
@@ -96,34 +115,34 @@
 
         <!-- 卡片主体：详细属性 -->
         <div class="card-body">
-          <div class="info-row">
+          <div class="info-row info-item">
             <Target :size="14" class="info-icon" />
             <span class="info-label">科目</span>
             <span class="info-val">{{ getSubjectName(student.subject) }}</span>
           </div>
-          <div class="info-row">
+          <div class="info-row info-item">
             <User :size="14" class="info-icon" />
             <span class="info-label">年龄</span>
             <span class="info-val">{{ student.age ?? '未设置' }}</span>
           </div>
-          <div class="info-row">
+          <div class="info-row info-item">
             <Phone :size="14" class="info-icon" />
             <span class="info-label">电话</span>
             <span class="info-val font-mono">{{ student.phone }}</span>
           </div>
-          <div class="info-row">
+          <div class="info-row info-item">
             <BookOpen :size="14" class="info-icon" />
             <span class="info-label">课程</span>
             <span class="info-val">{{ student.class }}</span>
           </div>
-          <div class="info-row" v-if="student.is_membership_active">
+          <div class="info-row info-item" v-if="student.is_membership_active">
             <Clock :size="14" class="info-icon" />
             <span class="info-label">有效期</span>
             <span class="info-val highlight-val">
               剩余 {{ student.membership_days_remaining }} 天
             </span>
           </div>
-          <div class="info-row">
+          <div class="info-row info-item">
             <Calendar :size="14" class="info-icon" />
             <span class="info-label">会员</span>
             <span class="info-val">{{ getMembershipRangeText(student) }}</span>

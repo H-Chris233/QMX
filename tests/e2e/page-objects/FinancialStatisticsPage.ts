@@ -55,14 +55,16 @@ export class FinancialStatisticsPage {
    * 获取分期付款数量
    */
   async getInstallmentCount(): Promise<string> {
-    return await this.page.locator('[data-testid="installment-count"]').textContent() || '0';
+    const text = (await this.page.locator('[data-testid="installment-count"]').textContent()) || '0';
+    return text.replace(/\D/g, '') || '0';
   }
 
   /**
    * 获取待处理分期数量
    */
   async getPendingInstallments(): Promise<string> {
-    return await this.page.locator('[data-testid="pending-installments"]').textContent() || '0';
+    const text = (await this.page.locator('[data-testid="pending-installments"]').textContent()) || '0';
+    return text.replace(/\D/g, '') || '0';
   }
 
   /**

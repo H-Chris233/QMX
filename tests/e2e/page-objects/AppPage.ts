@@ -10,12 +10,33 @@ const TEST_PASSWORD = 'test1234';
 export class AppPage {
   constructor(public readonly page: Page) {}
 
+  private async dismissErrorModalIfPresent(): Promise<void> {
+    const overlay = this.page.locator('.error-modal-overlay');
+    if (!(await overlay.isVisible().catch(() => false))) {
+      return;
+    }
+
+    const closeButton = this.page
+      .locator('.error-modal-overlay button:has-text("确定"), .error-modal-overlay button:has-text("关闭")')
+      .first();
+
+    if (await closeButton.isVisible().catch(() => false)) {
+      await closeButton.click({ force: true }).catch(() => {});
+    }
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await overlay.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+  }
+
   /**
    * 导航到指定标签页
    */
   async navigateToTab(tabId: 'dashboard' | 'students' | 'finance' | 'grades' | 'settings'): Promise<void> {
     const navItem = this.page.locator(`[data-testid="nav-${tabId}"]`);
-    await navItem.click();
+    await this.dismissErrorModalIfPresent();
+    await navItem.click().catch(async () => {
+      await this.dismissErrorModalIfPresent();
+      await navItem.click({ force: true });
+    });
     // 等待导航项变为激活状态
     await expect(navItem).toHaveClass(/active/, { timeout: 10000 });
     // 等待内容区过渡动画完成
@@ -26,7 +47,7 @@ export class AppPage {
    * 获取当前激活的标签页
    */
   async getActiveTab(): Promise<string | null> {
-    const activeTab = this.page.locator('.nav-menu-item.active');
+    const activeTab = this.page.locator('.nav-item.active').first();
     if (await activeTab.isVisible()) {
       return await activeTab.getAttribute('data-testid');
     }

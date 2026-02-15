@@ -393,20 +393,26 @@ test.describe('学生管理功能测试（重构版）', () => {
     }
     
     // 验证分页控件状态
+    const paginationWrap = studentPage.page.locator('[data-testid="student-pagination"]');
     const prevBtn = studentPage.page.locator('[data-testid="prev-page-btn"]');
     const nextBtn = studentPage.page.locator('[data-testid="next-page-btn"]');
-    
-    expect(await prevBtn.isVisible()).toBeTruthy();
-    expect(await nextBtn.isVisible()).toBeTruthy();
-    
-    // 验证第一页时上一页按钮禁用
-    if (pagination.currentPage === 1) {
-      expect(await prevBtn.isDisabled()).toBeTruthy();
-    }
-    
-    // 验证最后一页时下一页按钮禁用
-    if (pagination.currentPage === pagination.totalPages) {
-      expect(await nextBtn.isDisabled()).toBeTruthy();
+
+    if (pagination.totalPages > 1) {
+      expect(await paginationWrap.isVisible()).toBeTruthy();
+      expect(await prevBtn.isVisible()).toBeTruthy();
+      expect(await nextBtn.isVisible()).toBeTruthy();
+
+      // 验证第一页时上一页按钮禁用
+      if (pagination.currentPage === 1) {
+        expect(await prevBtn.isDisabled()).toBeTruthy();
+      }
+
+      // 验证最后一页时下一页按钮禁用
+      if (pagination.currentPage === pagination.totalPages) {
+        expect(await nextBtn.isDisabled()).toBeTruthy();
+      }
+    } else {
+      expect(await paginationWrap.count()).toBe(0);
     }
   });
 

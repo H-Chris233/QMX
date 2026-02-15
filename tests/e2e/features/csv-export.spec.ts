@@ -222,7 +222,7 @@ test.describe('CSV导出功能测试', () => {
     }
   });
 
-  test('导出按钮可用性验证', async () => {
+  test('导出按钮可用性验证', async ({ page }) => {
     // 等待学员列表加载
     await studentPage.waitForStudentList();
     
@@ -244,7 +244,7 @@ test.describe('CSV导出功能测试', () => {
     await studentPage.waitForStudentList();
     
     // 应用一个可能返回空结果的筛选条件
-    await studentPage.filterBySubject('NonExistentSubject');
+    await studentPage.searchStudent('___unlikely_no_result___');
     await page.waitForTimeout(1000);
     
     // 监听下载事件

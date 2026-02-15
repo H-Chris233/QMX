@@ -6,7 +6,7 @@
       <!-- 左侧：标题 + 时间周期 -->
       <div class="header-left">
         <!-- 移动端隐藏标题，节省空间 -->
-        <h2 class="page-title mobile-hidden">收支管理</h2>
+        <h2 class="page-title mobile-hidden">收支统计</h2>
         
         <!-- 时间周期胶囊 (支持横向滚动) -->
         <div class="period-scroll-container">
@@ -39,6 +39,7 @@
           class="btn btn-primary compact-btn"
           @click="openAddTransactionModal"
           :disabled="loading"
+          data-testid="add-transaction-btn"
         >
           <Plus :size="20" />
           <span class="btn-text">记一笔</span>

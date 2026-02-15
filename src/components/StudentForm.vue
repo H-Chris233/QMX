@@ -17,6 +17,7 @@
               <User :size="16" class="input-icon" />
               <input
                 id="name"
+                name="name"
                 v-model="formData.name"
                 type="text"
                 required
@@ -33,6 +34,7 @@
               <Calendar :size="16" class="input-icon" />
               <input
                 id="age"
+                name="age"
                 v-model.number="formData.age"
                 type="number"
                 min="0"
@@ -50,6 +52,7 @@
               <Phone :size="16" class="input-icon" />
               <input
                 id="phone"
+                name="phone"
                 v-model="formData.phone"
                 type="tel"
                 placeholder="手机号码"
@@ -63,7 +66,7 @@
             <label for="subject">训练科目</label>
             <div class="input-wrapper">
               <Target :size="16" class="input-icon" />
-              <select id="subject" v-model="formData.subject" class="form-select">
+              <select id="subject" name="subject" v-model="formData.subject" class="form-select">
                 <option value="Shooting">🎯 射击</option>
                 <option value="Archery">🏹 射箭</option>
                 <option value="Others">🧩 其他</option>
@@ -77,7 +80,7 @@
             <label for="class">课程类型</label>
             <div class="input-wrapper">
               <BookOpen :size="16" class="input-icon" />
-              <select id="class" v-model="formData.class" class="form-select">
+              <select id="class" name="class" v-model="formData.class" class="form-select">
                 <option value="TenTry">🎟️ 体验课</option>
                 <option value="Month">📅 月卡</option>
                 <option value="Year">🗓️ 年卡</option>
