@@ -284,6 +284,7 @@ test.describe('跨模块集成流程测试', () => {
 
   test('并发操作数据一致性验证', async ({ page }) => {
     // 测试快速切换页面时的数据一致性
+    // 注意：单页上下文中不能并发执行导航，采用串行快速切换模拟高频操作。
     
     // 快速切换页面
     const pages = ['students', 'finance', 'dashboard'] as const;
@@ -291,33 +292,35 @@ test.describe('跨模块集成流程测试', () => {
     for (let i = 0; i < 3; i++) {
       console.log(`第${i + 1}轮并发测试`);
       
-      // 快速访问所有页面
-      const promises = pages.map(async (tab) => {
+      // 快速串行访问所有页面
+      const results: Array<{ page: string; studentCount?: number; income?: string; revenue?: string }> = [];
+      for (const tab of pages) {
         await appPage.navigateToTab(tab);
         
         switch (tab) {
           case 'students':
             await studentPage.waitForPageLoad();
-            return {
+            results.push({
               page: 'students',
               studentCount: (await studentPage.getStudentCards()).length
-            };
+            });
+            break;
           case 'finance':
             await financePage.waitForPageLoad();
-            return {
+            results.push({
               page: 'finance',
               income: await financePage.getTotalIncome()
-            };
+            });
+            break;
           case 'dashboard':
             await dashboardPage.waitForPageLoad();
-            return {
+            results.push({
               page: 'dashboard',
               revenue: await dashboardPage.getTotalRevenue()
-            };
+            });
+            break;
         }
-      });
-      
-      const results = await Promise.all(promises);
+      }
       console.log(`第${i + 1}轮结果:`, results);
       
       // 验证数据格式正确

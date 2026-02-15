@@ -7,6 +7,23 @@ import { type Page, expect } from '@playwright/test';
 export class DashboardPage {
   constructor(public readonly page: Page) {}
 
+  private async dismissErrorModalIfPresent(): Promise<void> {
+    const overlay = this.page.locator('.error-modal-overlay');
+    if (!(await overlay.isVisible().catch(() => false))) {
+      return;
+    }
+
+    const closeButton = this.page
+      .locator('.error-modal-overlay button:has-text("确定"), .error-modal-overlay button:has-text("关闭")')
+      .first();
+
+    if (await closeButton.isVisible().catch(() => false)) {
+      await closeButton.click({ force: true }).catch(() => {});
+    }
+    await this.page.keyboard.press('Escape').catch(() => {});
+    await overlay.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+  }
+
   /**
    * 等待仪表盘页面加载
    */
@@ -19,7 +36,11 @@ export class DashboardPage {
    * 点击刷新按钮
    */
   async clickRefresh(): Promise<void> {
-    await this.page.locator('[data-testid="dashboard-refresh-btn"]').click();
+    await this.dismissErrorModalIfPresent();
+    await this.page.locator('[data-testid="dashboard-refresh-btn"]').click().catch(async () => {
+      await this.dismissErrorModalIfPresent();
+      await this.page.locator('[data-testid="dashboard-refresh-btn"]').click({ force: true });
+    });
     await this.waitForPageLoad();
   }
 

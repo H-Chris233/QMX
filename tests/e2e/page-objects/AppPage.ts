@@ -124,13 +124,23 @@ export class AppPage {
   private async performLogin(): Promise<void> {
     const passwordInputs = this.page.locator('input[type="password"]');
     const count = await passwordInputs.count();
+    const visibleInputIndexes: number[] = [];
 
-    if (count >= 2) {
+    for (let i = 0; i < count; i++) {
+      if (await passwordInputs.nth(i).isVisible().catch(() => false)) {
+        visibleInputIndexes.push(i);
+      }
+    }
+
+    if (visibleInputIndexes.length >= 2) {
       // 首次访问：设置密码 + 确认密码
-      await passwordInputs.nth(0).fill(TEST_PASSWORD);
-      await passwordInputs.nth(1).fill(TEST_PASSWORD);
-    } else if (count === 1) {
+      await passwordInputs.nth(visibleInputIndexes[0]).fill(TEST_PASSWORD);
+      await passwordInputs.nth(visibleInputIndexes[1]).fill(TEST_PASSWORD);
+    } else if (visibleInputIndexes.length === 1) {
       // 已有密码：输入密码登录
+      await passwordInputs.nth(visibleInputIndexes[0]).fill(TEST_PASSWORD);
+    } else if (count > 0) {
+      // 兜底：如果可见性判断异常，至少填充第一个输入框
       await passwordInputs.first().fill(TEST_PASSWORD);
     }
 
