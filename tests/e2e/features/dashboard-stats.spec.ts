@@ -280,7 +280,7 @@ test.describe('统计仪表盘核心流程', () => {
     expect(isLoading).toBeFalsy();
   });
 
-  test('数据更新时效性验证', async () => {
+  test('数据更新时效性验证', async ({ page }) => {
     await dashboardPage.waitForDataLoad();
     
     // 获取初始数据
