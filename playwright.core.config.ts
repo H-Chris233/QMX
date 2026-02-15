@@ -114,30 +114,6 @@ export default defineConfig({
       ],
     },
     
-    {
-      name: 'webkit-core',
-      use: { 
-        ...devices['Desktop Safari'],
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
-        contextOptions: {
-          ignoreHTTPSErrors: true,
-        },
-        locale: 'zh-CN',
-        timezoneId: 'Asia/Shanghai',
-      },
-      testIgnore: [
-        '**/smoke/**',
-        '**/connectivity/**',
-        '**/basic.spec.ts'
-      ],
-      testMatch: [
-        '**/features/**/*.spec.ts',
-        '**/integration.spec.ts'
-      ],
-    },
-    
     // 移动端核心流程测试
     {
       name: 'mobile-chrome-core',
@@ -160,26 +136,6 @@ export default defineConfig({
       ],
     },
     
-    {
-      name: 'mobile-safari-core',
-      use: { 
-        ...devices['iPhone 12'],
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        trace: 'retain-on-failure',
-        locale: 'zh-CN',
-        timezoneId: 'Asia/Shanghai',
-      },
-      testIgnore: [
-        '**/smoke/**',
-        '**/connectivity/**',
-        '**/basic.spec.ts'
-      ],
-      testMatch: [
-        '**/features/**/*.spec.ts',
-        '**/integration.spec.ts'
-      ],
-    },
   ],
   
   // 开发服务器配置

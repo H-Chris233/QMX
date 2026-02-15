@@ -43,7 +43,7 @@ test.describe('基础连接测试', () => {
       
       // 尝试健康检查接口
       try {
-        const healthResponse = await fetch('http://localhost:3001/api/v1/health');
+        const healthResponse = await fetch('http://127.0.0.1:3001/api/v1/health');
         expect([200, 404]).toContain(healthResponse.status);
         console.log('健康检查状态:', healthResponse.status);
       } catch (healthError) {
@@ -84,7 +84,7 @@ test.describe('基础连接测试', () => {
   test('测试数据接口验证', async ({ api }) => {
     try {
       // 检查测试数据状态
-      const statusResponse = await fetch('http://localhost:3001/api/v1/test/status');
+      const statusResponse = await fetch('http://127.0.0.1:3001/api/v1/test/status');
       
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();

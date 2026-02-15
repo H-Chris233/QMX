@@ -37,20 +37,23 @@ test.describe('冒烟测试', () => {
   test('后端API健康检查', async ({ api }) => {
     try {
       // 尝试访问后端健康检查接口
-      const response = await fetch('http://localhost:3001/api/v1/health');
-      
+      const response = await fetch('http://127.0.0.1:3001/api/v1/health');
+
       // 如果健康检查接口存在
       if (response.ok) {
         const data = await response.json();
-        expect(data).toBeValidApiResponse();
+        // 健康检查端点使用独立格式（含 status 字段），不遵循业务 API 的 { success, data } 格式
+        expect(data).toHaveProperty('status');
+        expect(['healthy', 'degraded']).toContain(data.status);
       } else {
         // 如果健康检查接口不存在，尝试访问基础API路径
-        const fallbackResponse = await fetch('http://localhost:3001/api/v1/');
+        const fallbackResponse = await fetch('http://127.0.0.1:3001/api/v1/');
         expect([200, 404, 401]).toContain(fallbackResponse.status);
       }
     } catch (error) {
       // 如果无法连接，测试失败
-      throw new Error('后端服务无法连接');
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`后端服务无法连接: ${msg}`);
     }
   });
 

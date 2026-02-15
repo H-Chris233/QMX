@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-container">
+  <div class="dashboard-container" data-testid="dashboard">
     <!-- 顶部标题栏 -->
     <header class="dashboard-header">
       <div class="header-left">
@@ -15,6 +15,7 @@
           @click="loadDashboardData(true)"
           :disabled="loading"
           aria-label="刷新数据"
+          data-testid="dashboard-refresh-btn"
         >
           <RefreshCw :class="['btn-icon', { spinning: loading }]" :size="18" />
           <span>{{ loading ? "同步中..." : "刷新" }}</span>
@@ -22,12 +23,16 @@
       </div>
     </header>
 
-    <div v-if="loading" class="loading-progress"></div>
+    <div v-if="loading" class="loading-progress" data-testid="loading-progress"></div>
 
     <!-- 核心指标网格 -->
-    <div class="stats-grid">
+    <div class="stats-grid" data-testid="stats-grid">
       <!-- 总收入 -->
-      <div class="stat-card" :class="{ 'is-loading': loading, skeleton: loading }">
+      <div
+        class="stat-card"
+        :class="{ 'is-loading': loading, skeleton: loading }"
+        data-testid="revenue-card"
+      >
         <div class="card-top">
           <span class="card-label">总收入</span>
           <div class="icon-wrapper income">
@@ -35,7 +40,7 @@
           </div>
         </div>
         <div class="card-content">
-          <div v-if="!loading" class="stat-value">
+          <div v-if="!loading" class="stat-value" data-testid="total-revenue">
             {{ formatCurrency(dashboardData.totalRevenue) }}
           </div>
           <div v-else class="skeleton-line h-8 w-2/3"></div>
@@ -44,7 +49,11 @@
       </div>
 
       <!-- 学员总数 -->
-      <div class="stat-card" :class="{ 'is-loading': loading, skeleton: loading }">
+      <div
+        class="stat-card"
+        :class="{ 'is-loading': loading, skeleton: loading }"
+        data-testid="students-card"
+      >
         <div class="card-top">
           <span class="card-label">活跃学员</span>
           <div class="icon-wrapper students">
@@ -52,7 +61,7 @@
           </div>
         </div>
         <div class="card-content">
-          <div v-if="!loading" class="stat-value">
+          <div v-if="!loading" class="stat-value" data-testid="active-students">
             {{ formatNumber(dashboardData.activeStudents) }}
           </div>
           <div v-else class="skeleton-line h-8 w-1/2"></div>
@@ -61,7 +70,11 @@
       </div>
 
       <!-- 平均成绩 -->
-      <div class="stat-card" :class="{ 'is-loading': loading, skeleton: loading }">
+      <div
+        class="stat-card"
+        :class="{ 'is-loading': loading, skeleton: loading }"
+        data-testid="grades-card"
+      >
         <div class="card-top">
           <span class="card-label">平均绩效</span>
           <div class="icon-wrapper score">
@@ -69,7 +82,7 @@
           </div>
         </div>
         <div class="card-content">
-          <div v-if="!loading" class="stat-value">
+          <div v-if="!loading" class="stat-value" data-testid="average-grade">
             {{ formatDecimal(dashboardData.averageGrade) }}
           </div>
           <div v-else class="skeleton-line h-8 w-1/2"></div>
@@ -86,16 +99,17 @@
       </div>
 
       <!-- 会员到期提醒 (宽卡片) -->
-      <div class="stat-card membership-card expiring-members" :class="{ 'is-loading': loading, skeleton: loading }">
+      <div
+        class="stat-card membership-card expiring-members"
+        :class="{ 'is-loading': loading, skeleton: loading }"
+        data-testid="membership-card"
+      >
         <div class="card-header-row">
           <div class="header-title">
             <Clock :size="18" class="text-warning" />
             <h3>会员到期提醒 (7日内)</h3>
           </div>
-          <span
-            class="badge-count"
-            v-if="!loading && expiringMemberships.length > 0"
-          >
+          <span class="badge-count" data-testid="expiring-count">
             {{ expiringMemberships.length }}
           </span>
         </div>
@@ -107,6 +121,7 @@
                 v-for="student in expiringMemberships"
                 :key="student.uid"
                 class="member-item"
+                :data-testid="`expiring-member-${student.uid}`"
               >
                 <div class="member-info">
                   <div class="member-top-row">

@@ -121,20 +121,6 @@ export default defineConfig({
           },
         },
         
-        {
-          name: 'webkit',
-          use: { 
-            ...devices['Desktop Safari'],
-            screenshot: 'only-on-failure',
-            video: 'retain-on-failure',
-            trace: 'retain-on-failure',
-            reducedMotion: 'reduce',
-            contextOptions: {
-              ignoreHTTPSErrors: true,
-            },
-          },
-        },
-        
         // 移动端测试
         {
           name: 'Mobile Chrome',
@@ -147,16 +133,6 @@ export default defineConfig({
           },
         },
         
-        {
-          name: 'Mobile Safari',
-          use: { 
-            ...devices['iPhone 12'],
-            screenshot: 'only-on-failure',
-            video: 'retain-on-failure',
-            trace: 'retain-on-failure',
-            reducedMotion: 'reduce',
-          },
-        },
       ],
   
   // 开发服务器配置

@@ -36,7 +36,7 @@ async function cleanupTestData() {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       // 调用后端清理接口
-      const response = await fetch('http://localhost:3001/api/v1/test/cleanup', {
+      const response = await fetch('http://127.0.0.1:3001/api/v1/test/cleanup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

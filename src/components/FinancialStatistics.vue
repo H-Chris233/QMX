@@ -31,6 +31,7 @@
           @click="forceRefresh"
           :disabled="loading"
           title="刷新数据"
+          data-testid="refresh-btn"
         >
           <RefreshCw :size="20" :class="{ 'spinning': loading }" />
         </button>

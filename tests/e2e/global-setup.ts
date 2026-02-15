@@ -31,7 +31,10 @@ async function globalSetup(config: FullConfig) {
     
     // 准备测试数据
     await setupTestData();
-    
+
+    // 设置测试密码（用于 E2E 登录）
+    await setupTestAuth();
+
     console.log('✅ E2E 测试全局设置完成');
   } catch (error) {
     console.error('❌ E2E 测试全局设置失败:', error);
@@ -47,7 +50,7 @@ async function waitForServices() {
   console.log('⏳ 等待服务启动...');
   
   const services = [
-    { name: '后端 (Backend)', url: 'http://localhost:3001/api/v1/health', port: 3001 },
+    { name: '后端 (Backend)', url: 'http://127.0.0.1:3001/api/v1/health', port: 3001 },
     { name: '前端 (Frontend)', url: 'http://localhost:1420', port: 1420 },
   ];
   
@@ -107,7 +110,7 @@ async function setupTestData() {
     try {
       console.log(`  - 准备测试数据 (尝试 ${attempt}/${maxRetries})...`);
       
-      const response = await fetch('http://localhost:3001/api/v1/test/seed', {
+      const response = await fetch('http://127.0.0.1:3001/api/v1/test/seed', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,6 +155,48 @@ async function setupTestData() {
     console.log(`  ⚠️  无法准备测试数据，但继续执行测试: ${lastError.message}`);
   } else {
     console.log('  ℹ️  测试数据准备完成或跳过');
+  }
+}
+
+/**
+ * 设置测试密码
+ * 通过 auth API 设置密码，供 E2E 测试自动登录使用
+ */
+async function setupTestAuth() {
+  console.log('🔑 设置测试认证...');
+
+  try {
+    // 检查认证状态
+    const statusRes = await fetch('http://127.0.0.1:3001/api/v1/auth/status', {
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!statusRes.ok) {
+      console.log('  ⚠️  认证状态接口不可用，跳过');
+      return;
+    }
+
+    const status = await statusRes.json();
+
+    if (status.isFirstVisit) {
+      // 首次访问，设置测试密码
+      const setupRes = await fetch('http://127.0.0.1:3001/api/v1/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: 'test1234' }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (setupRes.ok) {
+        console.log('  ✅ 测试密码设置完成');
+      } else {
+        console.log(`  ⚠️  密码设置失败: HTTP ${setupRes.status}`);
+      }
+    } else {
+      console.log('  ℹ️  密码已存在，跳过设置');
+    }
+  } catch (error) {
+    console.log('  ⚠️  认证设置失败，但继续执行测试:', error instanceof Error ? error.message : String(error));
   }
 }
 

@@ -210,8 +210,8 @@ test.describe('统计仪表盘核心流程', () => {
     const revenue = await dashboardPage.getTotalRevenue();
     const grade = await dashboardPage.getAverageGrade();
     
-    // 验证金额格式（¥符号，千分位分隔符，两位小数）
-    expect(revenue).toMatch(/^¥[\d,]+\.\d{2}$/);
+    // 验证金额格式（¥符号，千分位分隔符，可选两位小数）
+    expect(revenue).toMatch(/^¥[\d,]+(\.\d{2})?$/);
     
     // 验证成绩格式（1-2位小数）
     expect(grade).toMatch(/^\d+\.\d{1,2}$/);

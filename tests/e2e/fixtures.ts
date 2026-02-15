@@ -98,7 +98,7 @@ export const test = base.extend({
   // API helper fixture
   api: async ({ page }, use) => {
     const apiHelper = {
-      baseURL: 'http://localhost:3001/api/v1',
+      baseURL: 'http://127.0.0.1:3001/api/v1',
       
       // 发送API请求
       async request(endpoint: string, options: RequestInit = {}) {

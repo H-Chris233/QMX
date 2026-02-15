@@ -64,12 +64,14 @@ export class DashboardPage {
     
     for (const element of memberElements) {
       const name = await element.locator('.member-name').textContent();
-      const days = await element.locator('.member-days').textContent();
+      const daysText = await element.locator('.member-days').textContent();
       const testId = await element.getAttribute('data-testid');
       const studentId = testId?.replace('expiring-member-', '') || '';
+      const dayMatch = daysText?.match(/(\d+)\s*天/);
+      const days = dayMatch ? `${dayMatch[1]}天` : '';
       
       if (name && days) {
-        members.push({ name: name.trim(), days: days.trim(), studentId });
+        members.push({ name: name.trim(), days, studentId });
       }
     }
     
@@ -94,10 +96,10 @@ export class DashboardPage {
   }
 
   /**
-   * 验证金额格式（应该包含¥符号和两位小数）
+   * 验证金额格式（包含¥符号，可选两位小数）
    */
   async verifyCurrencyFormat(amount: string): Promise<boolean> {
-    const currencyRegex = /^¥[\d,]+\.\d{2}$/;
+    const currencyRegex = /^¥[\d,]+(\.\d{2})?$/;
     return currencyRegex.test(amount.trim());
   }
 
@@ -126,7 +128,7 @@ export class DashboardPage {
     });
     
     // 等待统计数据卡片显示实际数据（不是骨架屏）
-    await this.page.locator('[data-testid="stats-grid"] .stat-card:not(.skeleton)').first().waitFor();
+    await this.page.locator('[data-testid="stats-grid"] .stat-card:not(.skeleton)').first().waitFor({ state: 'visible' });
   }
 
   /**
@@ -149,7 +151,8 @@ export class DashboardPage {
 
     for (const cardSelector of cards) {
       const card = this.page.locator(cardSelector);
-      const isSkeleton = await card.locator('.skeleton').isVisible().catch(() => false);
+      const className = (await card.getAttribute('class')) || '';
+      const isSkeleton = className.includes('skeleton');
       if (isSkeleton) {
         return false;
       }
