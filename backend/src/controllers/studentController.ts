@@ -1,14 +1,14 @@
-import { Request, Response } from "express";
-import { catchAsync } from "@/middleware/errorHandler";
-import logger from "@/utils/logger";
-import type { ClassType, SubjectType } from "@/types";
-import { AppError } from "@/utils/errors";
-import { StudentRepository } from "../db/repositories/studentRepository";
-import { StudentQuery } from "../services/studentQuery";
-import { presentStudent } from "../services/studentPresenter";
+import { Request, Response } from 'express';
+import { catchAsync } from '@/middleware/errorHandler';
+import logger from '@/utils/logger';
+import type { ClassType, SubjectType } from '@/types';
+import { AppError } from '@/utils/errors';
+import { StudentRepository } from '../db/repositories/studentRepository';
+import { StudentQuery } from '../services/studentQuery';
+import { presentStudent } from '../services/studentPresenter';
 
 const parseNumber = (value: unknown): number | null => {
-  if (value === undefined || value === null || value === "") {
+  if (value === undefined || value === null || value === '') {
     return null;
   }
   const parsed = Number(value);
@@ -19,14 +19,14 @@ const parseBoolean = (value: unknown): boolean | null => {
   if (value === undefined || value === null) {
     return null;
   }
-  if (typeof value === "boolean") {
+  if (typeof value === 'boolean') {
     return value;
   }
   const stringified = String(value).toLowerCase();
-  if (["true", "1", "yes"].includes(stringified)) {
+  if (['true', '1', 'yes'].includes(stringified)) {
     return true;
   }
-  if (["false", "0", "no"].includes(stringified)) {
+  if (['false', '0', 'no'].includes(stringified)) {
     return false;
   }
   return null;
@@ -34,7 +34,7 @@ const parseBoolean = (value: unknown): boolean | null => {
 
 const buildMembershipPayload = (
   start?: any,
-  end?: any
+  end?: any,
 ): { start?: string | null; end?: string | null } | null | undefined => {
   if (start === undefined && end === undefined) {
     return undefined;
@@ -50,7 +50,7 @@ const buildMembershipPayload = (
 
 const applyUpdaterFromPayload = async (
   studentId: number,
-  payload: Record<string, any>
+  payload: Record<string, any>,
 ): Promise<any> => {
   const updateData: Record<string, unknown> = {};
 
@@ -87,7 +87,7 @@ const applyUpdaterFromPayload = async (
   ) {
     const membershipPayload = buildMembershipPayload(
       payload.membership_start_date ?? payload.membershipStartDate,
-      payload.membership_end_date ?? payload.membershipEndDate
+      payload.membership_end_date ?? payload.membershipEndDate,
     );
 
     if (membershipPayload !== undefined) {
@@ -114,7 +114,7 @@ export class StudentController {
       has_membership,
       membership_active_at,
       sort_by,
-      sort_order = "DESC",
+      sort_order = 'DESC',
     } = req.query;
 
     const result = await StudentQuery.create()
@@ -125,7 +125,7 @@ export class StudentController {
       .hasMembership(parseBoolean(has_membership))
       .membershipActiveAt(membership_active_at as string | undefined)
       .scoreRange(parseNumber(min_score), parseNumber(max_score))
-      .sort(sort_by as string | undefined, (sort_order as "ASC" | "DESC") ?? "DESC")
+      .sort(sort_by as string | undefined, (sort_order as 'ASC' | 'DESC') ?? 'DESC')
       .paginate(Number(page), Number(limit))
       .execute();
 
@@ -173,7 +173,7 @@ export class StudentController {
     res.status(201).json({
       success: true,
       data: presentStudent(student),
-      message: "学员添加成功",
+      message: '学员添加成功',
     });
   });
 
@@ -183,14 +183,14 @@ export class StudentController {
     const updatedStudent = await applyUpdaterFromPayload(Number(id), req.body ?? {});
 
     if (!updatedStudent) {
-      throw AppError.notFound("学员不存在");
+      throw AppError.notFound('学员不存在');
     }
 
     logger.info(`更新学员成功，UID: ${updatedStudent.uid}`);
     res.json({
       success: true,
       data: presentStudent(updatedStudent),
-      message: "学员更新成功",
+      message: '学员更新成功',
     });
   });
 
@@ -200,19 +200,19 @@ export class StudentController {
     const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
-      throw AppError.notFound("学员不存在");
+      throw AppError.notFound('学员不存在');
     }
 
     const deleted = await StudentRepository.deleteByUid(student.uid);
 
     if (!deleted) {
-      throw AppError.other("删除学员失败");
+      throw AppError.other('删除学员失败');
     }
 
     logger.info(`删除学员成功，UID: ${student.uid}`);
     res.json({
       success: true,
-      message: "学员删除成功",
+      message: '学员删除成功',
     });
   });
 
@@ -221,7 +221,7 @@ export class StudentController {
     const student = await StudentRepository.findByUid(Number(id));
 
     if (!student) {
-      throw AppError.notFound("学员不存在");
+      throw AppError.notFound('学员不存在');
     }
 
     res.json({
@@ -244,7 +244,7 @@ export class StudentController {
       page = 1,
       limit = 20,
       sort_by,
-      sort_order = "DESC",
+      sort_order = 'DESC',
     } = req.query;
 
     const result = await StudentQuery.create()
@@ -255,7 +255,7 @@ export class StudentController {
       .hasMembership(parseBoolean(has_membership))
       .membershipActiveAt(membership_active_at as string | undefined)
       .scoreRange(parseNumber(min_score), parseNumber(max_score))
-      .sort(sort_by as string | undefined, (sort_order as "ASC" | "DESC") ?? "DESC")
+      .sort(sort_by as string | undefined, (sort_order as 'ASC' | 'DESC') ?? 'DESC')
       .paginate(Number(page), Number(limit))
       .execute();
 
@@ -278,7 +278,7 @@ export class StudentController {
         !Array.isArray(studentIds) ||
         studentIds.length === 0
       ) {
-        throw AppError.invalidInput("学员ID列表不能为空");
+        throw AppError.invalidInput('学员ID列表不能为空');
       }
 
       let updatedCount = 0;
@@ -291,7 +291,7 @@ export class StudentController {
           logger.warn(
             `批量更新学员失败，UID: ${studentId}, 错误: ${
               (error as Error).message
-            }`
+            }`,
           );
         }
       }
@@ -304,7 +304,7 @@ export class StudentController {
         },
         message: `成功更新${updatedCount}个学员`,
       });
-    }
+    },
   );
 
   public batchDeleteStudents = catchAsync(
@@ -316,7 +316,7 @@ export class StudentController {
         !Array.isArray(studentIds) ||
         studentIds.length === 0
       ) {
-        throw AppError.invalidInput("学员ID列表不能为空");
+        throw AppError.invalidInput('学员ID列表不能为空');
       }
 
       let deletedCount = 0;
@@ -335,7 +335,7 @@ export class StudentController {
         },
         message: `成功删除${deletedCount}个学员`,
       });
-    }
+    },
   );
 
   public updateStudentScores = catchAsync(
@@ -344,7 +344,7 @@ export class StudentController {
       const { rings } = req.body;
 
       if (!Array.isArray(rings)) {
-        throw AppError.invalidInput("成绩必须是数组格式");
+        throw AppError.invalidInput('成绩必须是数组格式');
       }
 
       const updatedStudent = await StudentRepository.updateByUid(Number(id), {
@@ -352,16 +352,16 @@ export class StudentController {
       });
 
       if (!updatedStudent) {
-        throw AppError.notFound("学员不存在");
+        throw AppError.notFound('学员不存在');
       }
 
       logger.info(`更新学员成绩成功，UID: ${updatedStudent.uid}`);
       res.json({
         success: true,
         data: presentStudent(updatedStudent),
-        message: "学员成绩更新成功",
+        message: '学员成绩更新成功',
       });
-    }
+    },
   );
 
   public getExpiringMemberships = catchAsync(
@@ -372,7 +372,7 @@ export class StudentController {
       futureDate.setDate(futureDate.getDate() + Number(days));
 
       const expiringStudents = await StudentRepository.findExpiringMemberships(
-        Number(days)
+        Number(days),
       );
 
       res.json({
@@ -380,7 +380,7 @@ export class StudentController {
         data: expiringStudents.map(presentStudent),
         count: expiringStudents.length,
       });
-    }
+    },
   );
 
   public getStudentStats = catchAsync(async (_req: Request, res: Response) => {
@@ -407,8 +407,8 @@ export class StudentController {
     const subjectStats = new Map<string, number>();
 
     allStudents.forEach((student) => {
-      const className = student.classType || "Others";
-      const subjectName = student.subject || "Others";
+      const className = student.classType || 'Others';
+      const subjectName = student.subject || 'Others';
 
       classStats.set(className, (classStats.get(className) || 0) + 1);
       subjectStats.set(subjectName, (subjectStats.get(subjectName) || 0) + 1);
@@ -418,14 +418,14 @@ export class StudentController {
       ([cls, count]) => ({
         class: cls,
         count,
-      })
+      }),
     );
 
     const subject_statistics = Array.from(subjectStats.entries()).map(
       ([subj, count]) => ({
         subject: subj,
         count,
-      })
+      }),
     );
 
     res.json({

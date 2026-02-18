@@ -81,7 +81,7 @@ export const errorHandler = (
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction
+  _next: NextFunction,
 ): void => {
   const appError = normalizeError(err);
   const statusCode = appError.statusCode ?? mapErrorTypeToStatus(appError.type);
@@ -114,7 +114,7 @@ export const errorHandler = (
 };
 
 export const catchAsync = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
 ) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);

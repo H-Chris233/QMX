@@ -5,7 +5,7 @@ import {
   clearAllCollections,
   resetAllSequences,
   createTestApp, 
-  TestDataFactory 
+  TestDataFactory, 
 } from '../setupBackend';
 
 jest.setTimeout(30000);

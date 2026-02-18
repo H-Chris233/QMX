@@ -255,7 +255,7 @@ router.get('/search', validateQuery(searchStudentsSchema), studentController.sea
  */
 router.get('/:id', 
   validateParams(Joi.object({ id: commonValidations.id })),
-  studentController.getStudentById
+  studentController.getStudentById,
 );
 
 /**
@@ -342,7 +342,7 @@ router.get('/:id',
  */
 router.post('/',
   validate(createStudentSchema),
-  studentController.addStudent
+  studentController.addStudent,
 );
 
 /**
@@ -420,7 +420,7 @@ router.post('/',
 router.put('/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(updateStudentSchema),
-  studentController.updateStudent
+  studentController.updateStudent,
 );
 
 /**
@@ -465,7 +465,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
-  studentController.deleteStudent
+  studentController.deleteStudent,
 );
 
 export default router;

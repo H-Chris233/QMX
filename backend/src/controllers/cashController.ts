@@ -1,29 +1,29 @@
-import { Request, Response } from "express";
-import { catchAsync } from "@/middleware/errorHandler";
-import { CashBuilder, convertAmountToCents, normalizeNote } from "@/services/cashBuilder";
+import { Request, Response } from 'express';
+import { catchAsync } from '@/middleware/errorHandler';
+import { CashBuilder, convertAmountToCents, normalizeNote } from '@/services/cashBuilder';
 import {
   InstallmentStatusValues,
   InstallmentPlanStatusValues,
   PaymentFrequencyValues,
   IApiResponse,
   IPaginatedResponse,
-} from "@/types";
-import type { InstallmentStatus, InstallmentPlanStatus, PaymentFrequency } from "@/types";
-import type { ICashSearchOptions } from "@/types";
-import logger from "@/utils/logger";
-import { AppError } from "@/utils/errors";
-import { CashRepository } from "../db/repositories/cashRepository";
-import { StudentRepository } from "../db/repositories/studentRepository";
+} from '@/types';
+import type { InstallmentStatus, InstallmentPlanStatus, PaymentFrequency } from '@/types';
+import type { ICashSearchOptions } from '@/types';
+import logger from '@/utils/logger';
+import { AppError } from '@/utils/errors';
+import { CashRepository } from '../db/repositories/cashRepository';
+import { StudentRepository } from '../db/repositories/studentRepository';
 import {
   InstallmentRepository,
   InstallmentPlanRepository,
-} from "../db/repositories/installmentRepository";
+} from '../db/repositories/installmentRepository';
 import type {
   CashTransaction,
   InstallmentPlan,
   Installment,
   InstallmentSnapshot,
-} from "../db/schema";
+} from '../db/schema';
 
 interface StudentIncomeSummary {
   studentId: number;
@@ -44,37 +44,37 @@ interface FinancialStatsResponse {
 }
 
 const CASH_SORT_FIELDS = [
-  "uid",
-  "studentId",
-  "amount",
-  "created_at",
-  "updated_at",
+  'uid',
+  'studentId',
+  'amount',
+  'created_at',
+  'updated_at',
 ] as const;
 type CashSortField = (typeof CASH_SORT_FIELDS)[number];
-type CashSortOrder = "ASC" | "DESC";
+type CashSortOrder = 'ASC' | 'DESC';
 const isCashSortField = (value: unknown): value is CashSortField =>
-  typeof value === "string" &&
+  typeof value === 'string' &&
   (CASH_SORT_FIELDS as readonly string[]).includes(value);
 const normalizeCashSortOrder = (value: unknown): CashSortOrder | undefined => {
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     return undefined;
   }
   const upper = value.toUpperCase();
-  return upper === "ASC" || upper === "DESC" ? (upper as CashSortOrder) : undefined;
+  return upper === 'ASC' || upper === 'DESC' ? (upper as CashSortOrder) : undefined;
 };
 
 const INSTALLMENT_PLAN_SORT_FIELDS = [
-  "created_at",
-  "start_date",
-  "total_amount",
-  "status",
-  "updated_at",
+  'created_at',
+  'start_date',
+  'total_amount',
+  'status',
+  'updated_at',
 ] as const;
 type InstallmentPlanSortField = (typeof INSTALLMENT_PLAN_SORT_FIELDS)[number];
 const isInstallmentPlanSortField = (
-  value: unknown
+  value: unknown,
 ): value is InstallmentPlanSortField =>
-  typeof value === "string" &&
+  typeof value === 'string' &&
   (INSTALLMENT_PLAN_SORT_FIELDS as readonly string[]).includes(value);
 
 // 财务控制器
@@ -86,7 +86,7 @@ export class CashController {
       const result = await CashRepository.findWithPagination(options);
 
       const responseData = result.data.map((transaction) =>
-        this.presentTransaction(transaction)
+        this.presentTransaction(transaction),
       );
 
       const response: IApiResponse<any> = {
@@ -102,13 +102,13 @@ export class CashController {
 
       logger.info(`获取交易记录成功，共 ${result.pagination.total} 条记录`);
       res.json(response);
-    }
+    },
   );
 
   // 添加普通交易记录
   public addCashTransaction = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const { student_id, amount, note = "", installment } = req.body;
+      const { student_id, amount, note = '', installment } = req.body;
 
       const builder = CashBuilder.create().amount(amount).note(note);
 
@@ -127,16 +127,16 @@ export class CashController {
       const response: IApiResponse<typeof responseData> = {
         success: true,
         data: responseData,
-        message: "交易记录添加成功",
+        message: '交易记录添加成功',
       };
 
       logger.info(
         `添加交易记录成功，UID: ${
           transaction.uid
-        }, 金额: ¥${this.formatAmount(transaction.amount)}`
+        }, 金额: ¥${this.formatAmount(transaction.amount)}`,
       );
       res.status(201).json(response);
-    }
+    },
   );
 
   // 添加分期付款交易 - 完整版本
@@ -145,7 +145,7 @@ export class CashController {
       const {
         student_id,
         total_amount,
-        note = "",
+        note = '',
         total_installments,
         frequency,
         custom_days,
@@ -156,19 +156,19 @@ export class CashController {
       if (student_id !== null && student_id !== undefined) {
         const student = await StudentRepository.findByUid(Number(student_id));
         if (!student) {
-          throw AppError.invalidInput("指定的学员不存在");
+          throw AppError.invalidInput('指定的学员不存在');
         }
       }
 
       // 验证输入
       const normalizedFrequency = this.normalizeFrequency(frequency);
       if (!normalizedFrequency) {
-        throw AppError.invalidInput("无效的付款频率");
+        throw AppError.invalidInput('无效的付款频率');
       }
 
       const totalInstallmentsInt = Number(total_installments);
       if (!Number.isInteger(totalInstallmentsInt) || totalInstallmentsInt <= 0) {
-        throw AppError.invalidInput("总期数必须为正整数");
+        throw AppError.invalidInput('总期数必须为正整数');
       }
 
       const customDaysValue =
@@ -180,12 +180,12 @@ export class CashController {
         normalizedFrequency === PaymentFrequencyValues.CUSTOM &&
         customDaysValue === null
       ) {
-        throw AppError.invalidInput("自定义频率必须指定天数且大于0");
+        throw AppError.invalidInput('自定义频率必须指定天数且大于0');
       }
 
       const startDateObj = new Date(start_date);
       if (Number.isNaN(startDateObj.getTime())) {
-        throw AppError.invalidInput("开始日期格式不正确");
+        throw AppError.invalidInput('开始日期格式不正确');
       }
       const startDateValue = startDateObj.toISOString().split('T')[0];
 
@@ -212,7 +212,7 @@ export class CashController {
           const amountForInstallment = InstallmentPlanRepository.calculateInstallmentAmount(
             totalAmountCents,
             totalInstallmentsInt,
-            i
+            i,
           );
 
           const installmentData = {
@@ -231,26 +231,26 @@ export class CashController {
           dueDateCursor = this.calculateNextDueDate(
             dueDateCursor,
             normalizedFrequency,
-            customDaysValue
+            customDaysValue,
           );
         }
 
         const createdInstallments = await InstallmentRepository.createMany(
-          installmentsToCreate as any
+          installmentsToCreate as any,
         );
 
         const firstInstallment = createdInstallments[0];
         const firstInstallmentAmount = firstInstallment
           ? firstInstallment.installmentAmount / 100
           : this.formatAmount(
-              Math.round(totalAmountCents / totalInstallmentsInt)
-            );
+            Math.round(totalAmountCents / totalInstallmentsInt),
+          );
 
         const transaction = await CashBuilder.create()
           .studentId(student_id ?? null)
           .amount(firstInstallmentAmount)
           .note(
-            this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt)
+            this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt),
           )
           .installment({
             plan_uid: installmentPlan.uid,
@@ -303,21 +303,21 @@ export class CashController {
         const response: IApiResponse<typeof responseData> = {
           success: true,
           data: responseData,
-          message: "分期付款创建成功",
+          message: '分期付款创建成功',
         };
 
         logger.info(
-          `创建分期付款成功，交易ID: ${transaction.uid}, 计划ID: ${installmentPlan.uid}, 期数: ${total_installments}`
+          `创建分期付款成功，交易ID: ${transaction.uid}, 计划ID: ${installmentPlan.uid}, 期数: ${total_installments}`,
         );
         res.status(201).json(response);
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
         }
-        logger.error("创建分期付款失败:", error);
-        throw AppError.other("创建分期付款失败", { cause: error });
+        logger.error('创建分期付款失败:', error);
+        throw AppError.other('创建分期付款失败', { cause: error });
       }
-    }
+    },
   );
 
   // 删除交易记录
@@ -328,23 +328,23 @@ export class CashController {
       const transaction = await CashRepository.findByUid(Number(id));
 
       if (!transaction) {
-        throw AppError.notFound("交易记录不存在");
+        throw AppError.notFound('交易记录不存在');
       }
 
       const deleted = await CashRepository.deleteByUid(Number(id));
 
       if (!deleted) {
-        throw AppError.other("删除交易记录失败");
+        throw AppError.other('删除交易记录失败');
       }
 
       const response: IApiResponse = {
         success: true,
-        message: "交易记录删除成功",
+        message: '交易记录删除成功',
       };
 
       logger.info(`删除交易记录成功，UID: ${transaction.uid}`);
       res.json(response);
-    }
+    },
   );
 
   // 搜索现金记录
@@ -354,7 +354,7 @@ export class CashController {
       const result = await CashRepository.findWithPagination(options);
 
       const responseData = result.data.map((transaction) =>
-        this.presentTransaction(transaction)
+        this.presentTransaction(transaction),
       );
 
       const response: IApiResponse<any> = {
@@ -370,7 +370,7 @@ export class CashController {
 
       logger.info(`搜索现金记录完成，找到 ${result.pagination.total} 条记录`);
       res.json(response);
-    }
+    },
   );
 
   // 获取交易详情
@@ -381,7 +381,7 @@ export class CashController {
       const transaction = await CashRepository.findByUid(Number(id));
 
       if (!transaction) {
-        throw AppError.notFound("交易记录不存在");
+        throw AppError.notFound('交易记录不存在');
       }
 
       let student = null;
@@ -392,12 +392,12 @@ export class CashController {
       const responseData = this.presentTransaction(transaction, {
         student: student
           ? {
-              uid: student.uid,
-              name: student.name,
-              phone: student.phone,
-              class: student.classType,
-              subject: student.subject,
-            }
+            uid: student.uid,
+            name: student.name,
+            phone: student.phone,
+            class: student.classType,
+            subject: student.subject,
+          }
           : null,
         student_name: student ? student.name : null,
       });
@@ -409,7 +409,7 @@ export class CashController {
 
       logger.info(`获取交易详情成功，UID: ${transaction.uid}`);
       res.json(response);
-    }
+    },
   );
 
   // 更新交易记录
@@ -421,7 +421,7 @@ export class CashController {
       const transaction = await CashRepository.findByUid(Number(id));
 
       if (!transaction) {
-        throw AppError.notFound("交易记录不存在");
+        throw AppError.notFound('交易记录不存在');
       }
 
       const updateData: Record<string, any> = {};
@@ -442,7 +442,7 @@ export class CashController {
       const updated = await CashRepository.updateByUid(Number(id), updateData);
 
       if (!updated) {
-        throw AppError.other("更新交易记录失败");
+        throw AppError.other('更新交易记录失败');
       }
 
       const responseData = this.presentTransaction(updated);
@@ -450,37 +450,37 @@ export class CashController {
       const response: IApiResponse<typeof responseData> = {
         success: true,
         data: responseData,
-        message: "交易记录更新成功",
+        message: '交易记录更新成功',
       };
 
       logger.info(`更新交易记录成功，UID: ${transaction.uid}`);
       res.json(response);
-    }
+    },
   );
 
   private buildSearchOptions(query: Record<string, any>): any {
     const options: any = {};
 
     const student = query.studentId ?? query.student_id;
-    if (student !== undefined && student !== null && student !== "") {
+    if (student !== undefined && student !== null && student !== '') {
       options.student_id = Number(student);
     }
 
     const minAmount = query.minAmount ?? query.min_amount;
-    if (minAmount !== undefined && minAmount !== null && minAmount !== "") {
+    if (minAmount !== undefined && minAmount !== null && minAmount !== '') {
       options.min_amount = Math.round(Number(minAmount) * 100); // 转换为分
     }
 
     const maxAmount = query.maxAmount ?? query.max_amount;
-    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== "") {
+    if (maxAmount !== undefined && maxAmount !== null && maxAmount !== '') {
       options.max_amount = Math.round(Number(maxAmount) * 100); // 转换为分
     }
 
     const incomeFlag = query.isIncome ?? query.is_income;
-    if (incomeFlag !== undefined && incomeFlag !== null && incomeFlag !== "") {
-      if (incomeFlag === true || incomeFlag === "true") {
+    if (incomeFlag !== undefined && incomeFlag !== null && incomeFlag !== '') {
+      if (incomeFlag === true || incomeFlag === 'true') {
         options.is_income = true;
-      } else if (incomeFlag === false || incomeFlag === "false") {
+      } else if (incomeFlag === false || incomeFlag === 'false') {
         options.is_income = false;
       }
     }
@@ -489,11 +489,11 @@ export class CashController {
     if (
       installmentFlag !== undefined &&
       installmentFlag !== null &&
-      installmentFlag !== ""
+      installmentFlag !== ''
     ) {
-      if (installmentFlag === true || installmentFlag === "true") {
+      if (installmentFlag === true || installmentFlag === 'true') {
         options.has_installment = true;
-      } else if (installmentFlag === false || installmentFlag === "false") {
+      } else if (installmentFlag === false || installmentFlag === 'false') {
         options.has_installment = false;
       }
     }
@@ -509,12 +509,12 @@ export class CashController {
     }
 
     const pageValue = query.page;
-    if (pageValue !== undefined && pageValue !== null && pageValue !== "") {
+    if (pageValue !== undefined && pageValue !== null && pageValue !== '') {
       options.page = Number(pageValue);
     }
 
     const limitValue = query.limit;
-    if (limitValue !== undefined && limitValue !== null && limitValue !== "") {
+    if (limitValue !== undefined && limitValue !== null && limitValue !== '') {
       options.limit = Number(limitValue);
     }
 
@@ -534,7 +534,7 @@ export class CashController {
 
   private presentTransaction(
     transaction: CashTransaction,
-    overrides: Record<string, unknown> = {}
+    overrides: Record<string, unknown> = {},
   ) {
     const amountYuan = transaction.amount / 100;
     const isIncome = transaction.amount > 0;
@@ -576,12 +576,12 @@ export class CashController {
   // 私有辅助方法：获取交易描述
   private getTransactionDescription(transaction: CashTransaction): string {
     const amountYuan = Math.abs(transaction.amount / 100);
-    const prefix = transaction.amount > 0 ? "收入" : "支出";
+    const prefix = transaction.amount > 0 ? '收入' : '支出';
     return `${prefix} ¥${amountYuan.toFixed(2)}`;
   }
 
   private normalizeFrequency(value: unknown): PaymentFrequency | null {
-    if (typeof value !== "string") {
+    if (typeof value !== 'string') {
       return null;
     }
     const validFrequencies: PaymentFrequency[] = ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'CUSTOM'];
@@ -590,7 +590,7 @@ export class CashController {
   }
 
   private normalizePositiveInteger(value: unknown): number | null {
-    if (value === undefined || value === null || value === "") {
+    if (value === undefined || value === null || value === '') {
       return null;
     }
     const numeric = Number(value);
@@ -603,7 +603,7 @@ export class CashController {
   private calculateNextDueDate(
     current: Date,
     frequency: PaymentFrequency,
-    customDays?: number | null
+    customDays?: number | null,
   ): Date {
     const next = new Date(current);
 
@@ -632,9 +632,9 @@ export class CashController {
   private buildInstallmentNote(
     baseNote: string | null,
     current: number,
-    total: number
+    total: number,
   ): string {
-    const label = baseNote ? baseNote : "分期付款";
+    const label = baseNote ? baseNote : '分期付款';
     return `${label}: 第${current}/${total}期`;
   }
 
@@ -646,23 +646,24 @@ export class CashController {
   public getFinancialStats = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const periodParam = req.query.period;
-      const period = typeof periodParam === "string" ? periodParam : "month";
+      const period = typeof periodParam === 'string' ? periodParam : 'month';
 
       let dateFrom: Date;
       const now = new Date();
 
       switch (period) {
-        case "week":
+        case 'week':
           dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
           break;
-        case "month":
+        case 'month':
           dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
           break;
-        case "quarter":
+        case 'quarter': {
           const quarter = Math.floor(now.getMonth() / 3);
           dateFrom = new Date(now.getFullYear(), quarter * 3, 1);
           break;
-        case "year":
+        }
+        case 'year':
           dateFrom = new Date(now.getFullYear(), 0, 1);
           break;
         default:
@@ -675,7 +676,7 @@ export class CashController {
       // 使用 PostgreSQL 聚合查询
       const stats = await CashRepository.getFinancialStats(
         dateFromStr,
-        dateToStr
+        dateToStr,
       );
 
       const net_income = stats.totalIncome - stats.totalExpense;
@@ -695,7 +696,7 @@ export class CashController {
             student_name: student?.name ?? this.getStudentDisplayName(item.studentId),
             amount: (item.totalAmount as unknown as number) / 100, // 转换为元
           };
-        })
+        }),
       );
 
       const responseData: FinancialStatsResponse = {
@@ -716,10 +717,10 @@ export class CashController {
       };
 
       logger.info(
-        `获取财务统计成功，周期: ${period}, 收入: ¥${stats.totalIncome / 100}, 支出: ¥${stats.totalExpense / 100}`
+        `获取财务统计成功，周期: ${period}, 收入: ¥${stats.totalIncome / 100}, 支出: ¥${stats.totalExpense / 100}`,
       );
       res.json(response);
-    }
+    },
   );
 
   // 获取分期付款列表 - 完整版本
@@ -729,8 +730,8 @@ export class CashController {
         student_id,
         page = 1,
         limit = 20,
-        sort_by = "created_at",
-        sort_order = "DESC",
+        sort_by = 'created_at',
+        sort_order = 'DESC',
         status,
       } = req.query as any;
 
@@ -745,15 +746,15 @@ export class CashController {
       }
 
       const sortFieldCandidate =
-        typeof sort_by === "string" ? sort_by : undefined;
+        typeof sort_by === 'string' ? sort_by : undefined;
       const sortField: InstallmentPlanSortField =
         sortFieldCandidate && isInstallmentPlanSortField(sortFieldCandidate)
           ? sortFieldCandidate
-          : "created_at";
-      const sortOrderValue: "ASC" | "DESC" =
-        typeof sort_order === "string" && sort_order.toUpperCase() === "ASC"
-          ? "ASC"
-          : "DESC";
+          : 'created_at';
+      const sortOrderValue: 'ASC' | 'DESC' =
+        typeof sort_order === 'string' && sort_order.toUpperCase() === 'ASC'
+          ? 'ASC'
+          : 'DESC';
 
       const options = {
         ...whereCondition,
@@ -771,13 +772,13 @@ export class CashController {
         const planInstallments = await InstallmentRepository.findByPlanId(plan.uid);
 
         const paidCount = planInstallments.filter(
-          (i) => i.status === "PAID"
+          (i) => i.status === 'PAID',
         ).length;
         const pendingCount = planInstallments.filter(
-          (i) => i.status === "PENDING"
+          (i) => i.status === 'PENDING',
         ).length;
         const overdueCount = planInstallments.filter((i) =>
-          InstallmentRepository.isOverdue(i)
+          InstallmentRepository.isOverdue(i),
         ).length;
 
         responseData.push({
@@ -792,13 +793,13 @@ export class CashController {
           status_text: this.getStatusText(plan.status),
           frequency_text: this.getFrequencyText(
             plan.frequency,
-            plan.customDays
+            plan.customDays,
           ),
           installment_amount: this.formatAmount(
             InstallmentPlanRepository.calculateInstallmentAmount(
               plan.totalAmount,
-              plan.totalInstallments
-            )
+              plan.totalInstallments,
+            ),
           ),
           progress: Math.round((paidCount / plan.totalInstallments) * 100),
           paid_count: paidCount,
@@ -832,7 +833,7 @@ export class CashController {
 
       logger.info(`获取分期付款列表成功，共 ${result.pagination.total} 条记录`);
       res.json(response);
-    }
+    },
   );
 
   // 更新分期付款状态
@@ -841,19 +842,19 @@ export class CashController {
       const { id } = req.params;
       const { status } = req.body;
 
-      const validStatuses = ["PENDING", "PAID", "OVERDUE", "CANCELLED"];
+      const validStatuses = ['PENDING', 'PAID', 'OVERDUE', 'CANCELLED'];
       if (!validStatuses.includes(status)) {
-        throw AppError.invalidInput("无效的分期状态");
+        throw AppError.invalidInput('无效的分期状态');
       }
 
       const installment = await InstallmentRepository.findByUid(Number(id));
 
       if (!installment) {
-        throw AppError.notFound("分期记录不存在");
+        throw AppError.notFound('分期记录不存在');
       }
 
       // 如果是支付，创建交易记录
-      if (status === "PAID" && installment.status !== "PAID") {
+      if (status === 'PAID' && installment.status !== 'PAID') {
         const plan = await InstallmentPlanRepository.findByUid(installment.planId);
         if (plan) {
           await CashBuilder.create()
@@ -877,48 +878,48 @@ export class CashController {
         Number(id),
         {
           status: status as InstallmentStatus,
-          paidDate: status === "PAID" ? new Date().toISOString().split('T')[0] : installment.paidDate,
+          paidDate: status === 'PAID' ? new Date().toISOString().split('T')[0] : installment.paidDate,
           paidAmount:
-            status === "PAID"
+            status === 'PAID'
               ? installment.installmentAmount
               : installment.paidAmount,
-        }
+        },
       );
 
       if (!updatedInstallment) {
-        throw AppError.other("更新分期付款状态失败");
+        throw AppError.other('更新分期付款状态失败');
       }
 
       // 刷新计划状态
       await InstallmentRepository.refreshPlanStatus(installment.planId);
 
       logger.info(
-        `更新分期付款状态成功，ID: ${installment.uid}, 状态: ${status}`
+        `更新分期付款状态成功，ID: ${installment.uid}, 状态: ${status}`,
       );
       res.json({
         success: true,
         data: InstallmentRepository.toResponse(updatedInstallment),
-        message: "分期付款状态更新成功",
+        message: '分期付款状态更新成功',
       });
-    }
+    },
   );
 
   // 私有辅助方法：获取状态文本
   private getStatusText(status: string): string {
     switch (status) {
       case InstallmentStatusValues.PENDING:
-        return "待支付";
+        return '待支付';
       case InstallmentStatusValues.PAID:
-        return "已支付";
+        return '已支付';
       case InstallmentStatusValues.OVERDUE:
-        return "已逾期";
+        return '已逾期';
       case InstallmentStatusValues.CANCELLED:
       case InstallmentPlanStatusValues.CANCELLED:
-        return "已取消";
+        return '已取消';
       case InstallmentPlanStatusValues.ACTIVE:
-        return "进行中";
+        return '进行中';
       case InstallmentPlanStatusValues.COMPLETED:
-        return "已完成";
+        return '已完成';
       default:
         return status;
     }
@@ -927,10 +928,10 @@ export class CashController {
   // 私有辅助方法：获取频率文本
   private getFrequencyText(
     frequency: PaymentFrequency | string,
-    customDays?: number | null
+    customDays?: number | null,
   ): string {
     const safeCustomDays =
-      typeof customDays === "number" &&
+      typeof customDays === 'number' &&
       Number.isFinite(customDays) &&
       customDays > 0
         ? customDays
@@ -938,15 +939,15 @@ export class CashController {
 
     switch (frequency) {
       case PaymentFrequencyValues.WEEKLY:
-        return "周付";
+        return '周付';
       case PaymentFrequencyValues.MONTHLY:
-        return "月付";
+        return '月付';
       case PaymentFrequencyValues.QUARTERLY:
-        return "季付";
+        return '季付';
       case PaymentFrequencyValues.CUSTOM:
-        return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
+        return safeCustomDays ? `${safeCustomDays}天一次` : '自定义';
       default:
-        return typeof frequency === "string" ? frequency : String(frequency);
+        return typeof frequency === 'string' ? frequency : String(frequency);
     }
   }
 }

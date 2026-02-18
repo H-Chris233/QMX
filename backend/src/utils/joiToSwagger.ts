@@ -24,7 +24,7 @@ export function joiToSwagger(joiSchema: Joi.Schema): {
  * @returns OpenAPI Schema 对象映射
  */
 export function convertSchemas(
-  schemas: Record<string, Joi.Schema>
+  schemas: Record<string, Joi.Schema>,
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {};
 
@@ -44,7 +44,7 @@ export function convertSchemas(
  */
 export function generateRequestBody(
   joiSchema: Joi.Schema,
-  description: string = '请求体'
+  description: string = '请求体',
 ): {
   description: string;
   required: boolean;
@@ -75,7 +75,7 @@ export function generateRequestBody(
  */
 export function generateResponse(
   joiSchema: Joi.Schema,
-  description: string = '成功响应'
+  description: string = '成功响应',
 ): {
   description: string;
   content: {

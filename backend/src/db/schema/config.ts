@@ -3,7 +3,7 @@ import {
   varchar,
   text,
   timestamp,
-  jsonb
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 // 系统配置表

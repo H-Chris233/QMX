@@ -1,19 +1,19 @@
-import Joi from "joi";
-import express from "express";
-import type { Router } from "express";
-import installmentController from "@/controllers/installmentController";
+import Joi from 'joi';
+import express from 'express';
+import type { Router } from 'express';
+import installmentController from '@/controllers/installmentController';
 import {
   validate,
   validateParams,
   validateQuery,
   commonValidations,
-} from "@/middleware/validation";
-import { apiRateLimitMiddleware } from "@/middleware/rateLimiter";
+} from '@/middleware/validation';
+import { apiRateLimitMiddleware } from '@/middleware/rateLimiter';
 import {
   InstallmentStatusValues,
   PaymentFrequencyValues,
   InstallmentPlanStatusValues,
-} from "@/types";
+} from '@/types';
 
 const router: Router = express.Router();
 
@@ -23,39 +23,39 @@ router.use(apiRateLimitMiddleware);
 // 验证规则
 const createInstallmentPlanSchema = Joi.object({
   student_id: Joi.number().integer().min(1).optional().allow(null).messages({
-    "number.min": "学员编号必须大于0",
+    'number.min': '学员编号必须大于0',
   }),
   total_amount: Joi.number().positive().required().messages({
-    "number.positive": "总金额必须大于0",
-    "any.required": "总金额不能为空",
+    'number.positive': '总金额必须大于0',
+    'any.required': '总金额不能为空',
   }),
-  note: Joi.string().max(1000).default("").messages({
-    "string.max": "备注长度不能超过1000字符",
+  note: Joi.string().max(1000).default('').messages({
+    'string.max': '备注长度不能超过1000字符',
   }),
   total_installments: Joi.number().integer().min(1).required().messages({
-    "number.min": "总期数至少为1",
-    "any.required": "总期数不能为空",
+    'number.min': '总期数至少为1',
+    'any.required': '总期数不能为空',
   }),
   frequency: Joi.string()
     .valid(...Object.values(PaymentFrequencyValues))
     .required()
     .messages({
-      "any.only": "无效的付款频率",
-      "any.required": "付款频率不能为空",
+      'any.only': '无效的付款频率',
+      'any.required': '付款频率不能为空',
     }),
   custom_days: Joi.number()
     .integer()
     .min(1)
-    .when("frequency", {
+    .when('frequency', {
       is: PaymentFrequencyValues.CUSTOM,
       then: Joi.required().messages({
-        "any.required": "自定义频率必须指定天数",
+        'any.required': '自定义频率必须指定天数',
       }),
       otherwise: Joi.optional(),
     }),
   start_date: Joi.date().iso().required().messages({
-    "date.format": "开始日期格式不正确",
-    "any.required": "开始日期不能为空",
+    'date.format': '开始日期格式不正确',
+    'any.required': '开始日期不能为空',
   }),
 });
 
@@ -64,11 +64,11 @@ const updateInstallmentStatusSchema = Joi.object({
     .valid(...Object.values(InstallmentStatusValues))
     .required()
     .messages({
-      "any.only": "无效的分期付款状态",
-      "any.required": "分期付款状态不能为空",
+      'any.only': '无效的分期付款状态',
+      'any.required': '分期付款状态不能为空',
     }),
   amount: Joi.number().positive().optional().messages({
-    "number.positive": "支付金额必须大于0",
+    'number.positive': '支付金额必须大于0',
   }),
 });
 
@@ -77,8 +77,8 @@ const updateStatusSimpleSchema = Joi.object({
     .valid(...Object.values(InstallmentStatusValues))
     .required()
     .messages({
-      "any.only": "无效的分期付款状态",
-      "any.required": "分期付款状态不能为空",
+      'any.only': '无效的分期付款状态',
+      'any.required': '分期付款状态不能为空',
     }),
 });
 
@@ -89,10 +89,10 @@ const upcomingInstallmentsSchema = Joi.object({
     .max(90)
     .default(7)
     .messages({
-      "number.base": "天数必须是数字",
-      "number.integer": "天数必须是整数",
-      "number.min": "天数至少为1",
-      "number.max": "天数不能超过90",
+      'number.base': '天数必须是数字',
+      'number.integer': '天数必须是整数',
+      'number.min': '天数至少为1',
+      'number.max': '天数不能超过90',
     }),
 });
 
@@ -100,8 +100,8 @@ const queryInstallmentSchema = Joi.object({
   page: commonValidations.page,
   limit: commonValidations.limit,
   sort_by: Joi.string()
-    .valid("created_at", "start_date", "total_amount", "status")
-    .default("created_at"),
+    .valid('created_at', 'start_date', 'total_amount', 'status')
+    .default('created_at'),
   sort_order: commonValidations.sortOrder,
   student_id: commonValidations.id.optional(),
   status: Joi.string()
@@ -110,21 +110,21 @@ const queryInstallmentSchema = Joi.object({
 });
 
 const updateInstallmentPlanSchema = Joi.object({
-  note: Joi.string().max(1000).optional().allow("").messages({
-    "string.max": "备注长度不能超过1000字符",
+  note: Joi.string().max(1000).optional().allow('').messages({
+    'string.max': '备注长度不能超过1000字符',
   }),
   status: Joi.string()
     .valid(...Object.values(InstallmentPlanStatusValues))
     .optional()
     .messages({
-      "any.only": "无效的分期计划状态",
+      'any.only': '无效的分期计划状态',
     }),
 });
 
 const recordPaymentSchema = Joi.object({
   installment_index: Joi.number().integer().min(1).optional(),
   paid_amount: Joi.number().positive().optional().messages({
-    "number.positive": "支付金额必须大于0",
+    'number.positive': '支付金额必须大于0',
   }),
   paid_date: Joi.date().iso().optional(),
 });
@@ -185,9 +185,9 @@ const recordPaymentSchema = Joi.object({
  * @access Public
  */
 router.get(
-  "/",
+  '/',
   validateQuery(queryInstallmentSchema),
-  installmentController.getAllInstallmentPlans
+  installmentController.getAllInstallmentPlans,
 );
 
 /**
@@ -220,7 +220,7 @@ router.get(
  * @desc 获取逾期分期列表
  * @access Public
  */
-router.get("/overdue", installmentController.getOverdueInstallments);
+router.get('/overdue', installmentController.getOverdueInstallments);
 
 /**
  * @openapi
@@ -262,9 +262,9 @@ router.get("/overdue", installmentController.getOverdueInstallments);
  * @access Public
  */
 router.get(
-  "/upcoming",
+  '/upcoming',
   validateQuery(upcomingInstallmentsSchema),
-  installmentController.getUpcomingInstallments
+  installmentController.getUpcomingInstallments,
 );
 
 /**
@@ -310,10 +310,10 @@ router.get(
  * @access Public
  */
 router.patch(
-  "/:id/status",
+  '/:id/status',
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(updateStatusSimpleSchema),
-  installmentController.updateInstallmentStatus
+  installmentController.updateInstallmentStatus,
 );
 
 /**
@@ -354,9 +354,9 @@ router.patch(
  * @access Public
  */
 router.get(
-  "/:id",
+  '/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
-  installmentController.getInstallmentPlanById
+  installmentController.getInstallmentPlanById,
 );
 
 /**
@@ -426,9 +426,9 @@ router.get(
  * @access Public
  */
 router.post(
-  "/",
+  '/',
   validate(createInstallmentPlanSchema),
-  installmentController.createInstallmentPlan
+  installmentController.createInstallmentPlan,
 );
 
 /**
@@ -477,10 +477,10 @@ router.post(
  * @access Public
  */
 router.put(
-  "/:id/payment",
+  '/:id/payment',
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(updateInstallmentStatusSchema),
-  installmentController.updateInstallmentPayment
+  installmentController.updateInstallmentPayment,
 );
 
 /**
@@ -527,10 +527,10 @@ router.put(
  * @access Public
  */
 router.put(
-  "/:id",
+  '/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(updateInstallmentPlanSchema),
-  installmentController.updateInstallmentPlan
+  installmentController.updateInstallmentPlan,
 );
 
 /**
@@ -581,10 +581,10 @@ router.put(
  * @access Public
  */
 router.post(
-  "/:id/payments",
+  '/:id/payments',
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(recordPaymentSchema),
-  installmentController.recordPayment
+  installmentController.recordPayment,
 );
 
 /**
@@ -618,9 +618,9 @@ router.post(
  * @access Public
  */
 router.post(
-  "/:id/next",
+  '/:id/next',
   validateParams(Joi.object({ id: commonValidations.id })),
-  installmentController.payNextInstallment
+  installmentController.payNextInstallment,
 );
 
 /**
@@ -652,9 +652,9 @@ router.post(
  * @access Public
  */
 router.post(
-  "/:id/cancel",
+  '/:id/cancel',
   validateParams(Joi.object({ id: commonValidations.id })),
-  installmentController.cancelInstallmentPlan
+  installmentController.cancelInstallmentPlan,
 );
 
 /**
@@ -695,9 +695,9 @@ router.post(
  * @access Public
  */
 router.delete(
-  "/:id",
+  '/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
-  installmentController.deleteInstallmentPlan
+  installmentController.deleteInstallmentPlan,
 );
 
 export default router;

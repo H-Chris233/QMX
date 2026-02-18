@@ -131,8 +131,8 @@ export class StatsService {
       .where(
         and(
           eq(installments.status, 'PENDING' as const),
-          sql`${installments.dueDate} < CURRENT_DATE`
-        )
+          sql`${installments.dueDate} < CURRENT_DATE`,
+        ),
       )
       .orderBy(asc(installments.dueDate));
 
@@ -247,11 +247,11 @@ export class StatsService {
     const planIds = plans.map((p) => p.uid);
     const studentInstallments = planIds.length
       ? await db
-          .select()
-          .from(installments)
-          .where(
-            inArray(installments.planId, planIds)
-          )
+        .select()
+        .from(installments)
+        .where(
+          inArray(installments.planId, planIds),
+        )
       : [];
 
     const totalInstallmentCents = Number(planTotalResult?.totalAmount || 0);
@@ -326,8 +326,8 @@ export class StatsService {
       .where(
         and(
           gte(cashTransactions.createdAt, dateRange.start),
-          lt(cashTransactions.createdAt, dateRange.end)
-        )
+          lt(cashTransactions.createdAt, dateRange.end),
+        ),
       );
 
     const incomeCents = Number(incomeExpenseResult?.incomeCents || 0);
@@ -346,8 +346,8 @@ export class StatsService {
           gte(cashTransactions.createdAt, dateRange.start),
           lt(cashTransactions.createdAt, dateRange.end),
           gt(cashTransactions.amount, 0),
-          isNotNull(cashTransactions.studentId)
-        )
+          isNotNull(cashTransactions.studentId),
+        ),
       )
       .groupBy(cashTransactions.studentId)
       .orderBy(desc(sum(cashTransactions.amount)))
@@ -383,23 +383,23 @@ export class StatsService {
       .where(
         and(
           gte(installmentPlans.createdAt, dateRange.start),
-          lt(installmentPlans.createdAt, dateRange.end)
-        )
+          lt(installmentPlans.createdAt, dateRange.end),
+        ),
       );
 
     const planIds2 = plans.map((p) => p.uid);
     const installments2 = planIds2.length
       ? await db
-          .select()
-          .from(installments)
-          .where(
-            inArray(installments.planId, planIds2)
-          )
+        .select()
+        .from(installments)
+        .where(
+          inArray(installments.planId, planIds2),
+        )
       : [];
 
     const totalInstallmentCents = plans.reduce(
       (sum, plan) => sum + Number(plan.totalAmount),
-      0
+      0,
     );
 
     let paidInstallmentCents = 0;
@@ -418,7 +418,7 @@ export class StatsService {
 
     const remainingInstallmentCents = Math.max(
       totalInstallmentCents - paidInstallmentCents,
-      0
+      0,
     );
 
     return {
@@ -476,13 +476,14 @@ export class StatsService {
         end.setDate(end.getDate() + 1);
         break;
 
-      case 'ThisWeek':
+      case 'ThisWeek': {
         start = new Date(now);
         const dayOfWeek = start.getDay();
         start.setDate(start.getDate() - dayOfWeek);
         end = new Date(start);
         end.setDate(end.getDate() + 7);
         break;
+      }
 
       case 'ThisYear':
         start = new Date(now.getFullYear(), 0, 1);

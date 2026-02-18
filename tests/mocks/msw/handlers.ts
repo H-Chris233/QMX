@@ -486,6 +486,22 @@ export const handlers = [
     );
   }),
 
+  /**
+   * 获取即将到期的会员
+   */
+  http.get(`${API_BASE_URL}/stats/membership-expiring`, ({ request }) => {
+    const url = new URL(request.url);
+    const _days = parseInt(url.searchParams.get('days') || '7');
+
+    return HttpResponse.json(
+      {
+        success: true,
+        data: [],
+      },
+      { status: 200 }
+    );
+  }),
+
   // ============================================================================
   // CSV 导出
   // ============================================================================

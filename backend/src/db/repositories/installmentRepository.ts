@@ -64,7 +64,7 @@ export class InstallmentPlanRepository {
   // 更新计划
   static async updateByUid(
     uid: number,
-    data: Partial<NewInstallmentPlan>
+    data: Partial<NewInstallmentPlan>,
   ): Promise<InstallmentPlan | null> {
     const [updated] = await db
       .update(installmentPlans)
@@ -197,10 +197,10 @@ export class InstallmentPlanRepository {
       sortBy === 'total_amount'
         ? installmentPlans.totalAmount
         : sortBy === 'student_id'
-        ? installmentPlans.studentId
-        : sortBy === 'created_at' || sortBy === 'startDate'
-        ? installmentPlans.createdAt
-        : installmentPlans.uid;
+          ? installmentPlans.studentId
+          : sortBy === 'created_at' || sortBy === 'startDate'
+            ? installmentPlans.createdAt
+            : installmentPlans.uid;
 
     return sortOrder === 'ASC' ? asc(column) : desc(column);
   }
@@ -209,7 +209,7 @@ export class InstallmentPlanRepository {
   static calculateInstallmentAmount(
     totalAmount: number,
     totalInstallments: number,
-    installmentNumber?: number
+    installmentNumber?: number,
   ): number {
     if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
       return 0;
@@ -297,7 +297,7 @@ export class InstallmentRepository {
   // 更新分期
   static async updateByUid(
     uid: number,
-    data: Partial<NewInstallment>
+    data: Partial<NewInstallment>,
   ): Promise<Installment | null> {
     const [updated] = await db
       .update(installments)
@@ -342,8 +342,8 @@ export class InstallmentRepository {
       .where(
         and(
           eq(installments.status, 'PENDING'),
-          lt(installments.dueDate, today)
-        )
+          lt(installments.dueDate, today),
+        ),
       )
       .orderBy(asc(installments.dueDate));
   }
@@ -365,8 +365,8 @@ export class InstallmentRepository {
       .where(
         and(
           eq(installments.studentId, studentId),
-          eq(installments.status, 'PENDING')
-        )
+          eq(installments.status, 'PENDING'),
+        ),
       )
       .orderBy(asc(installments.dueDate));
   }
@@ -445,8 +445,8 @@ export class InstallmentRepository {
       conditions.push(
         and(
           eq(installments.status, 'PENDING'),
-          lt(installments.dueDate, today)
-        )
+          lt(installments.dueDate, today),
+        ),
       );
     }
 
@@ -459,14 +459,14 @@ export class InstallmentRepository {
       sortBy === 'due_date'
         ? installments.dueDate
         : sortBy === 'amount' || sortBy === 'installment_amount'
-        ? installments.installmentAmount
-        : sortBy === 'plan_id'
-        ? installments.planId
-        : sortBy === 'student_id'
-        ? installments.studentId
-        : sortBy === 'created_at'
-        ? installments.createdAt
-        : installments.uid;
+          ? installments.installmentAmount
+          : sortBy === 'plan_id'
+            ? installments.planId
+            : sortBy === 'student_id'
+              ? installments.studentId
+              : sortBy === 'created_at'
+                ? installments.createdAt
+                : installments.uid;
 
     return sortOrder === 'ASC' ? asc(column) : desc(column);
   }
@@ -482,7 +482,7 @@ export class InstallmentRepository {
     }
 
     const allPaid = planInstallments.every(
-      (i) => i.status === 'PAID' || i.paidAmount >= i.installmentAmount
+      (i) => i.status === 'PAID' || i.paidAmount >= i.installmentAmount,
     );
     const allCancelled = planInstallments.every((i) => i.status === 'CANCELLED');
 

@@ -7,7 +7,7 @@ const app = express();
 const PORT = 3001;
 
 // 数据存储（内存中）
-let students: any[] = [
+const students: any[] = [
   {
     uid: 1,
     name: '张三',
@@ -44,7 +44,7 @@ let students: any[] = [
   },
 ];
 
-let transactions: any[] = [
+const transactions: any[] = [
   {
     uid: 1,
     student_id: 1,
@@ -114,7 +114,7 @@ app.get('/api/v1/students', (req, res) => {
   let filteredStudents = students;
   if (name_contains) {
     filteredStudents = students.filter(s => 
-      s.name.toLowerCase().includes(String(name_contains).toLowerCase())
+      s.name.toLowerCase().includes(String(name_contains).toLowerCase()),
     );
   }
 
@@ -143,7 +143,7 @@ app.get('/api/v1/students/search', (req, res) => {
   
   if (name_contains) {
     filteredStudents = filteredStudents.filter(s => 
-      s.name.toLowerCase().includes(String(name_contains).toLowerCase())
+      s.name.toLowerCase().includes(String(name_contains).toLowerCase()),
     );
   }
   
@@ -389,7 +389,7 @@ app.get('/api/v1/dashboard/stats', (req, res) => {
   const totalExpense = Math.abs(
     transactions
       .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + t.amount, 0),
   );
 
   let totalScore = 0;

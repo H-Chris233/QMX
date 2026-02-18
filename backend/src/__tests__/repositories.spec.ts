@@ -407,7 +407,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       expect(installment.uid).toBeGreaterThan(0);
@@ -423,7 +423,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const updated = await InstallmentRepository.updateByUid(installment.uid, {
@@ -444,7 +444,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const deleted = await InstallmentRepository.deleteByUid(installment.uid);
@@ -546,7 +546,7 @@ describe('InstallmentRepository', () => {
         4,
         250,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const response = InstallmentRepository.toResponse(installment);

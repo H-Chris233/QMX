@@ -78,7 +78,7 @@ const formatDateTime = (value: Date | string | null | undefined): string | null 
 
 const determineMembershipStatus = (
   membershipStartDate: Date | string | null,
-  membershipEndDate: Date | string | null
+  membershipEndDate: Date | string | null,
 ): MembershipStatus => {
   if (!membershipStartDate || !membershipEndDate) {
     return MembershipStatus.NONE;
@@ -98,7 +98,7 @@ const determineMembershipStatus = (
 };
 
 const getMembershipDaysRemaining = (
-  membershipEndDate: Date | string | null
+  membershipEndDate: Date | string | null,
 ): number | null => {
   if (!membershipEndDate) {
     return null;
@@ -116,7 +116,7 @@ const getMembershipDaysRemaining = (
 
 const hasMembership = (
   membershipStartDate: Date | string | null,
-  membershipEndDate: Date | string | null
+  membershipEndDate: Date | string | null,
 ): boolean => {
   const status = determineMembershipStatus(membershipStartDate, membershipEndDate);
   return status === MembershipStatus.ACTIVE;
@@ -140,10 +140,10 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
 
   const lessonLeft = json.lessonLeft ?? json.lesson_left ?? null;
   const membershipStartDate = formatDateOnly(
-    json.membershipStartDate ?? json.membership_start_date ?? student.membershipStartDate ?? null
+    json.membershipStartDate ?? json.membership_start_date ?? student.membershipStartDate ?? null,
   );
   const membershipEndDate = formatDateOnly(
-    json.membershipEndDate ?? json.membership_end_date ?? student.membershipEndDate ?? null
+    json.membershipEndDate ?? json.membership_end_date ?? student.membershipEndDate ?? null,
   );
   const membershipDaysRemaining = json.membershipDaysRemaining
     ?? json.membership_days_remaining

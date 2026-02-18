@@ -106,7 +106,7 @@ describe('StudentController - Helper Functions', () => {
     // 通过访问私有方法测试（通过jest.spyOn）
     it('handles valid numbers', () => {
       const parseNumber = (StudentController as any).parseNumber || ((v: unknown) => {
-        if (v === undefined || v === null || v === "") {
+        if (v === undefined || v === null || v === '') {
           return null;
         }
         const parsed = Number(v);
@@ -121,7 +121,7 @@ describe('StudentController - Helper Functions', () => {
 
     it('handles null/undefined/empty', () => {
       const parseNumber = (StudentController as any).parseNumber || ((v: unknown) => {
-        if (v === undefined || v === null || v === "") {
+        if (v === undefined || v === null || v === '') {
           return null;
         }
         const parsed = Number(v);
@@ -135,7 +135,7 @@ describe('StudentController - Helper Functions', () => {
 
     it('handles invalid values', () => {
       const parseNumber = (StudentController as any).parseNumber || ((v: unknown) => {
-        if (v === undefined || v === null || v === "") {
+        if (v === undefined || v === null || v === '') {
           return null;
         }
         const parsed = Number(v);
@@ -154,14 +154,14 @@ describe('StudentController - Helper Functions', () => {
         if (v === undefined || v === null) {
           return null;
         }
-        if (typeof v === "boolean") {
+        if (typeof v === 'boolean') {
           return v;
         }
         const stringified = String(v).toLowerCase();
-        if (["true", "1", "yes"].includes(stringified)) {
+        if (['true', '1', 'yes'].includes(stringified)) {
           return true;
         }
-        if (["false", "0", "no"].includes(stringified)) {
+        if (['false', '0', 'no'].includes(stringified)) {
           return false;
         }
         return null;
@@ -179,14 +179,14 @@ describe('StudentController - Helper Functions', () => {
         if (v === undefined || v === null) {
           return null;
         }
-        if (typeof v === "boolean") {
+        if (typeof v === 'boolean') {
           return v;
         }
         const stringified = String(v).toLowerCase();
-        if (["true", "1", "yes"].includes(stringified)) {
+        if (['true', '1', 'yes'].includes(stringified)) {
           return true;
         }
-        if (["false", "0", "no"].includes(stringified)) {
+        if (['false', '0', 'no'].includes(stringified)) {
           return false;
         }
         return null;
@@ -204,14 +204,14 @@ describe('StudentController - Helper Functions', () => {
         if (v === undefined || v === null) {
           return null;
         }
-        if (typeof v === "boolean") {
+        if (typeof v === 'boolean') {
           return v;
         }
         const stringified = String(v).toLowerCase();
-        if (["true", "1", "yes"].includes(stringified)) {
+        if (['true', '1', 'yes'].includes(stringified)) {
           return true;
         }
-        if (["false", "0", "no"].includes(stringified)) {
+        if (['false', '0', 'no'].includes(stringified)) {
           return false;
         }
         return null;

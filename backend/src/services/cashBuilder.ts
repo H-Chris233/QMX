@@ -49,14 +49,14 @@ export function normalizeNote(note: string | null | undefined): string | null {
  * 清理分期快照
  */
 export function sanitizeInstallmentSnapshot(
-  snapshot: Partial<InstallmentSnapshot> | null | undefined
+  snapshot: Partial<InstallmentSnapshot> | null | undefined,
 ): InstallmentSnapshot | null {
   if (!snapshot) return null;
 
   const due_date = snapshot.due_date
     ? (typeof snapshot.due_date === 'string'
-        ? snapshot.due_date
-        : (snapshot.due_date as any).toISOString().split('T')[0])
+      ? snapshot.due_date
+      : (snapshot.due_date as any).toISOString().split('T')[0])
     : null;
 
   return {
@@ -144,7 +144,7 @@ export class CashBuilder {
   static createInstallmentSnapshot(
     planUid: number,
     installmentUid?: number | null,
-    otherFields?: Partial<InstallmentSnapshot>
+    otherFields?: Partial<InstallmentSnapshot>,
   ): InstallmentSnapshot {
     return {
       plan_uid: planUid,
@@ -208,7 +208,7 @@ export class CashUpdater {
       throw new AppError(
         '金额必须为正数',
         ErrorType.InvalidInput,
-        { details: { field: 'amount', value } }
+        { details: { field: 'amount', value } },
       );
     }
     this.updates.amount = value;

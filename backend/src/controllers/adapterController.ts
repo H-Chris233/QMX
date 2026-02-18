@@ -50,14 +50,14 @@ export class AdapterController {
         has_membership: presentStudent(student).isMembershipActive,
         days_remaining: presentStudent(student).membershipDaysRemaining,
         created_at: student.createdAt,
-        updated_at: student.updatedAt
+        updated_at: student.updatedAt,
       })),
       pagination: {
         page: result.pagination.page,
         limit: result.pagination.limit,
         total: result.pagination.total,
-        total_pages: result.pagination.total_pages
-      }
+        total_pages: result.pagination.total_pages,
+      },
     };
 
     logger.info(`PostgreSQL查询学生列表成功，共${result.pagination.total}条记录`);
@@ -93,9 +93,9 @@ export class AdapterController {
         membership_start_date: student.membershipStartDate,
         membership_end_date: student.membershipEndDate,
         note: student.note,
-        created_at: student.createdAt
+        created_at: student.createdAt,
       },
-      message: '学生添加成功'
+      message: '学生添加成功',
     };
 
     logger.info(`PostgreSQL添加学生成功，UID: ${student.uid}, 姓名: ${name}`);
@@ -130,14 +130,14 @@ export class AdapterController {
         description: transaction.amount > 0 ? '收入' : '支出',
         installment: transaction.installmentSnapshot ?? undefined,
         created_at: transaction.createdAt?.toISOString(),
-        updated_at: transaction.updatedAt?.toISOString()
+        updated_at: transaction.updatedAt?.toISOString(),
       })),
       pagination: {
         page: result.pagination.page,
         limit: result.pagination.limit,
         total: result.pagination.total,
-        total_pages: result.pagination.total_pages
-      }
+        total_pages: result.pagination.total_pages,
+      },
     };
 
     logger.info(`PostgreSQL查询交易记录成功，共${result.pagination.total}条记录`);
@@ -158,10 +158,11 @@ export class AdapterController {
       case 'month':
         dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
-      case 'quarter':
+      case 'quarter': {
         const quarter = Math.floor(now.getMonth() / 3);
         dateFrom = new Date(now.getFullYear(), quarter * 3, 1);
         break;
+      }
       case 'year':
         dateFrom = new Date(now.getFullYear(), 0, 1);
         break;
@@ -171,7 +172,7 @@ export class AdapterController {
 
     const stats = await CashRepository.getFinancialStats(
       dateFrom.toISOString(),
-      now.toISOString()
+      now.toISOString(),
     );
 
     const response = {
@@ -185,8 +186,8 @@ export class AdapterController {
         is_profitable: stats.netIncome > 0,
         transaction_count: stats.transactionCount,
         date_from: dateFrom,
-        date_to: now
-      }
+        date_to: now,
+      },
     };
 
     res.json(response);
@@ -205,10 +206,10 @@ export class AdapterController {
           connection_status: 'connected',
           details: {
             server: 'PostgreSQL 15+',
-            orm: 'Drizzle ORM'
+            orm: 'Drizzle ORM',
           },
-          timestamp: new Date()
-        }
+          timestamp: new Date(),
+        },
       };
 
       res.json(response);
@@ -219,8 +220,8 @@ export class AdapterController {
           database_type: 'postgresql',
           connection_status: 'disconnected',
           error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date()
-        }
+          timestamp: new Date(),
+        },
       };
 
       res.status(503).json(response);

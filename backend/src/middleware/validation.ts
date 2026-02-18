@@ -40,7 +40,7 @@ const createAmountSchema = (options?: { required?: boolean; allowNull?: boolean;
     .messages({
       'number.base': '金额必须是数字',
       'number.precision': '金额最多保留两位小数',
-      'amount.precision': '金额最多保留两位小数'
+      'amount.precision': '金额最多保留两位小数',
     });
 
   if (disallowZero) {

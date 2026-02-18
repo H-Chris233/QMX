@@ -12,7 +12,7 @@
 export function normalizePositiveInteger(
   value: unknown,
   min = 1,
-  max = Number.MAX_SAFE_INTEGER
+  max = Number.MAX_SAFE_INTEGER,
 ): number {
   const num = Number(value);
   if (!Number.isFinite(num)) {

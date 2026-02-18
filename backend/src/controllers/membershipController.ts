@@ -389,7 +389,7 @@ export class MembershipController {
     // 总会员数（有会员日期的）
     const allStudents = await StudentRepository.findAll();
     const totalMembers = allStudents.filter(
-      s => s.membershipStartDate && s.membershipEndDate
+      s => s.membershipStartDate && s.membershipEndDate,
     ).length;
 
     // 活跃会员数

@@ -40,7 +40,7 @@ router.get('/status', async (_req, res) => {
   try {
     // 检查是否已设置密码
     const result = await db.query.systemConfigs.findFirst({
-      where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+      where: (configs, { eq }) => eq(configs.key, 'site_password_hash'),
     });
 
     res.json({
@@ -49,12 +49,12 @@ router.get('/status', async (_req, res) => {
         hasPassword: !!result,
         isFirstVisit: !result,
         adminConfigured: !!adminPasswordHash,
-      }
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: '获取密码状态失败'
+      error: '获取密码状态失败',
     });
   }
 });
@@ -120,20 +120,20 @@ router.post('/setup', async (req, res) => {
   if (!password || password.length < 4) {
     return res.status(400).json({
       success: false,
-      error: '密码长度至少4位'
+      error: '密码长度至少4位',
     });
   }
 
   try {
     // 检查是否已存在密码
     const existing = await db.query.systemConfigs.findFirst({
-      where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+      where: (configs, { eq }) => eq(configs.key, 'site_password_hash'),
     });
 
     if (existing) {
       return res.status(400).json({
         success: false,
-        error: '密码已设置，请使用登录接口'
+        error: '密码已设置，请使用登录接口',
       });
     }
 
@@ -155,13 +155,13 @@ router.post('/setup', async (req, res) => {
 
     res.json({
       success: true,
-      message: '密码设置成功'
+      message: '密码设置成功',
     });
   } catch (error) {
     logger.error('设置密码错误:', error);
     res.status(500).json({
       success: false,
-      error: '设置密码失败'
+      error: '设置密码失败',
     });
   }
 });
@@ -221,7 +221,7 @@ router.post('/verify', async (req, res) => {
   if (!password) {
     return res.status(400).json({
       success: false,
-      error: '请提供密码'
+      error: '请提供密码',
     });
   }
 
@@ -232,14 +232,14 @@ router.post('/verify', async (req, res) => {
       if (adminMatch) {
         return res.json({
           success: true,
-          data: { isAdmin: true }
+          data: { isAdmin: true },
         });
       }
     }
 
     // 验证数据库中存储的密码哈希
     const result = await db.query.systemConfigs.findFirst({
-      where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+      where: (configs, { eq }) => eq(configs.key, 'site_password_hash'),
     });
 
     if (result) {
@@ -249,20 +249,20 @@ router.post('/verify', async (req, res) => {
       if (match) {
         return res.json({
           success: true,
-          data: { isAdmin: false }
+          data: { isAdmin: false },
         });
       }
     }
 
     res.status(401).json({
       success: false,
-      error: '密码错误'
+      error: '密码错误',
     });
   } catch (error) {
     logger.error('验证密码错误:', error);
     res.status(500).json({
       success: false,
-      error: '验证失败'
+      error: '验证失败',
     });
   }
 });
@@ -324,7 +324,7 @@ router.post('/change', async (req, res) => {
   if (!oldPassword || !newPassword || newPassword.length < 4) {
     return res.status(400).json({
       success: false,
-      error: '参数无效，新密码长度至少4位'
+      error: '参数无效，新密码长度至少4位',
     });
   }
 
@@ -342,13 +342,13 @@ router.post('/change', async (req, res) => {
     // 验证旧密码（如果是普通用户）
     if (!isAdminUser) {
       const result = await db.query.systemConfigs.findFirst({
-        where: (configs, { eq }) => eq(configs.key, 'site_password_hash')
+        where: (configs, { eq }) => eq(configs.key, 'site_password_hash'),
       });
 
       if (!result) {
         return res.status(401).json({
           success: false,
-          error: '未设置密码'
+          error: '未设置密码',
         });
       }
 
@@ -358,7 +358,7 @@ router.post('/change', async (req, res) => {
       if (!match) {
         return res.status(401).json({
           success: false,
-          error: '原密码错误'
+          error: '原密码错误',
         });
       }
     }
@@ -380,19 +380,19 @@ router.post('/change', async (req, res) => {
         set: {
           value: newPasswordHash,
           updatedAt: new Date(),
-        }
+        },
       })
       .execute();
 
     res.json({
       success: true,
-      message: '密码更改成功'
+      message: '密码更改成功',
     });
   } catch (error) {
     logger.error('更改密码错误:', error);
     res.status(500).json({
       success: false,
-      error: '更改密码失败'
+      error: '更改密码失败',
     });
   }
 });

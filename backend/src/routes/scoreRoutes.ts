@@ -98,7 +98,7 @@ const batchAddScoresSchema = Joi.object({
 router.post('/:id/scores', 
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(addScoreSchema),
-  scoreController.addScore
+  scoreController.addScore,
 );
 
 /**
@@ -156,7 +156,7 @@ router.post('/:id/scores',
  */
 router.get('/:id/scores', 
   validateParams(Joi.object({ id: commonValidations.id })),
-  scoreController.getStudentScores
+  scoreController.getStudentScores,
 );
 
 /**
@@ -236,7 +236,7 @@ router.put('/:id/scores/:scoreIndex',
     }),
   })),
   validate(updateScoreSchema),
-  scoreController.updateStudentScore
+  scoreController.updateStudentScore,
 );
 
 /**
@@ -294,7 +294,7 @@ router.delete('/:id/scores/:scoreIndex',
       'any.required': '成绩索引不能为空',
     }),
   })),
-  scoreController.deleteStudentScore
+  scoreController.deleteStudentScore,
 );
 
 /**
@@ -366,7 +366,7 @@ router.delete('/:id/scores/:scoreIndex',
 router.post('/:id/scores/batch', 
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(batchAddScoresSchema),
-  scoreController.batchAddScores
+  scoreController.batchAddScores,
 );
 
 /**
@@ -410,7 +410,7 @@ router.post('/:id/scores/batch',
  */
 router.delete('/:id/scores', 
   validateParams(Joi.object({ id: commonValidations.id })),
-  scoreController.clearAllScores
+  scoreController.clearAllScores,
 );
 
 export default router;

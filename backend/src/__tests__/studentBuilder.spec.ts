@@ -61,7 +61,7 @@ describe('StudentBuilder', () => {
         StudentBuilder.create()
           .name('')
           .phone('13812345678')
-          .build()
+          .build(),
       ).rejects.toThrow(/学员姓名不能为空/);
     });
 
@@ -71,7 +71,7 @@ describe('StudentBuilder', () => {
         StudentBuilder.create()
           .name(longName)
           .phone('13812345678')
-          .build()
+          .build(),
       ).rejects.toThrow(/学员姓名长度不能超过50字符/);
     });
 
@@ -91,7 +91,7 @@ describe('StudentBuilder', () => {
         StudentBuilder.create()
           .name('Test Student')
           .phone('')
-          .build()
+          .build(),
       ).rejects.toThrow(/手机号不能为空/);
     });
 
@@ -100,7 +100,7 @@ describe('StudentBuilder', () => {
         StudentBuilder.create()
           .name('Test Student')
           .phone('1'.repeat(12))
-          .build()
+          .build(),
       ).rejects.toThrow(/手机号长度不能超过11字符/);
     });
 
@@ -109,14 +109,14 @@ describe('StudentBuilder', () => {
         StudentBuilder.create()
           .name('Test Student')
           .phone('123456') // 太短
-          .build()
+          .build(),
       ).rejects.toThrow(/手机号格式不正确/);
 
       await expect(
         StudentBuilder.create()
           .name('Test Student')
           .phone('138123456789') // 12位
-          .build()
+          .build(),
       ).rejects.toThrow(/手机号长度不能超过11字符/);
     });
 
@@ -147,7 +147,7 @@ describe('StudentBuilder', () => {
           .name('Test Student')
           .phone('13812345678')
           .age(-1)
-          .build()
+          .build(),
       ).rejects.toThrow(/年龄必须在0-120之间/);
     });
 
@@ -157,7 +157,7 @@ describe('StudentBuilder', () => {
           .name('Test Student')
           .phone('13812345678')
           .age(121)
-          .build()
+          .build(),
       ).rejects.toThrow(/年龄必须在0-120之间/);
     });
 
@@ -235,7 +235,7 @@ describe('StudentBuilder', () => {
           .name('Test Student')
           .phone('13812345678')
           .membership(start, end)
-          .build()
+          .build(),
       ).rejects.toThrow(/会员开始日期不能晚于结束日期/);
     });
 
@@ -273,7 +273,7 @@ describe('StudentBuilder', () => {
           .name('Test Student')
           .phone('13812345678')
           .lessonLeft(-1)
-          .build()
+          .build(),
       ).rejects.toThrow(/课时数不能为负数/);
     });
 

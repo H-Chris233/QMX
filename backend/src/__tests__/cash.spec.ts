@@ -85,7 +85,7 @@ describe('Cash Transaction Service', () => {
         CashBuilder.create()
           .amount(100)
           .studentId(99999)
-          .build()
+          .build(),
       ).rejects.toMatchObject({
         message: expect.stringContaining('学员不存在'),
       });
@@ -126,7 +126,7 @@ describe('Cash Transaction Service', () => {
   describe('Cash Transaction - Validation', () => {
     it('requires amount to be set', async () => {
       await expect(
-        CashBuilder.create().note('Test').build()
+        CashBuilder.create().note('Test').build(),
       ).rejects.toThrow();
     });
 

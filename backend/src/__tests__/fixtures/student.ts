@@ -30,7 +30,7 @@ export async function createTestStudent(
     rings?: number[];
     lessonLeft?: number;
     membership?: { startDate: Date; endDate: Date } | null;
-  } = {}
+  } = {},
 ) {
   const builder = StudentBuilder.create()
     .name(options.name || 'Test Student')
@@ -65,7 +65,7 @@ export async function createTestTransaction(
   options: {
     studentId?: number | null;
     note?: string;
-  } = {}
+  } = {},
 ) {
   const builder = CashBuilder.create().amount(amount);
 
@@ -92,7 +92,7 @@ export async function createTestInstallmentPlan(
     studentId?: number | null;
     customDays?: number;
     note?: string;
-  } = {}
+  } = {},
 ) {
   return await InstallmentPlanRepository.create({
     studentId: options.studentId ?? null,
@@ -116,7 +116,7 @@ export async function createTestInstallment(
   totalInstallments: number,
   amount: number,           // 单位：元
   dueDate: Date,
-  status: string = 'PENDING'
+  status: string = 'PENDING',
 ) {
   return await InstallmentRepository.create({
     planId,
@@ -178,7 +178,7 @@ export async function createCompleteTestDataset() {
     4,   // 期数
     PaymentFrequencyValues.MONTHLY,
     new Date(),
-    { studentId: activeStudent.uid }
+    { studentId: activeStudent.uid },
   );
 
   // 创建分期记录（一个有逾期的）
@@ -190,7 +190,7 @@ export async function createCompleteTestDataset() {
     4,
     200, // 每期金额（元）
     overdueDueDate,
-    'PENDING'
+    'PENDING',
   );
 
   await createTestInstallment(
@@ -200,7 +200,7 @@ export async function createCompleteTestDataset() {
     4,
     200,
     new Date(),
-    'PAID'
+    'PAID',
   );
 
   return { activeStudent, trialStudent, otherStudent, plan };

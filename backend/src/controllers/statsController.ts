@@ -1,15 +1,15 @@
-import { Request, Response } from "express";
-import { catchAsync } from "@/middleware/errorHandler";
-import logger from "@/utils/logger";
-import { StudentRepository } from "../db/repositories/studentRepository";
-import { CashRepository } from "../db/repositories/cashRepository";
+import { Request, Response } from 'express';
+import { catchAsync } from '@/middleware/errorHandler';
+import logger from '@/utils/logger';
+import { StudentRepository } from '../db/repositories/studentRepository';
+import { CashRepository } from '../db/repositories/cashRepository';
 import {
   InstallmentRepository,
   InstallmentPlanRepository,
-} from "../db/repositories/installmentRepository";
-import StatsService from "@/services/statsService";
-import { PaymentFrequency } from "@/types";
-import { withCache, CacheKeys, CacheTTL } from "@/utils/cacheHelper";
+} from '../db/repositories/installmentRepository';
+import StatsService from '@/services/statsService';
+import { PaymentFrequency } from '@/types';
+import { withCache, CacheKeys, CacheTTL } from '@/utils/cacheHelper';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -29,7 +29,7 @@ export class StatsController {
       const stats = await withCache(
         CacheKeys.DASHBOARD_STATS,
         () => StatsService.buildDashboardStats(),
-        CacheTTL.DASHBOARD_STATS
+        CacheTTL.DASHBOARD_STATS,
       );
 
       // 返回 snake_case 格式（前端统一使用）
@@ -63,9 +63,9 @@ export class StatsController {
         data: responseData,
       };
 
-      logger.info("获取仪表板统计数据成功");
+      logger.info('获取仪表板统计数据成功');
       res.json(response);
-    }
+    },
   );
 
   // 获取特定学员的统计信息
@@ -127,7 +127,7 @@ export class StatsController {
 
       logger.info(`获取学员统计信息成功，UID: ${stats.studentUid}`);
       res.json(response);
-    }
+    },
   );
 
   // 获取全局学员统计
@@ -140,7 +140,7 @@ export class StatsController {
       let scoreCount = 0;
       let maxScore = 0;
       const studentsWithScores = allStudents.filter(
-        (student) => student.rings && student.rings.length > 0
+        (student) => student.rings && student.rings.length > 0,
       );
 
       studentsWithScores.forEach((student) => {
@@ -156,7 +156,7 @@ export class StatsController {
 
       // 计算活跃课程数
       const activeCourses = allStudents.filter(
-        (student) => student.lessonLeft && student.lessonLeft > 0
+        (student) => student.lessonLeft && student.lessonLeft > 0,
       ).length;
 
       // 计算活跃会员数
@@ -166,7 +166,7 @@ export class StatsController {
           student.membershipStartDate &&
           student.membershipEndDate &&
           new Date(student.membershipStartDate) <= now &&
-          new Date(student.membershipEndDate) >= now
+          new Date(student.membershipEndDate) >= now,
       ).length;
 
       const responseData = {
@@ -184,7 +184,7 @@ export class StatsController {
       };
 
       res.json(response);
-    }
+    },
   );
 
   // 获取全局财务统计
@@ -199,7 +199,7 @@ export class StatsController {
       const totalExpense = Math.abs(
         transactions
           .filter((t) => t.amount < 0)
-          .reduce((sum, t) => sum + t.amount, 0)
+          .reduce((sum, t) => sum + t.amount, 0),
       );
 
       const netIncome = totalRevenue - totalExpense;
@@ -215,7 +215,7 @@ export class StatsController {
         totalInstallmentAmount += plan.totalAmount;
         const installments = await InstallmentRepository.findByPlanId(plan.uid);
         for (const installment of installments) {
-          if (installment.status === "PAID") {
+          if (installment.status === 'PAID') {
             paidInstallmentAmount +=
               installment.paidAmount || installment.installmentAmount;
           }
@@ -232,7 +232,7 @@ export class StatsController {
         installment_total: formatCurrency(totalInstallmentAmount),
         installment_paid: formatCurrency(paidInstallmentAmount),
         installment_pending: formatCurrency(
-          totalInstallmentAmount - paidInstallmentAmount
+          totalInstallmentAmount - paidInstallmentAmount,
         ),
         overdue_count: overdueInstallments.length,
       };
@@ -243,7 +243,7 @@ export class StatsController {
       };
 
       res.json(response);
-    }
+    },
   );
 
   // 获取即将到期的会员（带缓存）
@@ -259,15 +259,15 @@ export class StatsController {
         CacheKeys.MEMBERSHIP_ALERTS,
         () => StudentRepository.findExpiringMemberships(Number(days)),
         CacheTTL.MEMBERSHIP_ALERTS,
-        { days }
+        { days },
       );
 
       const responseData = expiringStudents.map((student) => {
         const daysRemaining = student.membershipEndDate
           ? Math.ceil(
-              (new Date(student.membershipEndDate).getTime() - new Date().getTime()) /
-                MS_PER_DAY
-            )
+            (new Date(student.membershipEndDate).getTime() - new Date().getTime()) /
+                MS_PER_DAY,
+          )
           : null;
 
         return {
@@ -280,7 +280,7 @@ export class StatsController {
           days_remaining: daysRemaining,
           is_membership_active: daysRemaining !== null && daysRemaining > 0,
           membership_status:
-            daysRemaining !== null && daysRemaining <= 7 ? "即将到期" : "正常",
+            daysRemaining !== null && daysRemaining <= 7 ? '即将到期' : '正常',
         };
       });
 
@@ -290,17 +290,17 @@ export class StatsController {
       };
 
       logger.info(
-        `获取即将到期会员成功，天数: ${days}, 数量: ${responseData.length}`
+        `获取即将到期会员成功，天数: ${days}, 数量: ${responseData.length}`,
       );
       res.json(response);
-    }
+    },
   );
 
   // 获取趋势分析数据
   public getTrendsData = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      type TrendPeriod = "week" | "month" | "quarter" | "year";
-      type TrendMetric = "revenue" | "expense" | "students" | "installments";
+      type TrendPeriod = 'week' | 'month' | 'quarter' | 'year';
+      type TrendMetric = 'revenue' | 'expense' | 'students' | 'installments';
 
       interface TrendTimePoint {
         label: string;
@@ -316,23 +316,23 @@ export class StatsController {
       }
 
       const normalizePeriod = (raw: unknown): TrendPeriod => {
-        const value = typeof raw === "string" ? raw.toLowerCase() : "month";
-        if (value === "week" || value === "quarter" || value === "year") {
+        const value = typeof raw === 'string' ? raw.toLowerCase() : 'month';
+        if (value === 'week' || value === 'quarter' || value === 'year') {
           return value;
         }
-        return "month";
+        return 'month';
       };
 
       const normalizeMetric = (raw: unknown): TrendMetric => {
-        const value = typeof raw === "string" ? raw.toLowerCase() : "revenue";
+        const value = typeof raw === 'string' ? raw.toLowerCase() : 'revenue';
         if (
-          value === "expense" ||
-          value === "students" ||
-          value === "installments"
+          value === 'expense' ||
+          value === 'students' ||
+          value === 'installments'
         ) {
           return value;
         }
-        return "revenue";
+        return 'revenue';
       };
 
       const startOfDay = (date: Date): Date => {
@@ -349,13 +349,13 @@ export class StatsController {
 
       const createTimePoints = (
         period: TrendPeriod,
-        referenceDate: Date
+        referenceDate: Date,
       ): TrendTimePoint[] => {
         const points: TrendTimePoint[] = [];
         const baseDate = startOfDay(referenceDate);
 
         switch (period) {
-          case "week": {
+          case 'week': {
             const iterations = 12;
             for (let offset = iterations - 1; offset >= 0; offset--) {
               const weekEnd = endOfDay(new Date(baseDate));
@@ -374,7 +374,7 @@ export class StatsController {
             }
             break;
           }
-          case "month": {
+          case 'month': {
             const iterations = 12;
             for (let offset = iterations - 1; offset >= 0; offset--) {
               const monthStart = startOfDay(new Date(baseDate));
@@ -383,7 +383,7 @@ export class StatsController {
               const monthEndSeed = new Date(
                 monthStart.getFullYear(),
                 monthStart.getMonth() + 1,
-                0
+                0,
               );
 
               points.push({
@@ -391,7 +391,7 @@ export class StatsController {
                   monthStart.getMonth() + 1
                 )
                   .toString()
-                  .padStart(2, "0")}`,
+                  .padStart(2, '0')}`,
                 rangeStart: monthStart,
                 rangeEnd: endOfDay(monthEndSeed),
                 referenceDate: new Date(monthStart),
@@ -399,7 +399,7 @@ export class StatsController {
             }
             break;
           }
-          case "quarter": {
+          case 'quarter': {
             const iterations = 8;
             const currentQuarter = Math.floor(baseDate.getMonth() / 3);
             for (let offset = iterations - 1; offset >= 0; offset--) {
@@ -408,12 +408,12 @@ export class StatsController {
               const normalizedQuarter = ((quarterIndex % 4) + 4) % 4;
               const year = baseDate.getFullYear() + yearOffset;
               const quarterStart = startOfDay(
-                new Date(year, normalizedQuarter * 3, 1)
+                new Date(year, normalizedQuarter * 3, 1),
               );
               const quarterEndSeed = new Date(
                 year,
                 normalizedQuarter * 3 + 3,
-                0
+                0,
               );
 
               points.push({
@@ -425,7 +425,7 @@ export class StatsController {
             }
             break;
           }
-          case "year": {
+          case 'year': {
             const iterations = 5;
             for (let offset = iterations - 1; offset >= 0; offset--) {
               const year = baseDate.getFullYear() - offset;
@@ -452,13 +452,13 @@ export class StatsController {
       const timePoints = createTimePoints(trendPeriod, now);
       const dataPoints: TrendDataPoint[] = [];
       const cashTransactionsForTrend =
-        trendMetric === "revenue" || trendMetric === "expense"
+        trendMetric === 'revenue' || trendMetric === 'expense'
           ? await CashRepository.findAll()
           : null;
       const studentsForTrend =
-        trendMetric === "students" ? await StudentRepository.findAll() : null;
+        trendMetric === 'students' ? await StudentRepository.findAll() : null;
       const installmentPlansForTrend =
-        trendMetric === "installments"
+        trendMetric === 'installments'
           ? await InstallmentPlanRepository.findAll()
           : null;
 
@@ -466,7 +466,7 @@ export class StatsController {
         let rawValue = 0;
 
         switch (trendMetric) {
-          case "revenue": {
+          case 'revenue': {
             rawValue = (cashTransactionsForTrend || []).reduce(
               (sum, transaction) => {
                 const createdAt = transaction.createdAt
@@ -481,11 +481,11 @@ export class StatsController {
                 }
                 return transaction.amount > 0 ? sum + transaction.amount : sum;
               },
-              0
+              0,
             );
             break;
           }
-          case "expense": {
+          case 'expense': {
             rawValue = (cashTransactionsForTrend || []).reduce(
               (sum, transaction) => {
                 const createdAt = transaction.createdAt
@@ -502,11 +502,11 @@ export class StatsController {
                   ? sum + Math.abs(transaction.amount)
                   : sum;
               },
-              0
+              0,
             );
             break;
           }
-          case "students": {
+          case 'students': {
             const count = (studentsForTrend || []).filter((student) => {
               const createdAt = student.createdAt ? new Date(student.createdAt) : new Date();
               return createdAt >= point.rangeStart && createdAt <= point.rangeEnd;
@@ -514,7 +514,7 @@ export class StatsController {
             rawValue = count;
             break;
           }
-          case "installments": {
+          case 'installments': {
             const count = (installmentPlansForTrend || []).filter((plan) => {
               const createdAt = plan.createdAt ? new Date(plan.createdAt) : new Date();
               return createdAt >= point.rangeStart && createdAt <= point.rangeEnd;
@@ -525,7 +525,7 @@ export class StatsController {
         }
 
         const isCurrencyMetric =
-          trendMetric === "revenue" || trendMetric === "expense";
+          trendMetric === 'revenue' || trendMetric === 'expense';
         const normalizedValue = isCurrencyMetric
           ? Number(rawValue.toFixed(2))
           : rawValue;
@@ -539,7 +539,7 @@ export class StatsController {
 
       const aggregate = (
         values: number[],
-        formatter: (value: number) => number
+        formatter: (value: number) => number,
       ): number => {
         if (values.length === 0) {
           return 0;
@@ -553,26 +553,26 @@ export class StatsController {
 
       const total = aggregate(
         dataPoints.map((point) => point.value),
-        metricsFormatter
+        metricsFormatter,
       );
       const average =
         dataPoints.length > 0
           ? metricsFormatter(
-              dataPoints.reduce((sum, point) => sum + point.value, 0) /
-                dataPoints.length
-            )
+            dataPoints.reduce((sum, point) => sum + point.value, 0) /
+                dataPoints.length,
+          )
           : 0;
       const max =
         dataPoints.length > 0
           ? metricsFormatter(
-              Math.max(...dataPoints.map((point) => point.value))
-            )
+            Math.max(...dataPoints.map((point) => point.value)),
+          )
           : 0;
       const min =
         dataPoints.length > 0
           ? metricsFormatter(
-              Math.min(...dataPoints.map((point) => point.value))
-            )
+            Math.min(...dataPoints.map((point) => point.value)),
+          )
           : 0;
 
       const response = {
@@ -589,10 +589,10 @@ export class StatsController {
       };
 
       logger.info(
-        `获取趋势分析数据成功，类型: ${trendMetric}, 周期: ${trendPeriod}`
+        `获取趋势分析数据成功，类型: ${trendMetric}, 周期: ${trendPeriod}`,
       );
       res.json(response);
-    }
+    },
   );
 
   // 获取课程分布统计
@@ -606,16 +606,16 @@ export class StatsController {
       const subjectDistribution = new Map<string, number>();
 
       allStudents.forEach((student) => {
-        const className = student.classType || "Others";
-        const subjectName = student.subject || "Others";
+        const className = student.classType || 'Others';
+        const subjectName = student.subject || 'Others';
 
         classDistribution.set(
           className,
-          (classDistribution.get(className) || 0) + 1
+          (classDistribution.get(className) || 0) + 1,
         );
         subjectDistribution.set(
           subjectName,
-          (subjectDistribution.get(subjectName) || 0) + 1
+          (subjectDistribution.get(subjectName) || 0) + 1,
         );
       });
 
@@ -627,26 +627,26 @@ export class StatsController {
               name,
               count,
               percentage: Number(
-                ((count / allStudents.length) * 100).toFixed(1)
+                ((count / allStudents.length) * 100).toFixed(1),
               ),
-            })
+            }),
           ),
           subject_distribution: Array.from(subjectDistribution.entries()).map(
             ([name, count]) => ({
               name,
               count,
               percentage: Number(
-                ((count / allStudents.length) * 100).toFixed(1)
+                ((count / allStudents.length) * 100).toFixed(1),
               ),
-            })
+            }),
           ),
           total_students: allStudents.length,
         },
       };
 
-      logger.info("获取课程分布统计成功");
+      logger.info('获取课程分布统计成功');
       res.json(response);
-    }
+    },
   );
 
   // 获取成绩分布统计
@@ -655,11 +655,11 @@ export class StatsController {
       const allStudents = await StudentRepository.findAll();
 
       const scoreRanges = [
-        { label: "0-4分", min: 0, max: 4, count: 0 },
-        { label: "4-6分", min: 4, max: 6, count: 0 },
-        { label: "6-8分", min: 6, max: 8, count: 0 },
-        { label: "8-9分", min: 8, max: 9, count: 0 },
-        { label: "9-10分", min: 9, max: 10, count: 0 },
+        { label: '0-4分', min: 0, max: 4, count: 0 },
+        { label: '4-6分', min: 4, max: 6, count: 0 },
+        { label: '6-8分', min: 6, max: 8, count: 0 },
+        { label: '8-9分', min: 8, max: 9, count: 0 },
+        { label: '9-10分', min: 9, max: 10, count: 0 },
       ];
 
       let totalScores = 0;
@@ -700,14 +700,14 @@ export class StatsController {
           average_score: Number(averageScore.toFixed(2)),
           total_scores: scoreCount,
           students_with_scores: allStudents.filter(
-            (s) => s.rings && s.rings.length > 0
+            (s) => s.rings && s.rings.length > 0,
           ).length,
         },
       };
 
-      logger.info("获取成绩分布统计成功");
+      logger.info('获取成绩分布统计成功');
       res.json(response);
-    }
+    },
   );
 
   // 获取逾期分期付款统计
@@ -737,28 +737,28 @@ export class StatsController {
             overdue_amount: overdueAmount,
             plan: plan
               ? {
-                  frequency: plan.frequency,
-                  frequency_text: this.getFrequencyText(
-                    plan.frequency,
-                    plan.customDays
-                  ),
-                  total_amount: plan.totalAmount / 100,
-                }
+                frequency: plan.frequency,
+                frequency_text: this.getFrequencyText(
+                  plan.frequency,
+                  plan.customDays,
+                ),
+                total_amount: plan.totalAmount / 100,
+              }
               : null,
             student: student
               ? {
-                  uid: student.uid,
-                  name: student.name,
-                  phone: student.phone,
-                }
+                uid: student.uid,
+                name: student.name,
+                phone: student.phone,
+              }
               : null,
           };
-        })
+        }),
       );
 
       const totalOverdueAmount = responseData.reduce(
         (sum, item) => sum + item.overdue_amount,
-        0
+        0,
       );
 
       const response = {
@@ -770,11 +770,11 @@ export class StatsController {
           average_days_overdue:
             responseData.length > 0
               ? Math.round(
-                  responseData.reduce(
-                    (sum, item) => sum + item.days_overdue,
-                    0
-                  ) / responseData.length
-                )
+                responseData.reduce(
+                  (sum, item) => sum + item.days_overdue,
+                  0,
+                ) / responseData.length,
+              )
               : 0,
         },
       };
@@ -782,19 +782,19 @@ export class StatsController {
       logger.info(
         `获取逾期分期付款统计成功，逾期数量: ${
           responseData.length
-        }, 逾期金额: ¥${totalOverdueAmount.toFixed(2)}`
+        }, 逾期金额: ¥${totalOverdueAmount.toFixed(2)}`,
       );
       res.json(response);
-    }
+    },
   );
 
   // 私有辅助方法：获取频率文本
   private getFrequencyText(
     frequency: PaymentFrequency | string,
-    customDays?: number | null
+    customDays?: number | null,
   ): string {
     const safeCustomDays =
-      typeof customDays === "number" &&
+      typeof customDays === 'number' &&
       Number.isFinite(customDays) &&
       customDays > 0
         ? customDays
@@ -802,15 +802,15 @@ export class StatsController {
 
     switch (frequency) {
       case 'WEEKLY':
-        return "周付";
+        return '周付';
       case 'MONTHLY':
-        return "月付";
+        return '月付';
       case 'QUARTERLY':
-        return "季付";
+        return '季付';
       case 'CUSTOM':
-        return safeCustomDays ? `${safeCustomDays}天一次` : "自定义";
+        return safeCustomDays ? `${safeCustomDays}天一次` : '自定义';
       default:
-        return typeof frequency === "string" ? frequency : String(frequency);
+        return typeof frequency === 'string' ? frequency : String(frequency);
     }
   }
 }

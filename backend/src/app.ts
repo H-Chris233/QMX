@@ -71,15 +71,15 @@ export const createApp = (appConfig: AppConfig = {}): Application => {
   const helmetOptions: HelmetOptions = {
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"],
+        defaultSrc: ['\'self\''],
+        styleSrc: ['\'self\'', '\'unsafe-inline\''],
+        scriptSrc: ['\'self\''],
+        imgSrc: ['\'self\'', 'data:', 'blob:'],
+        connectSrc: ['\'self\''],
+        fontSrc: ['\'self\''],
+        objectSrc: ['\'none\''],
+        mediaSrc: ['\'self\''],
+        frameSrc: ['\'none\''],
       },
     },
   };
@@ -166,13 +166,13 @@ export const createApp = (appConfig: AppConfig = {}): Application => {
         data: {
           database_type: 'postgresql',
           connection_status: success ? 'connected' : 'disconnected',
-          timestamp: new Date()
-        }
+          timestamp: new Date(),
+        },
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown database error'
+        error: error instanceof Error ? error.message : 'Unknown database error',
       });
     }
   });

@@ -173,7 +173,7 @@ router.get('/stats', membershipController.getMembershipStats);
  */
 router.post('/batch', 
   validate(batchSetMembershipSchema),
-  membershipController.batchSetMembership
+  membershipController.batchSetMembership,
 );
 
 /**
@@ -224,7 +224,7 @@ router.post('/batch',
 router.post('/students/:id/membership', 
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(setMembershipSchema),
-  membershipController.setStudentMembership
+  membershipController.setStudentMembership,
 );
 
 /**
@@ -258,7 +258,7 @@ router.post('/students/:id/membership',
  */
 router.delete('/students/:id/membership', 
   validateParams(Joi.object({ id: commonValidations.id })),
-  membershipController.clearStudentMembership
+  membershipController.clearStudentMembership,
 );
 
 /**
@@ -312,7 +312,7 @@ router.delete('/students/:id/membership',
 router.post('/students/:id/membership/type', 
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(setMembershipByTypeSchema),
-  membershipController.setMembershipByType
+  membershipController.setMembershipByType,
 );
 
 /**
@@ -366,7 +366,7 @@ router.post('/students/:id/membership/type',
 router.post('/students/:id/membership/renew', 
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(renewMembershipSchema),
-  membershipController.renewMembership
+  membershipController.renewMembership,
 );
 
 export default router;

@@ -163,7 +163,7 @@ app.use((req, res) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`🚀 QMX后端服务启动成功！`);
+  console.log('🚀 QMX后端服务启动成功！');
   console.log(`📍 服务地址: http://localhost:${PORT}`);
   console.log(`🔗 健康检查: http://localhost:${PORT}/health`);
   console.log(`📚 API文档: http://localhost:${PORT}/api/v1`);

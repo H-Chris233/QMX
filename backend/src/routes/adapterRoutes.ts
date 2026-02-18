@@ -35,19 +35,19 @@ router.get('/info', (_req: Request, res: Response, _next: NextFunction): void =>
       endpoints: {
         students: {
           get: 'GET /adapter/students',
-          post: 'POST /adapter/students'
+          post: 'POST /adapter/students',
         },
         transactions: {
-          get: 'GET /adapter/transactions'
+          get: 'GET /adapter/transactions',
         },
         stats: {
-          get: 'GET /adapter/financial-stats'
+          get: 'GET /adapter/financial-stats',
         },
         health: {
-          get: 'GET /adapter/health'
-        }
-      }
-    }
+          get: 'GET /adapter/health',
+        },
+      },
+    },
   });
 });
 

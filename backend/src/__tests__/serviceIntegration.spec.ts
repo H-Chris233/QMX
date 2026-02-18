@@ -47,7 +47,7 @@ describe('Service Integration - 复杂业务场景', () => {
         .subject(SubjectType.SHOOTING)
         .membership(
           new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          new Date(Date.now() + 23 * 24 * 60 * 60 * 1000)
+          new Date(Date.now() + 23 * 24 * 60 * 60 * 1000),
         )
         .build();
 
@@ -97,7 +97,7 @@ describe('Service Integration - 复杂业务场景', () => {
 
       expect(updated.membershipEndDate).not.toEqual(originalEnd);
       expect(new Date(updated.membershipEndDate!).getTime()).toBeGreaterThan(
-        new Date(originalEnd!).getTime()
+        new Date(originalEnd!).getTime(),
       );
 
       // 展示验证
@@ -117,7 +117,7 @@ describe('Service Integration - 复杂业务场景', () => {
       // 多次更新
       for (let i = 0; i < 5; i++) {
         const updater = StudentUpdater.fromDocument(
-          await StudentRepository.findByUid(student.uid)!
+          await StudentRepository.findByUid(student.uid)!,
         );
         updater.addRing(8 + i * 0.1);
         await updater.commit();
@@ -177,7 +177,7 @@ describe('Service Integration - 复杂业务场景', () => {
         3,    // 期数
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        student.uid
+        student.uid,
       );
 
       expect(plan.status).toBe('ACTIVE');
@@ -190,7 +190,7 @@ describe('Service Integration - 复杂业务场景', () => {
         3,
         400, // 每期金额
         new Date(),
-        InstallmentStatusValues.PAID
+        InstallmentStatusValues.PAID,
       );
 
       const inst2 = await createTestInstallment(
@@ -200,7 +200,7 @@ describe('Service Integration - 复杂业务场景', () => {
         3,
         400,
         addMonths(new Date(), 1),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       // 3. 查询分期
@@ -222,7 +222,7 @@ describe('Service Integration - 复杂业务场景', () => {
         4,
         PaymentFrequencyValues.MONTHLY,
         addMonths(new Date(), -1), // 一个月前开始
-        student.uid
+        student.uid,
       );
 
       // 创建已逾期分期（应还日期在10天前）
@@ -233,7 +233,7 @@ describe('Service Integration - 复杂业务场景', () => {
         4,
         200,
         new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       // 查找逾期分期
@@ -241,7 +241,7 @@ describe('Service Integration - 复杂业务场景', () => {
       expect(overdue.length).toBeGreaterThan(0);
 
       const overdueWithStatus = overdue.find((i) =>
-        InstallmentRepository.isOverdue(i)
+        InstallmentRepository.isOverdue(i),
       );
       expect(overdueWithStatus).toBeDefined();
     });

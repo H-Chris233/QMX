@@ -9,7 +9,7 @@ import {
   date,
   timestamp,
   unique,
-  check
+  check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { students } from './students';
@@ -19,7 +19,7 @@ import { cashTransactions } from './cash';
 export const installmentPlans = pgTable('installment_plans', {
   uid: serial('uid').primaryKey(),
   studentId: integer('student_id').notNull().references(() => students.uid, {
-    onDelete: 'restrict'
+    onDelete: 'restrict',
   }),
   totalAmount: bigint('total_amount', { mode: 'number' }).notNull(),
   downPayment: bigint('down_payment', { mode: 'number' }).default(0),
@@ -42,13 +42,13 @@ export const installmentPlans = pgTable('installment_plans', {
 export const installments = pgTable('installments', {
   uid: serial('uid').primaryKey(),
   planId: integer('plan_id').notNull().references(() => installmentPlans.uid, {
-    onDelete: 'cascade'
+    onDelete: 'cascade',
   }),
   studentId: integer('student_id').notNull().references(() => students.uid, {
-    onDelete: 'restrict'
+    onDelete: 'restrict',
   }),
   cashUid: integer('cash_uid').references(() => cashTransactions.uid, {
-    onDelete: 'set null'
+    onDelete: 'set null',
   }),
   installmentNumber: smallint('installment_number').notNull(),
   installmentAmount: bigint('installment_amount', { mode: 'number' }).notNull(),

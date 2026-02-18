@@ -89,7 +89,7 @@ export async function resetAllSequences(): Promise<void> {
  * 注意：手机号必须符合正则 /^1[3-9]\d{9}$/（11位，以1开头，第二位3-9）
  */
 export async function createTestStudent(
-  overrides: TestStudentOverrides = {}
+  overrides: TestStudentOverrides = {},
 ) {
   // 生成符合格式的测试手机号：11位标准手机号
   const generatePhone = (): string => {
@@ -132,7 +132,7 @@ export async function createTestStudent(
  */
 export async function createTestStudents(
   count: number,
-  baseName: string = 'Student'
+  baseName: string = 'Student',
 ): Promise<Awaited<ReturnType<typeof createTestStudent>>[]> {
   const students: Awaited<ReturnType<typeof createTestStudent>>[] = [];
   for (let i = 0; i < count; i++) {
@@ -152,7 +152,7 @@ export async function createTestStudents(
 export async function createTestCashTransaction(
   amount: number,
   studentId?: number | null,
-  note?: string
+  note?: string,
 ) {
   const builder = CashBuilder.create().amount(amount);
 
@@ -173,7 +173,7 @@ export async function createTestCashTransaction(
 export async function createTestCashTransactions(
   amount: number,
   count: number,
-  studentId?: number | null
+  studentId?: number | null,
 ): Promise<Awaited<ReturnType<typeof createTestCashTransaction>>[]> {
   const transactions: Awaited<ReturnType<typeof createTestCashTransaction>>[] = [];
   for (let i = 0; i < count; i++) {
@@ -191,7 +191,7 @@ export async function createTestInstallmentPlan(
   frequency: keyof typeof PaymentFrequencyValues,
   startDate: Date,
   studentId?: number | null,
-  customDays?: number
+  customDays?: number,
 ) {
   const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
 
@@ -227,7 +227,7 @@ export async function createTestInstallment(
   totalInstallments: number,
   amount: number,
   dueDate: Date,
-  status: keyof typeof InstallmentStatusValues = 'PENDING'
+  status: keyof typeof InstallmentStatusValues = 'PENDING',
 ) {
   const { InstallmentRepository } = await import('@/db/repositories/installmentRepository');
 
@@ -264,14 +264,14 @@ export async function createCompleteInstallmentPlan(
   totalInstallments: number,
   frequency: keyof typeof PaymentFrequencyValues,
   startDate: Date,
-  studentId?: number | null
+  studentId?: number | null,
 ) {
   const plan = await createTestInstallmentPlan(
     totalAmount,
     totalInstallments,
     frequency,
     startDate,
-    studentId
+    studentId,
   );
 
   const installmentAmount = totalAmount / totalInstallments;
@@ -287,11 +287,12 @@ export async function createCompleteInstallmentPlan(
       case 'MONTHLY':
         dueDate.setMonth(dueDate.getMonth() + i);
         break;
-      case 'CUSTOM':
+      case 'CUSTOM': {
         // Use customDays from plan if available, default to 15
         const customDays = 15;
         dueDate.setDate(dueDate.getDate() + i * customDays);
         break;
+      }
     }
     
     installments.push(await createTestInstallment(
@@ -301,7 +302,7 @@ export async function createCompleteInstallmentPlan(
       totalInstallments,
       installmentAmount,
       dueDate,
-      'PENDING'
+      'PENDING',
     ));
   }
 
@@ -426,7 +427,7 @@ export async function createCompleteTestDataset(): Promise<CompleteTestDataset> 
     4, // 4 installments
     'MONTHLY',
     addDays(new Date(), -30),
-    activeStudent.uid
+    activeStudent.uid,
   );
 
   const installments: Awaited<ReturnType<typeof createTestInstallment>>[] = [];
@@ -444,7 +445,7 @@ export async function createCompleteTestDataset(): Promise<CompleteTestDataset> 
       4,
       200,
       dueDate,
-      status
+      status,
     ));
   }
 

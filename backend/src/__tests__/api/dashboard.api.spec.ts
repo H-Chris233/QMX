@@ -8,7 +8,7 @@ import {
   resetAllSequences,
   createTestApp, 
   TestDataFactory, 
-  dateUtils 
+  dateUtils, 
 } from '../setupBackend';
 
 jest.setTimeout(30000);
@@ -63,7 +63,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        { studentId: activeStudent.uid }
+        { studentId: activeStudent.uid },
       );
 
       const overdueDueDate = dateUtils.addDays(new Date(), -10);
@@ -74,7 +74,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         300,
         overdueDueDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       await TestDataFactory.createInstallment(
@@ -84,7 +84,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         300,
         new Date(),
-        InstallmentStatusValues.PAID
+        InstallmentStatusValues.PAID,
       );
     });
 
@@ -150,7 +150,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        { studentId: student.uid }
+        { studentId: student.uid },
       );
 
       await TestDataFactory.createInstallment(
@@ -160,7 +160,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         4,
         300,
         new Date(),
-        InstallmentStatusValues.PAID
+        InstallmentStatusValues.PAID,
       );
 
       const response = await request(app)
@@ -220,7 +220,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        { studentId: student1.uid }
+        { studentId: student1.uid },
       );
 
       await TestDataFactory.createInstallment(
@@ -230,7 +230,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         3,
         400,
         new Date(),
-        InstallmentStatusValues.PAID
+        InstallmentStatusValues.PAID,
       );
 
       await TestDataFactory.createInstallment(
@@ -240,7 +240,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
         3,
         400,
         dateUtils.addDays(new Date(), 30),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
     });
 

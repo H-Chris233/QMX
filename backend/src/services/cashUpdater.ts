@@ -69,7 +69,7 @@ export class CashUpdater {
           ? dueDate
           : (dueDate as any) instanceof Date
             ? (dueDate as Date).toISOString().split('T')[0]
-            : null
+            : null,
       };
     } else {
       this.pendingInstallment = sanitized;

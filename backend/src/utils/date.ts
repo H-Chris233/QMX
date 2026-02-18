@@ -89,9 +89,9 @@ export function addMonths(date: Date | string, months: number): Date {
   const result = new Date(d);
 
   // 获取原始日期和月份信息
-  const originalDay = result.getUTCDate();
+  const _originalDay = result.getUTCDate();
   const originalMonth = result.getUTCMonth();
-  const originalYear = result.getUTCFullYear();
+  const _originalYear = result.getUTCFullYear();
 
   // 设置目标月份
   result.setUTCMonth(originalMonth + months);
@@ -121,7 +121,7 @@ export function addYears(date: Date | string, years: number): Date {
 
   // 获取原始日期信息
   const originalDay = result.getUTCDate();
-  const originalMonth = result.getUTCMonth();
+  const _originalMonth = result.getUTCMonth();
 
   // 设置目标年份
   const targetYear = result.getUTCFullYear() + years;
@@ -147,7 +147,7 @@ export function addYears(date: Date | string, years: number): Date {
 export function isDateInRange(
   date: Date | string,
   start: Date | string,
-  end: Date | string
+  end: Date | string,
 ): boolean {
   const d = toUTCDate(date);
   const s = toUTCDate(start);

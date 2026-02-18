@@ -220,7 +220,7 @@ router.get('/global-financial-stats', statsController.getGlobalFinancialStats);
  */
 router.get('/membership-expiring',
   validateQuery(membershipExpiringSchema),
-  statsController.getMembershipExpiringSoon
+  statsController.getMembershipExpiringSoon,
 );
 
 /**
@@ -314,7 +314,7 @@ router.get('/membership-expiring',
  */
 router.get('/students/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
-  statsController.getStudentStats
+  statsController.getStudentStats,
 );
 
 /**
@@ -324,7 +324,7 @@ router.get('/students/:id',
  */
 router.get('/student/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
-  statsController.getStudentStats
+  statsController.getStudentStats,
 );
 
 // 趋势分析验证规则
@@ -416,7 +416,7 @@ const trendsSchema = Joi.object({
  */
 router.get('/trends',
   validateQuery(trendsSchema),
-  statsController.getTrendsData
+  statsController.getTrendsData,
 );
 
 /**

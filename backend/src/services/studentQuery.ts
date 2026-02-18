@@ -166,7 +166,7 @@ export class StudentQuery {
 
   sort(sortField?: string, order: 'ASC' | 'DESC' = 'DESC'): this {
     const key = Object.keys(SORT_FIELD_MAP).find(
-      (k) => k === sortField
+      (k) => k === sortField,
     ) as SortFieldKey | undefined;
     this.sortField = key ? SORT_FIELD_MAP[key] : SORT_FIELD_MAP.created_at;
     this.sortOrder = order === 'ASC' ? 1 : -1;
@@ -213,15 +213,15 @@ export class StudentQuery {
       conditions.push(
         and(
           isNotNull(students.membershipStartDate),
-          isNotNull(students.membershipEndDate)
-        ) as SQL<unknown>
+          isNotNull(students.membershipEndDate),
+        ) as SQL<unknown>,
       );
     } else if (this.membershipFilter === 'withoutMembership') {
       conditions.push(
         or(
           isNull(students.membershipStartDate),
-          isNull(students.membershipEndDate)
-        ) as SQL<unknown>
+          isNull(students.membershipEndDate),
+        ) as SQL<unknown>,
       );
     }
 
@@ -229,15 +229,15 @@ export class StudentQuery {
       const today = sql`CURRENT_DATE`;
       if (this.membershipStatusFilter === 'ACTIVE') {
         conditions.push(
-          sql`(${students.membershipStartDate} <= ${today} AND ${students.membershipEndDate} >= ${today})` as SQL<unknown>
+          sql`(${students.membershipStartDate} <= ${today} AND ${students.membershipEndDate} >= ${today})` as SQL<unknown>,
         );
       } else if (this.membershipStatusFilter === 'EXPIRED') {
         conditions.push(
-          sql`${students.membershipEndDate} < ${today}` as SQL<unknown>
+          sql`${students.membershipEndDate} < ${today}` as SQL<unknown>,
         );
       } else if (this.membershipStatusFilter === 'UPCOMING') {
         conditions.push(
-          sql`${students.membershipStartDate} > ${today}` as SQL<unknown>
+          sql`${students.membershipStartDate} > ${today}` as SQL<unknown>,
         );
       }
     }
@@ -245,7 +245,7 @@ export class StudentQuery {
     if (this.membershipActiveDate) {
       const activeAt = this.membershipActiveDate.toISOString().split('T')[0];
       conditions.push(
-        sql`(${students.membershipStartDate} <= ${activeAt} AND ${students.membershipEndDate} >= ${activeAt})` as SQL<unknown>
+        sql`(${students.membershipStartDate} <= ${activeAt} AND ${students.membershipEndDate} >= ${activeAt})` as SQL<unknown>,
       );
     }
 

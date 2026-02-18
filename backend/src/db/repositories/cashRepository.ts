@@ -57,7 +57,7 @@ export class CashRepository {
   // 更新交易
   static async updateByUid(
     uid: number,
-    data: Partial<NewCashTransaction>
+    data: Partial<NewCashTransaction>,
   ): Promise<CashTransaction | null> {
     const [updated] = await db
       .update(cashTransactions)
@@ -153,7 +153,7 @@ export class CashRepository {
         // 使用 COALESCE 处理 NULL 值，用 amount 正负区分收入和支出
         totalIncome: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END), 0)::numeric`,
         totalExpense: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ABS(${cashTransactions.amount}) ELSE 0 END), 0)::numeric`,
-        transactionCount: sql<number>`COUNT(*)::int`
+        transactionCount: sql<number>`COUNT(*)::int`,
       })
       .from(cashTransactions)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
@@ -173,7 +173,7 @@ export class CashRepository {
   static async getStudentIncomeRanking(
     limit: number = 10,
     dateFrom?: string,
-    dateTo?: string
+    dateTo?: string,
   ) {
     const conditions = [gt(cashTransactions.amount, 0)];
 
@@ -255,10 +255,10 @@ export class CashRepository {
       sortBy === 'amount' || sortBy === 'cash'
         ? cashTransactions.amount
         : sortBy === 'student_id'
-        ? cashTransactions.studentId
-        : sortBy === 'created_at' || sortBy === 'date'
-        ? cashTransactions.createdAt
-        : cashTransactions.uid;
+          ? cashTransactions.studentId
+          : sortBy === 'created_at' || sortBy === 'date'
+            ? cashTransactions.createdAt
+            : cashTransactions.uid;
 
     return sortOrder === 'ASC' ? asc(column) : desc(column);
   }

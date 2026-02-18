@@ -6,7 +6,7 @@ import {
   text,
   jsonb,
   timestamp,
-  check
+  check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { students } from './students';
@@ -26,7 +26,7 @@ export interface InstallmentSnapshot {
 export const cashTransactions = pgTable('cash_transactions', {
   uid: serial('uid').primaryKey(),
   studentId: integer('student_id').references(() => students.uid, {
-    onDelete: 'set null'
+    onDelete: 'set null',
   }),
   amount: bigint('amount', { mode: 'number' }).notNull(),
   note: text('note'),

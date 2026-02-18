@@ -148,8 +148,8 @@ export class StudentRepository {
           isNotNull(students.membershipStartDate),
           isNotNull(students.membershipEndDate),
           gte(students.membershipEndDate, now.toISOString().split('T')[0]),
-          lte(students.membershipEndDate, futureDate.toISOString().split('T')[0])
-        )
+          lte(students.membershipEndDate, futureDate.toISOString().split('T')[0]),
+        ),
       )
       .orderBy(asc(students.membershipEndDate));
   }
@@ -182,15 +182,15 @@ export class StudentRepository {
       conditions.push(
         and(
           isNotNull(students.membershipStartDate),
-          isNotNull(students.membershipEndDate)
-        )
+          isNotNull(students.membershipEndDate),
+        ),
       );
     } else if (options.hasMembership === false) {
       conditions.push(
         or(
           isNull(students.membershipStartDate),
-          isNull(students.membershipEndDate)
-        )
+          isNull(students.membershipEndDate),
+        ),
       );
     }
 
@@ -202,8 +202,8 @@ export class StudentRepository {
           isNotNull(students.membershipStartDate),
           isNotNull(students.membershipEndDate),
           lte(students.membershipStartDate, activeAtDate),
-          gte(students.membershipEndDate, activeAtDate)
-        )
+          gte(students.membershipEndDate, activeAtDate),
+        ),
       );
     }
 
@@ -214,8 +214,8 @@ export class StudentRepository {
   private static buildOrderBy(sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
     const column = sortBy === 'name' ? students.name
       : sortBy === 'age' ? students.age
-      : sortBy === 'created_at' || sortBy === 'createdAt' ? students.createdAt
-      : students.uid;
+        : sortBy === 'created_at' || sortBy === 'createdAt' ? students.createdAt
+          : students.uid;
 
     return sortOrder === 'ASC' ? asc(column) : desc(column);
   }

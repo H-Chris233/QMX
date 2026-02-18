@@ -40,7 +40,7 @@ const createRateLimiter = (points: number, duration: number) => {
 // 创建速率限制器中间件
 export const rateLimitMiddleware = createRateLimiter(
   config.rateLimit.maxRequests,
-  config.rateLimit.windowMs / 1000 // 转换为秒
+  config.rateLimit.windowMs / 1000, // 转换为秒
 );
 
 // API特定速率限制（更严格）

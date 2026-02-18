@@ -80,7 +80,7 @@ describe('CashBuilder', () => {
         CashBuilder.create()
           .amount(100)
           .studentId(99999)
-          .build()
+          .build(),
       ).rejects.toMatchObject({
         message: expect.stringContaining('学员不存在'),
       });
@@ -180,7 +180,7 @@ describe('CashBuilder', () => {
           total_installments: 12,
           status: 'PENDING',
           note: 'Test installment',
-        }
+        },
       );
 
       expect(snapshot.plan_uid).toBe(1);

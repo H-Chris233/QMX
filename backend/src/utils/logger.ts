@@ -8,7 +8,7 @@ const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.json(),
-  winston.format.prettyPrint()
+  winston.format.prettyPrint(),
 );
 
 // 控制台输出格式
@@ -17,7 +17,7 @@ const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.printf(({ timestamp, level, message, stack }) => {
     return `${timestamp} [${level}]: ${stack || message}`;
-  })
+  }),
 );
 
 // 创建日志传输器
@@ -34,7 +34,7 @@ if (useStdout) {
   transports.push(
     new winston.transports.Console({
       format: consoleFormat,
-    })
+    }),
   );
 } else {
   // 否则使用文件输出（开发环境）
@@ -43,12 +43,12 @@ if (useStdout) {
   if (!fs.existsSync(logDir)) {
     try {
       fs.mkdirSync(logDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // 如果创建失败，回退到标准输出
       transports.push(
         new winston.transports.Console({
           format: consoleFormat,
-        })
+        }),
       );
     }
   }
@@ -61,7 +61,7 @@ if (useStdout) {
         level: 'error',
         maxsize: 5242880, // 5MB
         maxFiles: 5,
-      })
+      }),
     );
 
     // 所有日志文件
@@ -70,7 +70,7 @@ if (useStdout) {
         filename: config.logging.file,
         maxsize: 5242880, // 5MB
         maxFiles: 5,
-      })
+      }),
     );
   }
 }
@@ -95,7 +95,7 @@ if (config.server.nodeEnv === 'production' && !useStdout) {
   logger.exceptions.handle(
     new winston.transports.File({
       filename: config.logging.file.replace('.log', '-exceptions.log'),
-    })
+    }),
   );
 }
 

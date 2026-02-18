@@ -582,7 +582,7 @@ describe('Rate Limiter Middleware', () => {
       const result = await rateLimitMiddleware(
         mockRequest as Request,
         mockResponse as Response,
-        mockNext
+        mockNext,
       );
 
       expect(mockNext).toHaveBeenCalled();
@@ -592,7 +592,7 @@ describe('Rate Limiter Middleware', () => {
       await apiRateLimitMiddleware(
         mockRequest as Request,
         mockResponse as Response,
-        mockNext
+        mockNext,
       );
 
       expect(mockNext).toHaveBeenCalled();

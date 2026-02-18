@@ -26,7 +26,7 @@ const startServer = async (): Promise<void> => {
 
     // 启动HTTP服务器
     server = app.listen(config.server.port, () => {
-      logger.info(`🚀 QMX后端服务启动成功`);
+      logger.info('🚀 QMX后端服务启动成功');
       logger.info(`📍 环境: ${config.server.nodeEnv}`);
       logger.info(`🌐 端口: ${config.server.port}`);
       logger.info(`🔗 健康检查: http://localhost:${config.server.port}/health`);

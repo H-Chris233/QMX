@@ -8,7 +8,7 @@ import {
   date,
   timestamp,
   real,
-  check
+  check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -38,7 +38,7 @@ export const students = pgTable('students', {
   validClassType: check('valid_class_type', sql`${table.classType} IN ('TEN_TRY', 'MONTH', 'YEAR', 'OTHERS')`),
   validSubject: check('valid_subject', sql`${table.subject} IN ('SHOOTING', 'ARCHERY', 'OTHERS')`),
   validMembershipDates: check('valid_membership_dates',
-    sql`(${table.membershipEndDate} IS NULL OR ${table.membershipStartDate} IS NULL OR ${table.membershipEndDate} >= ${table.membershipStartDate})`
+    sql`(${table.membershipEndDate} IS NULL OR ${table.membershipStartDate} IS NULL OR ${table.membershipEndDate} >= ${table.membershipStartDate})`,
   ),
 }));
 

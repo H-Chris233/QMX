@@ -118,7 +118,6 @@ export const config: Config = {
 export function validateConfig(): void {
   // 检查PostgreSQL连接必需的环境变量
   if (!config.postgresql.database_url) {
-    throw new Error('DATABASE_URL is required for QMX to work. Setting examples:');
     console.error('');
     console.error('  # PostgreSQL (recommended):');
     console.error('  DATABASE_URL=postgresql://username:password@localhost:5432/qmx');
@@ -129,6 +128,7 @@ export function validateConfig(): void {
     console.error('  # Docker Compose PostgreSQL:');
     console.error('  DATABASE_URL=postgresql://qmx:qmx_password@postgres:5432/qmx');
     console.error('');
+    throw new Error('DATABASE_URL is required for QMX to work.');
   }
 
   if (config.server.nodeEnv === 'production' && config.security.jwtSecret === 'your-super-secret-jwt-key-change-this-in-production') {

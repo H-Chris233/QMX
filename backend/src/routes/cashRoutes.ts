@@ -257,7 +257,7 @@ router.get('/search', validateQuery(searchCashSchema), cashController.searchCash
  */
 router.get('/:id', 
   validateParams(Joi.object({ id: commonValidations.id })),
-  cashController.getTransactionById
+  cashController.getTransactionById,
 );
 
 /**
@@ -315,7 +315,7 @@ router.get('/:id',
  */
 router.post('/',
   validate(addCashTransactionSchema),
-  cashController.addCashTransaction
+  cashController.addCashTransaction,
 );
 
 /**
@@ -398,7 +398,7 @@ router.post('/',
  */
 router.post('/installment',
   validate(addInstallmentTransactionSchema),
-  cashController.addInstallmentTransaction
+  cashController.addInstallmentTransaction,
 );
 
 /**
@@ -460,7 +460,7 @@ router.post('/installment',
 router.put('/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
   validate(updateTransactionSchema),
-  cashController.updateTransaction
+  cashController.updateTransaction,
 );
 
 /**
@@ -504,7 +504,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   validateParams(Joi.object({ id: commonValidations.id })),
-  cashController.deleteCashTransaction
+  cashController.deleteCashTransaction,
 );
 
 export default router;

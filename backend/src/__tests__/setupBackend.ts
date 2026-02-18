@@ -185,7 +185,7 @@ export class TestDataFactory {
     totalInstallments: number,
     frequency: any,
     startDate: Date,
-    overrides: any = {}
+    overrides: any = {},
   ) {
     const { InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
     const normalizedOverrides = overrides ?? {};
@@ -223,7 +223,7 @@ export class TestDataFactory {
     totalInstallments: number,
     amount: number,
     dueDate: Date,
-    status: any
+    status: any,
   ) {
     const { InstallmentRepository, InstallmentPlanRepository } = await import('@/db/repositories/installmentRepository');
 

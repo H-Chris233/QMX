@@ -75,7 +75,7 @@ type ConfirmType = 'primary' | 'danger' | 'warning';
 interface Props {
   show?: boolean;
   title?: string;
-  message: string;
+  message?: string;
   details?: string;
   closeOnOverlayClick?: boolean;
   confirmText?: string;
@@ -91,6 +91,7 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   show: false,
   title: '确认操作',
+  message: '',
   details: undefined,
   closeOnOverlayClick: true,
   confirmText: '确定',

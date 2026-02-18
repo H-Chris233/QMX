@@ -34,7 +34,7 @@ export async function withCache<T>(
   cacheKey: string,
   fetchFn: () => Promise<T>,
   ttl: number = 300,
-  params?: Record<string, any>
+  params?: Record<string, any>,
 ): Promise<T> {
   // 构建完整缓存键
   const fullKey = params

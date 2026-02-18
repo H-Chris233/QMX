@@ -37,7 +37,7 @@ describe('Installment Service', () => {
         4,
         'MONTHLY',
         startDate,
-        student.uid
+        student.uid,
       );
 
       expect(plan.uid).toBeGreaterThan(0);
@@ -56,7 +56,7 @@ describe('Installment Service', () => {
         8,
         PaymentFrequencyValues.WEEKLY,
         startDate,
-        student.uid
+        student.uid,
       );
 
       expect(plan.totalAmount).toBe(50000);
@@ -73,7 +73,7 @@ describe('Installment Service', () => {
         PaymentFrequencyValues.CUSTOM,
         startDate,
         null,
-        15
+        15,
       );
 
       expect(plan.frequency).toBe(PaymentFrequencyValues.CUSTOM);
@@ -86,12 +86,12 @@ describe('Installment Service', () => {
         4,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
 
       const installmentAmount = InstallmentPlanRepository.calculateInstallmentAmount(
         plan.totalAmount,
-        plan.totalInstallments
+        plan.totalInstallments,
       );
       expect(installmentAmount).toBe(25000);
     });
@@ -106,7 +106,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         startDate,
-        student.uid
+        student.uid,
       );
 
       const installment1 = await createTestInstallment(
@@ -116,7 +116,7 @@ describe('Installment Service', () => {
         3,
         400,
         startDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const installment2 = await createTestInstallment(
@@ -126,7 +126,7 @@ describe('Installment Service', () => {
         3,
         400,
         addMonths(startDate, 1),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const installment3 = await createTestInstallment(
@@ -136,7 +136,7 @@ describe('Installment Service', () => {
         3,
         400,
         addMonths(startDate, 2),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       expect(installment1.planId).toBe(plan.uid);
@@ -154,7 +154,7 @@ describe('Installment Service', () => {
         2,
         PaymentFrequencyValues.MONTHLY,
         startDate,
-        null
+        null,
       );
 
       await createTestInstallment(
@@ -164,7 +164,7 @@ describe('Installment Service', () => {
         2,
         300,
         startDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
       await createTestInstallment(
         plan.uid,
@@ -173,7 +173,7 @@ describe('Installment Service', () => {
         2,
         300,
         addMonths(startDate, 1),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const installments = await InstallmentRepository.findByPlanId(plan.uid);
@@ -191,7 +191,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const overdueDueDate = addDays(new Date(), -10);
       const installment = await createTestInstallment(
@@ -201,7 +201,7 @@ describe('Installment Service', () => {
         3,
         100,
         overdueDueDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       expect(InstallmentRepository.isOverdue(installment)).toBe(true);
@@ -214,7 +214,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const futureDueDate = addDays(new Date(), 10);
       const installment = await createTestInstallment(
@@ -224,7 +224,7 @@ describe('Installment Service', () => {
         3,
         100,
         futureDueDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       expect(InstallmentRepository.isOverdue(installment)).toBe(false);
@@ -237,7 +237,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const overdueDueDate = addDays(new Date(), -10);
       const installment = await createTestInstallment(
@@ -247,7 +247,7 @@ describe('Installment Service', () => {
         3,
         100,
         overdueDueDate,
-        InstallmentStatusValues.PAID
+        InstallmentStatusValues.PAID,
       );
 
       expect(InstallmentRepository.isOverdue(installment)).toBe(false);
@@ -259,7 +259,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const today = new Date();
       const pastDate = addDays(today, -5);
@@ -272,7 +272,7 @@ describe('Installment Service', () => {
         3,
         100,
         pastDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
       await createTestInstallment(
         plan.uid,
@@ -281,7 +281,7 @@ describe('Installment Service', () => {
         3,
         100,
         pastDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
       await createTestInstallment(
         plan.uid,
@@ -290,7 +290,7 @@ describe('Installment Service', () => {
         3,
         100,
         futureDate,
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const overdue = await InstallmentRepository.findOverdue();
@@ -309,7 +309,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const installment = await createTestInstallment(
         plan.uid,
@@ -318,7 +318,7 @@ describe('Installment Service', () => {
         3,
         100,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const updatedInstallment = await InstallmentRepository.updateByUid(installment.uid, {
@@ -340,7 +340,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const installment = await createTestInstallment(
         plan.uid,
@@ -349,7 +349,7 @@ describe('Installment Service', () => {
         3,
         100,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       await InstallmentRepository.updateByUid(installment.uid, {
@@ -369,7 +369,7 @@ describe('Installment Service', () => {
         2,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
 
       expect(plan.status).toBe(InstallmentPlanStatusValues.ACTIVE);
@@ -387,7 +387,7 @@ describe('Installment Service', () => {
         2,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
 
       const updated = await InstallmentPlanRepository.updateByUid(plan.uid, {
@@ -405,7 +405,7 @@ describe('Installment Service', () => {
         2,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
 
       const deleted = await InstallmentPlanRepository.deleteByUid(plan.uid);
@@ -428,7 +428,7 @@ describe('Installment Service', () => {
         3,
         PaymentFrequencyValues.MONTHLY,
         new Date(),
-        null
+        null,
       );
       const installment = await createTestInstallment(
         plan.uid,
@@ -437,7 +437,7 @@ describe('Installment Service', () => {
         3,
         100,
         new Date(),
-        InstallmentStatusValues.PENDING
+        InstallmentStatusValues.PENDING,
       );
 
       const deleted = await InstallmentRepository.deleteByUid(installment.uid);
@@ -458,7 +458,7 @@ describe('Installment Service', () => {
           3,
           PaymentFrequencyValues.MONTHLY,
           new Date(),
-          student.uid
+          student.uid,
         );
       }
 

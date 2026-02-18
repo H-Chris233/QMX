@@ -39,7 +39,7 @@ export function daysFromNow(days: number): Date {
  */
 export function createMembershipPeriod(
   daysBeforeStart: number = 5,
-  daysUntilEnd: number = 25
+  daysUntilEnd: number = 25,
 ): { startDate: Date; endDate: Date } {
   const now = new Date();
   const startDate = addDays(now, -daysBeforeStart);

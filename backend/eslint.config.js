@@ -13,26 +13,46 @@ export default [
         sourceType: 'module',
         project: './tsconfig.json',
       },
+      globals: {
+        // Node.js globals
+        process: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        Buffer: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearTimeout: 'readonly',
+        clearInterval: 'readonly',
+        setImmediate: 'readonly',
+        URL: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
     },
     rules: {
-      // TypeScript规则
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // Disable base rules that conflict with TypeScript
+      'no-unused-vars': 'off',
+      'no-undef': 'off', // TypeScript handles this via compiler
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
-      // 通用规则
-      'no-console': 'off', // Node.js项目允许console
+      // General rules
+      'no-console': 'off',
       'no-debugger': 'error',
       'prefer-const': 'warn',
       'no-var': 'error',
 
-      // 代码风格
-      'indent': ['warn', 2],
+      // Code style
+      'indent': ['warn', 2, { SwitchCase: 1 }],
       'quotes': ['warn', 'single'],
       'semi': ['warn', 'always'],
       'comma-dangle': ['warn', 'always-multiline'],
@@ -43,6 +63,7 @@ export default [
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {

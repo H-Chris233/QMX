@@ -69,7 +69,7 @@ const normalizeErrorType = (raw?: string | ErrorType | null): ErrorType | undefi
 };
 
 const parseLegacyMessage = (
-  message?: string
+  message?: string,
 ): { type?: ErrorType; message: string } => {
   if (!message) {
     return { message: '' };
@@ -161,7 +161,7 @@ export interface AppErrorFallbackOptions {
 }
 
 const extractExistingErrorShape = (
-  input: unknown
+  input: unknown,
 ): Partial<{ type: ErrorType; message: string; statusCode?: number; code?: string; details?: unknown }> => {
   if (!input || typeof input !== 'object') {
     return {};

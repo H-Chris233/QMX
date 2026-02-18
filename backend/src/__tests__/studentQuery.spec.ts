@@ -189,7 +189,7 @@ describe('StudentQuery', () => {
         .subject(SubjectType.SHOOTING)
         .membership(
           new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
-          new Date(now.getTime() + 25 * 24 * 60 * 60 * 1000)
+          new Date(now.getTime() + 25 * 24 * 60 * 60 * 1000),
         )
         .build();
 
@@ -202,7 +202,7 @@ describe('StudentQuery', () => {
         .subject(SubjectType.SHOOTING)
         .membership(
           new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
-          expiredEnd
+          expiredEnd,
         )
         .build();
 
