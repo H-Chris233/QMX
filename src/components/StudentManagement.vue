@@ -133,7 +133,7 @@
           <div class="info-row info-item">
             <BookOpen :size="14" class="info-icon" />
             <span class="info-label">课程</span>
-            <span class="info-val">{{ student.class }}</span>
+            <span class="info-val">{{ getClassTypeName(student.class) }}</span>
           </div>
           <div class="info-row info-item" v-if="student.is_membership_active">
             <Clock :size="14" class="info-icon" />
@@ -142,9 +142,9 @@
               剩余 {{ student.membership_days_remaining }} 天
             </span>
           </div>
-          <div class="info-row info-item">
+          <div class="info-row info-item" v-if="hasMembershipRange(student)">
             <Calendar :size="14" class="info-icon" />
-            <span class="info-label">会员</span>
+            <span class="info-label">会员期限</span>
             <span class="info-val">{{ getMembershipRangeText(student) }}</span>
           </div>
         </div>
@@ -369,7 +369,9 @@ const getMembershipRangeText = (student: Student) => {
     return `${start} 至 ${end}`;
   }
 
-  return '无会员';
+  if (start) return `${start} 起`;
+  if (end) return `截至 ${end}`;
+  return '';
 };
 
 const exportStudents = async (): Promise<void> => {
@@ -380,7 +382,7 @@ const exportStudents = async (): Promise<void> => {
       const end = formatDate(s.membership_end_date);
       const status = s.is_membership_active ? '激活' : '未激活';
       return [
-        s.uid, `"${s.name}"`, s.age || '', `"${s.phone}"`, `"${s.class}"`,
+        s.uid, `"${s.name}"`, s.age || '', `"${s.phone}"`, `"${getClassTypeName(s.class)}"`,
         `"${getSubjectName(s.subject)}"`, s.lesson_left || '',
         `"${start}"`, `"${end}"`, `"${status}"`, `"${s.note || ''}"`
       ].join(',');
@@ -407,6 +409,13 @@ const getSubjectName = (subject: string) => {
   const map: Record<string, string> = { 'Shooting': '射击', 'Archery': '射箭', 'Others': '其他' };
   return map[subject] || subject;
 };
+
+const getClassTypeName = (classType: string) => {
+  const map: Record<string, string> = { TenTry: '体验课', Month: '月卡', Year: '年卡', Others: '其他' };
+  return map[classType] || classType;
+};
+
+const hasMembershipRange = (student: Student) => Boolean(student.membership_start_date || student.membership_end_date);
 
 const getMembershipStatusClass = (s: Student) => {
   if (s.is_membership_active) return 'badge-active';

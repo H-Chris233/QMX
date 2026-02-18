@@ -108,6 +108,7 @@ describe('StudentManagement', () => {
       expect(card.text()).toContain('张三');
       expect(card.text()).toContain('13800138000');
       expect(card.text()).toContain('射击'); // 科目翻译
+      expect(card.text()).toContain('月卡'); // 课程翻译
     });
 
     it('应该显示分页信息', async () => {
@@ -726,7 +727,9 @@ describe('StudentManagement', () => {
 
       const cards = wrapper.findAll('.student-card');
       expect(cards[0].text()).toContain('至');
-      expect(cards[1].text()).toContain('无会员');
+      expect(cards[0].text()).toContain('会员期限');
+      expect(cards[1].text()).toContain('非会员');
+      expect(cards[1].text()).not.toContain('会员期限');
     });
 
     it('应该正确处理缺失字段', async () => {
@@ -768,6 +771,21 @@ describe('StudentManagement', () => {
       expect(wrapper.vm.getSubjectName('Archery')).toBe('射箭');
       expect(wrapper.vm.getSubjectName('Others')).toBe('其他');
       expect(wrapper.vm.getSubjectName('Unknown')).toBe('Unknown');
+    });
+
+    it('应该正确翻译课程类型名称', async () => {
+      vi.spyOn(ApiService, 'getAllStudents').mockResolvedValue(
+        createMockResponse([], 1, 20, 0)
+      );
+
+      mountComponent();
+      await nextTick();
+
+      expect(wrapper.vm.getClassTypeName('TenTry')).toBe('体验课');
+      expect(wrapper.vm.getClassTypeName('Month')).toBe('月卡');
+      expect(wrapper.vm.getClassTypeName('Year')).toBe('年卡');
+      expect(wrapper.vm.getClassTypeName('Others')).toBe('其他');
+      expect(wrapper.vm.getClassTypeName('Unknown')).toBe('Unknown');
     });
 
     it('应该正确格式化日期', async () => {
