@@ -202,8 +202,8 @@
         </div>
       </div>
 
-      <!-- C. 全局列表 (未选学员时显示最近的记录 - 可选) -->
-      <div v-if="!selectedStudentData && filteredGrades.length > 0" class="global-list-section">
+      <!-- C. 最近更新的成绩 -->
+      <div class="global-list-section">
         <div class="section-title">
           <Clock :size="18" />
           <span>最近更新的成绩</span>
@@ -235,6 +235,9 @@
                     <button @click="deleteGrade(grade.id)" class="action-btn danger"><Trash2 :size="14" /></button>
                   </div>
                 </td>
+              </tr>
+              <tr v-if="filteredGrades.length === 0">
+                <td colspan="6" class="text-muted">暂无最近更新的成绩</td>
               </tr>
             </tbody>
           </table>
