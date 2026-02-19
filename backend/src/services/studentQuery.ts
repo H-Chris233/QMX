@@ -187,10 +187,20 @@ export class StudentQuery {
    * 构建查询条件
    */
   private buildConditions() {
-    const conditions: ReturnType<typeof eq | typeof gte | typeof lte | typeof like | typeof isNull | typeof isNotNull>[] = [];
+    const conditions: SQL<unknown>[] = [];
 
     if (this.nameFilter) {
-      conditions.push(like(students.name, `%${this.nameFilter}%`));
+      const keyword = this.nameFilter.trim();
+      if (keyword) {
+        const keywordConditions: SQL<unknown>[] = [
+          like(students.name, `%${keyword}%`) as SQL<unknown>,
+          like(students.phone, `%${keyword}%`) as SQL<unknown>,
+        ];
+        if (/^\d+$/.test(keyword)) {
+          keywordConditions.push(eq(students.uid, Number(keyword)) as SQL<unknown>);
+        }
+        conditions.push(or(...keywordConditions) as SQL<unknown>);
+      }
     }
 
     if (this.ageFilter.min !== undefined) {

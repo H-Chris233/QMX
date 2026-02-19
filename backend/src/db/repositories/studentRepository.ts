@@ -161,7 +161,17 @@ export class StudentRepository {
     const conditions = [];
 
     if (options.nameContains) {
-      conditions.push(like(students.name, `%${options.nameContains}%`));
+      const keyword = String(options.nameContains).trim();
+      if (keyword) {
+        const keywordConditions = [
+          like(students.name, `%${keyword}%`),
+          like(students.phone, `%${keyword}%`),
+        ];
+        if (/^\d+$/.test(keyword)) {
+          keywordConditions.push(eq(students.uid, Number(keyword)));
+        }
+        conditions.push(or(...keywordConditions));
+      }
     }
 
     if (options.minAge !== undefined) {
