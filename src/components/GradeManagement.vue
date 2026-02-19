@@ -85,50 +85,65 @@
         <!-- 左侧：概览与图表 -->
         <div class="dashboard-left">
           <!-- 核心指标卡片 -->
-          <div class="stats-row">
-            <div class="stat-card">
-              <div class="stat-label">平均成绩</div>
-              <div class="stat-value">{{ averageScoreApi.toFixed(1) }}</div>
-              <div class="stat-trend neutral">
-                <Activity :size="14" />
-                <span>综合表现</span>
+          <div class="stats-sections">
+            <div
+              v-for="panel in statsPanels"
+              :key="`stats-${panel.key}`"
+              class="stats-section"
+            >
+              <div v-if="isSplitBySubject" class="stats-section-head">
+                {{ panel.title }}
               </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">最高纪录</div>
-              <div class="stat-value highlight">{{ maxScoreApi.toFixed(1) }}</div>
-              <div class="stat-trend positive">
-                <Trophy :size="14" />
-                <span>个人最佳</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">训练场次</div>
-              <div class="stat-value">{{ selectedStudentData.rings.length }}</div>
-              <div class="stat-trend">
-                <Hash :size="14" />
-                <span>总记录数</span>
+              <div class="stats-row">
+                <div class="stat-card">
+                  <div class="stat-label">平均成绩</div>
+                  <div class="stat-value">{{ panel.average.toFixed(1) }}</div>
+                  <div class="stat-trend neutral">
+                    <Activity :size="14" />
+                    <span>综合表现</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">最高纪录</div>
+                  <div class="stat-value highlight">{{ panel.max.toFixed(1) }}</div>
+                  <div class="stat-trend positive">
+                    <Trophy :size="14" />
+                    <span>个人最佳</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">训练场次</div>
+                  <div class="stat-value">{{ panel.count }}</div>
+                  <div class="stat-trend">
+                    <Hash :size="14" />
+                    <span>总记录数</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- 趋势图表 -->
-          <div class="chart-panel">
+          <div
+            v-for="panel in analyticsPanels"
+            :key="`trend-${panel.key}`"
+            class="chart-panel"
+          >
             <div class="panel-header">
-              <h3><TrendingUp :size="18" /> 近20次成绩趋势</h3>
+              <h3><TrendingUp :size="18" /> {{ panel.trendTitle }}</h3>
             </div>
             <div class="chart-body">
               <div class="chart-bars">
                 <div
-                  v-for="(score, index) in recentScores"
+                  v-for="(score, index) in panel.recentScores"
                   :key="index"
                   class="bar-wrapper"
                   :title="`第${index + 1}次: ${score}`"
                 >
-                  <div 
-                    class="bar-fill" 
-                    :style="{ height: `${Math.min((score / getMaxScore()) * 100, 100)}%` }"
-                    :class="getScoreLevelClass(score)"
+                  <div
+                    class="bar-fill"
+                    :style="{ height: `${Math.min((score / panel.maxScore) * 100, 100)}%` }"
+                    :class="getScoreLevelClassByCourse(score, panel.course)"
                   ></div>
                   <span class="bar-val">{{ score }}</span>
                 </div>
@@ -137,19 +152,23 @@
           </div>
 
           <!-- 成绩分布 -->
-          <div class="chart-panel">
+          <div
+            v-for="panel in analyticsPanels"
+            :key="`distribution-${panel.key}`"
+            class="chart-panel"
+          >
             <div class="panel-header">
-              <h3><PieChart :size="18" /> 成绩分布</h3>
+              <h3><PieChart :size="18" /> {{ panel.distributionTitle }}</h3>
             </div>
             <div class="distribution-list">
-              <div v-for="(range, index) in scoreRanges" :key="index" class="dist-row">
+              <div v-for="(range, index) in panel.scoreRanges" :key="index" class="dist-row">
                 <span class="dist-label">{{ range.label }}</span>
                 <div class="dist-track">
-                  <div 
-                    class="dist-fill" 
-                    :style="{ 
+                  <div
+                    class="dist-fill"
+                    :style="{
                       width: (range.count / range.maxCount) * 100 + '%',
-                      backgroundColor: range.color 
+                      backgroundColor: range.color
                     }"
                   ></div>
                 </div>
@@ -162,7 +181,7 @@
         <!-- 右侧：详细记录与操作 -->
         <div class="dashboard-right">
           <div class="panel-header action-header">
-            <h3><List :size="18" /> 详细记录</h3>
+            <h3><List :size="18" /> {{ isSplitBySubject ? '详细记录（按科目）' : '详细记录' }}</h3>
             <div class="mini-actions">
               <button class="btn-icon" @click="showBatchAddDialog" title="批量导入">
                 <Database :size="16" />
@@ -177,26 +196,40 @@
           </div>
 
           <div class="scores-grid-container">
-            <div class="scores-grid">
+            <div class="scores-sections">
               <div
-                v-for="record in detailedRecords"
-                :key="record.index"
-                class="score-capsule"
-                :class="getScoreLevelClass(record.score)"
+                v-for="panel in analyticsPanels"
+                :key="`records-${panel.key}`"
+                class="scores-section"
               >
-                <div class="capsule-content">
-                  <span class="capsule-idx">#{{ record.index + 1 }}</span>
-                  <span class="capsule-val">{{ record.score }}</span>
-                  <span class="capsule-meta">科目：{{ record.subject }}</span>
-                  <span class="capsule-time">录入：{{ record.recordedAt }}</span>
+                <div v-if="isSplitBySubject" class="scores-section-title">
+                  {{ panel.recordTitle }}
                 </div>
-                <div class="capsule-overlay">
-                  <button @click="editScore(record.index, record.score)" title="编辑">
-                    <Edit2 :size="14" />
-                  </button>
-                  <button @click="deleteScore(record.index, record.score)" title="删除" class="del">
-                    <X :size="14" />
-                  </button>
+                <div v-if="panel.records.length > 0" class="scores-grid">
+                  <div
+                    v-for="record in panel.records"
+                    :key="`${panel.key}-${record.index}`"
+                    class="score-capsule"
+                    :class="getScoreLevelClassByCourse(record.score, panel.course)"
+                  >
+                    <div class="capsule-content">
+                      <span class="capsule-idx">#{{ record.index + 1 }}</span>
+                      <span class="capsule-val">{{ record.score }}</span>
+                      <span class="capsule-meta">科目：{{ record.subject }}</span>
+                      <span class="capsule-time">录入：{{ record.recordedAt }}</span>
+                    </div>
+                    <div class="capsule-overlay">
+                      <button @click="editScore(record.index, record.score)" title="编辑">
+                        <Edit2 :size="14" />
+                      </button>
+                      <button @click="deleteScore(record.index, record.score)" title="删除" class="del">
+                        <X :size="14" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="scores-empty">
+                  暂无{{ panel.course }}成绩记录
                 </div>
               </div>
             </div>
@@ -229,19 +262,19 @@
                 <th>课程</th>
                 <th>分数</th>
                 <th>等级</th>
-                <th>日期</th>
+                <th>录入时间</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="grade in filteredGrades.slice(0, 10)" :key="grade.id">
                 <td class="font-medium">{{ getDisplayStudentName(grade) }}</td>
-                <td>{{ grade.course }}</td>
+                <td>{{ getDisplayCourseName(grade) }}</td>
                 <td>
                   <span class="score-tag" :class="getScoreClass(grade.score)">{{ grade.score }}</span>
                 </td>
                 <td>{{ getGradeLevel(grade.score) }}</td>
-                <td class="text-muted">{{ grade.date }}</td>
+                <td class="text-muted">{{ getGradeDateText(grade) }}</td>
                 <td>
                   <div class="row-actions">
                     <button @click="editGrade(grade)" class="action-btn"><Edit2 :size="14" /></button>
@@ -402,6 +435,44 @@ interface Grade {
   notes?: string;
 }
 
+type NormalizedSubjectType = 'SHOOTING' | 'ARCHERY' | 'SHOOTING_ARCHERY' | 'OTHERS';
+type DisplayCourse = '射击' | '射箭' | '射击&射箭' | '其他';
+
+interface DetailedRecordItem {
+  index: number;
+  score: number;
+  subject: DisplayCourse;
+  subjectType: NormalizedSubjectType;
+  recordedAt: string;
+}
+
+interface ScoreRangeItem {
+  label: string;
+  count: number;
+  color: string;
+  maxCount: number;
+}
+
+interface AnalyticsPanel {
+  key: string;
+  course: DisplayCourse;
+  trendTitle: string;
+  distributionTitle: string;
+  recordTitle: string;
+  maxScore: number;
+  recentScores: number[];
+  scoreRanges: ScoreRangeItem[];
+  records: DetailedRecordItem[];
+}
+
+interface StatsPanel {
+  key: string;
+  title: string;
+  average: number;
+  max: number;
+  count: number;
+}
+
 interface ErrorHandler {
   showError: (title: string, message: string, details?: string) => void;
   showConfirm: (options: any) => void;
@@ -463,7 +534,7 @@ const getTodayDateString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-const normalizeSubjectType = (subject?: string) => {
+const normalizeSubjectType = (subject?: string): NormalizedSubjectType => {
   const compact = (subject || '').trim().toUpperCase().replace(/[\s_-]/g, '');
   if (compact === 'SHOOTING') return 'SHOOTING';
   if (compact === 'ARCHERY') return 'ARCHERY';
@@ -473,11 +544,18 @@ const normalizeSubjectType = (subject?: string) => {
   return 'OTHERS';
 };
 
-const getDefaultCourseBySubject = (subject?: string) => {
+const getDefaultCourseBySubject = (subject?: string): DisplayCourse => {
   const normalizedSubject = normalizeSubjectType(subject);
   if (normalizedSubject === 'SHOOTING') return '射击';
   if (normalizedSubject === 'ARCHERY') return '射箭';
   if (normalizedSubject === 'SHOOTING_ARCHERY') return '射击';
+  return '其他';
+};
+
+const getCourseByNormalizedSubject = (subjectType: NormalizedSubjectType): DisplayCourse => {
+  if (subjectType === 'SHOOTING') return '射击';
+  if (subjectType === 'ARCHERY') return '射箭';
+  if (subjectType === 'SHOOTING_ARCHERY') return '射击&射箭';
   return '其他';
 };
 
@@ -513,6 +591,11 @@ const effectiveManageCourse = computed(() => {
   return '其他';
 });
 
+const isSplitBySubject = computed(() => {
+  if (!selectedStudentData.value) return false;
+  return normalizeSubjectType(selectedStudentData.value.subject) === 'SHOOTING_ARCHERY';
+});
+
 const syncManageCourseBySelectedStudent = () => {
   if (!selectedStudentData.value) {
     selectedManageCourse.value = '射击';
@@ -545,21 +628,17 @@ const syncCurrentGradeCourseBySubject = () => {
 };
 
 // Computed Props
-const recentScores = computed(() => selectedStudentData.value ? selectedStudentData.value.rings.slice(-20) : []);
-
-const averageScoreApi = computed(() => {
-  if (!selectedStudentData.value?.rings.length) return 0;
-  return selectedStudentData.value.rings.reduce((a, b) => a + b, 0) / selectedStudentData.value.rings.length;
-});
-
-const maxScoreApi = computed(() => {
-  if (!selectedStudentData.value?.rings.length) return 0;
-  return Math.max(...selectedStudentData.value.rings);
-});
 
 const filteredGrades = computed(() => {
   let filtered = grades.value;
-  if (selectedStudentData.value) filtered = filtered.filter((g) => g.studentName === selectedStudentData.value!.name);
+  if (selectedStudentData.value) filtered = filtered.filter((g) => g.studentId === selectedStudentData.value!.uid);
+  if (selectedStudentData.value && shouldShowManageCourseSelector.value) {
+    filtered = filtered.filter((g) => {
+      const subjectType = normalizeSubjectType(g.subjectValue || g.course);
+      if (subjectType === 'SHOOTING_ARCHERY') return true;
+      return getCourseByNormalizedSubject(subjectType) === selectedManageCourse.value;
+    });
+  }
   if (selectedCourse.value) filtered = filtered.filter((g) => g.course === selectedCourse.value);
   if (selectedExamType.value) filtered = filtered.filter((g) => g.examType === selectedExamType.value);
   if (studentSearch.value) filtered = filtered.filter((g) => g.studentName.toLowerCase().includes(studentSearch.value.toLowerCase()));
@@ -567,9 +646,8 @@ const filteredGrades = computed(() => {
 });
 
 // Helper Functions
-const getScoreLevelClass = (score: number) => {
-  if (!selectedStudentData.value) return 'level-normal';
-  const max = getMaxScore();
+const getScoreLevelClassByCourse = (score: number, course: string) => {
+  const max = getMaxScoreForCourse(course);
   const ratio = score / max;
   if (ratio >= 0.9) return 'level-excellent';
   if (ratio >= 0.8) return 'level-good';
@@ -615,12 +693,32 @@ const getDisplayStudentName = (grade: Grade) => {
   return student?.name || '未知学员';
 };
 
-const getRecentCourseBySubject = (subject?: string) => {
-  const normalizedSubject = normalizeSubjectType(subject);
-  if (normalizedSubject === 'SHOOTING') return '射击';
-  if (normalizedSubject === 'ARCHERY') return '射箭';
-  if (normalizedSubject === 'SHOOTING_ARCHERY') return '射击&射箭';
+const normalizeCourseLabel = (course?: string): DisplayCourse => {
+  const subjectByText = normalizeSubjectType(course);
+  if (subjectByText !== 'OTHERS') return getCourseByNormalizedSubject(subjectByText);
+
+  if (course === '射击') return '射击';
+  if (course === '射箭') return '射箭';
+  if (course === '射击&射箭') return '射击&射箭';
   return '其他';
+};
+
+const getDisplayCourseName = (grade: Grade): DisplayCourse => {
+  const fromSubjectValue = normalizeSubjectType(grade.subjectValue);
+  if (fromSubjectValue !== 'OTHERS') {
+    return getCourseByNormalizedSubject(fromSubjectValue);
+  }
+  return normalizeCourseLabel(grade.course);
+};
+
+const getGradeDateText = (grade: Grade): string => {
+  if (grade.recordedAt) return formatDateTime(grade.recordedAt);
+  if (grade.date) return grade.date;
+  return '--';
+};
+
+const getRecentCourseBySubject = (subject?: string): DisplayCourse => {
+  return getCourseByNormalizedSubject(normalizeSubjectType(subject));
 };
 
 const getSubjectValueByCourse = (course: string): string => {
@@ -699,19 +797,27 @@ const buildRecentGradesFromStudents = (items: Student[]): Grade[] => {
     .slice(0, MAX_RECENT_GRADES);
 };
 
-const detailedRecords = computed(() => {
+const detailedRecords = computed<DetailedRecordItem[]>(() => {
   if (!selectedStudentData.value) return [];
   return getStudentScoreDetails(selectedStudentData.value).map((detail, index) => ({
     index,
     score: Number(detail.score),
     subject: getRecentCourseBySubject(detail.subject),
+    subjectType: normalizeSubjectType(detail.subject),
     recordedAt: formatDateTime(detail.recorded_at),
   }));
 });
 
-const scoreRanges = computed(() => {
-  if (!selectedStudentData.value?.rings.length) return [];
-  const maxScore = getMaxScore();
+const buildScoreRanges = (scores: number[], maxScore: number): ScoreRangeItem[] => {
+  if (!scores.length) {
+    return [
+      { label: '90%+', count: 0, color: '#10b981', maxCount: 1 },
+      { label: '80-89%', count: 0, color: '#8b5cf6', maxCount: 1 },
+      { label: '60-79%', count: 0, color: '#f59e0b', maxCount: 1 },
+      { label: '0-59%', count: 0, color: '#ef4444', maxCount: 1 },
+    ];
+  }
+
   const ranges = [
     { label: '90%+', count: 0, color: '#10b981' },
     { label: '80-89%', count: 0, color: '#8b5cf6' },
@@ -719,7 +825,7 @@ const scoreRanges = computed(() => {
     { label: '0-59%', count: 0, color: '#ef4444' },
   ];
 
-  selectedStudentData.value.rings.forEach((score) => {
+  scores.forEach((score) => {
     const ratio = maxScore > 0 ? score / maxScore : 0;
     if (ratio >= 0.9) ranges[0].count++;
     else if (ratio >= 0.8) ranges[1].count++;
@@ -729,6 +835,89 @@ const scoreRanges = computed(() => {
 
   const maxCount = Math.max(...ranges.map((r) => r.count), 1);
   return ranges.map((r) => ({ ...r, maxCount }));
+};
+
+const createAnalyticsPanel = (
+  key: string,
+  course: DisplayCourse,
+  records: DetailedRecordItem[],
+  trendTitle: string,
+  distributionTitle: string,
+  recordTitle: string,
+): AnalyticsPanel => {
+  const maxScore = getMaxScoreForCourse(course);
+  const recentScores = records.slice(-20).map((record) => record.score);
+
+  return {
+    key,
+    course,
+    trendTitle,
+    distributionTitle,
+    recordTitle,
+    maxScore,
+    recentScores,
+    scoreRanges: buildScoreRanges(records.map((record) => record.score), maxScore),
+    records,
+  };
+};
+
+const analyticsPanels = computed<AnalyticsPanel[]>(() => {
+  if (!selectedStudentData.value) return [];
+
+  if (isSplitBySubject.value) {
+    const shootingRecords = detailedRecords.value.filter((record) =>
+      record.subjectType === 'SHOOTING' || record.subjectType === 'SHOOTING_ARCHERY'
+    );
+    const archeryRecords = detailedRecords.value.filter((record) =>
+      record.subjectType === 'ARCHERY' || record.subjectType === 'SHOOTING_ARCHERY'
+    );
+
+    return [
+      createAnalyticsPanel(
+        'shooting',
+        '射击',
+        shootingRecords,
+        '近20次成绩趋势（射击）',
+        '成绩分布（射击）',
+        '射击记录',
+      ),
+      createAnalyticsPanel(
+        'archery',
+        '射箭',
+        archeryRecords,
+        '近20次成绩趋势（射箭）',
+        '成绩分布（射箭）',
+        '射箭记录',
+      ),
+    ];
+  }
+
+  const singleCourse = getDefaultCourseBySubject(selectedStudentData.value.subject);
+  return [
+    createAnalyticsPanel(
+      'default',
+      singleCourse,
+      detailedRecords.value,
+      '近20次成绩趋势',
+      '成绩分布',
+      '详细记录',
+    ),
+  ];
+});
+
+const statsPanels = computed<StatsPanel[]>(() => {
+  return analyticsPanels.value.map((panel) => {
+    const count = panel.records.length;
+    const total = panel.records.reduce((sum, record) => sum + record.score, 0);
+    const max = count > 0 ? Math.max(...panel.records.map((record) => record.score)) : 0;
+    return {
+      key: panel.key,
+      title: `${panel.course}统计`,
+      average: count > 0 ? total / count : 0,
+      max,
+      count,
+    };
+  });
 });
 
 // --- API Actions (Logic preserved) ---
@@ -737,7 +926,7 @@ const loadData = async (forceOrEvent: boolean | Event = false) => {
   if (loading.value && !force) return;
   loading.value = true;
   try {
-    const response = await ApiService.getAllStudents();
+    const response = await ApiService.getAllStudents(undefined, force);
     const data = response.students || [];
     students.value = data.filter((s: any) => s && s.uid && s.name);
     grades.value = buildRecentGradesFromStudents(students.value);
@@ -775,6 +964,16 @@ const onStudentChange = async () => {
   }
 };
 
+const refreshScoreRelatedViews = async (studentId?: number) => {
+  await loadData(true);
+
+  if (!selectedStudent.value) return;
+  const selectedUid = Number(selectedStudent.value);
+  if (studentId && selectedUid !== studentId) return;
+
+  await onStudentChange();
+};
+
 const addQuickScore = async () => {
   if (!selectedStudent.value || quickScore.value === '') return;
   const score = Number(quickScore.value);
@@ -793,7 +992,7 @@ const addQuickScore = async () => {
       recorded_at: new Date().toISOString(),
     });
     showSuccess('添加成功', '成绩已录入');
-    await onStudentChange();
+    await refreshScoreRelatedViews(Number(selectedStudent.value));
     quickScore.value = '';
   } catch (error: any) {
     showError('添加失败', error.message);
@@ -834,7 +1033,7 @@ const batchAddScores = async () => {
     );
     showSuccess('导入成功', `已添加 ${scores.length} 条成绩`);
     closeBatchAddDialog();
-    await onStudentChange();
+    await refreshScoreRelatedViews(uid);
   } catch (error: any) {
     showError('导入失败', error.message);
   } finally {
@@ -868,9 +1067,10 @@ const clearAllScores = () => {
     onConfirm: async () => {
       loading.value = true;
       try {
-        await ApiService.clearAllScores(Number(selectedStudent.value));
+        const uid = Number(selectedStudent.value);
+        await ApiService.clearAllScores(uid);
         showSuccess('已清空', '所有成绩已移除');
-        await onStudentChange();
+        await refreshScoreRelatedViews(uid);
       } catch (e: any) {
         showError('操作失败', e.message);
       } finally {
@@ -889,8 +1089,9 @@ const deleteScore = (index: number, score: number) => {
     onConfirm: async () => {
       loading.value = true;
       try {
-        await ApiService.deleteStudentScore(Number(selectedStudent.value), index);
-        onStudentChange();
+        const uid = Number(selectedStudent.value);
+        await ApiService.deleteStudentScore(uid, index);
+        await refreshScoreRelatedViews(uid);
       } catch (e: any) {
         showError('删除失败', e.message);
       } finally {
@@ -908,10 +1109,11 @@ const editScore = async (index: number, currentScore: number) => {
   
   loading.value = true;
   try {
-    await ApiService.updateStudentScore(Number(selectedStudent.value), index, {
+    const uid = Number(selectedStudent.value);
+    await ApiService.updateStudentScore(uid, index, {
       newScore,
     });
-    await onStudentChange();
+    await refreshScoreRelatedViews(uid);
   } catch (e: any) {
     showError('更新失败', e.message);
   } finally {
@@ -978,10 +1180,7 @@ const saveGrade = async () => {
       });
     }
 
-    await loadData(true);
-    if (selectedStudent.value && Number(selectedStudent.value) === studentId) {
-      await onStudentChange();
-    }
+    await refreshScoreRelatedViews(studentId);
 
     showSuccess('保存成功', '成绩已保存');
     closeModals();
@@ -1013,10 +1212,7 @@ const deleteGrade = (grade: Grade) => {
       loading.value = true;
       try {
         await ApiService.deleteStudentScore(grade.studentId, grade.scoreIndex);
-        await loadData(true);
-        if (selectedStudent.value && Number(selectedStudent.value) === grade.studentId) {
-          await onStudentChange();
-        }
+        await refreshScoreRelatedViews(grade.studentId);
         showSuccess('删除成功', '成绩已删除');
       } catch (error: any) {
         showError('删除失败', error?.message || '无法删除成绩');
@@ -1216,6 +1412,25 @@ onUnmounted(() => abortController.value?.abort());
   overflow-y: auto;
 }
 
+.stats-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stats-section-head {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-left: 0.2rem;
+}
+
 .stats-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr); /* Compact grid */
@@ -1341,6 +1556,26 @@ onUnmounted(() => abortController.value?.abort());
   flex: 1;
 }
 
+.scores-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scores-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scores-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 0.35rem;
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
 .scores-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -1397,6 +1632,15 @@ onUnmounted(() => abortController.value?.abort());
 }
 .capsule-overlay button:hover { background: var(--primary-color); }
 .capsule-overlay button.del:hover { background: #ef4444; }
+
+.scores-empty {
+  border: 1px dashed var(--border-subtle);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+  background-color: var(--bg-app);
+}
 
 /* Empty State */
 .empty-state {

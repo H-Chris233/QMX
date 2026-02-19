@@ -24,15 +24,18 @@ const createRateLimiter = (points: number, duration: number) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await limiter.consume(req.ip || 'unknown');
-      next();
+      return next();
     } catch (rejRes: any) {
-      const secs = Math.round(rejRes.msBeforeNext / 1000) || 1;
+      const msBeforeNext = Number(rejRes?.msBeforeNext);
+      const secs = Number.isFinite(msBeforeNext)
+        ? Math.max(1, Math.ceil(msBeforeNext / 1000))
+        : 1;
       res.set('Retry-After', String(secs));
 
-      throw AppError.rateLimited(`请求过于频繁，请在 ${secs} 秒后重试`, {
+      return next(AppError.rateLimited(`请求过于频繁，请在 ${secs} 秒后重试`, {
         statusCode: 429,
         details: { retryAfterSeconds: secs },
-      });
+      }));
     }
   };
 };
@@ -44,4 +47,13 @@ export const rateLimitMiddleware = createRateLimiter(
 );
 
 // API特定速率限制（更严格）
-export const apiRateLimitMiddleware = createRateLimiter(30, 60); // 30个请求/分钟
+const apiRateLimitPoints = Number(
+  process.env.API_RATE_LIMIT_MAX_REQUESTS
+    || (config.server.nodeEnv === 'development' ? 300 : 60),
+);
+const apiRateLimitDurationSeconds = Number(process.env.API_RATE_LIMIT_WINDOW_SECONDS || 60);
+
+export const apiRateLimitMiddleware = createRateLimiter(
+  Number.isFinite(apiRateLimitPoints) && apiRateLimitPoints > 0 ? apiRateLimitPoints : 60,
+  Number.isFinite(apiRateLimitDurationSeconds) && apiRateLimitDurationSeconds > 0 ? apiRateLimitDurationSeconds : 60,
+);

@@ -76,7 +76,7 @@
         data-testid="grades-card"
       >
         <div class="card-top">
-          <span class="card-label">平均绩效</span>
+          <span class="card-label">平均成绩</span>
           <div class="icon-wrapper score">
             <Award :size="20" />
           </div>
@@ -182,15 +182,6 @@
           </template>
         </div>
       </div>
-    </div>
-
-    <div class="quick-actions">
-      <button class="action-btn add-student-btn" type="button">
-        添加学员
-      </button>
-      <button class="action-btn add-transaction-btn" type="button">
-        添加交易
-      </button>
     </div>
 
     <!-- 错误弹窗 (保持原有逻辑) -->

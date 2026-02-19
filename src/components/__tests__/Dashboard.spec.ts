@@ -5,7 +5,7 @@
  * 1. 统计卡片渲染
  * 2. 加载状态
  * 3. 会员过期预警
- * 4. 快捷操作
+ * 4. 快捷操作入口移除
  * 5. 数据刷新
  * 6. 空状态处理
  */
@@ -144,28 +144,25 @@ describe('Dashboard', () => {
   });
 
   describe('4. 快捷操作区域', () => {
-    it('应该渲染快捷操作按钮', async () => {
+    it('不应该渲染快捷操作区域', async () => {
       await waitForDOMUpdate();
 
       const quickActions = wrapper.find('.quick-actions');
-      expect(quickActions.exists()).toBe(true);
-
-      const buttons = wrapper.findAll('.action-btn');
-      expect(buttons.length).toBeGreaterThan(0);
+      expect(quickActions.exists()).toBe(false);
     });
 
-    it('应该显示添加学员按钮', async () => {
+    it('不应该渲染添加学员按钮', async () => {
       await waitForDOMUpdate();
 
       const addBtn = wrapper.find('.add-student-btn');
-      expect(addBtn.exists()).toBe(true);
+      expect(addBtn.exists()).toBe(false);
     });
 
-    it('应该显示添加交易按钮', async () => {
+    it('不应该渲染添加交易按钮', async () => {
       await waitForDOMUpdate();
 
       const addTransactionBtn = wrapper.find('.add-transaction-btn');
-      expect(addTransactionBtn.exists()).toBe(true);
+      expect(addTransactionBtn.exists()).toBe(false);
     });
   });
 
