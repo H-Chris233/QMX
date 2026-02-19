@@ -58,7 +58,7 @@
         <button class="btn btn-secondary" @click="loadData" :disabled="loading" title="刷新数据">
           <RefreshCw :size="18" :class="{ 'spin': loading }" />
         </button>
-        <button class="btn btn-primary" @click="showAddGrade = true">
+        <button class="btn btn-primary" @click="openAddGradeModal">
           <PlusCircle :size="18" />
           <span>添加记录</span>
         </button>
@@ -222,7 +222,7 @@
             </thead>
             <tbody>
               <tr v-for="grade in filteredGrades.slice(0, 10)" :key="grade.id">
-                <td class="font-medium">{{ grade.studentName }}</td>
+                <td class="font-medium">{{ getDisplayStudentName(grade) }}</td>
                 <td>{{ grade.course }}</td>
                 <td>
                   <span class="score-tag" :class="getScoreClass(grade.score)">{{ grade.score }}</span>
@@ -263,24 +263,23 @@
               </div>
             </div>
             <div class="form-row">
-              <div class="form-group">
+              <div class="form-group" v-if="shouldShowCourseSelector">
                 <label>课程</label>
                 <div class="select-wrapper full-width">
                   <select v-model="currentGrade.course">
                     <option value="射击">射击</option>
                     <option value="射箭">射箭</option>
-                    <option value="其他">其他</option>
                   </select>
                   <ChevronDown :size="14" class="select-arrow" />
                 </div>
               </div>
-              <div class="form-group">
+              <div class="form-group" :class="{ 'full-width-group': !shouldShowCourseSelector }">
                 <label>分数</label>
                 <input 
                   type="number" 
                   v-model.number="currentGrade.score" 
                   class="form-input"
-                  :placeholder="getScorePlaceholderText(currentGrade.course)"
+                  :placeholder="getScorePlaceholderText(effectiveCourseForGradeForm)"
                 />
               </div>
             </div>
@@ -433,6 +432,66 @@ const showError = errorHandler?.showError || ((title: string, message: string, d
 const showConfirm = errorHandler?.showConfirm || ((options: any) => { if (confirm(options.message)) options.onConfirm(); });
 const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => { logger.log(title, message); });
 
+const getTodayDateString = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeSubjectType = (subject?: string) => {
+  const compact = (subject || '').trim().toUpperCase().replace(/[\s_-]/g, '');
+  if (compact === 'SHOOTING') return 'SHOOTING';
+  if (compact === 'ARCHERY') return 'ARCHERY';
+  if (['SHOOTINGARCHERY', 'SHOOTINGANDARCHERY', 'SHOOTING&ARCHERY', 'SHOOTING/ARCHERY'].includes(compact)) {
+    return 'SHOOTING_ARCHERY';
+  }
+  return 'OTHERS';
+};
+
+const getDefaultCourseBySubject = (subject?: string) => {
+  const normalizedSubject = normalizeSubjectType(subject);
+  if (normalizedSubject === 'SHOOTING') return '射击';
+  if (normalizedSubject === 'ARCHERY') return '射箭';
+  if (normalizedSubject === 'SHOOTING_ARCHERY') return '射击';
+  return '其他';
+};
+
+const gradeFormStudent = computed(() => {
+  const studentId = Number(currentGrade.value.studentId);
+  if (!studentId) return null;
+  return students.value.find((student) => student.uid === studentId) ?? null;
+});
+
+const shouldShowCourseSelector = computed(() => {
+  if (!gradeFormStudent.value) return false;
+  return normalizeSubjectType(gradeFormStudent.value.subject) === 'SHOOTING_ARCHERY';
+});
+
+const effectiveCourseForGradeForm = computed(() => {
+  if (shouldShowCourseSelector.value) {
+    return currentGrade.value.course || '射击';
+  }
+  return getDefaultCourseBySubject(gradeFormStudent.value?.subject);
+});
+
+const syncCurrentGradeCourseBySubject = () => {
+  if (!gradeFormStudent.value) {
+    currentGrade.value.course = '';
+    return;
+  }
+
+  if (shouldShowCourseSelector.value) {
+    if (!['射击', '射箭'].includes(currentGrade.value.course)) {
+      currentGrade.value.course = '射击';
+    }
+    return;
+  }
+
+  currentGrade.value.course = getDefaultCourseBySubject(gradeFormStudent.value.subject);
+};
+
 // Computed Props
 const recentScores = computed(() => selectedStudentData.value ? selectedStudentData.value.rings.slice(-20) : []);
 
@@ -483,8 +542,11 @@ const getGradeLevel = (score: number) => {
 
 const getMaxScore = () => {
   if (!selectedStudentData.value) return 100;
-  const subject = selectedStudentData.value.subject;
-  return subject === 'Shooting' ? 654 : subject === 'Archery' ? 600 : 100;
+  const subject = normalizeSubjectType(selectedStudentData.value.subject);
+  if (subject === 'SHOOTING') return 654;
+  if (subject === 'ARCHERY') return 600;
+  if (subject === 'SHOOTING_ARCHERY') return 654;
+  return 100;
 };
 
 const getScorePlaceholder = () => {
@@ -499,6 +561,12 @@ const getMaxScoreForCourse = (course: string) => {
 };
 
 const getScorePlaceholderText = (course: string) => `请输入 (0-${getMaxScoreForCourse(course)})`;
+
+const getDisplayStudentName = (grade: Grade) => {
+  if (grade.studentName && grade.studentName.trim()) return grade.studentName;
+  const student = students.value.find((item) => item.uid === Number(grade.studentId));
+  return student?.name || '未知学员';
+};
 
 const scoreRanges = computed(() => {
   if (!selectedStudentData.value?.rings.length) return [];
@@ -700,11 +768,42 @@ const closeModals = () => {
   showEditGrade.value = false;
 };
 
+const openAddGradeModal = () => {
+  currentGrade.value = {
+    id: null,
+    studentId: selectedStudent.value || '',
+    studentName: '',
+    course: '',
+    examType: '',
+    score: null,
+    date: getTodayDateString(),
+    notes: '',
+  };
+  syncCurrentGradeCourseBySubject();
+  showAddGrade.value = true;
+};
+
 const saveGrade = () => {
   // 简化的保存逻辑，适配原有功能
-  if (!currentGrade.value.score) return;
+  if (currentGrade.value.score === null || currentGrade.value.score === undefined) return;
+  if (!currentGrade.value.studentId) {
+    showError('保存失败', '请先选择学员');
+    return;
+  }
+
+  const studentId = Number(currentGrade.value.studentId);
+  const student = students.value.find((item) => item.uid === studentId);
+  const studentName = student?.name || currentGrade.value.studentName || '未知学员';
+
+  const payload = {
+    ...currentGrade.value,
+    studentId,
+    studentName,
+    course: effectiveCourseForGradeForm.value,
+  };
+
   if (showAddGrade.value) {
-    grades.value.push({ ...currentGrade.value, id: Date.now() } as any);
+    grades.value.push({ ...payload, id: Date.now() } as any);
   }
   closeModals();
 };
@@ -724,6 +823,10 @@ if (refreshSystem?.refreshTriggers) {
     if (n > o) loadData();
   });
 }
+
+watch(() => currentGrade.value.studentId, () => {
+  syncCurrentGradeCourseBySubject();
+});
 
 onMounted(loadData);
 onUnmounted(() => abortController.value?.abort());
@@ -1128,6 +1231,7 @@ onUnmounted(() => abortController.value?.abort());
 .close-btn { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; }
 .modal-body { padding: 1.5rem; }
 .form-group { margin-bottom: 1rem; }
+.full-width-group { flex: 1; }
 .form-group label { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--text-secondary); }
 .form-input, .full-width select { width: 100%; padding: 0.6rem; background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-primary); }
 .code-font { font-family: monospace; }

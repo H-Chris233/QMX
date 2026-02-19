@@ -34,6 +34,7 @@
               <option value="">📚 所有科目</option>
               <option value="Shooting">🎯 射击</option>
               <option value="Archery">🏹 射箭</option>
+              <option value="ShootingArchery">🎯🏹 射击&射箭</option>
               <option value="Others">🧩 其他</option>
             </select>
             <ChevronDown :size="14" class="select-arrow" />
@@ -406,7 +407,7 @@ const changePage = async (page: number) => {
 
 // 辅助函数
 const getSubjectName = (subject: string) => {
-  const map: Record<string, string> = { 'Shooting': '射击', 'Archery': '射箭', 'Others': '其他' };
+  const map: Record<string, string> = { 'Shooting': '射击', 'Archery': '射箭', 'ShootingArchery': '射击&射箭', 'Others': '其他' };
   return map[subject] || subject;
 };
 

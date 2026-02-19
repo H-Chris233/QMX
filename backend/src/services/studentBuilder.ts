@@ -39,7 +39,7 @@ export class StudentBuilder {
   }
 
   subject(subject: string): this {
-    if (!['SHOOTING', 'ARCHERY', 'OTHERS'].includes(subject)) {
+    if (!['SHOOTING', 'ARCHERY', 'SHOOTING_ARCHERY', 'OTHERS'].includes(subject)) {
       throw new Error(`无效的科目类型: ${subject}`);
     }
     this.payload.subject = subject;

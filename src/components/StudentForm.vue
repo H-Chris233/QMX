@@ -69,6 +69,7 @@
               <select id="subject" name="subject" v-model="formData.subject" class="form-select">
                 <option value="Shooting">🎯 射击</option>
                 <option value="Archery">🏹 射箭</option>
+                <option value="ShootingArchery">🎯🏹 射击&射箭</option>
                 <option value="Others">🧩 其他</option>
               </select>
               <ChevronDown :size="14" class="select-arrow" />

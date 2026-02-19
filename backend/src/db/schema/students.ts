@@ -14,7 +14,7 @@ import { sql } from 'drizzle-orm';
 
 // 枚举类型
 export const classTypeEnum = ['TEN_TRY', 'MONTH', 'YEAR', 'OTHERS'] as const;
-export const subjectEnum = ['SHOOTING', 'ARCHERY', 'OTHERS'] as const;
+export const subjectEnum = ['SHOOTING', 'ARCHERY', 'SHOOTING_ARCHERY', 'OTHERS'] as const;
 
 export type ClassType = typeof classTypeEnum[number];
 export type Subject = typeof subjectEnum[number];
@@ -36,7 +36,7 @@ export const students = pgTable('students', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
   validClassType: check('valid_class_type', sql`${table.classType} IN ('TEN_TRY', 'MONTH', 'YEAR', 'OTHERS')`),
-  validSubject: check('valid_subject', sql`${table.subject} IN ('SHOOTING', 'ARCHERY', 'OTHERS')`),
+  validSubject: check('valid_subject', sql`${table.subject} IN ('SHOOTING', 'ARCHERY', 'SHOOTING_ARCHERY', 'OTHERS')`),
   validMembershipDates: check('valid_membership_dates',
     sql`(${table.membershipEndDate} IS NULL OR ${table.membershipStartDate} IS NULL OR ${table.membershipEndDate} >= ${table.membershipStartDate})`,
   ),

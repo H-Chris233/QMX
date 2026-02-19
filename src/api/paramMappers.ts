@@ -17,6 +17,9 @@ export function toSubjectType(value: NullableString): NullableString {
   const lowered = normalized.toLowerCase();
   if (lowered === 'shooting') return 'SHOOTING';
   if (lowered === 'archery') return 'ARCHERY';
+  if (['shootingarchery', 'shooting_and_archery', 'shooting-archery', 'shooting&archery'].includes(lowered)) {
+    return 'SHOOTING_ARCHERY';
+  }
   if (lowered === 'others') return 'OTHERS';
   return normalized.toUpperCase();
 }
@@ -68,6 +71,7 @@ export function toFrontendSubjectType(value: NullableString): NullableString {
   const normalized = value.trim();
   if (normalized === 'SHOOTING') return 'Shooting';
   if (normalized === 'ARCHERY') return 'Archery';
+  if (normalized === 'SHOOTING_ARCHERY') return 'ShootingArchery';
   if (normalized === 'OTHERS') return 'Others';
   return normalized;
 }

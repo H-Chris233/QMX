@@ -769,6 +769,7 @@ describe('StudentManagement', () => {
 
       expect(wrapper.vm.getSubjectName('Shooting')).toBe('射击');
       expect(wrapper.vm.getSubjectName('Archery')).toBe('射箭');
+      expect(wrapper.vm.getSubjectName('ShootingArchery')).toBe('射击&射箭');
       expect(wrapper.vm.getSubjectName('Others')).toBe('其他');
       expect(wrapper.vm.getSubjectName('Unknown')).toBe('Unknown');
     });

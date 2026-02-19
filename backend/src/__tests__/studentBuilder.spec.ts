@@ -210,7 +210,7 @@ describe('StudentBuilder', () => {
     });
 
     it('所有有效科目类型正常', async () => {
-      const validSubjects = [SubjectType.SHOOTING, SubjectType.ARCHERY, SubjectType.OTHERS];
+      const validSubjects = [SubjectType.SHOOTING, SubjectType.ARCHERY, SubjectType.SHOOTING_ARCHERY, SubjectType.OTHERS];
       for (const subject of validSubjects) {
         const suffix = `${Date.now()}${validSubjects.indexOf(subject)}`.slice(-8).padStart(8, '0');
         const student = await StudentBuilder.create()

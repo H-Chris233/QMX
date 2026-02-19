@@ -177,10 +177,11 @@ describe('StudentForm', () => {
       
       // 检查科目选项
       const subjectOptions = subjectSelect.findAll('option');
-      expect(subjectOptions.length).toBe(3);
+      expect(subjectOptions.length).toBe(4);
       expect(subjectOptions[0].attributes('value')).toBe('Shooting');
       expect(subjectOptions[1].attributes('value')).toBe('Archery');
-      expect(subjectOptions[2].attributes('value')).toBe('Others');
+      expect(subjectOptions[2].attributes('value')).toBe('ShootingArchery');
+      expect(subjectOptions[3].attributes('value')).toBe('Others');
       
       // 检查课程类型选项
       const classOptions = classSelect.findAll('option');

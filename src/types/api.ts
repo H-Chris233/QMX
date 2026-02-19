@@ -23,6 +23,7 @@ export enum ClassType {
 export enum SubjectType {
   SHOOTING = 'Shooting',
   ARCHERY = 'Archery',
+  SHOOTING_ARCHERY = 'ShootingArchery',
   OTHERS = 'Others',
 }
 
