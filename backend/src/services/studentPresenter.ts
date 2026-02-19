@@ -1,4 +1,6 @@
-import { MembershipStatus } from '@/types';
+import { MembershipStatus, SubjectType } from '@/types';
+import { normalizeScoreDetails, scoreDetailsToRings } from './scoreDetails';
+import type { ScoreDetail } from '@/db/schema/students';
 
 interface StudentJson {
   uid?: number;
@@ -9,6 +11,8 @@ interface StudentJson {
   classType?: string;
   subject?: string;
   rings?: number[];
+  scoreDetails?: unknown[];
+  score_details?: unknown[];
   note?: string;
   lessonLeft?: number | null;
   lesson_left?: number | null;
@@ -37,6 +41,7 @@ export interface PresentedStudent {
   classType: string;
   subject: string;
   rings: number[];
+  score_details: ScoreDetail[];
   averageScore: number;
   note: string;
   lessonLeft: number | null;
@@ -137,6 +142,11 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ?? (student as any).subject
     ?? '';
+  const resolvedSubjectType = (
+    typeof resolvedSubject === 'string' && resolvedSubject.trim()
+      ? resolvedSubject.trim().toUpperCase()
+      : SubjectType.SHOOTING
+  ) as SubjectType;
 
   const lessonLeft = json.lessonLeft ?? json.lesson_left ?? null;
   const membershipStartDate = formatDateOnly(
@@ -160,8 +170,16 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
   const created_at = json.created_at ?? (createdAt ?? null);
   const updated_at = json.updated_at ?? (updatedAt ?? null);
 
-  // 处理 rings - 可能是数组或 undefined
-  const rings = Array.isArray(json.rings) ? json.rings : [];
+  const fallbackRecordedAt = updatedAt ?? createdAt ?? new Date().toISOString();
+  const normalizedScoreDetails = normalizeScoreDetails(
+    json.scoreDetails ?? json.score_details,
+    { fallbackSubject: resolvedSubjectType, fallbackRecordedAt },
+  );
+  const ringsFromLegacy = Array.isArray(json.rings) ? json.rings : [];
+  const scoreDetails = normalizedScoreDetails.length > 0
+    ? normalizedScoreDetails
+    : normalizeScoreDetails(ringsFromLegacy, { fallbackSubject: resolvedSubjectType, fallbackRecordedAt });
+  const rings = scoreDetailsToRings(scoreDetails);
 
   // 计算平均分
   const averageScore = rings.length > 0
@@ -177,6 +195,7 @@ export const presentStudent = (student: StudentPresentable): PresentedStudent =>
     classType: resolvedClassType,
     subject: resolvedSubject,
     rings,
+    score_details: scoreDetails,
     averageScore,
     note: json.note ?? '',
     lessonLeft,

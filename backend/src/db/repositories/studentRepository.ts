@@ -1,6 +1,8 @@
 import { db } from '../index';
 import { students, Student, NewStudent } from '../schema/students';
 import { eq, like, and, or, gte, lte, isNull, isNotNull, desc, asc, count, sql } from 'drizzle-orm';
+import { SubjectType } from '@/types';
+import { createScoreDetail, normalizeScoreDetails, scoreDetailsToRings } from '@/services/scoreDetails';
 
 export interface StudentSearchOptions {
   nameContains?: string;
@@ -221,33 +223,66 @@ export class StudentRepository {
   }
 
   // 成绩操作 - 添加成绩
-  static async addScore(uid: number, score: number): Promise<number[] | null> {
+  static async addScore(
+    uid: number,
+    score: number,
+    subject?: SubjectType,
+    recordedAt?: string,
+  ): Promise<number[] | null> {
     const student = await this.findByUid(uid);
     if (!student) return null;
 
-    const newRings = [...(student.rings || []), score];
-    await this.updateByUid(uid, { rings: newRings });
+    const currentDetails = normalizeScoreDetails(student.scoreDetails, {
+      fallbackSubject: (student.subject ?? SubjectType.SHOOTING) as SubjectType,
+      fallbackRecordedAt: student.updatedAt ? new Date(student.updatedAt).toISOString() : new Date().toISOString(),
+    });
+    const nextDetails = [
+      ...currentDetails,
+      createScoreDetail(score, {
+        fallbackSubject: subject ?? (student.subject ?? SubjectType.SHOOTING) as SubjectType,
+        fallbackRecordedAt: recordedAt ?? new Date().toISOString(),
+      }),
+    ];
+    const newRings = scoreDetailsToRings(nextDetails);
+    await this.updateByUid(uid, { scoreDetails: nextDetails, rings: newRings });
     return newRings;
   }
 
   // 成绩操作 - 更新成绩
   static async updateScore(uid: number, index: number, newScore: number): Promise<number[] | null> {
     const student = await this.findByUid(uid);
-    if (!student || !student.rings || index >= student.rings.length) return null;
+    if (!student) return null;
 
-    const newRings = [...student.rings];
-    newRings[index] = newScore;
-    await this.updateByUid(uid, { rings: newRings });
+    const currentDetails = normalizeScoreDetails(student.scoreDetails, {
+      fallbackSubject: (student.subject ?? SubjectType.SHOOTING) as SubjectType,
+      fallbackRecordedAt: student.updatedAt ? new Date(student.updatedAt).toISOString() : new Date().toISOString(),
+    });
+    if (index < 0 || index >= currentDetails.length) return null;
+
+    const nextDetails = [...currentDetails];
+    nextDetails[index] = {
+      ...nextDetails[index],
+      score: newScore,
+    };
+    const newRings = scoreDetailsToRings(nextDetails);
+    await this.updateByUid(uid, { scoreDetails: nextDetails, rings: newRings });
     return newRings;
   }
 
   // 成绩操作 - 删除成绩
   static async deleteScore(uid: number, index: number): Promise<number[] | null> {
     const student = await this.findByUid(uid);
-    if (!student || !student.rings || index >= student.rings.length) return null;
+    if (!student) return null;
 
-    const newRings = student.rings.filter((_, i) => i !== index);
-    await this.updateByUid(uid, { rings: newRings });
+    const currentDetails = normalizeScoreDetails(student.scoreDetails, {
+      fallbackSubject: (student.subject ?? SubjectType.SHOOTING) as SubjectType,
+      fallbackRecordedAt: student.updatedAt ? new Date(student.updatedAt).toISOString() : new Date().toISOString(),
+    });
+    if (index < 0 || index >= currentDetails.length) return null;
+
+    const nextDetails = currentDetails.filter((_, i) => i !== index);
+    const newRings = scoreDetailsToRings(nextDetails);
+    await this.updateByUid(uid, { scoreDetails: nextDetails, rings: newRings });
     return newRings;
   }
 }

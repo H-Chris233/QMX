@@ -481,23 +481,18 @@ describe('Validation Middleware', () => {
     });
 
     describe('Score Validation', () => {
-      it('accepts valid scores 0-10', () => {
+      it('accepts any valid numeric scores', () => {
         const schema = Joi.object({ score: commonValidations.score });
         expect(schema.validate({ score: 0 }).error).toBeUndefined();
         expect(schema.validate({ score: 5.5 }).error).toBeUndefined();
-        expect(schema.validate({ score: 10 }).error).toBeUndefined();
+        expect(schema.validate({ score: 654 }).error).toBeUndefined();
+        expect(schema.validate({ score: -1 }).error).toBeUndefined();
       });
 
-      it('rejects negative scores', () => {
+      it('rejects invalid numeric values', () => {
         const schema = Joi.object({ score: commonValidations.score });
-        const { error } = schema.validate({ score: -1 });
-        expect(error).toBeDefined();
-      });
-
-      it('rejects scores above 10', () => {
-        const schema = Joi.object({ score: commonValidations.score });
-        const { error } = schema.validate({ score: 10.1 });
-        expect(error).toBeDefined();
+        expect(schema.validate({ score: Number.NaN }).error).toBeDefined();
+        expect(schema.validate({}).error).toBeDefined();
       });
     });
 

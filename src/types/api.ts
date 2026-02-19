@@ -138,8 +138,20 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 // ============================================================================
 
 /**
+ * 成绩明细项
+ */
+export interface StudentScoreDetail {
+  /** 分数 */
+  score: number;
+  /** 科目 */
+  subject: SubjectType | string;
+  /** 录入时间（ISO 字符串） */
+  recorded_at: string;
+}
+
+/**
  * 学员信息接口
- * 注意：后端使用 `rings` 存储成绩数组
+ * 注意：后端使用 `score_details` 存储成绩明细
  */
 export interface Student {
   /** 学员唯一标识符 */
@@ -152,8 +164,10 @@ export interface Student {
   class: ClassType | string;
   /** 联系电话 */
   phone: string;
-  /** 成绩数组（后端字段名为 rings） */
+  /** 成绩数组（由 score_details 派生） */
   rings: number[];
+  /** 成绩明细数组 */
+  score_details?: StudentScoreDetail[];
   /** 备注信息 */
   note: string | null;
   /** 科目类型 */
@@ -178,7 +192,7 @@ export interface Student {
 
 /**
  * 学员成绩兼容类型
- * 提供 scores 属性的向后兼容
+ * 提供 scores 属性的向后兼容（映射 rings）
  */
 export type StudentScores = Student & {
   /** 成绩数组（兼容旧代码，指向 rings） */
@@ -220,8 +234,8 @@ export interface StudentUpdateData {
   membership_start_date?: string | null;
   /** 会员结束日期 */
   membership_end_date?: string | null;
-  /** 成绩数组 */
-  rings?: number[];
+  /** 成绩明细数组 */
+  score_details?: StudentScoreDetail[];
 }
 
 /**
@@ -279,10 +293,16 @@ export interface StudentSearchOptions {
  * 学员成绩响应接口
  */
 export interface StudentScoresResponse {
-  /** 成绩数组 */
-  rings: number[];
-  /** 兼容旧代码的 scores 别名 */
-  scores?: number[];
+  /** 成绩明细数组 */
+  score_details: StudentScoreDetail[];
+  /** 成绩总条数 */
+  total_scores?: number;
+  /** 平均分 */
+  average_score?: number;
+  /** 最高分 */
+  max_score?: number;
+  /** 最低分 */
+  min_score?: number;
 }
 
 /**

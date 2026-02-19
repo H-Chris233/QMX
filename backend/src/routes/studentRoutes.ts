@@ -11,6 +11,12 @@ const router: Router = express.Router();
 // 应用速率限制
 router.use(apiRateLimitMiddleware);
 
+const scoreDetailSchema = Joi.object({
+  score: commonValidations.score,
+  subject: Joi.string().valid(...Object.values(SubjectType)).required(),
+  recorded_at: Joi.date().iso().required(),
+});
+
 // 验证规则
 const createStudentSchema = Joi.object({
   name: commonValidations.name,
@@ -25,7 +31,7 @@ const createStudentSchema = Joi.object({
   membershipStartDate: Joi.date().iso().optional().allow(null),
   membership_end_date: Joi.date().iso().optional().allow(null),
   membershipEndDate: Joi.date().iso().optional().allow(null),
-  rings: Joi.array().items(Joi.number().min(0).max(10).precision(1)).optional(),
+  score_details: Joi.array().items(scoreDetailSchema).optional(),
 });
 
 const updateStudentSchema = Joi.object({
@@ -41,15 +47,15 @@ const updateStudentSchema = Joi.object({
   membershipStartDate: Joi.date().iso().optional().allow(null),
   membership_end_date: Joi.date().iso().optional().allow(null),
   membershipEndDate: Joi.date().iso().optional().allow(null),
-  rings: Joi.array().items(Joi.number().min(0).max(10).precision(1)).optional(),
+  score_details: Joi.array().items(scoreDetailSchema).optional(),
 });
 
 const searchStudentsSchema = Joi.object({
   name_contains: Joi.string().trim().max(50).optional(),
   min_age: Joi.number().integer().min(0).max(120).optional().allow(null),
   max_age: Joi.number().integer().min(0).max(120).optional().allow(null),
-  min_score: Joi.number().min(0).max(10).precision(1).optional().allow(null),
-  max_score: Joi.number().min(0).max(10).precision(1).optional().allow(null),
+  min_score: Joi.number().optional().allow(null),
+  max_score: Joi.number().optional().allow(null),
   class_type: Joi.string().valid(...Object.values(ClassType)).optional().allow(null),
   subject: Joi.string().valid(...Object.values(SubjectType)).optional().allow(null),
   has_membership: Joi.boolean().optional().allow(null),

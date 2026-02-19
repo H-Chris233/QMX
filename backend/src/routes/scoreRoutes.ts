@@ -4,6 +4,7 @@ import type { Router } from 'express';
 import scoreController from '@/controllers/scoreController';
 import { validate, validateParams, commonValidations } from '@/middleware/validation';
 import { apiRateLimitMiddleware } from '@/middleware/rateLimiter';
+import { SubjectType } from '@/types';
 
 const router: Router = express.Router();
 
@@ -13,22 +14,30 @@ router.use(apiRateLimitMiddleware);
 // 验证规则
 const addScoreSchema = Joi.object({
   score: commonValidations.score,
+  subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
+  recorded_at: Joi.date().iso().optional(),
 });
 
 const updateScoreSchema = Joi.object({
   newScore: commonValidations.score,
+  subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
+  recorded_at: Joi.date().iso().optional(),
 });
 
 const batchAddScoresSchema = Joi.object({
-  scores: Joi.array()
-    .items(commonValidations.score)
+  score_details: Joi.array()
+    .items(Joi.object({
+      score: commonValidations.score,
+      subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
+      recorded_at: Joi.date().iso().optional(),
+    }))
     .min(1)
     .max(50) // 限制最多添加50个成绩
     .required()
     .messages({
       'array.min': '至少需要添加1个成绩',
       'array.max': '最多只能添加50个成绩',
-      'any.required': '成绩数组不能为空',
+      'any.required': '成绩明细数组不能为空',
     }),
 });
 
@@ -61,9 +70,7 @@ const batchAddScoresSchema = Joi.object({
  *             properties:
  *               score:
  *                 type: number
- *                 minimum: 0
- *                 maximum: 10
- *                 description: 成绩分数（0-10）
+ *                 description: 成绩分数
  *                 example: 8.5
  *     responses:
  *       201:
@@ -193,8 +200,6 @@ router.get('/:id/scores',
  *             properties:
  *               newScore:
  *                 type: number
- *                 minimum: 0
- *                 maximum: 10
  *                 description: 新成绩分数
  *     responses:
  *       200:

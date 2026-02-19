@@ -1,0 +1,19 @@
+/* 全局重置：避免浏览器默认 body 外边距导致页面出现白边 */
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}

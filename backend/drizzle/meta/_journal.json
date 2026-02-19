@@ -15,6 +15,13 @@
       "when": 1771427457000,
       "tag": "0002_subject_constraint_shooting_archery",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771497600000,
+      "tag": "0003_score_details_breaking_change",
+      "breakpoints": true
     }
   ]
 }

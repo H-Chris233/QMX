@@ -69,6 +69,11 @@ export interface IStudent {
   classType: ClassType;
   subject: Subject;
   rings: number[];
+  scoreDetails?: Array<{
+    score: number;
+    subject: SubjectType;
+    recorded_at: string;
+  }>;
   note: string | null;
   lessonLeft: number | null;
   class?: never;

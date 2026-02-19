@@ -26,6 +26,7 @@ import type {
   Installment,
   InstallmentPlan,
   InstallmentStatus,
+  StudentScoreDetail,
 } from '../types/api';
 
 
@@ -164,7 +165,7 @@ export class ApiService {
   /**
    * 获取学员成绩
    */
-  static async getStudentScores(uid: number): Promise<number[]> {
+  static async getStudentScores(uid: number): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
       () => StudentApiService.getStudentScores(uid),
       '获取学员成绩',
@@ -175,18 +176,21 @@ export class ApiService {
   /**
    * 添加学员成绩
    */
-  static async addScore(uid: number, score: number): Promise<number[]> {
+  static async addScore(
+    uid: number,
+    payload: { score: number; subject?: string; recorded_at?: string },
+  ): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
-      () => StudentApiService.addScore(uid, score),
+      () => StudentApiService.addScore(uid, payload),
       '添加成绩',
-      { retryable: false, context: { uid, score } }
+      { retryable: false, context: { uid, payload } }
     );
   }
 
   /**
    * 删除学员成绩
    */
-  static async deleteStudentScore(uid: number, scoreIndex: number): Promise<number[]> {
+  static async deleteStudentScore(uid: number, scoreIndex: number): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
       () => StudentApiService.deleteScore(uid, scoreIndex),
       '删除成绩',
@@ -197,22 +201,29 @@ export class ApiService {
   /**
    * 更新学员成绩
    */
-  static async updateStudentScore(uid: number, scoreIndex: number, newScore: number): Promise<number[]> {
+  static async updateStudentScore(
+    uid: number,
+    scoreIndex: number,
+    payload: { newScore: number; subject?: string; recorded_at?: string },
+  ): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
-      () => StudentApiService.updateScore(uid, scoreIndex, newScore),
+      () => StudentApiService.updateScore(uid, scoreIndex, payload),
       '更新成绩',
-      { retryable: false, context: { uid, scoreIndex, newScore } }
+      { retryable: false, context: { uid, scoreIndex, payload } }
     );
   }
 
   /**
    * 批量更新学员成绩
    */
-  static async updateScoresBatch(uid: number, scores: number[]): Promise<number[]> {
+  static async updateScoresBatch(
+    uid: number,
+    scoreDetails: Array<{ score: number; subject?: string; recorded_at?: string }>,
+  ): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
-      () => StudentApiService.updateScoresBatch(uid, scores),
+      () => StudentApiService.updateScoresBatch(uid, scoreDetails),
       '批量更新成绩',
-      { retryable: false, context: { uid, scores } }
+      { retryable: false, context: { uid, scoreDetails } }
     );
   }
 

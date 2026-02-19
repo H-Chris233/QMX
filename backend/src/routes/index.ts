@@ -21,7 +21,7 @@ router.get('/', (_req: Request, res: Response, _next: NextFunction): void => {
     description: '启明星学生管理系统后端API',
     endpoints: {
       students: '/students',
-      scores: '/scores',
+      scores: '/students/:id/scores',
       transactions: '/transactions',
       installments: '/installments',
       membership: '/membership',
@@ -35,7 +35,7 @@ router.get('/', (_req: Request, res: Response, _next: NextFunction): void => {
 
 // 注册路由模块
 router.use('/students', studentRoutes);
-router.use('/', scoreRoutes); // 成绩路由使用 /students/:id/scores 格式
+router.use('/students', scoreRoutes);
 router.use('/transactions', cashRoutes);
 router.use('/installments', installmentRoutes);
 router.use('/membership', membershipRoutes);

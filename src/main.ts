@@ -1,6 +1,7 @@
 import { createApp, defineAsyncComponent } from 'vue';
 import { createPinia } from 'pinia';
 import MainApp from './MainApp.vue';
+import './styles/global.css';
 import pinia from './stores';
 import { useAppStore as useAppStoreStore } from './stores/app';
 import { logger } from './utils/logger';

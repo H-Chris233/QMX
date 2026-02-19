@@ -6,6 +6,7 @@ import { AppError } from '@/utils/errors';
 import { StudentRepository } from '../db/repositories/studentRepository';
 import { StudentQuery } from '../services/studentQuery';
 import { presentStudent } from '../services/studentPresenter';
+import { normalizeScoreDetails, scoreDetailsToRings } from '../services/scoreDetails';
 
 const parseNumber = (value: unknown): number | null => {
   if (value === undefined || value === null || value === '') {
@@ -75,8 +76,22 @@ const applyUpdaterFromPayload = async (
   if (payload.note !== undefined) {
     updateData.note = payload.note;
   }
-  if (payload.rings !== undefined) {
-    updateData.rings = Array.isArray(payload.rings) ? payload.rings : [];
+  const fallbackSubject = (
+    payload.subject?.toUpperCase()
+    ?? payload.subjectType?.toUpperCase()
+    ?? 'SHOOTING'
+  ) as SubjectType;
+
+  if (payload.score_details !== undefined || payload.scoreDetails !== undefined) {
+    const scoreDetails = normalizeScoreDetails(payload.score_details ?? payload.scoreDetails, {
+      fallbackSubject,
+    });
+    updateData.scoreDetails = scoreDetails;
+    updateData.rings = scoreDetailsToRings(scoreDetails);
+  } else if (payload.rings !== undefined) {
+    const scoreDetails = normalizeScoreDetails(payload.rings, { fallbackSubject });
+    updateData.scoreDetails = scoreDetails;
+    updateData.rings = scoreDetailsToRings(scoreDetails);
   }
 
   if (
@@ -142,19 +157,26 @@ export class StudentController {
     const classType = (payload.class?.toUpperCase() ?? 'TEN_TRY') as ClassType;
     const lessonLeftInput = payload.lesson_left ?? payload.lessonLeft;
 
+    const defaultSubject = (payload.subject?.toUpperCase() ?? 'SHOOTING') as SubjectType;
+    const scoreDetails = normalizeScoreDetails(
+      payload.score_details ?? payload.scoreDetails ?? payload.rings,
+      { fallbackSubject: defaultSubject },
+    );
+
     // 构建学员数据
     const newStudent = {
       name: payload.name,
       age: payload.age === null || payload.age === undefined ? null : Number(payload.age),
       phone: payload.phone,
       classType,
-      subject: (payload.subject?.toUpperCase() ?? 'SHOOTING') as SubjectType,
+      subject: defaultSubject,
       note: payload.note ?? '',
       // TEN_TRY 默认 10 节课，其它类型默认 0（与 StudentBuilder 行为保持一致）
       lessonLeft: lessonLeftInput == null
         ? (classType === 'TEN_TRY' ? 10 : 0)
         : Number(lessonLeftInput),
-      rings: Array.isArray(payload.rings) ? payload.rings : [],
+      rings: scoreDetailsToRings(scoreDetails),
+      scoreDetails,
       membershipStartDate: payload.membership_start_date ?? payload.membershipStartDate
         ? (typeof (payload.membership_start_date ?? payload.membershipStartDate) === 'string'
           ? payload.membership_start_date ?? payload.membershipStartDate
@@ -341,14 +363,22 @@ export class StudentController {
   public updateStudentScores = catchAsync(
     async (req: Request, res: Response) => {
       const { id } = req.params;
-      const { rings } = req.body;
+      const { score_details } = req.body;
 
-      if (!Array.isArray(rings)) {
-        throw AppError.invalidInput('成绩必须是数组格式');
+      if (!Array.isArray(score_details)) {
+        throw AppError.invalidInput('成绩明细必须是数组格式');
       }
 
+      const student = await StudentRepository.findByUid(Number(id));
+      if (!student) throw AppError.notFound('学员不存在');
+
+      const normalizedScoreDetails = normalizeScoreDetails(score_details, {
+        fallbackSubject: (student.subject ?? 'SHOOTING') as SubjectType,
+      });
+
       const updatedStudent = await StudentRepository.updateByUid(Number(id), {
-        rings,
+        scoreDetails: normalizedScoreDetails,
+        rings: scoreDetailsToRings(normalizedScoreDetails),
       });
 
       if (!updatedStudent) {

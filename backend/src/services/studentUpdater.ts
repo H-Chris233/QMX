@@ -2,9 +2,8 @@ import { StudentRepository } from '../db/repositories/studentRepository';
 import { Student } from '../db/schema/students';
 import { NewStudent } from '../db/schema/students';
 import { normalizeStudentPhoneOrThrow } from './studentPhone';
-
-const SCORE_MIN = 0;
-const SCORE_MAX = 10;
+import { SubjectType } from '@/types';
+import { createScoreDetail, normalizeScoreDetails, scoreDetailsToRings } from './scoreDetails';
 
 export class StudentUpdater {
   private student: Student;
@@ -68,50 +67,76 @@ export class StudentUpdater {
   }
 
   rings(rings?: number[]): this {
-    this.updates.rings = rings ?? [];
+    const fallbackSubject = (this.updates.subject ?? this.student.subject ?? SubjectType.SHOOTING) as SubjectType;
+    const scoreDetails = normalizeScoreDetails(rings ?? [], { fallbackSubject });
+    this.updates.scoreDetails = scoreDetails;
+    this.updates.rings = scoreDetailsToRings(scoreDetails);
+    return this;
+  }
+
+  scoreDetails(scoreDetails?: unknown[]): this {
+    const fallbackSubject = (this.updates.subject ?? this.student.subject ?? SubjectType.SHOOTING) as SubjectType;
+    const normalized = normalizeScoreDetails(scoreDetails ?? [], { fallbackSubject });
+    this.updates.scoreDetails = normalized;
+    this.updates.rings = scoreDetailsToRings(normalized);
     return this;
   }
 
   private getCurrentRings(): number[] {
-    return (this.updates.rings ?? this.student.rings ?? []) as number[];
+    const fallbackSubject = (this.updates.subject ?? this.student.subject ?? SubjectType.SHOOTING) as SubjectType;
+    const details = normalizeScoreDetails(this.updates.scoreDetails ?? this.student.scoreDetails ?? [], {
+      fallbackSubject,
+      fallbackRecordedAt: this.student.updatedAt ? new Date(this.student.updatedAt).toISOString() : new Date().toISOString(),
+    });
+    return scoreDetailsToRings(details);
+  }
+
+  private getCurrentScoreDetails() {
+    const fallbackSubject = (this.updates.subject ?? this.student.subject ?? SubjectType.SHOOTING) as SubjectType;
+    return normalizeScoreDetails(this.updates.scoreDetails ?? this.student.scoreDetails ?? [], {
+      fallbackSubject,
+      fallbackRecordedAt: this.student.updatedAt ? new Date(this.student.updatedAt).toISOString() : new Date().toISOString(),
+    });
   }
 
   addRing(score: number): this {
-    if (typeof score !== 'number' || Number.isNaN(score)) {
-      throw new Error('成绩必须是数字');
+    if (typeof score !== 'number' || Number.isNaN(score) || !Number.isFinite(score)) {
+      throw new Error('成绩必须是有效数字');
     }
-    if (score < SCORE_MIN || score > SCORE_MAX) {
-      throw new Error(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
-    }
-    const newRings = [...this.getCurrentRings(), score];
-    this.updates.rings = newRings;
+    const newScoreDetails = [
+      ...this.getCurrentScoreDetails(),
+      createScoreDetail(score, {
+        fallbackSubject: (this.updates.subject ?? this.student.subject ?? SubjectType.SHOOTING) as SubjectType,
+      }),
+    ];
+    this.updates.scoreDetails = newScoreDetails;
+    this.updates.rings = scoreDetailsToRings(newScoreDetails);
     return this;
   }
 
   removeRing(index: number): this {
-    const rings = this.getCurrentRings();
-    if (index < 0 || index >= rings.length) {
+    const scoreDetails = this.getCurrentScoreDetails();
+    if (index < 0 || index >= scoreDetails.length) {
       throw new Error('成绩索引超出范围');
     }
-    const newRings = rings.filter((_, i) => i !== index);
-    this.updates.rings = newRings;
+    const newScoreDetails = scoreDetails.filter((_, i) => i !== index);
+    this.updates.scoreDetails = newScoreDetails;
+    this.updates.rings = scoreDetailsToRings(newScoreDetails);
     return this;
   }
 
   ringAt(index: number, score: number): this {
-    if (typeof score !== 'number' || Number.isNaN(score)) {
-      throw new Error('成绩必须是数字');
+    if (typeof score !== 'number' || Number.isNaN(score) || !Number.isFinite(score)) {
+      throw new Error('成绩必须是有效数字');
     }
-    if (score < SCORE_MIN || score > SCORE_MAX) {
-      throw new Error(`成绩必须在 ${SCORE_MIN}-${SCORE_MAX} 之间`);
-    }
-    const rings = this.getCurrentRings();
-    if (index < 0 || index >= rings.length) {
+    const scoreDetails = this.getCurrentScoreDetails();
+    if (index < 0 || index >= scoreDetails.length) {
       throw new Error('成绩索引超出范围');
     }
-    const newRings = [...rings];
-    newRings[index] = score;
-    this.updates.rings = newRings;
+    const newScoreDetails = [...scoreDetails];
+    newScoreDetails[index] = { ...newScoreDetails[index], score };
+    this.updates.scoreDetails = newScoreDetails;
+    this.updates.rings = scoreDetailsToRings(newScoreDetails);
     return this;
   }
 

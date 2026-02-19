@@ -1,6 +1,8 @@
 import { StudentRepository } from '../db/repositories/studentRepository';
-import { Student, NewStudent } from '../db/schema/students';
+import { Student, NewStudent, ScoreDetail } from '../db/schema/students';
 import { normalizeStudentPhoneOrThrow } from './studentPhone';
+import { normalizeScoreDetails, scoreDetailsToRings } from './scoreDetails';
+import { SubjectType } from '@/types';
 
 export class StudentBuilder {
   private payload: Partial<NewStudent> = {};
@@ -47,7 +49,18 @@ export class StudentBuilder {
   }
 
   rings(rings?: number[]): this {
-    this.payload.rings = rings || [];
+    const fallbackSubject = (this.payload.subject ?? SubjectType.SHOOTING) as SubjectType;
+    const scoreDetails = normalizeScoreDetails(rings || [], { fallbackSubject });
+    this.payload.scoreDetails = scoreDetails;
+    this.payload.rings = scoreDetailsToRings(scoreDetails);
+    return this;
+  }
+
+  scoreDetails(scoreDetails?: ScoreDetail[]): this {
+    const fallbackSubject = (this.payload.subject ?? SubjectType.SHOOTING) as SubjectType;
+    const normalized = normalizeScoreDetails(scoreDetails || [], { fallbackSubject });
+    this.payload.scoreDetails = normalized;
+    this.payload.rings = scoreDetailsToRings(normalized);
     return this;
   }
 
@@ -117,9 +130,13 @@ export class StudentBuilder {
       throw new Error('课时数不能为负数');
     }
 
-    // 成绩数组：对齐测试期望（默认空数组）
-    if (this.payload.rings === undefined) {
-      this.payload.rings = [];
-    }
+    // 成绩明细：默认空数组，并同步 rings 快照
+    const fallbackSubject = (this.payload.subject ?? SubjectType.SHOOTING) as SubjectType;
+    const scoreDetails = normalizeScoreDetails(
+      this.payload.scoreDetails ?? this.payload.rings ?? [],
+      { fallbackSubject },
+    );
+    this.payload.scoreDetails = scoreDetails;
+    this.payload.rings = scoreDetailsToRings(scoreDetails);
   }
 }

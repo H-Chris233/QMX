@@ -554,36 +554,67 @@ describe('ApiService - 成绩模块', () => {
         requestedPath = request.url;
 
         expect(params.uid).toBe('101');
-        expect(capturedPayload).toEqual({ score: 95 });
+        expect(capturedPayload).toEqual({
+          score: 95,
+          subject: 'SHOOTING',
+          recorded_at: '2026-02-19T00:00:00.000Z',
+        });
 
         return HttpResponse.json({
           success: true,
-          data: { rings: [90, 95] },
+          data: {
+            score_details: [
+              { score: 90, subject: 'SHOOTING', recorded_at: '2026-02-18T00:00:00.000Z' },
+              { score: 95, subject: 'SHOOTING', recorded_at: '2026-02-19T00:00:00.000Z' },
+            ],
+          },
         }, { status: 201 });
       })
     );
 
-    const result = await ApiService.addScore(101, 95);
+    const result = await ApiService.addScore(101, {
+      score: 95,
+      subject: 'SHOOTING',
+      recorded_at: '2026-02-19T00:00:00.000Z',
+    });
 
     expect(requestedPath).toContain('/api/v1/students/101/scores');
-    expect(result).toEqual([90, 95]);
+    expect(result).toHaveLength(2);
+    expect(result[1]).toMatchObject({ score: 95, subject: 'SHOOTING' });
   });
 
-  it('should fallback to scores array when rings field missing', async () => {
+  it('should send score_details payload for batch add', async () => {
     mswServer.use(
       http.post(`${API_BASE}/students/:uid/scores/batch`, async ({ request, params }) => {
         expect(params.uid).toBe('202');
         const payload = await request.json();
-        expect(payload).toEqual({ scores: [88, 92, 96] });
+        expect(payload).toEqual({
+          score_details: [
+            { score: 88, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+            { score: 92, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+            { score: 96, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+          ],
+        });
         return HttpResponse.json({
           success: true,
-          data: { scores: [88, 92, 96] },
+          data: {
+            score_details: [
+              { score: 88, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+              { score: 92, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+              { score: 96, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+            ],
+          },
         });
       })
     );
 
-    const result = await ApiService.updateScoresBatch(202, [88, 92, 96]);
-    expect(result).toEqual([88, 92, 96]);
+    const result = await ApiService.updateScoresBatch(202, [
+      { score: 88, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+      { score: 92, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+      { score: 96, subject: 'ARCHERY', recorded_at: '2026-02-19T10:00:00.000Z' },
+    ]);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toMatchObject({ score: 88, subject: 'ARCHERY' });
   });
 
   it('should notify error handler when deleting score fails', async () => {

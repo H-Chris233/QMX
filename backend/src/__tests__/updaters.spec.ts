@@ -159,12 +159,22 @@ describe('StudentUpdater', () => {
       expect(() => updater.ringAt(5, 10)).toThrow(/成绩索引超出范围/);
     });
 
+    it('支持任意数值成绩', async () => {
+      const student = await createTestStudent();
+      const updater = StudentUpdater.fromDocument(student);
+      updater.addRing(11);
+      updater.addRing(-1);
+      const updated = await updater.commit();
+
+      expect(updated.rings).toEqual([11, -1]);
+    });
+
     it('无效成绩值抛出错误', async () => {
       const student = await createTestStudent();
       const updater = StudentUpdater.fromDocument(student);
 
-      expect(() => updater.addRing(11)).toThrow(/成绩必须在 0-10 之间/);
-      expect(() => updater.addRing(-1)).toThrow(/成绩必须在 0-10 之间/);
+      expect(() => updater.addRing(Number.NaN)).toThrow(/成绩必须是有效数字/);
+      expect(() => updater.addRing(Number.POSITIVE_INFINITY)).toThrow(/成绩必须是有效数字/);
     });
   });
 

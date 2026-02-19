@@ -8,6 +8,8 @@ import type {
   StudentSearchOptions,
   PaginatedResponse,
   CurrentStudentInput,
+  StudentScoreDetail,
+  StudentScoresResponse,
 } from "../types/api";
 import {
   toClassType,
@@ -50,10 +52,15 @@ export interface StudentListResponse {
  */
 export class StudentApiService {
   private static normalizeStudent(student: Student): Student {
+    const scoreDetails = Array.isArray(student.score_details) ? student.score_details : [];
+    const rings = scoreDetails.map((detail) => Number(detail.score)).filter((score) => Number.isFinite(score));
+
     return {
       ...student,
       class: toFrontendClassType(String(student.class)) || student.class,
       subject: toFrontendSubjectType(String(student.subject)) || student.subject,
+      score_details: scoreDetails,
+      rings,
       membership_status: student.membership_status
         ? (toFrontendMembershipStatus(String(student.membership_status)) as any)
         : student.membership_status,
@@ -175,7 +182,7 @@ export class StudentApiService {
       payload.membership_start_date = data.membership_start_date;
     if (data.membership_end_date !== undefined)
       payload.membership_end_date = data.membership_end_date;
-    if (data.rings !== undefined) payload.rings = data.rings;
+    if (data.score_details !== undefined) payload.score_details = data.score_details;
 
     const updated = await apiCall<Student>(baseClient.put(`/students/${uid}`, payload));
     return StudentApiService.normalizeStudent(updated);
@@ -191,35 +198,34 @@ export class StudentApiService {
   /**
    * 获取学员成绩
    */
-  static async getStudentScores(uid: number): Promise<number[]> {
-    const response = await apiCall<{ rings: number[]; scores?: number[] }>(
+  static async getStudentScores(uid: number): Promise<StudentScoreDetail[]> {
+    const response = await apiCall<StudentScoresResponse>(
       baseClient.get(`/students/${uid}/scores`)
     );
-
-    // 返回 rings 字段（后端使用 rings 存储成绩）
-    return response.rings || response.scores || [];
+    return Array.isArray(response.score_details) ? response.score_details : [];
   }
 
   /**
    * 添加学员成绩
    */
-  static async addScore(uid: number, score: number): Promise<number[]> {
-    const response = await apiCall<{ rings: number[]; scores?: number[] }>(
-      baseClient.post(`/students/${uid}/scores`, { score })
+  static async addScore(
+    uid: number,
+    payload: { score: number; subject?: string; recorded_at?: string },
+  ): Promise<StudentScoreDetail[]> {
+    const response = await apiCall<StudentScoresResponse>(
+      baseClient.post(`/students/${uid}/scores`, payload)
     );
-
-    return response.rings || response.scores || [];
+    return Array.isArray(response.score_details) ? response.score_details : [];
   }
 
   /**
    * 删除学员成绩
    */
-  static async deleteScore(uid: number, scoreIndex: number): Promise<number[]> {
-    const response = await apiCall<{ rings: number[]; scores?: number[] }>(
+  static async deleteScore(uid: number, scoreIndex: number): Promise<StudentScoreDetail[]> {
+    const response = await apiCall<StudentScoresResponse>(
       baseClient.delete(`/students/${uid}/scores/${scoreIndex}`)
     );
-
-    return response.rings || response.scores || [];
+    return Array.isArray(response.score_details) ? response.score_details : [];
   }
 
   /**
@@ -235,13 +241,12 @@ export class StudentApiService {
   static async updateScore(
     uid: number,
     scoreIndex: number,
-    newScore: number
-  ): Promise<number[]> {
-    const response = await apiCall<{ rings: number[]; scores?: number[] }>(
-      baseClient.put(`/students/${uid}/scores/${scoreIndex}`, { newScore })
+    payload: { newScore: number; subject?: string; recorded_at?: string },
+  ): Promise<StudentScoreDetail[]> {
+    const response = await apiCall<StudentScoresResponse>(
+      baseClient.put(`/students/${uid}/scores/${scoreIndex}`, payload)
     );
-
-    return response.rings || response.scores || [];
+    return Array.isArray(response.score_details) ? response.score_details : [];
   }
 
   /**
@@ -249,12 +254,11 @@ export class StudentApiService {
    */
   static async updateScoresBatch(
     uid: number,
-    scores: number[]
-  ): Promise<number[]> {
-    const response = await apiCall<{ rings: number[]; scores?: number[] }>(
-      baseClient.post(`/students/${uid}/scores/batch`, { scores })
+    scoreDetails: Array<{ score: number; subject?: string; recorded_at?: string }>,
+  ): Promise<StudentScoreDetail[]> {
+    const response = await apiCall<StudentScoresResponse>(
+      baseClient.post(`/students/${uid}/scores/batch`, { score_details: scoreDetails })
     );
-
-    return response.rings || response.scores || [];
+    return Array.isArray(response.score_details) ? response.score_details : [];
   }
 }

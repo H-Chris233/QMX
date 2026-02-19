@@ -192,8 +192,13 @@ export const commonValidations = {
   date: Joi.date().iso().optional(),
   amount: createAmountSchema(),
   optionalAmount: createAmountSchema({ required: false, allowNull: true, disallowZero: false }),
-  score: Joi.number().min(0).max(10).precision(1).required(),
-  optionalScore: Joi.number().min(0).max(10).precision(1).optional(),
+  score: Joi.number().required().messages({
+    'number.base': '成绩必须是有效数字',
+    'any.required': '成绩不能为空',
+  }),
+  optionalScore: Joi.number().optional().messages({
+    'number.base': '成绩必须是有效数字',
+  }),
   text: Joi.string().trim().max(1000).optional().allow(''),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),

@@ -8,6 +8,7 @@ import {
   date,
   timestamp,
   real,
+  jsonb,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -18,6 +19,11 @@ export const subjectEnum = ['SHOOTING', 'ARCHERY', 'SHOOTING_ARCHERY', 'OTHERS']
 
 export type ClassType = typeof classTypeEnum[number];
 export type Subject = typeof subjectEnum[number];
+export interface ScoreDetail {
+  score: number;
+  subject: Subject;
+  recorded_at: string;
+}
 
 // 学员表
 export const students = pgTable('students', {
@@ -29,6 +35,7 @@ export const students = pgTable('students', {
   subject: varchar('subject', { length: 20 }).notNull().default('SHOOTING'),
   lessonLeft: integer('lesson_left').default(0),
   rings: real('rings').array().default(sql`'{}'`),
+  scoreDetails: jsonb('score_details').$type<ScoreDetail[]>().notNull().default(sql`'[]'::jsonb`),
   note: text('note'),
   membershipStartDate: date('membership_start_date'),
   membershipEndDate: date('membership_end_date'),

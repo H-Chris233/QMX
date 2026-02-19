@@ -29,6 +29,17 @@
         <!-- 快速录入 (仅选中学员时显示) -->
         <Transition name="fade-slide">
           <div class="quick-add-group" v-if="selectedStudentData">
+            <div v-if="shouldShowManageCourseSelector" class="select-wrapper quick-course-select">
+              <select
+                v-model="selectedManageCourse"
+                class="quick-course-field"
+                aria-label="选择训练科目"
+              >
+                <option value="射击">射击</option>
+                <option value="射箭">射箭</option>
+              </select>
+              <ChevronDown :size="12" class="select-arrow" />
+            </div>
             <div class="input-wrapper">
               <Target :size="16" class="input-icon" />
               <input
@@ -168,20 +179,22 @@
           <div class="scores-grid-container">
             <div class="scores-grid">
               <div
-                v-for="(score, index) in selectedStudentData.rings"
-                :key="index"
+                v-for="record in detailedRecords"
+                :key="record.index"
                 class="score-capsule"
-                :class="getScoreLevelClass(score)"
+                :class="getScoreLevelClass(record.score)"
               >
                 <div class="capsule-content">
-                  <span class="capsule-idx">#{{ index + 1 }}</span>
-                  <span class="capsule-val">{{ score }}</span>
+                  <span class="capsule-idx">#{{ record.index + 1 }}</span>
+                  <span class="capsule-val">{{ record.score }}</span>
+                  <span class="capsule-meta">科目：{{ record.subject }}</span>
+                  <span class="capsule-time">录入：{{ record.recordedAt }}</span>
                 </div>
                 <div class="capsule-overlay">
-                  <button @click="editScore(index, score)" title="编辑">
+                  <button @click="editScore(record.index, record.score)" title="编辑">
                     <Edit2 :size="14" />
                   </button>
-                  <button @click="deleteScore(index, score)" title="删除" class="del">
+                  <button @click="deleteScore(record.index, record.score)" title="删除" class="del">
                     <X :size="14" />
                   </button>
                 </div>
@@ -232,7 +245,7 @@
                 <td>
                   <div class="row-actions">
                     <button @click="editGrade(grade)" class="action-btn"><Edit2 :size="14" /></button>
-                    <button @click="deleteGrade(grade.id)" class="action-btn danger"><Trash2 :size="14" /></button>
+                    <button @click="deleteGrade(grade)" class="action-btn danger"><Trash2 :size="14" /></button>
                   </div>
                 </td>
               </tr>
@@ -343,7 +356,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
-import type { Student } from '../types/api';
+import type { Student, StudentScoreDetail } from '../types/api';
 import { ApiService } from '../api/ApiService';
 import { handleValidationError } from '../utils/errorHandler';
 import { validateScoreInput, safeParseNumber } from '../utils/dataTransformers';
@@ -377,11 +390,14 @@ import {
 // 保持原有的逻辑代码，未做删减，仅适配新UI
 interface Grade {
   id: number;
+  scoreIndex: number;
   studentName: string;
   course: string;
+  subjectValue?: string;
   examType: string;
   score: number;
   date: string;
+  recordedAt?: string;
   studentId: number;
   notes?: string;
 }
@@ -395,11 +411,13 @@ interface ErrorHandler {
 const loading = ref(false);
 const grades = ref<Grade[]>([]);
 const students = ref<Student[]>([]);
+const MAX_RECENT_GRADES = 200;
 
 const selectedStudent = ref('');
 const selectedStudentData = ref<Student | null>(null);
 const quickScore = ref<number | ''>('');
 const abortController = ref<AbortController | null>(null);
+const selectedManageCourse = ref<'射击' | '射箭'>('射击');
 const selectedCourse = ref('');
 const selectedExamType = ref('');
 const studentSearch = ref('');
@@ -409,6 +427,7 @@ const showBatchAdd = ref(false);
 const batchScoresText = ref('');
 const currentGrade = ref<{
   id: number | null;
+  scoreIndex: number | null;
   studentId: string;
   studentName: string;
   course: string;
@@ -418,6 +437,7 @@ const currentGrade = ref<{
   notes: string;
 }>({
   id: null,
+  scoreIndex: null,
   studentId: '',
   studentName: '',
   course: '',
@@ -478,6 +498,35 @@ const effectiveCourseForGradeForm = computed(() => {
   }
   return getDefaultCourseBySubject(gradeFormStudent.value?.subject);
 });
+
+const shouldShowManageCourseSelector = computed(() => {
+  if (!selectedStudentData.value) return false;
+  return normalizeSubjectType(selectedStudentData.value.subject) === 'SHOOTING_ARCHERY';
+});
+
+const effectiveManageCourse = computed(() => {
+  if (!selectedStudentData.value) return '';
+  const normalizedSubject = normalizeSubjectType(selectedStudentData.value.subject);
+  if (normalizedSubject === 'SHOOTING') return '射击';
+  if (normalizedSubject === 'ARCHERY') return '射箭';
+  if (normalizedSubject === 'SHOOTING_ARCHERY') return selectedManageCourse.value || '射击';
+  return '其他';
+});
+
+const syncManageCourseBySelectedStudent = () => {
+  if (!selectedStudentData.value) {
+    selectedManageCourse.value = '射击';
+    return;
+  }
+
+  const normalizedSubject = normalizeSubjectType(selectedStudentData.value.subject);
+  if (normalizedSubject === 'ARCHERY') {
+    selectedManageCourse.value = '射箭';
+    return;
+  }
+
+  selectedManageCourse.value = '射击';
+};
 
 const syncCurrentGradeCourseBySubject = () => {
   if (!gradeFormStudent.value) {
@@ -544,12 +593,7 @@ const getGradeLevel = (score: number) => {
 };
 
 const getMaxScore = () => {
-  if (!selectedStudentData.value) return 100;
-  const subject = normalizeSubjectType(selectedStudentData.value.subject);
-  if (subject === 'SHOOTING') return 654;
-  if (subject === 'ARCHERY') return 600;
-  if (subject === 'SHOOTING_ARCHERY') return 654;
-  return 100;
+  return getMaxScoreForCourse(effectiveManageCourse.value || '其他');
 };
 
 const getScorePlaceholder = () => {
@@ -571,46 +615,132 @@ const getDisplayStudentName = (grade: Grade) => {
   return student?.name || '未知学员';
 };
 
+const getRecentCourseBySubject = (subject?: string) => {
+  const normalizedSubject = normalizeSubjectType(subject);
+  if (normalizedSubject === 'SHOOTING') return '射击';
+  if (normalizedSubject === 'ARCHERY') return '射箭';
+  if (normalizedSubject === 'SHOOTING_ARCHERY') return '射击&射箭';
+  return '其他';
+};
+
+const getSubjectValueByCourse = (course: string): string => {
+  if (course === '射击') return 'SHOOTING';
+  if (course === '射箭') return 'ARCHERY';
+  if (course === '射击&射箭') return 'SHOOTING_ARCHERY';
+  return 'OTHERS';
+};
+
+const getStudentScoreDetails = (student?: Student | null): StudentScoreDetail[] => {
+  if (!student) return [];
+  if (Array.isArray(student.score_details) && student.score_details.length > 0) {
+    return student.score_details.filter((item) => item && Number.isFinite(Number(item.score)));
+  }
+  const fallbackTime = student.updated_at || new Date().toISOString();
+  const fallbackSubject = normalizeSubjectType(student.subject);
+  return (student.rings || []).map((score) => ({
+    score: Number(score),
+    subject: fallbackSubject,
+    recorded_at: fallbackTime,
+  }));
+};
+
+const toIsoByDateInput = (dateText?: string) => {
+  if (!dateText) return new Date().toISOString();
+  const parsed = new Date(dateText);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  const parsedWithDayStart = new Date(`${dateText}T00:00:00`);
+  if (!Number.isNaN(parsedWithDayStart.getTime())) return parsedWithDayStart.toISOString();
+  return new Date().toISOString();
+};
+
+const formatDateTime = (input?: string) => {
+  if (!input) return '--';
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return '--';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+const buildRecentGradesFromStudents = (items: Student[]): Grade[] => {
+  const list: Grade[] = [];
+  let idSeed = 1;
+
+  for (const student of items) {
+    const scoreDetails = getStudentScoreDetails(student);
+    for (let scoreIndex = 0; scoreIndex < scoreDetails.length; scoreIndex++) {
+      const detail = scoreDetails[scoreIndex];
+      const recordedAt = detail.recorded_at || student.updated_at || '';
+      list.push({
+        id: idSeed++,
+        scoreIndex,
+        studentId: student.uid,
+        studentName: student.name,
+        course: getRecentCourseBySubject(detail.subject),
+        subjectValue: detail.subject,
+        examType: '',
+        score: Number(detail.score),
+        date: recordedAt ? recordedAt.split('T')[0] : '',
+        recordedAt,
+        notes: student.note || '',
+      });
+    }
+  }
+
+  return list
+    .sort((a, b) => {
+      const aTime = a.recordedAt ? new Date(a.recordedAt).getTime() : 0;
+      const bTime = b.recordedAt ? new Date(b.recordedAt).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, MAX_RECENT_GRADES);
+};
+
+const detailedRecords = computed(() => {
+  if (!selectedStudentData.value) return [];
+  return getStudentScoreDetails(selectedStudentData.value).map((detail, index) => ({
+    index,
+    score: Number(detail.score),
+    subject: getRecentCourseBySubject(detail.subject),
+    recordedAt: formatDateTime(detail.recorded_at),
+  }));
+});
+
 const scoreRanges = computed(() => {
   if (!selectedStudentData.value?.rings.length) return [];
-  const subject = selectedStudentData.value.subject;
-  let ranges;
-  
-  if (subject === 'Shooting') {
-    ranges = [
-      { label: '500+', min: 500, max: 654, count: 0, color: '#10b981' },
-      { label: '400-499', min: 400, max: 499, count: 0, color: '#8b5cf6' },
-      { label: '300-399', min: 300, max: 399, count: 0, color: '#f59e0b' },
-      { label: '0-299', min: 0, max: 299, count: 0, color: '#ef4444' },
-    ];
-  } else {
-    // Generic ranges
-    ranges = [
-      { label: '90%+', min: 90, max: 1000, count: 0, color: '#10b981' },
-      { label: '80-89%', min: 80, max: 89, count: 0, color: '#8b5cf6' },
-      { label: '60-79%', min: 60, max: 79, count: 0, color: '#f59e0b' },
-      { label: '0-59%', min: 0, max: 59, count: 0, color: '#ef4444' },
-    ];
-  }
-  
+  const maxScore = getMaxScore();
+  const ranges = [
+    { label: '90%+', count: 0, color: '#10b981' },
+    { label: '80-89%', count: 0, color: '#8b5cf6' },
+    { label: '60-79%', count: 0, color: '#f59e0b' },
+    { label: '0-59%', count: 0, color: '#ef4444' },
+  ];
+
   selectedStudentData.value.rings.forEach((score) => {
-    // 简单适配通用逻辑，实际应根据百分比计算
-    const range = ranges.find((r) => score >= r.min && score <= r.max);
-    if (range) range.count++;
+    const ratio = maxScore > 0 ? score / maxScore : 0;
+    if (ratio >= 0.9) ranges[0].count++;
+    else if (ratio >= 0.8) ranges[1].count++;
+    else if (ratio >= 0.6) ranges[2].count++;
+    else ranges[3].count++;
   });
-  
+
   const maxCount = Math.max(...ranges.map((r) => r.count), 1);
   return ranges.map((r) => ({ ...r, maxCount }));
 });
 
 // --- API Actions (Logic preserved) ---
-const loadData = async () => {
-  if (loading.value) return;
+const loadData = async (forceOrEvent: boolean | Event = false) => {
+  const force = typeof forceOrEvent === 'boolean' ? forceOrEvent : false;
+  if (loading.value && !force) return;
   loading.value = true;
   try {
     const response = await ApiService.getAllStudents();
     const data = response.students || [];
     students.value = data.filter((s: any) => s && s.uid && s.name);
+    grades.value = buildRecentGradesFromStudents(students.value);
   } catch (error: any) {
     showError('数据加载失败', error.message);
   } finally {
@@ -621,15 +751,22 @@ const loadData = async () => {
 const onStudentChange = async () => {
   if (!selectedStudent.value) {
     selectedStudentData.value = null;
+    syncManageCourseBySelectedStudent();
     return;
   }
   loading.value = true;
   try {
     const uid = Number(selectedStudent.value);
-    const scores = await ApiService.getStudentScores(uid);
+    const scoreDetails = await ApiService.getStudentScores(uid);
     const student = students.value.find((s: any) => s.uid === uid);
     if (student) {
-      selectedStudentData.value = { ...student, rings: Array.isArray(scores) ? scores : [] } as Student;
+      const normalizedScoreDetails = Array.isArray(scoreDetails) ? scoreDetails : [];
+      selectedStudentData.value = {
+        ...student,
+        score_details: normalizedScoreDetails,
+        rings: normalizedScoreDetails.map((item) => Number(item.score)),
+      } as Student;
+      syncManageCourseBySelectedStudent();
     }
   } catch (error: any) {
     showError('获取失败', error.message);
@@ -649,7 +786,12 @@ const addQuickScore = async () => {
   
   loading.value = true;
   try {
-    await ApiService.addScore(Number(selectedStudent.value), score);
+    const course = effectiveManageCourse.value || getDefaultCourseBySubject(selectedStudentData.value?.subject);
+    await ApiService.addScore(Number(selectedStudent.value), {
+      score,
+      subject: getSubjectValueByCourse(course),
+      recorded_at: new Date().toISOString(),
+    });
     showSuccess('添加成功', '成绩已录入');
     await onStudentChange();
     quickScore.value = '';
@@ -679,10 +821,20 @@ const batchAddScores = async () => {
   loading.value = true;
   try {
     const uid = Number(selectedStudent.value);
-    for (const score of scores) await ApiService.addScore(uid, score);
+    const course = effectiveManageCourse.value || getDefaultCourseBySubject(selectedStudentData.value?.subject);
+    const subject = getSubjectValueByCourse(course);
+    const now = new Date().toISOString();
+    await ApiService.updateScoresBatch(
+      uid,
+      scores.map((score) => ({
+        score,
+        subject,
+        recorded_at: now,
+      })),
+    );
     showSuccess('导入成功', `已添加 ${scores.length} 条成绩`);
     closeBatchAddDialog();
-    onStudentChange();
+    await onStudentChange();
   } catch (error: any) {
     showError('导入失败', error.message);
   } finally {
@@ -716,9 +868,9 @@ const clearAllScores = () => {
     onConfirm: async () => {
       loading.value = true;
       try {
-        await ApiService.updateScoresBatch(Number(selectedStudent.value), []);
+        await ApiService.clearAllScores(Number(selectedStudent.value));
         showSuccess('已清空', '所有成绩已移除');
-        onStudentChange();
+        await onStudentChange();
       } catch (e: any) {
         showError('操作失败', e.message);
       } finally {
@@ -756,8 +908,10 @@ const editScore = async (index: number, currentScore: number) => {
   
   loading.value = true;
   try {
-    await ApiService.updateStudentScore(Number(selectedStudent.value), index, newScore);
-    onStudentChange();
+    await ApiService.updateStudentScore(Number(selectedStudent.value), index, {
+      newScore,
+    });
+    await onStudentChange();
   } catch (e: any) {
     showError('更新失败', e.message);
   } finally {
@@ -774,6 +928,7 @@ const closeModals = () => {
 const openAddGradeModal = () => {
   currentGrade.value = {
     id: null,
+    scoreIndex: null,
     studentId: selectedStudent.value || '',
     studentName: '',
     course: '',
@@ -786,8 +941,7 @@ const openAddGradeModal = () => {
   showAddGrade.value = true;
 };
 
-const saveGrade = () => {
-  // 简化的保存逻辑，适配原有功能
+const saveGrade = async () => {
   if (currentGrade.value.score === null || currentGrade.value.score === undefined) return;
   if (!currentGrade.value.studentId) {
     showError('保存失败', '请先选择学员');
@@ -795,29 +949,82 @@ const saveGrade = () => {
   }
 
   const studentId = Number(currentGrade.value.studentId);
-  const student = students.value.find((item) => item.uid === studentId);
-  const studentName = student?.name || currentGrade.value.studentName || '未知学员';
-
-  const payload = {
-    ...currentGrade.value,
-    studentId,
-    studentName,
-    course: effectiveCourseForGradeForm.value,
-  };
-
-  if (showAddGrade.value) {
-    grades.value.push({ ...payload, id: Date.now() } as any);
+  const score = Number(currentGrade.value.score);
+  if (!Number.isFinite(score)) {
+    showError('保存失败', '成绩格式无效');
+    return;
   }
-  closeModals();
+
+  loading.value = true;
+  try {
+    const subjectValue = getSubjectValueByCourse(effectiveCourseForGradeForm.value);
+    const recordedAt = toIsoByDateInput(currentGrade.value.date);
+
+    if (showAddGrade.value) {
+      await ApiService.addScore(studentId, {
+        score,
+        subject: subjectValue,
+        recorded_at: recordedAt,
+      });
+    } else if (showEditGrade.value && currentGrade.value.id !== null) {
+      if (currentGrade.value.scoreIndex === null || currentGrade.value.scoreIndex === undefined) {
+        showError('保存失败', '缺少成绩索引，无法更新');
+        return;
+      }
+      await ApiService.updateStudentScore(studentId, currentGrade.value.scoreIndex, {
+        newScore: score,
+        subject: subjectValue,
+        recorded_at: recordedAt,
+      });
+    }
+
+    await loadData(true);
+    if (selectedStudent.value && Number(selectedStudent.value) === studentId) {
+      await onStudentChange();
+    }
+
+    showSuccess('保存成功', '成绩已保存');
+    closeModals();
+  } catch (error: any) {
+    showError('保存失败', error?.message || '无法保存成绩');
+  } finally {
+    loading.value = false;
+  }
 };
 
 const editGrade = (g: Grade) => {
-  currentGrade.value = { ...g, studentId: String(g.studentId), notes: g.notes || '' };
+  currentGrade.value = {
+    ...g,
+    studentId: String(g.studentId),
+    scoreIndex: g.scoreIndex,
+    course: g.course || '',
+    date: g.date || getTodayDateString(),
+    notes: g.notes || '',
+  };
   showEditGrade.value = true;
 };
 
-const deleteGrade = (id: number) => {
-  grades.value = grades.value.filter(g => g.id !== id);
+const deleteGrade = (grade: Grade) => {
+  showConfirm({
+    title: '删除成绩',
+    message: `确定删除学员 ${getDisplayStudentName(grade)} 的该条成绩吗？`,
+    confirmType: 'danger',
+    onConfirm: async () => {
+      loading.value = true;
+      try {
+        await ApiService.deleteStudentScore(grade.studentId, grade.scoreIndex);
+        await loadData(true);
+        if (selectedStudent.value && Number(selectedStudent.value) === grade.studentId) {
+          await onStudentChange();
+        }
+        showSuccess('删除成功', '成绩已删除');
+      } catch (error: any) {
+        showError('删除失败', error?.message || '无法删除成绩');
+      } finally {
+        loading.value = false;
+      }
+    },
+  });
 };
 
 // Watchers & Lifecycle
@@ -831,7 +1038,9 @@ watch(() => currentGrade.value.studentId, () => {
   syncCurrentGradeCourseBySubject();
 });
 
-onMounted(loadData);
+onMounted(() => {
+  loadData();
+});
 onUnmounted(() => abortController.value?.abort());
 </script>
 
@@ -914,6 +1123,24 @@ onUnmounted(() => abortController.value?.abort());
   padding-left: 0.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
+}
+
+.quick-course-select {
+  min-width: 104px;
+}
+
+.quick-course-field {
+  min-width: 104px;
+  padding: 0.4rem 1.6rem 0.4rem 0.6rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  appearance: none;
+  cursor: pointer;
+}
+
+.quick-course-field:focus {
+  outline: none;
 }
 
 .quick-input {
@@ -1117,7 +1344,7 @@ onUnmounted(() => abortController.value?.abort());
 
 .scores-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 0.75rem;
 }
 
@@ -1125,7 +1352,7 @@ onUnmounted(() => abortController.value?.abort());
   background-color: var(--bg-app);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  padding: 0.6rem 0.4rem;
+  padding: 0.65rem 0.55rem;
   text-align: center;
   position: relative;
   transition: all 0.2s;
@@ -1141,6 +1368,8 @@ onUnmounted(() => abortController.value?.abort());
 .capsule-content { display: flex; flex-direction: column; gap: 0.25rem; }
 .capsule-idx { font-size: 0.7rem; color: var(--text-secondary); }
 .capsule-val { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.capsule-meta { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.2; }
+.capsule-time { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.2; }
 
 .score-capsule.level-excellent .capsule-val { color: #10b981; }
 .score-capsule.level-fail .capsule-val { color: #ef4444; }
