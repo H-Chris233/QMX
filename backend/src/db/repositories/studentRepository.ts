@@ -3,6 +3,16 @@ import { students, Student, NewStudent } from '../schema/students';
 import { eq, like, and, or, gte, lte, isNull, isNotNull, desc, asc, count, sql } from 'drizzle-orm';
 import { SubjectType } from '@/types';
 import { createScoreDetail, normalizeScoreDetails, scoreDetailsToRings } from '@/services/scoreDetails';
+const MAX_STUDENT_UID = 2_147_483_647;
+
+const parseUidKeyword = (keyword: string): number | null => {
+  if (!/^\d+$/.test(keyword)) return null;
+  const parsed = Number(keyword);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > MAX_STUDENT_UID) {
+    return null;
+  }
+  return parsed;
+};
 
 export interface StudentSearchOptions {
   nameContains?: string;
@@ -167,8 +177,9 @@ export class StudentRepository {
           like(students.name, `%${keyword}%`),
           like(students.phone, `%${keyword}%`),
         ];
-        if (/^\d+$/.test(keyword)) {
-          keywordConditions.push(eq(students.uid, Number(keyword)));
+        const uidKeyword = parseUidKeyword(keyword);
+        if (uidKeyword !== null) {
+          keywordConditions.push(eq(students.uid, uidKeyword));
         }
         conditions.push(or(...keywordConditions));
       }

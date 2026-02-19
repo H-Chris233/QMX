@@ -55,6 +55,16 @@ type SortFieldKey = keyof typeof SORT_FIELD_MAP;
 type SortFieldValue = (typeof SORT_FIELD_MAP)[SortFieldKey];
 
 type MembershipFilterState = 'any' | 'withMembership' | 'withoutMembership';
+const MAX_STUDENT_UID = 2_147_483_647;
+
+const parseUidKeyword = (keyword: string): number | null => {
+  if (!/^\d+$/.test(keyword)) return null;
+  const parsed = Number(keyword);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > MAX_STUDENT_UID) {
+    return null;
+  }
+  return parsed;
+};
 
 export class StudentQuery {
   private nameFilter?: string;
@@ -196,8 +206,9 @@ export class StudentQuery {
           like(students.name, `%${keyword}%`) as SQL<unknown>,
           like(students.phone, `%${keyword}%`) as SQL<unknown>,
         ];
-        if (/^\d+$/.test(keyword)) {
-          keywordConditions.push(eq(students.uid, Number(keyword)) as SQL<unknown>);
+        const uidKeyword = parseUidKeyword(keyword);
+        if (uidKeyword !== null) {
+          keywordConditions.push(eq(students.uid, uidKeyword) as SQL<unknown>);
         }
         conditions.push(or(...keywordConditions) as SQL<unknown>);
       }

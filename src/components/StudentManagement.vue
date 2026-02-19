@@ -26,6 +26,15 @@
             搜索
           </button>
         </div>
+        <button
+          type="button"
+          class="reset-filter-btn"
+          data-testid="reset-filter-button"
+          @click="resetAllFilters"
+        >
+          <X :size="16" />
+          <span>重置筛选项</span>
+        </button>
 
         <div class="filters-group">
           <!-- 科目筛选 -->
@@ -264,6 +273,16 @@ const selectedStudent = ref<Student | null>(null);
 // 表单状态
 const showAddStudentForm = ref(false);
 const showEditForm = ref(false);
+
+const resetAllFilters = async (): Promise<void> => {
+  searchQuery.value = '';
+  searchFilters.value = {
+    subject: '',
+    classType: '',
+    hasMembership: '',
+  };
+  await fetchStudents(1);
+};
 
 // 搜索逻辑
 const performSearch = async (): Promise<void> => {
@@ -508,6 +527,28 @@ onMounted(() => fetchStudents());
   transition: all 0.2s ease;
 }
 .search-submit-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.reset-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.55rem;
+  padding: 0 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.reset-filter-btn:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
 }
@@ -839,6 +880,7 @@ onMounted(() => fetchStudents());
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .management-toolbar { flex-direction: column; align-items: stretch; }
+  .reset-filter-btn { justify-content: center; }
   .filters-group { flex-wrap: wrap; }
   .select-wrapper { flex: 1; min-width: 120px; }
   .select-wrapper select { width: 100%; }

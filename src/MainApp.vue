@@ -44,15 +44,6 @@
           </div>
         </div>
 
-        <!-- 开发环境测试按钮 -->
-        <button
-          v-if="isDev"
-          class="icon-btn test-btn"
-          @click="testConfirmModal"
-          title="测试确认弹窗"
-        >
-          <FlaskConical :size="20" />
-        </button>
       </div>
 
       <!-- 移动端：侧边栏（抽屉式） -->
@@ -147,7 +138,6 @@ import {
   Settings,
   Menu,
   X,
-  FlaskConical,
   Sparkles
 } from 'lucide-vue-next';
 
@@ -204,7 +194,6 @@ const SettingsComp = defineAsyncComponent({
 
 const appStore = useAppStore();
 const authStore = useAuthStore();
-const isDev = import.meta.env.DEV;
 
 // 状态管理
 const activeTab = ref('dashboard');
@@ -269,17 +258,6 @@ const toggleSidebar = (): void => {
 const handleSidebarItemClick = (id: string): void => {
   activeTab.value = id;
   toggleSidebar();
-};
-
-const testConfirmModal = (): void => {
-  appStore.showConfirm({
-    title: '系统通知',
-    message: 'Lucide 图标库已成功集成，当前界面采用 Material Dark 风格渲染。',
-    confirmText: '确认',
-    cancelText: '取消',
-    confirmType: 'primary',
-    onConfirm: () => logger.log('Confirmed'),
-  });
 };
 
 // 响应式与事件清理
@@ -483,15 +461,6 @@ onUnmounted(() => cleanupFunctions.forEach(fn => fn()));
 .nav-item.active {
   background-color: var(--bg-hover);
   color: var(--primary-color);
-}
-
-/* 开发测试按钮 */
-.test-btn {
-  color: #fbbf24;
-}
-.test-btn:hover {
-  background-color: rgba(251, 191, 36, 0.1);
-  color: #f59e0b;
 }
 
 /* ========== Sidebar 侧边栏 ========== */
