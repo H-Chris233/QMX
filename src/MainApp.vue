@@ -585,8 +585,10 @@ onUnmounted(() => cleanupFunctions.forEach(fn => fn()));
 /* ========== Main Content 主内容 ========== */
 .main-content {
   flex: 1;
+  min-height: 0;
   padding: 2rem;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
 }
 .content-wrapper {
