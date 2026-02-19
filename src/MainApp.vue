@@ -590,7 +590,7 @@ onUnmounted(() => cleanupFunctions.forEach(fn => fn()));
   position: relative;
 }
 .content-wrapper {
-  height: 100%;
+  min-height: 100%;
 }
 
 /* 内容切换过渡动画 */

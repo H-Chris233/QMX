@@ -1048,7 +1048,7 @@ onUnmounted(() => abortController.value?.abort());
 .grade-management {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 100%;
   gap: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -1195,18 +1195,17 @@ onUnmounted(() => abortController.value?.abort());
 
 /* === Main Content Layout === */
 .main-content {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  min-height: 0;
+  min-height: 100%;
 }
 
 .student-dashboard {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 1.5rem;
-  height: 100%;
+  min-height: 520px;
 }
 
 /* Dashboard Left: Charts & Stats */
@@ -1430,7 +1429,9 @@ onUnmounted(() => abortController.value?.abort());
   border-radius: 12px;
   border: 1px solid var(--border-subtle);
   overflow: hidden;
+  flex-shrink: 0;
 }
+.table-container { overflow-x: auto; overflow-y: auto; max-height: 420px; }
 .section-title { padding: 1rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.5rem; font-weight: 600; }
 .modern-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .modern-table th { text-align: left; padding: 0.75rem 1rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); font-weight: 500; }
