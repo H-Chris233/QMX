@@ -16,11 +16,12 @@ const calculateMembershipPeriod = (membershipType: MembershipType, startDate: Da
   const end = new Date(startDate);
 
   if (membershipType === 'month') {
-    end.setMonth(end.getMonth() + 1);
+    // 月卡固定 31 天（含开始日），结束日 = 开始日 + 30 天
+    end.setDate(end.getDate() + 30);
   } else {
     end.setFullYear(end.getFullYear() + 1);
+    end.setDate(end.getDate() - 1);
   }
-  end.setDate(end.getDate() - 1);
 
   return { startDate: start, endDate: end };
 };
@@ -322,9 +323,8 @@ export class MembershipController {
           periodStart = customStartDate ? new Date(customStartDate) : now;
           periodEnd = customEndDate ? new Date(customEndDate) : new Date(periodStart);
           if (!customEndDate) {
-            // 如果没有结束日期，默认一个月
-            periodEnd.setMonth(periodEnd.getMonth() + 1);
-            periodEnd.setDate(periodEnd.getDate() - 1);
+            // 如果没有结束日期，默认 31 天（含开始日）
+            periodEnd.setDate(periodEnd.getDate() + 30);
           }
         } else {
           // 使用会员类型计算日期

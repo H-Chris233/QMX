@@ -92,7 +92,7 @@
           </div>
 
           <!-- 剩余课时 -->
-          <div class="form-group">
+          <div v-if="shouldShowLessonLeftField" class="form-group">
             <label for="lesson_left">剩余课时</label>
             <div class="input-wrapper">
               <Hourglass :size="16" class="input-icon" />
@@ -125,7 +125,7 @@
       </section>
 
       <!-- Section 2: 会员权益 -->
-      <section class="form-section">
+      <section v-if="shouldShowMembershipSection" class="form-section">
         <div class="section-header">
           <Crown :size="18" class="section-icon text-warning" />
           <h3 class="section-title">会员权益</h3>
@@ -156,7 +156,7 @@
 
           <div class="info-box">
             <Info :size="16" class="info-icon-small" />
-            <p>留空表示非会员状态；填写日期将自动激活会员身份。</p>
+            <p>月卡/年卡默认视为会员并自动生成日期（可手动修改）；其他课程留空则为非会员。</p>
           </div>
         </div>
       </section>
@@ -176,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Student, CurrentStudentInput } from '../types/api';
 import { 
   User, 
@@ -227,6 +227,77 @@ const formData = ref<FormData>({
   membership_end_date: null,
 });
 
+const shouldShowLessonLeftField = computed(() => {
+  return !['Month', 'Year'].includes(formData.value.class);
+});
+
+const isMembershipClassType = (classType: string): boolean => {
+  return classType === 'Month' || classType === 'Year';
+};
+
+const shouldShowMembershipSection = computed(() => {
+  return isMembershipClassType(formData.value.class);
+});
+
+const normalizeLessonLeft = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.floor(parsed));
+};
+
+const formatDateInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateInput = (value?: string | null): Date | null => {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const normalizeDateField = (value?: string | null): string | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized || null;
+};
+
+const buildMembershipEndDate = (startDate: Date, classType: string): Date => {
+  const endDate = new Date(startDate);
+  if (classType === 'Year') {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+    return endDate;
+  }
+  // 月卡固定 31 天（含开始日），结束日 = 开始日 + 30 天
+  endDate.setDate(endDate.getDate() + 30);
+  return endDate;
+};
+
+const ensureMembershipDatesForClass = (
+  classType: string,
+  options: { forceRecalculateEnd?: boolean } = {},
+) => {
+  if (!isMembershipClassType(classType)) return;
+  const { forceRecalculateEnd = false } = options;
+
+  const startRaw = normalizeDateField(formData.value.membership_start_date);
+  const endRaw = normalizeDateField(formData.value.membership_end_date);
+
+  const startDate = parseDateInput(startRaw) ?? new Date();
+  let endDate = parseDateInput(endRaw);
+
+  if (forceRecalculateEnd || !endDate || endDate.getTime() < startDate.getTime()) {
+    endDate = buildMembershipEndDate(startDate, classType);
+  }
+
+  formData.value.membership_start_date = formatDateInput(startDate);
+  formData.value.membership_end_date = formatDateInput(endDate);
+};
+
 watch(() => props.modelValue, (student) => {
   if (student) {
     formData.value = {
@@ -236,19 +307,57 @@ watch(() => props.modelValue, (student) => {
       class: student.class,
       subject: student.subject,
       note: student.note || '',
-      lesson_left: student.lesson_left ?? null,
+      lesson_left: student.lesson_left ?? (student.class === 'TenTry' ? 10 : null),
       membership_start_date: student.membership_start_date ? student.membership_start_date.split('T')[0] : null,
       membership_end_date: student.membership_end_date ? student.membership_end_date.split('T')[0] : null,
     };
   }
 }, { immediate: true });
 
+watch(() => formData.value.class, (classType, prevClassType) => {
+  if (classType === 'TenTry') {
+    if (normalizeLessonLeft(formData.value.lesson_left) === null) {
+      formData.value.lesson_left = 10;
+    }
+    formData.value.membership_start_date = null;
+    formData.value.membership_end_date = null;
+    return;
+  }
+
+  if (classType === 'Month' || classType === 'Year') {
+    formData.value.lesson_left = null;
+    const forceRecalculateEnd = Boolean(
+      prevClassType && isMembershipClassType(prevClassType) && prevClassType !== classType,
+    );
+    ensureMembershipDatesForClass(classType, { forceRecalculateEnd });
+    return;
+  }
+
+  formData.value.membership_start_date = null;
+  formData.value.membership_end_date = null;
+}, { immediate: true });
+
 const handleSubmit = () => {
   const trimmedNote = formData.value.note.trim();
   const ageValue = formData.value.age;
-  const lessonLeftValue = formData.value.lesson_left;
-  const membershipStart = formData.value.membership_start_date;
-  const membershipEnd = formData.value.membership_end_date;
+  const normalizedLessonLeft = normalizeLessonLeft(formData.value.lesson_left);
+  const shouldPersistLessonLeft = formData.value.class !== 'Month' && formData.value.class !== 'Year';
+  const lessonLeftValue = !shouldPersistLessonLeft
+    ? undefined
+    : formData.value.class === 'TenTry'
+      ? (normalizedLessonLeft ?? 10)
+      : normalizedLessonLeft;
+  if (isMembershipClassType(formData.value.class)) {
+    ensureMembershipDatesForClass(formData.value.class);
+  }
+
+  const shouldPersistMembershipDates = isMembershipClassType(formData.value.class);
+  const membershipStart = shouldPersistMembershipDates
+    ? normalizeDateField(formData.value.membership_start_date)
+    : null;
+  const membershipEnd = shouldPersistMembershipDates
+    ? normalizeDateField(formData.value.membership_end_date)
+    : null;
   const apiData: CurrentStudentInput = {
     name: formData.value.name.trim(),
     age: ageValue === null ? null : ageValue,
@@ -257,8 +366,8 @@ const handleSubmit = () => {
     subject: formData.value.subject,
     note: trimmedNote || undefined,
     lesson_left: lessonLeftValue === null ? undefined : lessonLeftValue,
-    membership_start_date: membershipStart === null ? undefined : membershipStart,
-    membership_end_date: membershipEnd === null ? undefined : membershipEnd,
+    membership_start_date: membershipStart ?? undefined,
+    membership_end_date: membershipEnd ?? undefined,
   };
   emit('save', apiData);
 };

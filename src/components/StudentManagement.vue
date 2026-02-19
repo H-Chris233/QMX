@@ -61,17 +61,6 @@
             </select>
             <ChevronDown :size="14" class="select-arrow" />
           </div>
-
-          <!-- 会员状态 -->
-          <div class="select-wrapper">
-            <select v-model="searchFilters.membershipStatus" @change="performSearch" data-testid="filter-membership-status">
-              <option value="">👑 会员状态</option>
-              <option value="Active">✅ 激活中</option>
-              <option value="Expired">⚠️ 已过期</option>
-              <option value="Upcoming">⏳ 即将开始</option>
-            </select>
-            <ChevronDown :size="14" class="select-arrow" />
-          </div>
         </div>
       </div>
 
@@ -129,7 +118,7 @@
           <div class="info-row info-item">
             <Phone :size="14" class="info-icon" />
             <span class="info-label">电话</span>
-            <span class="info-val font-mono">{{ student.phone }}</span>
+            <span class="info-val font-mono">{{ getDisplayPhone(student.phone) }}</span>
           </div>
           <div class="info-row info-item">
             <BookOpen :size="14" class="info-icon" />
@@ -252,7 +241,6 @@ const searchQuery = ref('');
 const searchFilters = ref({
   subject: '',
   classType: '',
-  membershipStatus: '',
   hasMembership: ''
 });
 
@@ -289,14 +277,16 @@ const performSearch = async (): Promise<void> => {
 
 const fetchStudents = async (page: number = 1): Promise<void> => {
   try {
-    const params: any = { page, limit: 20 };
-    if (searchQuery.value) params.name_contains = searchQuery.value;
-    if (searchFilters.value.subject) params.subject = searchFilters.value.subject;
-    if (searchFilters.value.classType) params.class_type = searchFilters.value.classType;
-    if (searchFilters.value.membershipStatus) params.membership_status = searchFilters.value.membershipStatus;
-    if (searchFilters.value.hasMembership) {
-      params.has_membership = searchFilters.value.hasMembership === 'true';
-    }
+    const normalizedKeyword = searchQuery.value.trim();
+    const hasMembershipFilter = searchFilters.value.hasMembership;
+    const params: any = {
+      page,
+      limit: 20,
+      name_contains: normalizedKeyword || null,
+      subject: searchFilters.value.subject || null,
+      class_type: searchFilters.value.classType || null,
+      has_membership: hasMembershipFilter === '' ? null : hasMembershipFilter === 'true',
+    };
 
     await studentStore.fetchStudents(params);
   } catch (error) {
@@ -383,7 +373,7 @@ const exportStudents = async (): Promise<void> => {
       const end = formatDate(s.membership_end_date);
       const status = s.is_membership_active ? '激活' : '未激活';
       return [
-        s.uid, `"${s.name}"`, s.age || '', `"${s.phone}"`, `"${getClassTypeName(s.class)}"`,
+        s.uid, `"${s.name}"`, s.age || '', `"${getDisplayPhone(s.phone)}"`, `"${getClassTypeName(s.class)}"`,
         `"${getSubjectName(s.subject)}"`, s.lesson_left || '',
         `"${start}"`, `"${end}"`, `"${status}"`, `"${s.note || ''}"`
       ].join(',');
@@ -414,6 +404,11 @@ const getSubjectName = (subject: string) => {
 const getClassTypeName = (classType: string) => {
   const map: Record<string, string> = { TenTry: '体验课', Month: '月卡', Year: '年卡', Others: '其他' };
   return map[classType] || classType;
+};
+
+const getDisplayPhone = (phone?: string | null) => {
+  const normalized = typeof phone === 'string' ? phone.trim() : '';
+  return normalized || '（未提供）';
 };
 
 const hasMembershipRange = (student: Student) => Boolean(student.membership_start_date || student.membership_end_date);
@@ -564,6 +559,7 @@ onMounted(() => fetchStudents());
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
+  align-items: start;
 }
 
 .student-card {
@@ -574,6 +570,8 @@ onMounted(() => fetchStudents());
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
+  height: auto;
+  align-self: start;
 }
 
 .student-card:hover {
@@ -642,7 +640,6 @@ onMounted(() => fetchStudents());
 /* Card Body */
 .card-body {
   padding: 1.25rem;
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -757,17 +754,22 @@ onMounted(() => fetchStudents());
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 1rem;
   z-index: 1000;
 }
 
 .modal-content {
   background-color: var(--bg-surface);
   border-radius: 16px;
-  width: 90%;
+  width: min(90vw, 550px);
   max-width: 550px;
+  max-height: calc(100vh - 2rem);
   border: 1px solid var(--border-subtle);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   animation: modal-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-header {
@@ -790,7 +792,11 @@ onMounted(() => fetchStudents());
 }
 .modal-close-btn:hover { background-color: var(--bg-hover); color: var(--text-primary); }
 
-.modal-body { padding: 1.5rem; }
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  min-height: 0;
+}
 
 /* Transitions */
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.2s; }
