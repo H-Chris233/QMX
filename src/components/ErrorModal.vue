@@ -9,7 +9,7 @@
         @click="closeOnOverlayClick ? closeModal() : null"
         role="alertdialog"
         aria-modal="true"
-        :style="{ zIndex: 9999 }" 
+        :style="{ zIndex: 2147483647 }"
       >
         <div 
           class="error-card error-modal" 
@@ -196,7 +196,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* z-index 通过内联样式强制设为 9999 */
+  /* z-index 通过内联样式强制设为浏览器可用最高层级 */
 }
 
 /* Critical Overlay */

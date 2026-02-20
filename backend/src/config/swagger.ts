@@ -491,6 +491,10 @@ const options: swaggerJsdoc.Options = {
               type: 'integer',
               description: '总收入（分）',
             },
+            monthly_revenue_cents: {
+              type: 'integer',
+              description: '当月收入（分）',
+            },
             total_expense_cents: {
               type: 'integer',
               description: '总支出（分）',

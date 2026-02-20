@@ -531,6 +531,8 @@ export interface DashboardStats {
   total_students: number;
   /** 总收入（单位：元） */
   total_revenue: number;
+  /** 当月收入（单位：元） */
+  monthly_revenue?: number;
   /** 总支出（单位：元） */
   total_expense: number;
   /** 净收入（单位：元） */

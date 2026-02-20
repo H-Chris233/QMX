@@ -27,14 +27,14 @@
 
     <!-- 核心指标网格 -->
     <div class="stats-grid" data-testid="stats-grid">
-      <!-- 总收入 -->
+      <!-- 月总收入 -->
       <div
         class="stat-card"
         :class="{ 'is-loading': loading, skeleton: loading }"
         data-testid="revenue-card"
       >
         <div class="card-top">
-          <span class="card-label">总收入</span>
+          <span class="card-label">月总收入</span>
           <div class="icon-wrapper income">
             <Wallet :size="20" />
           </div>

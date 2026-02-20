@@ -35,6 +35,7 @@ describe('StatsService', () => {
 
       expect(stats.totalStudents).toBe(3);
       expect(stats.totalRevenueCents).toBe(95000); // 500 + 300 + 150
+      expect(stats.monthlyRevenueCents).toBe(95000); // 数据集均为当月交易
       expect(stats.totalExpenseCents).toBe(30000); // -100 + -200
       expect(stats.netIncomeCents).toBe(65000);
       expect(stats.averageScore).toBeCloseTo(8.3, 1);
@@ -50,6 +51,7 @@ describe('StatsService', () => {
 
       expect(stats.totalStudents).toBe(0);
       expect(stats.totalRevenueCents).toBe(0);
+      expect(stats.monthlyRevenueCents).toBe(0);
       expect(stats.totalExpenseCents).toBe(0);
       expect(stats.netIncomeCents).toBe(0);
       expect(stats.averageScore).toBe(0);
@@ -68,6 +70,7 @@ describe('StatsService', () => {
       const stats = await StatsService.buildDashboardStats();
 
       expect(stats.totalRevenueCents).toBe(100000);
+      expect(stats.monthlyRevenueCents).toBe(100000);
       expect(stats.totalExpenseCents).toBe(25000);
       expect(stats.netIncomeCents).toBe(75000);
     });

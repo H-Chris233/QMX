@@ -82,6 +82,22 @@ describe('transformDashboardData', () => {
     expect(result.activeStudents).toBe(0); // 负数被限制为0
     expect(result.averageGrade).toBe(1000); // 超出范围被限制为最大值
   });
+
+  it('应该优先使用当月收入字段', () => {
+    const raw = {
+      monthly_revenue: 8888.88,
+      total_revenue: 99999.99,
+      total_students: 10,
+      average_score: 8,
+      total_expense: 0,
+      net_income: 0,
+      max_score: 0,
+      active_courses: 0,
+    };
+
+    const result = transformDashboardData(raw as any);
+    expect(result.totalRevenue).toBe(8888.88);
+  });
 });
 
 describe('validateTransactionData', () => {

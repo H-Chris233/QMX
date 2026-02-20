@@ -37,6 +37,7 @@ export class StatsController {
       const responseData = {
         total_students: stats.totalStudents,
         total_revenue_cents: stats.totalRevenueCents,
+        monthly_revenue_cents: stats.monthlyRevenueCents,
         total_expense_cents: stats.totalExpenseCents,
         net_income_cents: stats.netIncomeCents,
         average_score: stats.averageScore,
@@ -48,6 +49,7 @@ export class StatsController {
         // 兼容旧字段名（camelCase）
         totalStudents: stats.totalStudents,
         totalRevenueCents: stats.totalRevenueCents,
+        monthlyRevenueCents: stats.monthlyRevenueCents,
         totalExpenseCents: stats.totalExpenseCents,
         netIncomeCents: stats.netIncomeCents,
         averageScore: stats.averageScore,

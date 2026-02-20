@@ -235,16 +235,23 @@ export function isNumberInRange(value: number, min: number, max: number): boolea
  */
 export function transformDashboardData(raw: DashboardStats): TransformedDashboardData {
   const source = raw as unknown as {
+    monthly_revenue?: number;
     total_revenue?: number;
     total_students?: number;
     average_score?: number;
+    monthlyRevenue?: number;
     totalRevenue?: number;
     totalStudents?: number;
     activeStudents?: number;
     averageGrade?: number;
   };
 
-  const totalRevenueValue = source.total_revenue ?? source.totalRevenue ?? 0;
+  const totalRevenueValue =
+    source.monthly_revenue ??
+    source.monthlyRevenue ??
+    source.total_revenue ??
+    source.totalRevenue ??
+    0;
   const totalStudentsValue = source.activeStudents ?? source.total_students ?? source.totalStudents ?? 0;
   const averageScoreValue = source.average_score ?? source.averageGrade ?? 0;
 

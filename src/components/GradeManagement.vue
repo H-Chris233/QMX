@@ -69,10 +69,6 @@
         <button class="btn btn-secondary" @click="loadData(true)" :disabled="loading" title="刷新数据">
           <RefreshCw :size="18" :class="{ 'spin': loading }" />
         </button>
-        <button class="btn btn-primary" @click="openAddGradeModal">
-          <PlusCircle :size="18" />
-          <span>添加记录</span>
-        </button>
       </div>
     </header>
 
@@ -402,7 +398,6 @@ import {
   ChevronDown, 
   Target, 
   Plus, 
-  PlusCircle, 
   RefreshCw, 
   Activity, 
   Trophy, 
@@ -1169,22 +1164,6 @@ const editScore = async (index: number, currentScore: number) => {
 const closeModals = () => {
   showAddGrade.value = false;
   showEditGrade.value = false;
-};
-
-const openAddGradeModal = () => {
-  currentGrade.value = {
-    id: null,
-    scoreIndex: null,
-    studentId: selectedStudent.value || '',
-    studentName: '',
-    course: '',
-    examType: '',
-    score: null,
-    date: getTodayDateString(),
-    notes: '',
-  };
-  syncCurrentGradeCourseBySubject();
-  showAddGrade.value = true;
 };
 
 const saveGrade = async () => {

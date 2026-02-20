@@ -98,6 +98,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
 
       expect(stats.totalStudents).toBe(3);
       expect(stats.totalRevenueCents).toBe(80000);
+      expect(stats.monthlyRevenueCents).toBe(80000);
       expect(stats.totalExpenseCents).toBe(15000);
       expect(stats.netIncomeCents).toBe(65000);
       expect(stats.activeCourses).toBeGreaterThan(0);
@@ -124,6 +125,7 @@ describe('Dashboard/Stats API Integration Tests', () => {
       const stats = response.body.data;
       expect(stats).toHaveProperty('totalStudents');
       expect(stats).toHaveProperty('totalRevenueCents');
+      expect(stats).toHaveProperty('monthlyRevenueCents');
       expect(stats).toHaveProperty('totalExpenseCents');
       expect(stats).toHaveProperty('netIncomeCents');
       expect(stats).toHaveProperty('averageScore');

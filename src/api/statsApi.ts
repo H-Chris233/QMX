@@ -71,6 +71,7 @@ const toAmount = (cents?: number): number => {
 const mapDashboardStats = (raw: any): DashboardStats => ({
   total_students: raw.total_students ?? raw.totalStudents ?? 0,
   total_revenue: raw.total_revenue ?? toAmount(raw.total_revenue_cents ?? raw.totalRevenueCents),
+  monthly_revenue: raw.monthly_revenue ?? toAmount(raw.monthly_revenue_cents ?? raw.monthlyRevenueCents),
   total_expense: raw.total_expense ?? toAmount(raw.total_expense_cents ?? raw.totalExpenseCents),
   net_income: raw.net_income ?? toAmount(raw.net_income_cents ?? raw.netIncomeCents),
   average_score: raw.average_score ?? raw.averageScore ?? 0,

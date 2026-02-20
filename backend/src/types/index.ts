@@ -164,6 +164,7 @@ export interface IInstallmentCreationAttributes extends Omit<IInstallment, 'uid'
 export interface IDashboardStats {
   total_students: number;
   total_revenue: number;
+  monthly_revenue?: number;
   total_expense: number;
   net_income: number;
   average_score: number;

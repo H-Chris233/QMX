@@ -104,11 +104,11 @@
     <!-- 弹窗组件 -->
     <ErrorModal
       :show="appStore.hasErrors"
-      :title="appStore.latestError?.message || '错误'"
-      :message="appStore.latestError?.context || '操作失败'"
-      :details="appStore.latestError ? JSON.stringify(appStore.latestError, null, 2) : ''"
+      :title="currentError?.message || '错误'"
+      :message="currentError?.context || '操作失败'"
+      :details="currentError ? JSON.stringify(currentError, null, 2) : ''"
       :show-retry="true"
-      @close="appStore.clearErrors"
+      @close="closeCurrentError"
     />
 
     <ConfirmModal
@@ -221,6 +221,13 @@ const currentTabComponent = computed(() => {
 const activeTabLabel = computed(() => {
   return menuItems.value.find(item => item.id === activeTab.value)?.label || '页面';
 });
+
+const currentError = computed(() => appStore.errors[0] ?? null);
+
+const closeCurrentError = () => {
+  if (!appStore.errors.length) return;
+  appStore.removeError(0);
+};
 
 // 处理组件错误
 function handleComponentError(error: Error, info: string): void {

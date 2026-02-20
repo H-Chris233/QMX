@@ -26,6 +26,7 @@ import { AppError } from '@/utils/errors';
 export interface DashboardStatsData {
   totalStudents: number;
   totalRevenueCents: number;
+  monthlyRevenueCents: number;
   totalExpenseCents: number;
   netIncomeCents: number;
   averageScore: number;
@@ -113,6 +114,13 @@ export class StatsService {
         db
           .select({
             totalRevenue: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} > 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
+            monthlyRevenue: sql<number>`SUM(CASE
+              WHEN ${cashTransactions.amount} > 0
+                AND ${cashTransactions.createdAt} >= date_trunc('month', now())
+                AND ${cashTransactions.createdAt} < date_trunc('month', now()) + interval '1 month'
+              THEN ${cashTransactions.amount}
+              ELSE 0
+            END)`,
             totalExpense: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
           })
           .from(cashTransactions),
@@ -188,11 +196,13 @@ export class StatsService {
 
     const averageScore = scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
     const totalRevenueCents = Number(cashAggregateResult[0]?.totalRevenue || 0);
+    const monthlyRevenueCents = Number(cashAggregateResult[0]?.monthlyRevenue || 0);
     const totalExpenseCents = Math.abs(Number(cashAggregateResult[0]?.totalExpense || 0));
 
     return {
       totalStudents: studentsCountResult[0]?.count || 0,
       totalRevenueCents,
+      monthlyRevenueCents,
       totalExpenseCents,
       netIncomeCents: totalRevenueCents - totalExpenseCents,
       averageScore,
