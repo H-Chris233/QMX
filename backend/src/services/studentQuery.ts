@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { students, Student } from '../db/schema/students';
 import { MembershipStatus } from '@/types';
+import type { ScoreDetail } from '@/db/schema/students';
 import {
   eq,
   and,
@@ -35,6 +36,7 @@ export interface StudentQueryItem {
   classType: string;
   subject: string;
   rings: number[];
+  scoreDetails: ScoreDetail[];
   averageScore: number;
   membershipStatus: MembershipStatus;
   membershipStartDate: string | null;
@@ -319,6 +321,7 @@ export class StudentQuery {
         classType: students.classType,
         subject: students.subject,
         rings: students.rings,
+        scoreDetails: students.scoreDetails,
         lessonLeft: students.lessonLeft,
         averageScore: avgScoreExpr,
         membershipStatus: this.calculateMembershipStatus(),
@@ -419,6 +422,7 @@ export class StudentQuery {
       classType: item.classType,
       subject: item.subject,
       rings: item.rings || [],
+      scoreDetails: item.scoreDetails || [],
       averageScore: Number(item.averageScore || 0),
       membershipStatus: (item.membershipStatus as MembershipStatus) || MembershipStatus.NONE,
       membershipStartDate: item.membershipStartDate || null,

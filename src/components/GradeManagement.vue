@@ -66,7 +66,7 @@
       </div>
 
       <div class="bar-right">
-        <button class="btn btn-secondary" @click="loadData" :disabled="loading" title="刷新数据">
+        <button class="btn btn-secondary" @click="loadData(true)" :disabled="loading" title="刷新数据">
           <RefreshCw :size="18" :class="{ 'spin': loading }" />
         </button>
         <button class="btn btn-primary" @click="openAddGradeModal">
@@ -630,8 +630,14 @@ const syncCurrentGradeCourseBySubject = () => {
 // Computed Props
 
 const filteredGrades = computed(() => {
-  let filtered = grades.value;
-  if (selectedStudentData.value) filtered = filtered.filter((g) => g.studentId === selectedStudentData.value!.uid);
+  let filtered = selectedStudentData.value
+    ? buildRecentGradesFromStudents([selectedStudentData.value])
+    : grades.value;
+
+  if (selectedStudentData.value) {
+    filtered = filtered.filter((g) => g.studentId === selectedStudentData.value!.uid);
+  }
+
   if (selectedStudentData.value && shouldShowManageCourseSelector.value) {
     filtered = filtered.filter((g) => {
       const subjectType = normalizeSubjectType(g.subjectValue || g.course);
@@ -1226,7 +1232,7 @@ const deleteGrade = (grade: Grade) => {
 // Watchers & Lifecycle
 if (refreshSystem?.refreshTriggers) {
   watch(() => refreshSystem.refreshTriggers.grades, (n, o) => {
-    if (n > o) loadData();
+    if (n > o) loadData(true);
   });
 }
 
@@ -1235,7 +1241,7 @@ watch(() => currentGrade.value.studentId, () => {
 });
 
 onMounted(() => {
-  loadData();
+  loadData(true);
 });
 onUnmounted(() => abortController.value?.abort());
 </script>
