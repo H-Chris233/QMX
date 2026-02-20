@@ -11,7 +11,7 @@ export interface TransactionFilterState {
 
 export interface TransactionFormModel {
   student_id: number | null;
-  amount: number;
+  amount: number | null;
   note: string;
   is_installment: boolean;
   is_expense: boolean;

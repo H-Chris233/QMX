@@ -152,12 +152,15 @@ export class CashController {
         start_date,
       } = req.body;
 
+      if (student_id === null || student_id === undefined) {
+        throw AppError.invalidInput('分期付款必须关联学员');
+      }
+      const studentId = Number(student_id);
+
       // 验证学员是否存在
-      if (student_id !== null && student_id !== undefined) {
-        const student = await StudentRepository.findByUid(Number(student_id));
-        if (!student) {
-          throw AppError.invalidInput('指定的学员不存在');
-        }
+      const student = await StudentRepository.findByUid(studentId);
+      if (!student) {
+        throw AppError.invalidInput('指定的学员不存在');
       }
 
       // 验证输入
@@ -194,7 +197,7 @@ export class CashController {
         const sanitizedNote = normalizeNote(note);
 
         const installmentPlan = await InstallmentPlanRepository.create({
-          studentId: student_id !== undefined ? Number(student_id) : null,
+          studentId,
           totalAmount: totalAmountCents,
           totalInstallments: totalInstallmentsInt,
           frequency: normalizedFrequency,
@@ -247,7 +250,7 @@ export class CashController {
           );
 
         const transaction = await CashBuilder.create()
-          .studentId(student_id ?? null)
+          .studentId(studentId)
           .amount(firstInstallmentAmount)
           .note(
             this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt),

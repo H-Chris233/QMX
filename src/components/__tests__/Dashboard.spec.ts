@@ -132,15 +132,6 @@ describe('Dashboard', () => {
       expect(cardText).toContain('100,000');
     });
 
-    it('应该正确显示平均成绩', async () => {
-      const mockStats = createMockDashboardStats({ averageGrade: 9.2 });
-
-      statsStore.dashboardStats = mockStats;
-      await waitForDOMUpdate();
-
-      const cardText = wrapper.text();
-      expect(cardText).toContain('9.2');
-    });
   });
 
   describe('4. 快捷操作区域', () => {

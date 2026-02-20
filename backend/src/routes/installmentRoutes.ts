@@ -22,8 +22,9 @@ router.use(apiRateLimitMiddleware);
 
 // 验证规则
 const createInstallmentPlanSchema = Joi.object({
-  student_id: Joi.number().integer().min(1).optional().allow(null).messages({
+  student_id: Joi.number().integer().min(1).required().messages({
     'number.min': '学员编号必须大于0',
+    'any.required': '分期付款必须关联学员',
   }),
   total_amount: Joi.number().positive().required().messages({
     'number.positive': '总金额必须大于0',
@@ -43,16 +44,20 @@ const createInstallmentPlanSchema = Joi.object({
       'any.only': '无效的付款频率',
       'any.required': '付款频率不能为空',
     }),
-  custom_days: Joi.number()
-    .integer()
-    .min(1)
-    .when('frequency', {
-      is: PaymentFrequencyValues.CUSTOM,
-      then: Joi.required().messages({
-        'any.required': '自定义频率必须指定天数',
-      }),
-      otherwise: Joi.optional(),
+  custom_days: Joi.when('frequency', {
+    is: PaymentFrequencyValues.CUSTOM,
+    then: Joi.number().integer().min(1).required().messages({
+      'number.base': '自定义天数必须是数字',
+      'number.integer': '自定义天数必须是整数',
+      'number.min': '自定义天数至少为1',
+      'any.required': '自定义频率必须指定天数',
     }),
+    otherwise: Joi.number().integer().min(1).optional().allow(null).messages({
+      'number.base': '自定义天数必须是数字',
+      'number.integer': '自定义天数必须是整数',
+      'number.min': '自定义天数至少为1',
+    }),
+  }),
   start_date: Joi.date().iso().required().messages({
     'date.format': '开始日期格式不正确',
     'any.required': '开始日期不能为空',

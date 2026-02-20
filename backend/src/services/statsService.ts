@@ -27,6 +27,8 @@ export interface DashboardStatsData {
   totalStudents: number;
   totalRevenueCents: number;
   monthlyRevenueCents: number;
+  monthlyExpenseCents: number;
+  monthlyNetIncomeCents: number;
   totalExpenseCents: number;
   netIncomeCents: number;
   averageScore: number;
@@ -35,6 +37,7 @@ export interface DashboardStatsData {
   activeMembers: number;
   activeInstallmentPlans: number;
   overdueInstallmentCount: number;
+  upcomingInstallmentDueCount7d: number;
 }
 
 export interface FinancialPeriod {
@@ -103,7 +106,12 @@ export class StatsService {
    */
   static async buildDashboardStats(): Promise<DashboardStatsData> {
     // 并行查询多个指标
-    const [studentsCountResult, cashAggregateResult, activeInstallmentsResult] =
+    const [
+      studentsCountResult,
+      cashAggregateResult,
+      activeInstallmentsResult,
+      upcomingInstallmentsResult,
+    ] =
       await Promise.all([
         // 学员数量和统计
         db.select({
@@ -121,6 +129,13 @@ export class StatsService {
               THEN ${cashTransactions.amount}
               ELSE 0
             END)`,
+            monthlyExpense: sql<number>`SUM(CASE
+              WHEN ${cashTransactions.amount} < 0
+                AND ${cashTransactions.createdAt} >= date_trunc('month', now())
+                AND ${cashTransactions.createdAt} < date_trunc('month', now()) + interval '1 month'
+              THEN ABS(${cashTransactions.amount})
+              ELSE 0
+            END)`,
             totalExpense: sql<number>`SUM(CASE WHEN ${cashTransactions.amount} < 0 THEN ${cashTransactions.amount} ELSE 0 END)`,
           })
           .from(cashTransactions),
@@ -130,6 +145,18 @@ export class StatsService {
           .select({ count: count() })
           .from(installmentPlans)
           .where(eq(installmentPlans.status, 'ACTIVE' as const)),
+
+        // 7日内到期的分期数量（包含今天）
+        db
+          .select({ count: count() })
+          .from(installments)
+          .where(
+            and(
+              eq(installments.status, 'PENDING' as const),
+              sql`${installments.dueDate} >= CURRENT_DATE`,
+              sql`${installments.dueDate} <= CURRENT_DATE + interval '7 day'`,
+            ),
+          ),
       ]);
 
     // 查询逾期分期
@@ -197,12 +224,15 @@ export class StatsService {
     const averageScore = scoreCount > 0 ? Number((totalScore / scoreCount).toFixed(1)) : 0;
     const totalRevenueCents = Number(cashAggregateResult[0]?.totalRevenue || 0);
     const monthlyRevenueCents = Number(cashAggregateResult[0]?.monthlyRevenue || 0);
+    const monthlyExpenseCents = Number(cashAggregateResult[0]?.monthlyExpense || 0);
     const totalExpenseCents = Math.abs(Number(cashAggregateResult[0]?.totalExpense || 0));
 
     return {
       totalStudents: studentsCountResult[0]?.count || 0,
       totalRevenueCents,
       monthlyRevenueCents,
+      monthlyExpenseCents,
+      monthlyNetIncomeCents: monthlyRevenueCents - monthlyExpenseCents,
       totalExpenseCents,
       netIncomeCents: totalRevenueCents - totalExpenseCents,
       averageScore,
@@ -211,6 +241,7 @@ export class StatsService {
       activeMembers,
       activeInstallmentPlans: activeInstallmentsResult[0]?.count || 0,
       overdueInstallmentCount: overdueInstallments.length,
+      upcomingInstallmentDueCount7d: upcomingInstallmentsResult[0]?.count || 0,
     };
   }
 

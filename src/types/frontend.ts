@@ -93,9 +93,16 @@ export interface SearchOptions {
  * @returns 前端交易数据
  */
 export function mapApiTransactionToFrontend(transaction: Transaction): FrontendTransaction {
+  const isIncome =
+    transaction.is_income === true
+      ? true
+      : transaction.is_expense === true
+        ? false
+        : transaction.amount >= 0;
+
   const result: FrontendTransaction = {
     id: transaction.uid,
-    type: transaction.amount >= 0 ? 'income' : 'expense',
+    type: isIncome ? 'income' : 'expense',
     description: transaction.description ?? '',
     amount: Math.abs(transaction.amount),
     note: transaction.note || null,

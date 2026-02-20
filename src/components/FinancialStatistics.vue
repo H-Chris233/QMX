@@ -209,6 +209,12 @@
                     <RefreshCw :size="16" />
                   </button>
                   <button
+                    class="icon-btn edit"
+                    @click="openEditTransactionModal(transaction)"
+                  >
+                    <Edit2 :size="16" />
+                  </button>
+                  <button
                     class="icon-btn delete"
                     @click="deleteTransaction(transaction.uid)"
                   >
@@ -263,6 +269,69 @@
             <button class="btn btn-secondary" @click="closeModals">取消</button>
             <button class="btn btn-primary" @click="saveTransaction" :disabled="loading">
               保存
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 编辑交易模态框 -->
+      <div v-if="showEditTransaction" class="modal-overlay" @click="closeModals">
+        <div class="modal-content sm" @click.stop>
+          <div class="modal-header">
+            <h3>编辑收支记录</h3>
+            <button class="modal-close-btn" @click="closeModals"><X :size="24"/></button>
+          </div>
+          <div class="modal-body">
+            <div class="status-summary">
+              <div class="summary-item">
+                <span class="label">记录类型</span>
+                <span class="value">
+                  {{ editTransactionForm.isInstallment ? '分期交易' : '普通交易' }}
+                </span>
+              </div>
+            </div>
+
+            <div v-if="!editTransactionForm.isInstallment" class="form-group mt-4">
+              <label>收支类型</label>
+              <div class="select-wrapper">
+                <select v-model="editTransactionForm.isExpense" class="form-select">
+                  <option :value="false">收入</option>
+                  <option :value="true">支出</option>
+                </select>
+                <ChevronDown :size="16" class="select-arrow" />
+              </div>
+            </div>
+
+            <div class="form-group mt-4">
+              <label>金额</label>
+              <div class="input-wrapper">
+                <input
+                  v-model.number="editTransactionForm.amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="form-input"
+                  placeholder="请输入金额"
+                />
+              </div>
+            </div>
+
+            <div class="form-group mt-4">
+              <label>备注</label>
+              <div class="input-wrapper">
+                <textarea
+                  v-model="editTransactionForm.note"
+                  rows="3"
+                  class="form-textarea"
+                  placeholder="填写备注（可选）"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="closeModals">取消</button>
+            <button class="btn btn-primary" @click="saveEditedTransaction" :disabled="loading">
+              保存修改
             </button>
           </div>
         </div>
@@ -331,7 +400,7 @@ import type { TransactionFormModel, TransactionFilterState, TransactionTypeFilte
 import { 
   RefreshCw, Plus, Search, 
   TrendingUp, TrendingDown, Wallet, CalendarClock,
-  User, Trash2, ChevronLeft, ChevronRight, X, ChevronDown, Inbox
+  User, Trash2, ChevronLeft, ChevronRight, X, ChevronDown, Inbox, Edit2
 } from 'lucide-vue-next';
 
 interface PaginationState {
@@ -345,8 +414,21 @@ const appStore = useAppStore();
 const transactionStore = useTransactionStore();
 
 const showUpdateStatus = ref<boolean>(false);
+const showEditTransaction = ref<boolean>(false);
 const selectedStatus = ref<InstallmentStatus>(InstallmentStatus.PENDING);
 const selectedTransaction = ref<Transaction | null>(null);
+const editingTransactionId = ref<number | null>(null);
+const editTransactionForm = ref<{
+  amount: number;
+  note: string;
+  isExpense: boolean;
+  isInstallment: boolean;
+}>({
+  amount: 0,
+  note: '',
+  isExpense: false,
+  isInstallment: false,
+});
 
 const filterState = ref<TransactionFilterState>({
   type: 'all',
@@ -384,12 +466,12 @@ const getTodayString = (): string => new Date().toISOString().split('T')[0];
 
 const createDefaultTransactionFormModel = (): TransactionFormModel => ({
   student_id: null,
-  amount: 0,
+  amount: null,
   note: '',
   is_installment: false,
   is_expense: false,
-  total_amount: 0,
-  total_installments: 2,
+  total_amount: null,
+  total_installments: null,
   frequency: PaymentFrequency.MONTHLY,
   custom_days: null,
   due_date: getTodayString(),
@@ -447,18 +529,35 @@ const pendingInstallments = computed(() => transactionStore.pendingInstallments)
 // Formatters
 const formatCurrency = (value: number) => formatCurrencyUtil(value);
 const formatDate = (date: string | undefined) => formatDateUtil(date, 'date');
-const formatTransactionAmount = (transaction: Transaction) => formatCurrency(transaction.amount);
+const isIncomeTransaction = (transaction: Transaction): boolean => {
+  if (transaction.is_income === true) return true;
+  if (transaction.is_expense === true) return false;
+  return transaction.amount > 0;
+};
 
-const getAmountClass = (transaction: Transaction) => transaction.amount >= 0 ? 'text-income' : 'text-expense';
+const isExpenseTransaction = (transaction: Transaction): boolean => {
+  if (transaction.is_expense === true) return true;
+  if (transaction.is_income === true) return false;
+  return transaction.amount < 0;
+};
+
+const getSignedAmount = (transaction: Transaction): number => {
+  const amount = Math.abs(Number(transaction.amount || 0));
+  return isExpenseTransaction(transaction) ? -amount : amount;
+};
+
+const formatTransactionAmount = (transaction: Transaction) => formatCurrency(getSignedAmount(transaction));
+
+const getAmountClass = (transaction: Transaction) => isExpenseTransaction(transaction) ? 'text-expense' : 'text-income';
 
 const getTransactionTypeText = (transaction: Transaction) => {
   if (transaction.is_installment) return '分期';
-  return transaction.amount >= 0 ? '收入' : '支出';
+  return isExpenseTransaction(transaction) ? '支出' : '收入';
 };
 
 const getTransactionTypeClass = (transaction: Transaction) => {
   if (transaction.is_installment) return 'badge-installment';
-  return transaction.amount >= 0 ? 'badge-income' : 'badge-expense';
+  return isExpenseTransaction(transaction) ? 'badge-expense' : 'badge-income';
 };
 
 const getStatusClass = (status: string | null | undefined) => STATUS_CLASS_MAP[normalizeInstallmentStatus(status)] ?? '';
@@ -554,11 +653,15 @@ const saveTransaction = async () => {
   const formData = normalizeTransactionFormModel(currentTransaction.value);
   currentTransaction.value = formData;
 
-  if (!formData.is_installment && formData.amount <= 0) {
+  if (!formData.is_installment && (!Number.isFinite(formData.amount) || Number(formData.amount) <= 0)) {
     showError('请输入有效的金额');
     return;
   }
   if (formData.is_installment) {
+    if (!Number.isFinite(formData.student_id) || Number(formData.student_id) <= 0) {
+      showError('分期付款必须关联学员');
+      return;
+    }
     if (!formData.total_amount || formData.total_amount <= 0) { showError('请输入有效的总金额'); return; }
     if (!formData.total_installments || formData.total_installments < 2) { showError('分期数必须至少为2'); return; }
     if (!formData.due_date) { showError('请选择首次到期日'); return; }
@@ -566,8 +669,9 @@ const saveTransaction = async () => {
 
   try {
     if (formData.is_installment) {
+      const installmentStudentId = Number(formData.student_id);
       await ApiService.addInstallmentTransaction({
-        student_id: formData.student_id,
+        student_id: installmentStudentId,
         amount: formData.total_amount!,
         total_installments: formData.total_installments!,
         frequency: String(formData.frequency!),
@@ -578,7 +682,8 @@ const saveTransaction = async () => {
       });
       showSuccess('分期付款已创建');
     } else {
-      const amount = formData.is_expense ? -Math.abs(formData.amount) : Math.abs(formData.amount);
+      const amountValue = Number(formData.amount);
+      const amount = formData.is_expense ? -Math.abs(amountValue) : Math.abs(amountValue);
       await ApiService.addCashTransaction({
         student_id: formData.student_id,
         amount,
@@ -595,7 +700,7 @@ const saveTransaction = async () => {
 
 const deleteTransaction = async (uid: number) => {
   const transaction = transactions.value.find((t) => t.uid === uid);
-  const message = transaction ? `确定要删除此条记录？\n金额: ${formatCurrency(transaction.amount)}` : '确定删除？';
+  const message = transaction ? `确定要删除此条记录？\n金额: ${formatTransactionAmount(transaction)}` : '确定删除？';
   
   showConfirm({
     title: '删除记录',
@@ -613,6 +718,41 @@ const deleteTransaction = async (uid: number) => {
       }
     },
   });
+};
+
+const openEditTransactionModal = (transaction: Transaction) => {
+  editingTransactionId.value = transaction.uid;
+  editTransactionForm.value = {
+    amount: Math.abs(Number(transaction.amount || 0)),
+    note: transaction.note || '',
+    isExpense: isExpenseTransaction(transaction),
+    isInstallment: Boolean(transaction.is_installment),
+  };
+  showEditTransaction.value = true;
+};
+
+const saveEditedTransaction = async () => {
+  if (editingTransactionId.value === null) return;
+
+  const amount = Number(editTransactionForm.value.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showError('请输入有效金额');
+    return;
+  }
+
+  try {
+    const signedAmount = editTransactionForm.value.isExpense ? -Math.abs(amount) : Math.abs(amount);
+    await ApiService.updateTransaction(editingTransactionId.value, {
+      uid: editingTransactionId.value,
+      amount: signedAmount,
+      note: editTransactionForm.value.note || '',
+    });
+    showSuccess('记录已更新');
+    closeModals();
+    await loadTransactions();
+  } catch (error) {
+    showError('更新失败', (error as Error)?.message || '更新交易时发生错误');
+  }
 };
 
 const showUpdateStatusModal = (transaction: Transaction) => {
@@ -637,9 +777,17 @@ const updateInstallmentStatus = async () => {
 const closeModals = () => {
   transactionStore.toggleAddTransaction(false);
   showUpdateStatus.value = false;
+  showEditTransaction.value = false;
   selectedTransaction.value = null;
+  editingTransactionId.value = null;
   currentTransaction.value = createDefaultTransactionFormModel();
   selectedStatus.value = InstallmentStatus.PENDING;
+  editTransactionForm.value = {
+    amount: 0,
+    note: '',
+    isExpense: false,
+    isInstallment: false,
+  };
 };
 
 const forceRefresh = () => loadTransactions();
@@ -963,6 +1111,7 @@ onMounted(async () => {
   padding: 0.3rem;
   cursor: pointer;
 }
+.icon-btn.edit { color: #60a5fa; }
 .icon-btn.delete { color: #ef4444; }
 
 /* === Modals (Fixed) === */

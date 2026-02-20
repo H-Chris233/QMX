@@ -165,6 +165,8 @@ export interface IDashboardStats {
   total_students: number;
   total_revenue: number;
   monthly_revenue?: number;
+  monthly_expense?: number;
+  monthly_net_income?: number;
   total_expense: number;
   net_income: number;
   average_score: number;
@@ -173,6 +175,7 @@ export interface IDashboardStats {
   active_members: number;
   active_installments: number;
   overdue_installments: number;
+  upcoming_installment_due_count_7d?: number;
 }
 
 // 学员统计数据

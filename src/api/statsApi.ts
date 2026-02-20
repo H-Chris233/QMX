@@ -72,6 +72,8 @@ const mapDashboardStats = (raw: any): DashboardStats => ({
   total_students: raw.total_students ?? raw.totalStudents ?? 0,
   total_revenue: raw.total_revenue ?? toAmount(raw.total_revenue_cents ?? raw.totalRevenueCents),
   monthly_revenue: raw.monthly_revenue ?? toAmount(raw.monthly_revenue_cents ?? raw.monthlyRevenueCents),
+  monthly_expense: raw.monthly_expense ?? toAmount(raw.monthly_expense_cents ?? raw.monthlyExpenseCents),
+  monthly_net_income: raw.monthly_net_income ?? toAmount(raw.monthly_net_income_cents ?? raw.monthlyNetIncomeCents),
   total_expense: raw.total_expense ?? toAmount(raw.total_expense_cents ?? raw.totalExpenseCents),
   net_income: raw.net_income ?? toAmount(raw.net_income_cents ?? raw.netIncomeCents),
   average_score: raw.average_score ?? raw.averageScore ?? 0,
@@ -80,6 +82,11 @@ const mapDashboardStats = (raw: any): DashboardStats => ({
   active_members: raw.active_members ?? raw.activeMembers,
   active_installments: raw.active_installments ?? raw.active_installment_plans ?? raw.activeInstallmentPlans,
   overdue_installments: raw.overdue_installments ?? raw.overdue_installment_count ?? raw.overdueInstallmentCount,
+  upcoming_installment_due_count_7d:
+    raw.upcoming_installment_due_count_7d ??
+    raw.upcoming_installment_due_count ??
+    raw.upcomingInstallmentDueCount7d ??
+    0,
 });
 
 // 优先使用 snake_case 字段（新格式），兼容 camelCase（旧格式）

@@ -25,7 +25,9 @@ const addCashTransactionSchema = Joi.object({
 });
 
 const addInstallmentTransactionSchema = Joi.object({
-  student_id: commonValidations.optionalId.allow(null),
+  student_id: commonValidations.id.required().messages({
+    'any.required': '分期付款必须关联学员',
+  }),
   total_amount: commonValidations.amount,
   note: commonValidations.text.allow(null).default(''),
   total_installments: Joi.number().integer().min(1).required().messages({
@@ -48,10 +50,21 @@ const addInstallmentTransactionSchema = Joi.object({
   }),
   current_installment: Joi.number().integer().min(1).default(1),
   plan_id: commonValidations.optionalId,
-  custom_days: Joi.number().integer().min(1).max(365).when('frequency', {
+  custom_days: Joi.when('frequency', {
     is: PaymentFrequencyValues.CUSTOM,
-    then: Joi.required(),
-    otherwise: Joi.optional(),
+    then: Joi.number().integer().min(1).max(365).required().messages({
+      'number.base': '自定义天数必须是数字',
+      'number.integer': '自定义天数必须是整数',
+      'number.min': '自定义天数至少为1',
+      'number.max': '自定义天数不能超过365',
+      'any.required': '自定义频率必须指定天数',
+    }),
+    otherwise: Joi.number().integer().min(1).max(365).optional().allow(null).messages({
+      'number.base': '自定义天数必须是数字',
+      'number.integer': '自定义天数必须是整数',
+      'number.min': '自定义天数至少为1',
+      'number.max': '自定义天数不能超过365',
+    }),
   }),
 });
 

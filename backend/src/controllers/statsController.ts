@@ -38,6 +38,8 @@ export class StatsController {
         total_students: stats.totalStudents,
         total_revenue_cents: stats.totalRevenueCents,
         monthly_revenue_cents: stats.monthlyRevenueCents,
+        monthly_expense_cents: stats.monthlyExpenseCents,
+        monthly_net_income_cents: stats.monthlyNetIncomeCents,
         total_expense_cents: stats.totalExpenseCents,
         net_income_cents: stats.netIncomeCents,
         average_score: stats.averageScore,
@@ -46,10 +48,13 @@ export class StatsController {
         active_members: stats.activeMembers,
         active_installment_plans: stats.activeInstallmentPlans,
         overdue_installment_count: stats.overdueInstallmentCount,
+        upcoming_installment_due_count_7d: stats.upcomingInstallmentDueCount7d,
         // 兼容旧字段名（camelCase）
         totalStudents: stats.totalStudents,
         totalRevenueCents: stats.totalRevenueCents,
         monthlyRevenueCents: stats.monthlyRevenueCents,
+        monthlyExpenseCents: stats.monthlyExpenseCents,
+        monthlyNetIncomeCents: stats.monthlyNetIncomeCents,
         totalExpenseCents: stats.totalExpenseCents,
         netIncomeCents: stats.netIncomeCents,
         averageScore: stats.averageScore,
@@ -58,6 +63,7 @@ export class StatsController {
         activeMembers: stats.activeMembers,
         activeInstallmentPlans: stats.activeInstallmentPlans,
         overdueInstallmentCount: stats.overdueInstallmentCount,
+        upcomingInstallmentDueCount7d: stats.upcomingInstallmentDueCount7d,
       };
 
       const response = {

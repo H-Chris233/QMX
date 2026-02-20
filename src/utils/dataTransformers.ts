@@ -118,8 +118,11 @@ export interface NormalizedMembershipRecord {
  */
 export interface TransformedDashboardData {
   totalRevenue: number;
+  monthlyExpense: number;
+  monthlyNetIncome: number;
   activeStudents: number;
   averageGrade: number;
+  upcomingInstallments7d: number;
 }
 
 // ============================================================================
@@ -236,10 +239,18 @@ export function isNumberInRange(value: number, min: number, max: number): boolea
 export function transformDashboardData(raw: DashboardStats): TransformedDashboardData {
   const source = raw as unknown as {
     monthly_revenue?: number;
+    monthly_expense?: number;
+    monthly_net_income?: number;
+    upcoming_installment_due_count_7d?: number;
     total_revenue?: number;
+    total_expense?: number;
+    net_income?: number;
     total_students?: number;
     average_score?: number;
     monthlyRevenue?: number;
+    monthlyExpense?: number;
+    monthlyNetIncome?: number;
+    upcomingInstallmentDueCount7d?: number;
     totalRevenue?: number;
     totalStudents?: number;
     activeStudents?: number;
@@ -254,9 +265,34 @@ export function transformDashboardData(raw: DashboardStats): TransformedDashboar
     0;
   const totalStudentsValue = source.activeStudents ?? source.total_students ?? source.totalStudents ?? 0;
   const averageScoreValue = source.average_score ?? source.averageGrade ?? 0;
+  const monthlyExpenseValue =
+    source.monthly_expense ??
+    source.monthlyExpense ??
+    source.total_expense ??
+    0;
+  const monthlyNetIncomeValue =
+    source.monthly_net_income ??
+    source.monthlyNetIncome ??
+    source.net_income ??
+    0;
+  const upcomingInstallmentCountValue =
+    source.upcoming_installment_due_count_7d ??
+    source.upcomingInstallmentDueCount7d ??
+    0;
 
   return {
     totalRevenue: safeParseNumber(totalRevenueValue, 0, {
+      min: MIN_AMOUNT,
+      max: MAX_SAFE_AMOUNT,
+      decimals: AMOUNT_DECIMALS,
+    }),
+    monthlyExpense: safeParseNumber(monthlyExpenseValue, 0, {
+      min: 0,
+      max: MAX_SAFE_AMOUNT,
+      decimals: AMOUNT_DECIMALS,
+      allowNegative: false,
+    }),
+    monthlyNetIncome: safeParseNumber(monthlyNetIncomeValue, 0, {
       min: MIN_AMOUNT,
       max: MAX_SAFE_AMOUNT,
       decimals: AMOUNT_DECIMALS,
@@ -271,6 +307,12 @@ export function transformDashboardData(raw: DashboardStats): TransformedDashboar
       min: MIN_SCORE,
       max: MAX_SCORE,
       decimals: SCORE_DECIMALS,
+      allowNegative: false,
+    }),
+    upcomingInstallments7d: safeParseNumber(upcomingInstallmentCountValue, 0, {
+      min: 0,
+      max: MAX_STUDENTS,
+      decimals: 0,
       allowNegative: false,
     }),
   };

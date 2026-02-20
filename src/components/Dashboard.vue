@@ -48,6 +48,54 @@
         </div>
       </div>
 
+      <!-- 月总支出 -->
+      <div
+        class="stat-card"
+        :class="{ 'is-loading': loading, skeleton: loading }"
+        data-testid="monthly-expense-card"
+      >
+        <div class="card-top">
+          <span class="card-label">月总支出</span>
+          <div class="icon-wrapper expense">
+            <TrendingDown :size="20" />
+          </div>
+        </div>
+        <div class="card-content">
+          <div v-if="!loading" class="stat-value" data-testid="monthly-expense">
+            {{ formatCurrency(dashboardData.monthlyExpense) }}
+          </div>
+          <div v-else class="skeleton-line h-8 w-2/3"></div>
+        </div>
+      </div>
+
+      <!-- 月净收益 -->
+      <div
+        class="stat-card"
+        :class="{ 'is-loading': loading, skeleton: loading }"
+        data-testid="monthly-net-income-card"
+      >
+        <div class="card-top">
+          <span class="card-label">月净收益</span>
+          <div class="icon-wrapper net-income">
+            <TrendingUp :size="20" />
+          </div>
+        </div>
+        <div class="card-content">
+          <div v-if="!loading" class="stat-value" data-testid="monthly-net-income">
+            {{ formatCurrency(dashboardData.monthlyNetIncome) }}
+          </div>
+          <div v-else class="skeleton-line h-8 w-2/3"></div>
+          <div
+            class="stat-badge"
+            :class="getNetIncomeClass(dashboardData.monthlyNetIncome)"
+            v-if="!loading"
+          >
+            {{ getNetIncomeText(dashboardData.monthlyNetIncome) }}
+          </div>
+          <div v-else class="skeleton-line h-4 w-1/3 mt-2"></div>
+        </div>
+      </div>
+
       <!-- 学员总数 -->
       <div
         class="stat-card"
@@ -69,32 +117,73 @@
         </div>
       </div>
 
-      <!-- 平均成绩 -->
+      <!-- 分期付款到期提醒 (宽卡片) -->
       <div
-        class="stat-card"
+        class="stat-card installment-card upcoming-installments-card"
         :class="{ 'is-loading': loading, skeleton: loading }"
-        data-testid="grades-card"
+        data-testid="upcoming-installments-card"
       >
-        <div class="card-top">
-          <span class="card-label">平均成绩</span>
-          <div class="icon-wrapper score">
-            <Award :size="20" />
+        <div class="card-header-row">
+          <div class="header-title">
+            <CalendarClock :size="18" class="text-warning" />
+            <h3>分期付款到期提醒 (7日内)</h3>
           </div>
+          <span class="badge-count" data-testid="upcoming-installment-count">
+            {{ upcomingInstallments.length }}
+          </span>
         </div>
-        <div class="card-content">
-          <div v-if="!loading" class="stat-value" data-testid="average-grade">
-            {{ formatDecimal(dashboardData.averageGrade) }}
-          </div>
-          <div v-else class="skeleton-line h-8 w-1/2"></div>
 
-          <div
-            class="stat-badge"
-            :class="getGradeTrendClass(dashboardData.averageGrade)"
-            v-if="!loading"
-          >
-            {{ getGradeTrendText(dashboardData.averageGrade) }}
-          </div>
-          <div v-else class="skeleton-line h-4 w-1/3 mt-2"></div>
+        <div class="card-body-scroll">
+          <template v-if="!loading">
+            <div v-if="upcomingInstallments.length > 0" class="member-list">
+              <div
+                v-for="item in upcomingInstallments"
+                :key="item.uid"
+                class="member-item"
+                :data-testid="`upcoming-installment-${item.uid}`"
+              >
+                <div class="member-info">
+                  <div class="member-top-row">
+                    <span class="member-name">{{ item.student_name }}</span>
+                    <button
+                      v-if="item.student_phone"
+                      class="phone-btn"
+                      @click="contactInstallmentStudent(item)"
+                      :title="item.student_phone"
+                    >
+                      <Phone :size="12" />
+                      {{ item.student_phone }}
+                    </button>
+                  </div>
+                  <span class="expiry-date member-days">
+                    <Calendar :size="12" />
+                    剩余 {{ item.days_until_due }} 天 · 到期 {{ formatDateOnly(item.due_date) }}
+                  </span>
+                </div>
+                <div class="installment-meta">
+                  <div class="installment-amount">{{ formatCurrency(item.installment_amount) }}</div>
+                  <div class="installment-period">
+                    第 {{ item.current_installment }}/{{ item.total_installments }} 期
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="empty-state">
+              <CheckCircle2 :size="48" class="empty-icon" />
+              <p>近期无即将到期分期</p>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="member-list">
+              <div
+                class="skeleton-line h-10 w-full mb-2"
+                v-for="i in 3"
+                :key="`installment-skeleton-${i}`"
+              ></div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -221,9 +310,11 @@ import type { Student as ApiStudent } from '../types/api';
 import {
   RefreshCw,
   Wallet,
+  TrendingDown,
+  TrendingUp,
   Users,
-  Award,
   Clock,
+  CalendarClock,
   Calendar,
   CheckCircle2,
   Phone,
@@ -276,11 +367,25 @@ const showMembershipError = (title: string, message: string, details?: string): 
   showMembershipErrorModal.value = true;
 };
 
+interface UpcomingInstallmentItem {
+  uid: number;
+  plan_id: number;
+  current_installment: number;
+  total_installments: number;
+  installment_amount: number;
+  due_date: string;
+  days_until_due: number;
+  student_uid: number;
+  student_name: string;
+  student_phone: string;
+}
+
 const dashboardData = computed(() => {
   return transformDashboardData((dashboardStats.value || {}) as any);
 });
 
 const expiringMemberships: Ref<ApiStudent[]> = ref([]);
+const upcomingInstallments: Ref<UpcomingInstallmentItem[]> = ref([]);
 
 const loadDashboardData = async (forceRefresh = false): Promise<void> => {
   if (loading.value) return;
@@ -303,7 +408,36 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
         return { success: false, error };
       });
 
-    const [statsResult, membershipResult] = await Promise.all([statsPromise, membershipPromise]);
+    const upcomingInstallmentsPromise = ApiService.getUpcomingInstallments(7)
+      .then(result => {
+        const mapped = (result || [])
+          .filter((item: any) => item?.plan?.student?.uid)
+          .map((item: any) => ({
+            uid: item.uid,
+            plan_id: item.plan_id,
+            current_installment: item.current_installment,
+            total_installments: item.plan.total_installments,
+            installment_amount: safeParseNumber(item.installment_amount, 0),
+            due_date: String(item.due_date || ''),
+            days_until_due: safeParseNumber(item.days_until_due, 0, { min: 0, decimals: 0 }),
+            student_uid: item.plan.student.uid,
+            student_name: item.plan.student.name,
+            student_phone: item.plan.student.phone || '',
+          }))
+          .sort((a, b) => a.days_until_due - b.days_until_due);
+        upcomingInstallments.value = mapped;
+        return { success: true, data: mapped };
+      })
+      .catch(error => {
+        upcomingInstallments.value = [];
+        return { success: false, error };
+      });
+
+    const [statsResult, membershipResult, upcomingResult] = await Promise.all([
+      statsPromise,
+      membershipPromise,
+      upcomingInstallmentsPromise,
+    ]);
 
     if (statsResult.success) {
       lastUpdateTime.value = new Date();
@@ -311,8 +445,11 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
        showStatsError('加载失败', '无法获取统计数据', String((statsResult as any).error));
     }
 
-    if (!membershipResult.success) {
-      showMembershipError('部分数据异常', '会员到期列表加载失败');
+    const partialLoadErrors: string[] = [];
+    if (!membershipResult.success) partialLoadErrors.push('会员到期列表');
+    if (!upcomingResult.success) partialLoadErrors.push('分期到期列表');
+    if (partialLoadErrors.length > 0) {
+      showMembershipError('部分数据异常', `${partialLoadErrors.join('、')}加载失败`);
     }
 
   } catch (error) {
@@ -335,10 +472,13 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
       } catch { return '¥0'; }
     };
 
-    const formatDecimal = (val: any) => safeParseNumber(val, 0).toFixed(1);
-
-    const getGradeTrendClass = (grade: number) => grade >= 8 ? 'text-success' : grade >= 6 ? 'text-info' : 'text-warning';
-    const getGradeTrendText = (grade: number) => grade >= 8 ? '优秀' : grade >= 6 ? '良好' : '需关注';
+    const formatDateOnly = (value: string) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
+    const getNetIncomeClass = (value: number) => value >= 0 ? 'text-success' : 'text-warning';
+    const getNetIncomeText = (value: number) => value >= 0 ? '盈利' : '亏损';
 
     // 简单的重试逻辑
     const closeStatsError = () => showStatsErrorModal.value = false;
@@ -395,6 +535,22 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
       } catch {
         if (navigator.clipboard) {
           navigator.clipboard.writeText(student.phone);
+          showSuccess('号码已复制');
+        }
+      }
+    };
+
+    const contactInstallmentStudent = (item: UpcomingInstallmentItem): void => {
+      if (!item.student_phone) {
+        showError('无电话号码');
+        return;
+      }
+
+      try {
+        window.location.href = `tel:${item.student_phone}`;
+      } catch {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(item.student_phone);
           showSuccess('号码已复制');
         }
       }
@@ -513,6 +669,14 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
   color: #10b981;
   background-color: rgba(16, 185, 129, 0.1);
 }
+.icon-wrapper.expense {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+.icon-wrapper.net-income {
+  color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.1);
+}
 .icon-wrapper.students {
   color: #3b82f6;
   background-color: rgba(59, 130, 246, 0.1);
@@ -520,6 +684,10 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
 .icon-wrapper.score {
   color: #f59e0b;
   background-color: rgba(245, 158, 11, 0.1);
+}
+.icon-wrapper.installment-due {
+  color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.15);
 }
 
 .stat-value {
@@ -566,6 +734,9 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
 .membership-card {
   grid-column: span 1;
   /* 在宽屏下跨两列，后面媒体查询处理 */
+}
+.installment-card {
+  grid-column: span 1;
 }
 
 .card-header-row {
@@ -699,6 +870,25 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
   cursor: not-allowed;
 }
 
+.installment-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 110px;
+}
+
+.installment-amount {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.installment-period {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
 .action-link {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -764,6 +954,7 @@ const loadDashboardData = async (forceRefresh = false): Promise<void> => {
 
 /* Responsive */
 @media (min-width: 1024px) {
+  .installment-card,
   .membership-card {
     grid-column: span 2;
   }

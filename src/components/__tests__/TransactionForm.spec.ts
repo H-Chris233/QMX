@@ -22,7 +22,7 @@ describe('TransactionForm', () => {
 
   const createDefaultModel = (overrides: Partial<TransactionFormModel> = {}): TransactionFormModel => ({
     student_id: null,
-    amount: 0,
+    amount: null,
     note: '',
     is_expense: false,
     is_installment: false,
@@ -115,8 +115,8 @@ describe('TransactionForm', () => {
       const emitEvent = wrapper.emitted('update:modelValue');
       const newModel = emitEvent[emitEvent.length - 1][0] as TransactionFormModel;
 
-      expect(newModel.total_amount).toBe(0);
-      expect(newModel.total_installments).toBe(2);
+      expect(newModel.total_amount).toBeNull();
+      expect(newModel.total_installments).toBeNull();
       expect(newModel.due_date).toBeDefined();
     });
 
@@ -269,6 +269,18 @@ describe('TransactionForm', () => {
       const newModel = emitEvent[emitEvent.length - 1][0] as TransactionFormModel;
       expect(newModel.student_id).toBeNull();
     });
+
+    it('分期模式下不应显示"不关联学员"选项', () => {
+      const installmentModel = createDefaultModel({ is_installment: true, student_id: null });
+
+      wrapper = mountWithPinia(TransactionForm, {
+        props: { modelValue: installmentModel, students }
+      });
+
+      const options = wrapper.findAll('option');
+      expect(options.some(option => option.text().includes('不关联学员'))).toBe(false);
+      expect(options[0]?.text()).toContain('请选择学员');
+    });
   });
 
   describe('5. 金额输入（普通交易）', () => {
@@ -313,7 +325,7 @@ describe('TransactionForm', () => {
 
       const emitEvent = wrapper.emitted('update:modelValue');
       const newModel = emitEvent[emitEvent.length - 1][0] as TransactionFormModel;
-      expect(newModel.amount).toBe(0);
+      expect(newModel.amount).toBeNull();
     });
   });
 

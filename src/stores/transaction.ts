@@ -51,6 +51,18 @@ export const useTransactionStore = defineStore('transaction', () => {
   const showUpdateStatus = ref<boolean>(false);
   const selectedStatus = ref<InstallmentStatus>(InstallmentStatus.PENDING);
 
+  const isIncomeTransaction = (transaction: Transaction): boolean => {
+    if (transaction.is_income === true) return true;
+    if (transaction.is_expense === true) return false;
+    return transaction.amount > 0;
+  };
+
+  const isExpenseTransaction = (transaction: Transaction): boolean => {
+    if (transaction.is_expense === true) return true;
+    if (transaction.is_income === true) return false;
+    return transaction.amount < 0;
+  };
+
   // Getters
   const transactionsById = computed(() => {
     const map = new Map<number, Transaction>();
@@ -61,11 +73,11 @@ export const useTransactionStore = defineStore('transaction', () => {
   });
 
   const incomeTransactions = computed(() => {
-    return (transactions.value || []).filter(t => t.amount > 0);
+    return (transactions.value || []).filter((t) => isIncomeTransaction(t));
   });
 
   const expenseTransactions = computed(() => {
-    return (transactions.value || []).filter(t => t.amount < 0);
+    return (transactions.value || []).filter((t) => isExpenseTransaction(t));
   });
 
   const transactionsByStudent = computed(() => {

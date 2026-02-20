@@ -51,9 +51,10 @@
 
     <!-- 关联学员 -->
     <div class="form-group">
-      <label class="input-label">
+      <label :class="['input-label', { required: modelValue.is_installment }]">
         <User :size="14" class="label-icon" /> 关联学员
-        <span class="badge-optional">可选</span>
+        <span v-if="!modelValue.is_installment" class="badge-optional">可选</span>
+        <span v-else class="badge-required">必选</span>
       </label>
       <div class="input-wrapper">
         <select
@@ -61,7 +62,8 @@
           @change="onStudentChange"
           class="form-select student-select"
         >
-          <option :value="null">-- 不关联学员 --</option>
+          <option v-if="modelValue.is_installment" :value="null" disabled>-- 请选择学员 --</option>
+          <option v-else :value="null">-- 不关联学员 --</option>
           <option
             v-for="student in students"
             :key="student.uid"
@@ -82,9 +84,9 @@
           <span class="currency-symbol">¥</span>
           <input
             type="number"
-            :value="modelValue.amount"
+            :value="modelValue.amount ?? ''"
             @input="onAmountInput"
-            placeholder="0.00"
+            placeholder="0"
             min="0"
             step="0.01"
             class="amount-input"
@@ -117,9 +119,9 @@
             <span class="currency-symbol">¥</span>
             <input
               type="number"
-              :value="modelValue.total_amount"
+              :value="modelValue.total_amount ?? ''"
               @input="onTotalAmountInput"
-              placeholder="0.00"
+              placeholder="0"
               min="0"
               step="0.01"
               class="amount-input"
@@ -135,7 +137,7 @@
               <Layers :size="16" class="input-icon" />
               <input
                 type="number"
-                :value="modelValue.total_installments"
+                :value="modelValue.total_installments ?? ''"
                 @input="onInstallmentsInput"
                 placeholder="2"
                 min="2"
@@ -172,7 +174,7 @@
             <span class="calc-value">¥{{ calculateInstallmentAmount() }}</span>
           </div>
           <div class="calc-desc">
-            共 {{ modelValue.total_installments }} 期，总计 ¥{{ modelValue.total_amount || 0 }}
+            共 {{ modelValue.total_installments ?? '--' }} 期，总计 ¥{{ modelValue.total_amount ?? 0 }}
           </div>
         </div>
 
@@ -264,8 +266,8 @@ const setTransactionType = (isInstallment: boolean) => {
 
   if (isInstallment) {
     const frequency = props.modelValue.frequency ?? PaymentFrequency.MONTHLY;
-    updated.total_amount = props.modelValue.total_amount ?? props.modelValue.amount;
-    updated.total_installments = props.modelValue.total_installments ?? 2;
+    updated.total_amount = props.modelValue.total_amount ?? props.modelValue.amount ?? null;
+    updated.total_installments = props.modelValue.total_installments ?? null;
     updated.frequency = frequency;
     updated.custom_days =
       frequency === PaymentFrequency.CUSTOM ? props.modelValue.custom_days ?? 30 : null;
@@ -296,6 +298,10 @@ const onStudentChange = (event: Event) => {
 const onAmountInput = (event: Event) => {
   const target = event.currentTarget as HTMLInputElement | null;
   if (!target) return;
+  if (target.value.trim() === '') {
+    updateField('amount', null);
+    return;
+  }
   const value = Number.parseFloat(target.value);
   updateField('amount', Number.isFinite(value) ? value : 0);
 };
@@ -309,6 +315,10 @@ const onNoteInput = (event: Event) => {
 const onTotalAmountInput = (event: Event) => {
   const target = event.currentTarget as HTMLInputElement | null;
   if (!target) return;
+  if (target.value.trim() === '') {
+    updateField('total_amount', null);
+    return;
+  }
   const value = Number.parseFloat(target.value);
   updateField('total_amount', Number.isFinite(value) ? value : 0);
 };
@@ -316,6 +326,10 @@ const onTotalAmountInput = (event: Event) => {
 const onInstallmentsInput = (event: Event) => {
   const target = event.currentTarget as HTMLInputElement | null;
   if (!target) return;
+  if (target.value.trim() === '') {
+    updateField('total_installments', null);
+    return;
+  }
   const value = Number.parseInt(target.value, 10);
   const sanitized = Number.isFinite(value) ? Math.max(2, value) : 2;
   updateField('total_installments', sanitized);
@@ -351,7 +365,7 @@ const onDueDateInput = (event: Event) => {
 
 const calculateInstallmentAmount = (): string => {
   const total = props.modelValue.total_amount ?? 0;
-  const installments = props.modelValue.total_installments ?? 2;
+  const installments = props.modelValue.total_installments;
   if (!installments) return '0.00';
   const perInstallment = total / installments;
   return Number.isFinite(perInstallment) ? perInstallment.toFixed(2) : '0.00';
@@ -478,6 +492,16 @@ const calculateInstallmentAmount = (): string => {
 .badge-optional {
   background-color: var(--bg-app);
   border: 1px solid var(--border-subtle);
+  font-size: 0.7rem;
+  padding: 0 4px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+.badge-required {
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
   font-size: 0.7rem;
   padding: 0 4px;
   border-radius: 4px;

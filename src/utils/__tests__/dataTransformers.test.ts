@@ -60,8 +60,11 @@ describe('transformDashboardData', () => {
 
     expect(result).toEqual({
       totalRevenue: 12345.67,
+      monthlyExpense: 5000,
+      monthlyNetIncome: 7345.67,
       activeStudents: 150,
       averageGrade: 8.5,
+      upcomingInstallments7d: 0,
     });
   });
 
@@ -79,8 +82,11 @@ describe('transformDashboardData', () => {
     const result = transformDashboardData(raw);
 
     expect(result.totalRevenue).toBe(0);
+    expect(result.monthlyExpense).toBe(0);
+    expect(result.monthlyNetIncome).toBe(0);
     expect(result.activeStudents).toBe(0); // 负数被限制为0
     expect(result.averageGrade).toBe(1000); // 超出范围被限制为最大值
+    expect(result.upcomingInstallments7d).toBe(0);
   });
 
   it('应该优先使用当月收入字段', () => {
