@@ -87,19 +87,60 @@ export class TransactionApiService {
     return typeof note === 'string' ? note : '';
   }
 
+  private static parseInstallmentProgress(note?: string | null): {
+    installment_number: number;
+    total_installments: number;
+  } | null {
+    if (!note) return null;
+    const matched = note.match(/第\s*(\d+)\s*\/\s*(\d+)\s*期/);
+    if (!matched) return null;
+    const installment_number = Number(matched[1]);
+    const total_installments = Number(matched[2]);
+    if (
+      !Number.isInteger(installment_number) ||
+      !Number.isInteger(total_installments) ||
+      installment_number <= 0 ||
+      total_installments <= 0
+    ) {
+      return null;
+    }
+    return { installment_number, total_installments };
+  }
+
   private static normalizeTransaction(transaction: Transaction): Transaction {
+    const normalized: Transaction = {
+      ...transaction,
+      is_installment: Boolean(
+        transaction.is_installment ||
+          transaction.installment ||
+          TransactionApiService.parseInstallmentProgress(transaction.note),
+      ),
+    };
+
     const installment = transaction.installment;
-    if (!installment || !installment.status) {
-      return transaction;
+    if (installment && installment.status) {
+      normalized.installment = {
+        ...installment,
+        status:
+          toFrontendInstallmentStatus(String(installment.status)) ||
+          installment.status,
+      };
+      return normalized;
     }
 
-    return {
-      ...transaction,
-      installment: {
-        ...installment,
-        status: toFrontendInstallmentStatus(String(installment.status)) || installment.status,
-      },
-    };
+    if (!normalized.installment) {
+      const parsedProgress = TransactionApiService.parseInstallmentProgress(
+        transaction.note,
+      );
+      if (parsedProgress) {
+        normalized.installment = {
+          installment_number: parsedProgress.installment_number,
+          total_installments: parsedProgress.total_installments,
+        } as Transaction['installment'];
+      }
+    }
+
+    return normalized;
   }
   /**
    * 获取所有交易（支持分页和搜索）

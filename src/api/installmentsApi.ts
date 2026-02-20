@@ -6,6 +6,7 @@ import type {
   Installment,
   InstallmentPlan,
   InstallmentStatus,
+  PaginatedResponse,
 } from '../types/api';
 import {
   toInstallmentPlanStatus,
@@ -51,14 +52,24 @@ export class InstallmentsApiService {
       total_pages: number;
     };
   }> {
-    const raw = await apiCall<any>(
-      baseClient.get('/installments', { params })
+    const response = await baseClient.get<PaginatedResponse<InstallmentPlan>>(
+      '/installments',
+      { params },
     );
+    const rawPlans = Array.isArray(response.data?.data)
+      ? response.data.data
+      : [];
+
     return {
-      ...raw,
-      data: (raw.data || []).map((plan: InstallmentPlan) =>
+      data: rawPlans.map((plan: InstallmentPlan) =>
         InstallmentsApiService.normalizePlan(plan)
       ),
+      pagination: response.data?.pagination || {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? rawPlans.length,
+        total: rawPlans.length,
+        total_pages: 1,
+      },
     };
   }
 

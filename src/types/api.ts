@@ -474,10 +474,28 @@ export interface InstallmentPlan {
   status: InstallmentPlanStatus;
   /** 备注 */
   note?: string | null;
+  /** 学员信息（列表场景） */
+  student?: {
+    uid: number;
+    name: string;
+    phone?: string | null;
+  } | null;
+  /** 分期明细（管理场景） */
+  installments?: Installment[];
+  /** 计划进度（可选） */
+  progress?: number;
+  /** 已支付期数（可选） */
+  paid_count?: number;
+  /** 待处理期数（可选） */
+  pending_count?: number;
+  /** 逾期期数（可选） */
+  overdue_count?: number;
   /** 创建时间 */
   created_at?: string;
   /** 更新时间 */
   updated_at?: string;
+  /** 兼容字段：驼峰 */
+  totalInstallments?: number;
 }
 
 /**
@@ -492,10 +510,18 @@ export interface Installment {
   installment_amount: number;
   /** 当前分期号 */
   current_installment: number;
+  /** 兼容字段：蛇形分期序号 */
+  installment_number?: number;
+  /** 兼容字段：驼峰 */
+  currentInstallment?: number;
   /** 总分期数 */
   total_installments: number;
+  /** 兼容字段：驼峰 */
+  totalInstallments?: number;
   /** 到期日期（ISO 格式字符串） */
   due_date: string;
+  /** 兼容字段：驼峰 */
+  dueDate?: string;
   /** 分期状态 */
   status: InstallmentStatus;
   /** 已支付金额（单位：元） */
@@ -504,6 +530,8 @@ export interface Installment {
   paid_at: string | null;
   /** 关联的学员ID */
   student_id: number | null;
+  /** 兼容字段：驼峰 */
+  studentId?: number | null;
   /** 关联的交易记录ID */
   cash_uid: number | null;
   /** 是否逾期 */

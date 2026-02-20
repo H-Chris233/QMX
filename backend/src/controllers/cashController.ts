@@ -191,6 +191,8 @@ export class CashController {
         throw AppError.invalidInput('开始日期格式不正确');
       }
       const startDateValue = startDateObj.toISOString().split('T')[0];
+      const todayValue = new Date().toISOString().split('T')[0];
+      const shouldMarkFirstInstallmentPaid = startDateValue <= todayValue;
 
       try {
         const totalAmountCents = convertAmountToCents(total_amount);
@@ -217,16 +219,21 @@ export class CashController {
             totalInstallmentsInt,
             i,
           );
+          const isFirstInstallmentPaid =
+            shouldMarkFirstInstallmentPaid && i === 1;
 
           const installmentData = {
             planId: installmentPlan.uid,
             installmentNumber: i,
             installmentAmount: amountForInstallment,
             dueDate: dueDate.toISOString().split('T')[0],
-            status:
-              i === 1 ? InstallmentStatusValues.PAID : InstallmentStatusValues.PENDING,
-            paidAmount: i === 1 ? amountForInstallment : 0,
-            paidDate: i === 1 ? new Date().toISOString().split('T')[0] : undefined,
+            status: isFirstInstallmentPaid
+              ? InstallmentStatusValues.PAID
+              : InstallmentStatusValues.PENDING,
+            paidAmount: isFirstInstallmentPaid ? amountForInstallment : 0,
+            paidDate: isFirstInstallmentPaid
+              ? new Date().toISOString().split('T')[0]
+              : undefined,
             studentId: installmentPlan.studentId,
           };
           installmentsToCreate.push(installmentData);
@@ -243,36 +250,40 @@ export class CashController {
         );
 
         const firstInstallment = createdInstallments[0];
-        const firstInstallmentAmount = firstInstallment
-          ? firstInstallment.installmentAmount / 100
-          : this.formatAmount(
-            Math.round(totalAmountCents / totalInstallmentsInt),
-          );
+        let transaction: CashTransaction | null = null;
 
-        const transaction = await CashBuilder.create()
-          .studentId(studentId)
-          .amount(firstInstallmentAmount)
-          .note(
-            this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt),
-          )
-          .installment({
-            plan_uid: installmentPlan.uid,
-            installment_uid: firstInstallment?.uid ?? null,
-            installment_number: firstInstallment?.installmentNumber ?? 1,
-            total_installments: totalInstallmentsInt,
-            due_date: firstInstallment?.dueDate ?? startDateValue,
-            status: InstallmentStatusValues.PAID,
-            note: sanitizedNote ?? undefined,
-          })
-          .build();
+        if (shouldMarkFirstInstallmentPaid) {
+          const firstInstallmentAmount = firstInstallment
+            ? firstInstallment.installmentAmount / 100
+            : this.formatAmount(
+              Math.round(totalAmountCents / totalInstallmentsInt),
+            );
 
-        if (firstInstallment) {
-          await InstallmentRepository.updateByUid(firstInstallment.uid, {
-            cashUid: transaction.uid,
-          });
+          transaction = await CashBuilder.create()
+            .studentId(studentId)
+            .amount(firstInstallmentAmount)
+            .note(
+              this.buildInstallmentNote(sanitizedNote, 1, totalInstallmentsInt),
+            )
+            .installment({
+              plan_uid: installmentPlan.uid,
+              installment_uid: firstInstallment?.uid ?? null,
+              installment_number: firstInstallment?.installmentNumber ?? 1,
+              total_installments: totalInstallmentsInt,
+              due_date: firstInstallment?.dueDate ?? startDateValue,
+              status: InstallmentStatusValues.PAID,
+              note: sanitizedNote ?? undefined,
+            })
+            .build();
+
+          if (firstInstallment) {
+            await InstallmentRepository.updateByUid(firstInstallment.uid, {
+              cashUid: transaction.uid,
+            });
+          }
         }
 
-        if (totalInstallmentsInt === 1) {
+        if (shouldMarkFirstInstallmentPaid && totalInstallmentsInt === 1) {
           await InstallmentPlanRepository.updateByUid(installmentPlan.uid, {
             status: InstallmentPlanStatusValues.COMPLETED,
           });
@@ -280,7 +291,9 @@ export class CashController {
         }
 
         const responseData = {
-          transaction: this.presentTransaction(transaction as any),
+          transaction: transaction
+            ? this.presentTransaction(transaction as any)
+            : null,
           plan: {
             uid: installmentPlan.uid,
             student_id: installmentPlan.studentId,
@@ -310,7 +323,7 @@ export class CashController {
         };
 
         logger.info(
-          `创建分期付款成功，交易ID: ${transaction.uid}, 计划ID: ${installmentPlan.uid}, 期数: ${total_installments}`,
+          `创建分期付款成功，交易ID: ${transaction?.uid ?? '未创建(首次到期日未到)'}, 计划ID: ${installmentPlan.uid}, 期数: ${total_installments}`,
         );
         res.status(201).json(response);
       } catch (error) {
@@ -566,6 +579,8 @@ export class CashController {
       formattedAmount: isIncome
         ? `+¥${amountYuan.toFixed(2)}`
         : `-¥${Math.abs(amountYuan).toFixed(2)}`,
+      is_installment: Boolean(transaction.installmentSnapshot),
+      isInstallment: Boolean(transaction.installmentSnapshot),
       installment: transaction.installmentSnapshot ?? null,
       created_at: transaction.createdAt instanceof Date ? transaction.createdAt.toISOString() : (transaction.createdAt || ''),
       createdAt: transaction.createdAt instanceof Date ? transaction.createdAt.toISOString() : (transaction.createdAt || ''),

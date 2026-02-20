@@ -620,13 +620,41 @@ export class InstallmentController {
         throw AppError.notFound('分期计划不存在');
       }
 
-      const updateData: Record<string, unknown> = {
-        status: normalizedStatus,
-        updatedAt: new Date(),
-      };
-
       // 使用事务执行所有更新
       const result = await db.transaction(async (tx) => {
+        const syncCashSnapshotStatus = async (
+          cashUid: number,
+          nextStatus: (typeof InstallmentStatus)[keyof typeof InstallmentStatus],
+        ) => {
+          const [existingCash] = await tx
+            .select({ installmentSnapshot: cashTransactions.installmentSnapshot })
+            .from(cashTransactions)
+            .where(eq(cashTransactions.uid, cashUid))
+            .limit(1);
+
+          await tx
+            .update(cashTransactions)
+            .set({
+              installmentSnapshot: {
+                ...(existingCash?.installmentSnapshot ?? {}),
+                plan_uid: plan.uid,
+                installment_uid: installment.uid,
+                installment_number: installment.installmentNumber,
+                total_installments: plan.totalInstallments,
+                due_date: installment.dueDate,
+                status: nextStatus,
+                note: plan.note ?? null,
+              },
+              note: this.buildInstallmentNote(
+                plan.note ?? '',
+                installment.installmentNumber,
+                plan.totalInstallments,
+              ),
+              updatedAt: new Date(),
+            })
+            .where(eq(cashTransactions.uid, cashUid));
+        };
+
       // 处理已支付状态
         if (normalizedStatus === InstallmentStatus.PAID) {
           const paidAmountInCents =
@@ -720,6 +748,13 @@ export class InstallmentController {
             })
             .where(eq(installments.uid, installment.uid));
 
+          if (installment.cashUid) {
+            await syncCashSnapshotStatus(
+              installment.cashUid,
+              InstallmentStatus.CANCELLED,
+            );
+          }
+
           // 刷新计划状态
           await InstallmentRepository.refreshPlanStatus(plan.uid);
 
@@ -729,6 +764,13 @@ export class InstallmentController {
             .update(installments)
             .set({ status: InstallmentStatus.OVERDUE })
             .where(eq(installments.uid, installment.uid));
+
+          if (installment.cashUid) {
+            await syncCashSnapshotStatus(
+              installment.cashUid,
+              InstallmentStatus.OVERDUE,
+            );
+          }
 
           // 刷新计划状态
           await InstallmentRepository.refreshPlanStatus(plan.uid);
