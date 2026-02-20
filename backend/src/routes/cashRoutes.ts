@@ -20,14 +20,14 @@ const optionalAmountSchema = commonValidations.optionalAmount;
 const addCashTransactionSchema = Joi.object({
   student_id: commonValidations.optionalId.allow(null),
   amount: amountSchema,
-  note: commonValidations.text.default(''),
+  note: commonValidations.text.allow(null).default(''),
   is_installment: Joi.boolean().default(false),
 });
 
 const addInstallmentTransactionSchema = Joi.object({
   student_id: commonValidations.optionalId.allow(null),
   total_amount: commonValidations.amount,
-  note: commonValidations.text.default(''),
+  note: commonValidations.text.allow(null).default(''),
   total_installments: Joi.number().integer().min(1).required().messages({
     'number.base': '总期数必须是数字',
     'number.integer': '总期数必须是整数',
@@ -71,7 +71,7 @@ const searchCashSchema = Joi.object({
 const updateTransactionSchema = Joi.object({
   amount: optionalAmountSchema,
   description: Joi.string().optional().allow(null),
-  note: commonValidations.text.default(''),
+  note: commonValidations.text.allow(null).default(''),
 });
 
 // 路由定义

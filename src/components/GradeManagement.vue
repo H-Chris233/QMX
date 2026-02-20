@@ -388,13 +388,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { Student, StudentScoreDetail } from '../types/api';
 import { ApiService } from '../api/ApiService';
-import { handleValidationError } from '../utils/errorHandler';
-import { validateScoreInput, safeParseNumber } from '../utils/dataTransformers';
+import { safeParseNumber } from '../utils/dataTransformers';
 import DatePicker from './DatePicker.vue';
 import { logger } from '../utils/logger';
+import { useAppStore } from '../stores/app';
 
 // 引入图标
 import { 
@@ -473,12 +473,6 @@ interface StatsPanel {
   count: number;
 }
 
-interface ErrorHandler {
-  showError: (title: string, message: string, details?: string) => void;
-  showConfirm: (options: any) => void;
-  showSuccess: (title: string, message: string) => void;
-}
-
 const loading = ref(false);
 const grades = ref<Grade[]>([]);
 const students = ref<Student[]>([]);
@@ -518,13 +512,32 @@ const currentGrade = ref<{
   notes: '',
 });
 
-const errorHandler = inject<ErrorHandler>('errorHandler');
-interface RefreshSystem { refreshTriggers: { grades: number; }; }
-const refreshSystem = inject<RefreshSystem>('refreshSystem');
+const appStore = useAppStore();
 
-const showError = errorHandler?.showError || ((title: string, message: string, details?: string) => { logger.error(title, message, details); });
-const showConfirm = errorHandler?.showConfirm || ((options: any) => { if (confirm(options.message)) options.onConfirm(); });
-const showSuccess = errorHandler?.showSuccess || ((title: string, message: string) => { logger.log(title, message); });
+const showError = (title: string, message: string, details?: string) => {
+  const context = [message, details].filter(Boolean).join(' | ');
+  appStore.errorHandler.showError(title, context || undefined);
+  logger.error(title, message, details);
+};
+
+const showConfirm = (options: {
+  title: string;
+  message: string;
+  confirmType?: 'danger' | 'warning' | 'primary';
+  onConfirm?: () => void;
+}) => {
+  appStore.showConfirm({
+    title: options.title,
+    message: options.message,
+    confirmType: options.confirmType || 'primary',
+    onConfirm: options.onConfirm,
+  });
+};
+
+const showSuccess = (title: string, message: string) => {
+  appStore.errorHandler.showSuccess(`${title}：${message}`);
+  logger.log(title, message);
+};
 
 const getTodayDateString = (): string => {
   const now = new Date();
@@ -692,6 +705,19 @@ const getMaxScoreForCourse = (course: string) => {
 };
 
 const getScorePlaceholderText = (course: string) => `请输入 (0-${getMaxScoreForCourse(course)})`;
+
+const validateScoreForCourse = (score: unknown, course: string): { valid: boolean; error?: string } => {
+  if (typeof score !== 'number' || Number.isNaN(score) || !Number.isFinite(score)) {
+    return { valid: false, error: '成绩必须是有效数字' };
+  }
+
+  const maxScore = getMaxScoreForCourse(course);
+  if (score < 0 || score > maxScore) {
+    return { valid: false, error: `成绩必须在 0 到 ${maxScore} 之间（${course}）` };
+  }
+
+  return { valid: true };
+};
 
 const getDisplayStudentName = (grade: Grade) => {
   if (grade.studentName && grade.studentName.trim()) return grade.studentName;
@@ -982,16 +1008,16 @@ const refreshScoreRelatedViews = async (studentId?: number) => {
 
 const addQuickScore = async () => {
   if (!selectedStudent.value || quickScore.value === '') return;
+  const course = effectiveManageCourse.value || getDefaultCourseBySubject(selectedStudentData.value?.subject);
   const score = Number(quickScore.value);
-  const validation = validateScoreInput(score);
+  const validation = validateScoreForCourse(score, course);
   if (!validation.valid) {
-    showError('无效输入', validation.errors.join(', '));
+    showError('无效输入', validation.error || '成绩格式无效');
     return;
   }
   
   loading.value = true;
   try {
-    const course = effectiveManageCourse.value || getDefaultCourseBySubject(selectedStudentData.value?.subject);
     await ApiService.addScore(Number(selectedStudent.value), {
       score,
       subject: getSubjectValueByCourse(course),
@@ -1017,27 +1043,39 @@ const showBatchAddDialog = () => {
 const closeBatchAddDialog = () => showBatchAdd.value = false;
 
 const batchAddScores = async () => {
-  const scores = batchScoresText.value.split('\n')
-    .map(line => parseFloat(line.trim()))
-    .filter(n => !isNaN(n));
-    
-  if (scores.length === 0) return;
+  const rawLines = batchScoresText.value.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (rawLines.length === 0) {
+    showError('导入失败', '请先输入要导入的成绩');
+    return;
+  }
   
   loading.value = true;
   try {
     const uid = Number(selectedStudent.value);
     const course = effectiveManageCourse.value || getDefaultCourseBySubject(selectedStudentData.value?.subject);
+    const parsedScores: number[] = [];
+
+    for (let i = 0; i < rawLines.length; i += 1) {
+      const score = Number(rawLines[i]);
+      const validation = validateScoreForCourse(score, course);
+      if (!validation.valid) {
+        showError('导入失败', `第 ${i + 1} 行无效：${validation.error}`);
+        return;
+      }
+      parsedScores.push(score);
+    }
+
     const subject = getSubjectValueByCourse(course);
     const now = new Date().toISOString();
     await ApiService.updateScoresBatch(
       uid,
-      scores.map((score) => ({
+      parsedScores.map((score) => ({
         score,
         subject,
         recorded_at: now,
       })),
     );
-    showSuccess('导入成功', `已添加 ${scores.length} 条成绩`);
+    showSuccess('导入成功', `已添加 ${parsedScores.length} 条成绩`);
     closeBatchAddDialog();
     await refreshScoreRelatedViews(uid);
   } catch (error: any) {
@@ -1165,7 +1203,14 @@ const saveGrade = async () => {
 
   loading.value = true;
   try {
-    const subjectValue = getSubjectValueByCourse(effectiveCourseForGradeForm.value);
+    const course = effectiveCourseForGradeForm.value;
+    const validation = validateScoreForCourse(score, course);
+    if (!validation.valid) {
+      showError('保存失败', validation.error || '成绩格式无效');
+      return;
+    }
+
+    const subjectValue = getSubjectValueByCourse(course);
     const recordedAt = toIsoByDateInput(currentGrade.value.date);
 
     if (showAddGrade.value) {
@@ -1230,12 +1275,6 @@ const deleteGrade = (grade: Grade) => {
 };
 
 // Watchers & Lifecycle
-if (refreshSystem?.refreshTriggers) {
-  watch(() => refreshSystem.refreshTriggers.grades, (n, o) => {
-    if (n > o) loadData(true);
-  });
-}
-
 watch(() => currentGrade.value.studentId, () => {
   syncCurrentGradeCourseBySubject();
 });

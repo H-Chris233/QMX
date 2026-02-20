@@ -574,7 +574,7 @@ const saveTransaction = async () => {
         custom_days: formData.frequency === PaymentFrequency.CUSTOM ? formData.custom_days : null,
         start_date: formData.due_date || '',
         due_date: formData.due_date || '',
-        note: formData.note ? formData.note : null,
+        note: formData.note ? formData.note : '',
       });
       showSuccess('分期付款已创建');
     } else {
@@ -582,7 +582,7 @@ const saveTransaction = async () => {
       await ApiService.addCashTransaction({
         student_id: formData.student_id,
         amount,
-        note: formData.note ? formData.note : null,
+        note: formData.note ? formData.note : '',
       });
       showSuccess('交易已保存');
     }

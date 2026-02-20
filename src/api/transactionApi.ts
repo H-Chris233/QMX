@@ -83,6 +83,10 @@ export interface TransactionListResponse {
  * 交易 API 服务类
  */
 export class TransactionApiService {
+  private static normalizeNote(note?: string | null): string {
+    return typeof note === 'string' ? note : '';
+  }
+
   private static normalizeTransaction(transaction: Transaction): Transaction {
     const installment = transaction.installment;
     if (!installment || !installment.status) {
@@ -153,7 +157,7 @@ export class TransactionApiService {
     const payload = {
       student_id: data.student_id,
       amount: data.amount,
-      note: data.note || null,
+      note: TransactionApiService.normalizeNote(data.note),
     };
 
     const transaction = await apiCall<Transaction>(
@@ -177,6 +181,7 @@ export class TransactionApiService {
   }): Promise<Transaction> {
     const payload = {
       ...data,
+      note: TransactionApiService.normalizeNote(data.note),
       frequency: toPaymentFrequency(data.frequency) || data.frequency,
     };
 
