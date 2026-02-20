@@ -472,6 +472,25 @@ export class ApiService {
   }
 
   /**
+   * 更新分期计划（状态/备注）
+   */
+  static async updateInstallmentPlan(
+    planId: number,
+    data: {
+      note?: string;
+      status?: string;
+      total_amount?: number;
+      total_installments?: number;
+    }
+  ): Promise<InstallmentPlan> {
+    return handleApiOperation(
+      () => InstallmentsApiService.updateInstallmentPlan(planId, data),
+      '更新分期计划',
+      { retryable: false, context: { planId, ...data } }
+    );
+  }
+
+  /**
    * 更新分期付款状态（支付/标记逾期等）
    */
   static async updateInstallmentPayment(

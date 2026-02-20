@@ -16,6 +16,8 @@ import {
 import {
   eq,
   and,
+  inArray,
+  or,
   isNull,
   isNotNull,
   count,
@@ -622,6 +624,10 @@ export class InstallmentController {
 
       // 使用事务执行所有更新
       const result = await db.transaction(async (tx) => {
+        const shouldRebalanceForStatusChange =
+          normalizedStatus === InstallmentStatus.CANCELLED ||
+          installment.status === InstallmentStatus.CANCELLED;
+
         const syncCashSnapshotStatus = async (
           cashUid: number,
           nextStatus: (typeof InstallmentStatus)[keyof typeof InstallmentStatus],
@@ -713,8 +719,26 @@ export class InstallmentController {
             })
             .where(eq(installments.uid, installment.uid));
 
+          if (shouldRebalanceForStatusChange) {
+            const [latestPlan] = await tx
+              .select()
+              .from(installmentPlans)
+              .where(eq(installmentPlans.uid, plan.uid))
+              .limit(1);
+            if (latestPlan) {
+              await this.rebalanceRemainingInstallments(tx, latestPlan);
+            }
+          }
+
+          await this.syncInstallmentCashSnapshots(
+            tx,
+            plan.uid,
+            plan.totalInstallments,
+            plan.note ?? '',
+          );
+
           // 刷新计划状态
-          await InstallmentRepository.refreshPlanStatus(plan.uid);
+          await this.refreshPlanStatus(plan.uid, tx);
 
           return { installment: installment.uid, cash: newCash };
         } else if (normalizedStatus === InstallmentStatus.PENDING) {
@@ -735,28 +759,63 @@ export class InstallmentController {
             })
             .where(eq(installments.uid, installment.uid));
 
+          if (shouldRebalanceForStatusChange) {
+            const [latestPlan] = await tx
+              .select()
+              .from(installmentPlans)
+              .where(eq(installmentPlans.uid, plan.uid))
+              .limit(1);
+            if (latestPlan) {
+              await this.rebalanceRemainingInstallments(tx, latestPlan);
+            }
+          }
+
+          await this.syncInstallmentCashSnapshots(
+            tx,
+            plan.uid,
+            plan.totalInstallments,
+            plan.note ?? '',
+          );
+
           // 刷新计划状态
-          await InstallmentRepository.refreshPlanStatus(plan.uid);
+          await this.refreshPlanStatus(plan.uid, tx);
 
           return { installment: installment.uid, cash: null };
         } else if (normalizedStatus === InstallmentStatus.CANCELLED) {
+          if (installment.cashUid) {
+            await tx
+              .delete(cashTransactions)
+              .where(eq(cashTransactions.uid, installment.cashUid));
+          }
+
           await tx
             .update(installments)
             .set({
               status: InstallmentStatus.CANCELLED,
+              paidAmount: 0,
               paidDate: null,
+              cashUid: null,
             })
             .where(eq(installments.uid, installment.uid));
 
-          if (installment.cashUid) {
-            await syncCashSnapshotStatus(
-              installment.cashUid,
-              InstallmentStatus.CANCELLED,
-            );
+          const [latestPlan] = await tx
+            .select()
+            .from(installmentPlans)
+            .where(eq(installmentPlans.uid, plan.uid))
+            .limit(1);
+          if (latestPlan) {
+            await this.rebalanceRemainingInstallments(tx, latestPlan);
           }
 
+          await this.syncInstallmentCashSnapshots(
+            tx,
+            plan.uid,
+            plan.totalInstallments,
+            plan.note ?? '',
+          );
+
           // 刷新计划状态
-          await InstallmentRepository.refreshPlanStatus(plan.uid);
+          await this.refreshPlanStatus(plan.uid, tx);
 
           return { installment: installment.uid, cash: null };
         } else if (normalizedStatus === InstallmentStatus.OVERDUE) {
@@ -772,8 +831,26 @@ export class InstallmentController {
             );
           }
 
+          if (shouldRebalanceForStatusChange) {
+            const [latestPlan] = await tx
+              .select()
+              .from(installmentPlans)
+              .where(eq(installmentPlans.uid, plan.uid))
+              .limit(1);
+            if (latestPlan) {
+              await this.rebalanceRemainingInstallments(tx, latestPlan);
+            }
+          }
+
+          await this.syncInstallmentCashSnapshots(
+            tx,
+            plan.uid,
+            plan.totalInstallments,
+            plan.note ?? '',
+          );
+
           // 刷新计划状态
-          await InstallmentRepository.refreshPlanStatus(plan.uid);
+          await this.refreshPlanStatus(plan.uid, tx);
 
           return { installment: installment.uid, cash: null };
         }
@@ -782,6 +859,7 @@ export class InstallmentController {
       });
 
       const updatedInstallment = await InstallmentRepository.findByUid(installment.uid);
+      const refreshedPlan = await InstallmentPlanRepository.findByUid(plan.uid);
 
       logger.info(
         `更新分期付款状态成功，UID: ${installment.uid}, 状态: ${normalizedStatus}`,
@@ -791,8 +869,8 @@ export class InstallmentController {
         success: true,
         data: {
           installment: updatedInstallment ? InstallmentRepository.toResponse(updatedInstallment) : null,
-          plan: plan
-            ? await this.buildPlanResponse(plan)
+          plan: refreshedPlan
+            ? await this.buildPlanResponse(refreshedPlan)
             : null,
           cashTransaction: result.cash ? CashRepository.toResponse(result.cash) : null,
         },
@@ -826,25 +904,62 @@ export class InstallmentController {
         throw AppError.notFound('分期计划不存在');
       }
 
-      // 直接更新状态
-      const updateData: Record<string, unknown> = {
-        status: normalizedStatus,
-        updatedAt: new Date(),
-      };
+      const updatedInstallment = await db.transaction(async (tx) => {
+        // 直接更新状态
+        const updateData: Record<string, unknown> = {
+          status: normalizedStatus,
+          updatedAt: new Date(),
+        };
 
-      // 如果是取消状态，清除支付信息
-      if (normalizedStatus === InstallmentStatus.CANCELLED) {
-        updateData.paidAmount = null;
-        updateData.paidDate = null;
-        updateData.cashUid = null;
-      }
+        // 如果是取消状态，清除支付信息
+        if (normalizedStatus === InstallmentStatus.CANCELLED) {
+          if (installment.cashUid) {
+            await tx
+              .delete(cashTransactions)
+              .where(eq(cashTransactions.uid, installment.cashUid));
+          }
+          updateData.paidAmount = null;
+          updateData.paidDate = null;
+          updateData.cashUid = null;
+        }
 
-      await InstallmentRepository.updateByUid(installment.uid, updateData);
+        const [nextInstallment] = await tx
+          .update(installments)
+          .set(updateData)
+          .where(eq(installments.uid, installment.uid))
+          .returning();
 
-      // 刷新计划状态
-      await InstallmentRepository.refreshPlanStatus(plan.uid);
+        if (!nextInstallment) {
+          throw AppError.other('分期状态更新失败');
+        }
 
-      const updatedInstallment = await InstallmentRepository.findByUid(installment.uid);
+        const shouldRebalanceForStatusChange =
+          normalizedStatus === InstallmentStatus.CANCELLED ||
+          installment.status === InstallmentStatus.CANCELLED;
+
+        const [latestPlan] = await tx
+          .select()
+          .from(installmentPlans)
+          .where(eq(installmentPlans.uid, plan.uid))
+          .limit(1);
+
+        if (latestPlan && shouldRebalanceForStatusChange) {
+          await this.rebalanceRemainingInstallments(tx, latestPlan);
+        }
+
+        await this.syncInstallmentCashSnapshots(
+          tx,
+          plan.uid,
+          latestPlan?.totalInstallments ?? plan.totalInstallments,
+          latestPlan?.note ?? plan.note ?? '',
+        );
+
+        // 刷新计划状态
+        await this.refreshPlanStatus(plan.uid, tx);
+
+        return nextInstallment;
+      });
+
       const refreshedPlan = await InstallmentPlanRepository.findByUid(plan.uid);
 
       logger.info(
@@ -1025,10 +1140,12 @@ export class InstallmentController {
   public updateInstallmentPlan = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
-      const { note, status } = req.body as {
-      note?: string;
-      status?: string;
-    };
+      const { note, status, total_amount, total_installments } = req.body as {
+        note?: string;
+        status?: string;
+        total_amount?: number;
+        total_installments?: number;
+      };
 
       const plan = await InstallmentPlanRepository.findByUid(Number(id));
 
@@ -1037,6 +1154,7 @@ export class InstallmentController {
       }
 
       const updateData: Record<string, unknown> = {};
+      let shouldRebalance = false;
 
       if (note !== undefined) {
         updateData.note = normalizeNote(note);
@@ -1047,10 +1165,53 @@ export class InstallmentController {
         updateData.status = status;
       }
 
-      const updatedPlan = await InstallmentPlanRepository.updateByUid(
-        plan.uid,
-        updateData,
-      );
+      if (total_amount !== undefined) {
+        const amount = Number(total_amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          throw AppError.invalidInput('总金额必须大于0');
+        }
+        updateData.totalAmount = convertAmountToCents(amount);
+        shouldRebalance = true;
+      }
+
+      if (total_installments !== undefined) {
+        const totalInstallments = Number(total_installments);
+        if (!Number.isInteger(totalInstallments) || totalInstallments <= 0) {
+          throw AppError.invalidInput('总期数必须为正整数');
+        }
+        updateData.totalInstallments = totalInstallments;
+        shouldRebalance = true;
+      }
+
+      const updatedPlan = await db.transaction(async (tx) => {
+        await tx
+          .update(installmentPlans)
+          .set({ ...updateData, updatedAt: new Date() })
+          .where(eq(installmentPlans.uid, plan.uid));
+
+        const [nextPlan] = await tx
+          .select()
+          .from(installmentPlans)
+          .where(eq(installmentPlans.uid, plan.uid))
+          .limit(1);
+
+        if (!nextPlan) {
+          throw AppError.other('更新分期计划失败');
+        }
+
+        if (shouldRebalance) {
+          await this.rebalanceRemainingInstallments(tx, nextPlan);
+        }
+
+        await this.syncInstallmentCashSnapshots(
+          tx,
+          nextPlan.uid,
+          nextPlan.totalInstallments,
+          nextPlan.note ?? '',
+        );
+
+        return nextPlan;
+      });
 
       if (!updatedPlan) {
         throw AppError.other('更新分期计划失败');
@@ -1073,6 +1234,7 @@ export class InstallmentController {
   public deleteInstallmentPlan = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
+      const planUid = Number(id);
 
       // 使用事务删除
       await db.transaction(async (tx) => {
@@ -1080,37 +1242,46 @@ export class InstallmentController {
         const [plan] = await tx
           .select()
           .from(installmentPlans)
-          .where(eq(installmentPlans.uid, Number(id)))
+          .where(eq(installmentPlans.uid, planUid))
           .limit(1);
 
         if (!plan) {
           throw AppError.notFound('分期计划不存在');
         }
 
-        // 2. 如果是活跃计划，检查是否有限制
-        if (plan.status === InstallmentPlanStatus.ACTIVE) {
-        // 检查是否有已支付的分期
-          const [paidCountResult] = await tx
-            .select({ count: count() })
-            .from(installments)
+        // 2. 查找该计划相关的分期与交易
+        const planInstallments = await tx
+          .select({
+            uid: installments.uid,
+            cashUid: installments.cashUid,
+          })
+          .from(installments)
+          .where(eq(installments.planId, plan.uid));
+
+        const relatedCashIds = planInstallments
+          .map((item) => (typeof item.cashUid === 'number' ? item.cashUid : null))
+          .filter((item): item is number => item !== null);
+
+        // 3. 删除相关现金交易（避免残留）
+        if (relatedCashIds.length > 0) {
+          await tx
+            .delete(cashTransactions)
             .where(
-              and(
-                eq(installments.planId, plan.uid),
-                eq(installments.status, 'PAID' as const),
+              or(
+                inArray(cashTransactions.uid, relatedCashIds),
+                sql`${cashTransactions.installmentSnapshot} ->> 'plan_uid' = ${String(plan.uid)}`,
               ),
             );
-
-          if (paidCountResult.count > 0) {
-            throw AppError.invalidInput(
-              `已有${paidCountResult.count}期已支付，无法删除`,
-            );
-          }
+        } else {
+          await tx
+            .delete(cashTransactions)
+            .where(sql`${cashTransactions.installmentSnapshot} ->> 'plan_uid' = ${String(plan.uid)}`);
         }
 
-        // 3. 删除所有分期记录（会级联删除）
+        // 4. 删除所有分期记录
         await tx.delete(installments).where(eq(installments.planId, plan.uid));
 
-        // 4. 删除计划
+        // 5. 删除计划
         await tx.delete(installmentPlans).where(eq(installmentPlans.uid, plan.uid));
       });
 
@@ -1308,10 +1479,13 @@ export class InstallmentController {
     transaction?: any,
   ): Promise<void> {
     const dbToUse = transaction || db;
-    const installments =
-      await InstallmentRepository.findByPlanId(planUid);
+    const planInstallments = await dbToUse
+      .select()
+      .from(installments)
+      .where(eq(installments.planId, planUid))
+      .orderBy(asc(installments.installmentNumber));
 
-    if (installments.length === 0) {
+    if (planInstallments.length === 0) {
       // 没有分期记录，完成计划
       await dbToUse
         .update(installmentPlans)
@@ -1320,8 +1494,8 @@ export class InstallmentController {
       return;
     }
 
-    const allPaid = installments.every((i) => i.status === 'PAID');
-    const anyPending = installments.some(
+    const allPaid = planInstallments.every((i) => i.status === 'PAID');
+    const anyPending = planInstallments.some(
       (i) => i.status === 'PENDING' || i.status === 'OVERDUE',
     );
 
@@ -1339,6 +1513,230 @@ export class InstallmentController {
   }
 
   // ==================== 私有辅助方法 ====================
+
+  /**
+   * 同步分期关联的现金快照与备注
+   */
+  private async syncInstallmentCashSnapshots(
+    tx: any,
+    planUid: number,
+    totalInstallments: number,
+    note: string,
+  ): Promise<void> {
+    const planInstallments = await tx
+      .select({
+        uid: installments.uid,
+        installmentNumber: installments.installmentNumber,
+        dueDate: installments.dueDate,
+        status: installments.status,
+        cashUid: installments.cashUid,
+      })
+      .from(installments)
+      .where(eq(installments.planId, planUid))
+      .orderBy(asc(installments.installmentNumber));
+
+    for (const term of planInstallments) {
+      if (!term.cashUid) continue;
+
+      const [existingCash] = await tx
+        .select({ installmentSnapshot: cashTransactions.installmentSnapshot })
+        .from(cashTransactions)
+        .where(eq(cashTransactions.uid, term.cashUid))
+        .limit(1);
+
+      await tx
+        .update(cashTransactions)
+        .set({
+          installmentSnapshot: {
+            ...(existingCash?.installmentSnapshot ?? {}),
+            plan_uid: planUid,
+            installment_uid: term.uid,
+            installment_number: term.installmentNumber,
+            total_installments: totalInstallments,
+            due_date: term.dueDate,
+            status: term.status,
+            note: note || null,
+          },
+          note: this.buildInstallmentNote(
+            note || '',
+            term.installmentNumber,
+            totalInstallments,
+          ),
+          updatedAt: new Date(),
+        })
+        .where(eq(cashTransactions.uid, term.cashUid));
+    }
+  }
+
+  /**
+   * 重算剩余分期金额（仅作用于未支付且未取消分期）
+   * - 总金额或总期数变更时触发
+   * - 某期改为已取消（或从已取消恢复）时触发
+   */
+  private async rebalanceRemainingInstallments(
+    tx: any,
+    plan: {
+      uid: number;
+      studentId: number | null;
+      totalAmount: number;
+      totalInstallments: number;
+      frequency: string;
+      customDays: number | null;
+      startDate: Date | string;
+      note: string | null;
+    },
+  ): Promise<void> {
+    const currentTerms = await tx
+      .select()
+      .from(installments)
+      .where(eq(installments.planId, plan.uid))
+      .orderBy(asc(installments.installmentNumber));
+
+    const paidTerms = currentTerms.filter((term: any) => term.status === InstallmentStatus.PAID);
+    const cancelledTerms = currentTerms.filter(
+      (term: any) => term.status === InstallmentStatus.CANCELLED,
+    );
+    const mutableTerms = currentTerms.filter(
+      (term: any) => term.status !== InstallmentStatus.PAID && term.status !== InstallmentStatus.CANCELLED,
+    );
+
+    const lockedCount = paidTerms.length + cancelledTerms.length;
+    if (plan.totalInstallments < lockedCount) {
+      throw AppError.invalidInput(
+        `总期数不能小于已支付和已取消期数之和（当前至少需要 ${lockedCount} 期）`,
+      );
+    }
+
+    const targetRemainingCount = plan.totalInstallments - lockedCount;
+    const currentRemainingCount = mutableTerms.length;
+
+    if (targetRemainingCount > currentRemainingCount) {
+      const toAdd = targetRemainingCount - currentRemainingCount;
+      const sortedByNumber = [...currentTerms].sort(
+        (a: any, b: any) => a.installmentNumber - b.installmentNumber,
+      );
+      let nextInstallmentNumber =
+        sortedByNumber.length > 0
+          ? Number(sortedByNumber[sortedByNumber.length - 1].installmentNumber)
+          : 0;
+
+      let lastDueDate = sortedByNumber.length > 0
+        ? new Date(sortedByNumber[sortedByNumber.length - 1].dueDate)
+        : new Date(plan.startDate);
+      if (Number.isNaN(lastDueDate.getTime())) {
+        lastDueDate = new Date();
+      }
+
+      const newTerms: Array<{
+        planId: number;
+        studentId: number;
+        installmentNumber: number;
+        installmentAmount: number;
+        paidAmount: number;
+        dueDate: string;
+        status: string;
+        note: string | null;
+      }> = [];
+      if (plan.studentId === null) {
+        throw AppError.invalidInput('分期计划未关联学员，无法自动补齐期数');
+      }
+
+      for (let i = 0; i < toAdd; i++) {
+        nextInstallmentNumber += 1;
+        lastDueDate = this.calculateNextDueDate(lastDueDate, plan.frequency, plan.customDays);
+        newTerms.push({
+          planId: plan.uid,
+          studentId: Number(plan.studentId),
+          installmentNumber: nextInstallmentNumber,
+          installmentAmount: 1,
+          paidAmount: 0,
+          dueDate: lastDueDate.toISOString().split('T')[0],
+          status: InstallmentStatus.PENDING,
+          note: plan.note ?? null,
+        });
+      }
+
+      if (newTerms.length > 0) {
+        await tx.insert(installments).values(newTerms);
+      }
+    } else if (targetRemainingCount < currentRemainingCount) {
+      const toRemove = currentRemainingCount - targetRemainingCount;
+      const removableTerms = [...mutableTerms]
+        .sort((a: any, b: any) => b.installmentNumber - a.installmentNumber)
+        .slice(0, toRemove);
+
+      for (const term of removableTerms) {
+        if (term.cashUid) {
+          await tx
+            .delete(cashTransactions)
+            .where(eq(cashTransactions.uid, term.cashUid));
+        }
+      }
+
+      const removableIds = removableTerms.map((term: any) => Number(term.uid));
+      if (removableIds.length > 0) {
+        await tx
+          .delete(installments)
+          .where(inArray(installments.uid, removableIds));
+      }
+    }
+
+    const latestTerms = await tx
+      .select()
+      .from(installments)
+      .where(eq(installments.planId, plan.uid))
+      .orderBy(asc(installments.installmentNumber));
+
+    const paidAmountTotal = latestTerms
+      .filter((term: any) => term.status === InstallmentStatus.PAID)
+      .reduce(
+        (sum: number, term: any) =>
+          sum + Number(term.paidAmount ?? term.installmentAmount ?? 0),
+        0,
+      );
+
+    const remainingTerms = latestTerms.filter(
+      (term: any) => term.status !== InstallmentStatus.PAID && term.status !== InstallmentStatus.CANCELLED,
+    );
+
+    const remainingBudget = plan.totalAmount - paidAmountTotal;
+    if (remainingBudget < 0) {
+      throw AppError.invalidInput('总金额不能小于已支付金额');
+    }
+
+    if (remainingTerms.length === 0) {
+      if (remainingBudget !== 0) {
+        throw AppError.invalidInput('无可重算的剩余期数，无法分配剩余金额');
+      }
+      return;
+    }
+
+    if (remainingBudget < remainingTerms.length) {
+      throw AppError.invalidInput('剩余金额不足以分配到每一期（每期至少 0.01 元）');
+    }
+
+    const newAmounts = this.getInstallmentAmounts(remainingBudget, remainingTerms.length);
+
+    for (let i = 0; i < remainingTerms.length; i++) {
+      const term = remainingTerms[i];
+      if (term.cashUid) {
+        await tx
+          .delete(cashTransactions)
+          .where(eq(cashTransactions.uid, term.cashUid));
+      }
+
+      await tx
+        .update(installments)
+        .set({
+          installmentAmount: newAmounts[i],
+          paidAmount: 0,
+          paidDate: null,
+          cashUid: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(installments.uid, term.uid));
+    }
+  }
 
   /**
    * 计算分期统计数据

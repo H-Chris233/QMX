@@ -184,7 +184,12 @@ export class InstallmentsApiService {
    */
   static async updateInstallmentPlan(
     planId: number,
-    data: { note?: string; status?: string }
+    data: {
+      note?: string;
+      status?: string;
+      total_amount?: number;
+      total_installments?: number;
+    }
   ): Promise<InstallmentPlan> {
     const payload = {
       ...data,

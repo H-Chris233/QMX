@@ -292,7 +292,7 @@
                   </button>
                   <button
                     class="icon-btn delete"
-                    @click="deleteTransaction(transaction.uid)"
+                    @click="deleteTransaction(transaction)"
                   >
                     <Trash2 :size="16" />
                   </button>
@@ -461,10 +461,81 @@
                 </span>
               </div>
               <div class="summary-item">
+                <span class="label">计划状态</span>
+                <span class="value">{{ getPlanStatusText(selectedInstallmentPlan.planStatus) }}</span>
+              </div>
+              <div class="summary-item">
                 <span class="label">合并状态</span>
                 <span :class="['value', getMergedStatusClass(selectedInstallmentPlan.mergedStatus)]">
                   {{ getMergedStatusText(selectedInstallmentPlan.mergedStatus) }}
                 </span>
+              </div>
+            </div>
+
+            <div class="plan-editor">
+              <div class="form-group">
+                <label>计划总金额（元）</label>
+                <div class="input-wrapper">
+                  <input
+                    v-model.number="planEditForm.totalAmount"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="form-input"
+                    placeholder="请输入计划总金额"
+                    :disabled="loading || installmentLoading || installmentPlanSaving"
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>计划总期数</label>
+                <div class="input-wrapper">
+                  <input
+                    v-model.number="planEditForm.totalInstallments"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="form-input"
+                    placeholder="请输入计划总期数"
+                    :disabled="loading || installmentLoading || installmentPlanSaving"
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>编辑计划状态</label>
+                <div class="select-wrapper">
+                  <select
+                    v-model="planEditForm.status"
+                    class="form-select"
+                    :disabled="loading || installmentLoading || installmentPlanSaving"
+                  >
+                    <option v-for="item in planStatusOptions" :key="item.value" :value="item.value">
+                      {{ item.label }}
+                    </option>
+                  </select>
+                  <ChevronDown :size="16" class="select-arrow" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>计划备注</label>
+                <div class="input-wrapper">
+                  <textarea
+                    v-model="planEditForm.note"
+                    rows="2"
+                    class="form-textarea"
+                    placeholder="填写计划备注（可选）"
+                    :disabled="loading || installmentLoading || installmentPlanSaving"
+                  ></textarea>
+                </div>
+              </div>
+              <div class="plan-editor-actions">
+                <button
+                  class="btn btn-primary compact-btn"
+                  :disabled="loading || installmentLoading || installmentPlanSaving"
+                  @click="saveInstallmentPlan"
+                >
+                  {{ installmentPlanSaving ? '保存中...' : '保存计划' }}
+                </button>
               </div>
             </div>
 
@@ -554,6 +625,8 @@ interface InstallmentPlanView {
   overdueCount: number;
   cancelledCount: number;
   mergedStatus: InstallmentMergedStatus;
+  planStatus: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  note: string;
   nextDueDate: string | null;
   terms: InstallmentTermView[];
 }
@@ -563,10 +636,22 @@ const transactionStore = useTransactionStore();
 
 const showEditTransaction = ref<boolean>(false);
 const showInstallmentPlanModal = ref<boolean>(false);
+const installmentPlanSaving = ref<boolean>(false);
 const editingTransactionId = ref<number | null>(null);
 const editingTransactionSource = ref<Transaction | null>(null);
 const selectedInstallmentPlan = ref<InstallmentPlanView | null>(null);
 const termUpdatingMap = ref<Record<number, boolean>>({});
+const planEditForm = ref<{
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  note: string;
+  totalAmount: number;
+  totalInstallments: number;
+}>({
+  status: 'ACTIVE',
+  note: '',
+  totalAmount: 0,
+  totalInstallments: 1,
+});
 const editTransactionForm = ref<{
   amount: number;
   note: string;
@@ -599,7 +684,7 @@ const filterState = ref<TransactionFilterState>({
 const students = ref<Student[]>([]);
 const installmentPlans = ref<InstallmentPlanView[]>([]);
 const installmentLoading = ref<boolean>(false);
-const installmentFilter = ref<InstallmentFilterValue>('ALL');
+const installmentFilter = ref<InstallmentFilterValue>('ACTIVE');
 const loading = computed(() => appStore.isLoading);
 const transactions = computed(() => transactionStore.transactions);
 const showAddTransaction = computed(() => transactionStore.showAddTransaction);
@@ -638,6 +723,11 @@ const installmentFilters: Array<{ label: string; value: InstallmentFilterValue }
   { label: '全部', value: 'ALL' },
   { label: '进行中', value: 'ACTIVE' },
   { label: '含逾期', value: 'OVERDUE' },
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '已取消', value: 'CANCELLED' },
+];
+const planStatusOptions: Array<{ label: string; value: 'ACTIVE' | 'COMPLETED' | 'CANCELLED' }> = [
+  { label: '进行中', value: 'ACTIVE' },
   { label: '已完成', value: 'COMPLETED' },
   { label: '已取消', value: 'CANCELLED' },
 ];
@@ -731,12 +821,60 @@ const pendingInstallmentTermCount = computed(() =>
 const overdueInstallmentTermCount = computed(() =>
   installmentPlans.value.reduce((sum, plan) => sum + plan.overdueCount, 0),
 );
+
+const resolvePlanMergedStatus = (
+  planStatus: 'ACTIVE' | 'COMPLETED' | 'CANCELLED',
+  counts: {
+    paidCount: number;
+    pendingCount: number;
+    overdueCount: number;
+    cancelledCount: number;
+    totalInstallments: number;
+  },
+): InstallmentMergedStatus => {
+  if (planStatus === 'CANCELLED') return 'CANCELLED';
+  if (counts.overdueCount > 0) return 'OVERDUE';
+  if (counts.pendingCount > 0) return 'ACTIVE';
+
+  const allTermsCancelled =
+    counts.totalInstallments > 0 &&
+    counts.cancelledCount === counts.totalInstallments &&
+    counts.paidCount === 0;
+  if (allTermsCancelled) return 'CANCELLED';
+
+  if (planStatus === 'COMPLETED' || counts.paidCount > 0) return 'COMPLETED';
+  return 'ACTIVE';
+};
+
+const matchesInstallmentFilter = (
+  plan: InstallmentPlanView,
+  filter: InstallmentFilterValue,
+): boolean => {
+  if (filter === 'ALL') return true;
+  if (filter === 'OVERDUE') return plan.overdueCount > 0;
+  if (filter === 'ACTIVE') {
+    return plan.mergedStatus === 'ACTIVE' || plan.mergedStatus === 'OVERDUE';
+  }
+  if (filter === 'COMPLETED') {
+    return (
+      plan.planStatus === 'COMPLETED' ||
+      (plan.pendingCount === 0 &&
+        plan.overdueCount === 0 &&
+        plan.paidCount > 0 &&
+        plan.planStatus !== 'CANCELLED')
+    );
+  }
+  return (
+    plan.planStatus === 'CANCELLED' ||
+    (plan.totalInstallments > 0 &&
+      plan.cancelledCount === plan.totalInstallments &&
+      plan.paidCount === 0)
+  );
+};
+
 const filteredInstallmentPlans = computed(() => {
   const list = [...installmentPlans.value];
-  const filtered =
-    installmentFilter.value === 'ALL'
-      ? list
-      : list.filter((item) => item.mergedStatus === installmentFilter.value);
+  const filtered = list.filter((item) => matchesInstallmentFilter(item, installmentFilter.value));
   return filtered.sort((a, b) => {
     const ad = a.nextDueDate ? new Date(a.nextDueDate).getTime() : Number.MAX_SAFE_INTEGER;
     const bd = b.nextDueDate ? new Date(b.nextDueDate).getTime() : Number.MAX_SAFE_INTEGER;
@@ -935,6 +1073,11 @@ const getMergedStatusClass = (status: InstallmentMergedStatus): string => {
   if (status === 'COMPLETED') return 'status-paid';
   return 'status-cancelled';
 };
+const getPlanStatusText = (status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED'): string => {
+  if (status === 'ACTIVE') return '进行中';
+  if (status === 'COMPLETED') return '已完成';
+  return '已取消';
+};
 
 const handleTransactionUpdate = (value: TransactionFormModel) => {
   currentTransaction.value = normalizeTransactionFormModel(value);
@@ -1054,22 +1197,21 @@ const loadInstallments = async () => {
       const overdueCount = terms.filter((item) => item.status === InstallmentStatus.OVERDUE).length;
       const cancelledCount = terms.filter((item) => item.status === InstallmentStatus.CANCELLED).length;
       const planStatus = normalizePlanStatus(rawPlan.status);
-      const mergedStatus: InstallmentMergedStatus =
-        planStatus === 'CANCELLED'
-          ? 'CANCELLED'
-          : overdueCount > 0
-            ? 'OVERDUE'
-            : pendingCount > 0
-              ? 'ACTIVE'
-              : 'COMPLETED';
+      const totalInstallments = Number(
+        rawPlan.total_installments || rawPlan.totalInstallments || terms.length || 0,
+      );
+      const mergedStatus = resolvePlanMergedStatus(planStatus, {
+        paidCount,
+        pendingCount,
+        overdueCount,
+        cancelledCount,
+        totalInstallments,
+      });
 
       const nextDueTerm = terms
         .filter((item) => item.status === InstallmentStatus.PENDING || item.status === InstallmentStatus.OVERDUE)
         .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
 
-      const totalInstallments = Number(
-        rawPlan.total_installments || rawPlan.totalInstallments || terms.length || 0,
-      );
       const totalAmount =
         Number(rawPlan.total_amount || 0) ||
         terms.reduce((sum, item) => sum + item.installmentAmount, 0);
@@ -1085,6 +1227,8 @@ const loadInstallments = async () => {
         overdueCount,
         cancelledCount,
         mergedStatus,
+        planStatus,
+        note: rawPlan.note ? String(rawPlan.note) : '',
         nextDueDate: nextDueTerm?.dueDate || null,
         terms,
       });
@@ -1097,6 +1241,13 @@ const loadInstallments = async () => {
       selectedInstallmentPlan.value = refreshed;
       if (!refreshed) {
         showInstallmentPlanModal.value = false;
+      } else if (!installmentPlanSaving.value) {
+        planEditForm.value = {
+          status: refreshed.planStatus,
+          note: refreshed.note,
+          totalAmount: refreshed.totalAmount,
+          totalInstallments: refreshed.totalInstallments,
+        };
       }
     }
   } catch (error) {
@@ -1108,7 +1259,46 @@ const loadInstallments = async () => {
 
 const openInstallmentPlanModal = (plan: InstallmentPlanView) => {
   selectedInstallmentPlan.value = plan;
+  planEditForm.value = {
+    status: plan.planStatus,
+    note: plan.note,
+    totalAmount: plan.totalAmount,
+    totalInstallments: plan.totalInstallments,
+  };
   showInstallmentPlanModal.value = true;
+};
+
+const saveInstallmentPlan = async () => {
+  const plan = selectedInstallmentPlan.value;
+  if (!plan) return;
+
+  const totalAmount = Number(planEditForm.value.totalAmount);
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    showError('计划总金额必须大于0');
+    return;
+  }
+
+  const totalInstallments = Number(planEditForm.value.totalInstallments);
+  if (!Number.isInteger(totalInstallments) || totalInstallments <= 0) {
+    showError('计划总期数必须为正整数');
+    return;
+  }
+
+  try {
+    installmentPlanSaving.value = true;
+    await ApiService.updateInstallmentPlan(plan.uid, {
+      status: planEditForm.value.status,
+      note: planEditForm.value.note,
+      total_amount: totalAmount,
+      total_installments: totalInstallments,
+    });
+    showSuccess('分期计划已更新');
+    await Promise.all([loadInstallments(), loadTransactions()]);
+  } catch (error) {
+    showError('更新分期计划失败', (error as Error)?.message || '请稍后重试');
+  } finally {
+    installmentPlanSaving.value = false;
+  }
 };
 
 const onTermStatusChange = async (
@@ -1208,25 +1398,44 @@ const saveTransaction = async () => {
   }
 };
 
-const deleteTransaction = async (uid: number) => {
+const deleteTransaction = async (input: number | Transaction) => {
   const transaction =
-    displayedTransactions.value.find((t) => t.uid === uid) ||
-    transactions.value.find((t) => t.uid === uid);
-  const message = transaction ? `确定要删除此条记录？\n金额: ${formatTransactionAmount(transaction)}` : '确定删除？';
-  
+    typeof input === 'number'
+      ? (displayedTransactions.value.find((t) => t.uid === input) ||
+         transactions.value.find((t) => t.uid === input))
+      : input;
+
+  const installmentPlanUid =
+    transaction && isInstallmentTransaction(transaction)
+      ? Number(transaction.installment?.plan_uid || 0)
+      : 0;
+  const isInstallmentPlanDelete = Number.isInteger(installmentPlanUid) && installmentPlanUid > 0;
+
+  const title = isInstallmentPlanDelete ? '删除分期计划' : '删除记录';
+  const message = isInstallmentPlanDelete
+    ? `确定要删除整个分期计划？\n计划ID: ${installmentPlanUid}\n此操作会删除该计划下所有期数及相关收支记录。`
+    : transaction
+      ? `确定要删除此条记录？\n金额: ${formatTransactionAmount(transaction)}`
+      : '确定删除？';
+
   showConfirm({
-    title: '删除记录',
+    title,
     message: message,
     confirmText: '删除',
     cancelText: '取消',
     confirmType: 'danger',
     onConfirm: async () => {
       try {
-        await ApiService.deleteCashTransaction(uid);
-        showSuccess('已删除');
+        if (isInstallmentPlanDelete) {
+          await ApiService.deleteInstallmentPlan(installmentPlanUid);
+          showSuccess('分期计划已删除');
+        } else if (transaction) {
+          await ApiService.deleteCashTransaction(transaction.uid);
+          showSuccess('已删除');
+        }
         await Promise.all([loadTransactions(), loadInstallments()]);
       } catch (error) {
-        showError('删除失败');
+        showError('删除失败', (error as Error)?.message || '请稍后重试');
       }
     },
   });
@@ -1308,10 +1517,17 @@ const closeModals = () => {
   transactionStore.toggleAddTransaction(false);
   showEditTransaction.value = false;
   showInstallmentPlanModal.value = false;
+  installmentPlanSaving.value = false;
   editingTransactionId.value = null;
   editingTransactionSource.value = null;
   selectedInstallmentPlan.value = null;
   termUpdatingMap.value = {};
+  planEditForm.value = {
+    status: 'ACTIVE',
+    note: '',
+    totalAmount: 0,
+    totalInstallments: 1,
+  };
   currentTransaction.value = createDefaultTransactionFormModel();
   editTransactionForm.value = {
     amount: 0,
@@ -1564,6 +1780,20 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.75rem;
+}
+
+.plan-editor {
+  margin-top: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.plan-editor-actions {
+  margin-top: 0.45rem;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .term-card {

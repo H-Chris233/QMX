@@ -124,6 +124,13 @@ const updateInstallmentPlanSchema = Joi.object({
     .messages({
       'any.only': '无效的分期计划状态',
     }),
+  total_amount: Joi.number().positive().optional().messages({
+    'number.positive': '总金额必须大于0',
+  }),
+  total_installments: Joi.number().integer().min(1).optional().messages({
+    'number.integer': '总期数必须是整数',
+    'number.min': '总期数至少为1',
+  }),
 });
 
 const recordPaymentSchema = Joi.object({
