@@ -86,9 +86,31 @@ export const createApp = (appConfig: AppConfig = {}): Application => {
 
   app.use(helmet(helmetOptions));
 
+  const parseCorsOrigins = (value: string): string[] =>
+    value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const allowedOrigins = parseCorsOrigins(finalConfig.server?.corsOrigin || config.server.corsOrigin);
+
   // CORS配置
   app.use(cors({
-    origin: finalConfig.server?.corsOrigin || config.server.corsOrigin,
+    origin: (origin, callback) => {
+      // 非浏览器请求（curl/postman/同源）放行
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      logger.warn(`CORS 拒绝来源: ${origin}, 允许来源: ${allowedOrigins.join(', ')}`);
+      callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

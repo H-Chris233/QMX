@@ -39,8 +39,11 @@ function getAuthToken(): string | null {
  * 创建配置好的 axios 实例
  */
 function createAxiosInstance(): AxiosInstance {
+  const rawBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim();
+  const normalizedBaseUrl = rawBaseUrl ? rawBaseUrl.replace(/\/+$/, '') : '/api/v1';
+
   const instance = axios.create({
-    baseURL: '/api/v1',
+    baseURL: normalizedBaseUrl,
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
