@@ -476,16 +476,17 @@ onMounted(() => fetchStudents());
 
 .toolbar-left {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
   flex: 1;
 }
 
 .search-wrapper {
   position: relative;
-  min-width: 240px;
-  width: min(460px, 100%);
-  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+  flex: 0 0 auto;
 }
 .search-input {
   width: 100%;
@@ -535,7 +536,7 @@ onMounted(() => fetchStudents());
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  height: 2.55rem;
+  height: 2.5rem;
   padding: 0 0.9rem;
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
@@ -565,7 +566,8 @@ onMounted(() => fetchStudents());
   background-color: var(--bg-app);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
-  padding: 0.6rem 2rem 0.6rem 1rem;
+  padding: 0 2rem 0 1rem;
+  height: 2.5rem;
   border-radius: 8px;
   font-size: 0.9rem;
   cursor: pointer;
