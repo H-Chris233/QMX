@@ -275,30 +275,6 @@ describe('StudentManagement', () => {
       );
     });
 
-    it('应该根据会员状态筛选条件构建参数（membership_status）', async () => {
-      const mockResponse = createMockResponse(
-        [createMockStudent({ uid: 1, membership_status: 'Active' })],
-        1,
-        20,
-        1
-      );
-
-      vi.spyOn(ApiService, 'getAllStudents').mockResolvedValue(mockResponse);
-
-      mountComponent();
-      await nextTick();
-      await waitForDOMUpdate();
-
-      wrapper.vm.searchFilters.membershipStatus = 'Active';
-      await wrapper.vm.performSearch();
-
-      expect(ApiService.getAllStudents).toHaveBeenCalledWith(
-        expect.objectContaining({
-          membership_status: 'Active',
-        })
-      );
-    });
-
     it('应该在改变页码时获取对应页数据', async () => {
       const mockResponse1 = createMockResponse(
         [createMockStudent({ uid: 1 })],
@@ -380,9 +356,9 @@ describe('StudentManagement', () => {
 
       // 验证空值未被传递
       expect(lastCall.subject).toBeUndefined();
-      expect(lastCall.classType).toBeUndefined();
-      expect(lastCall.hasMembership).toBeUndefined();
-      expect(lastCall.membershipStatus).toBeUndefined();
+      expect(lastCall.class_type).toBeUndefined();
+      expect(lastCall.has_membership).toBeUndefined();
+      expect(lastCall.membership_status).toBeUndefined();
     });
   });
 

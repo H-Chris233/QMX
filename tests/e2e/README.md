@@ -12,7 +12,6 @@
 - ✅ 列表分页与筛选功能
   - `has_membership` 会员状态筛选
   - `membership_active_at` 会员激活时间筛选
-  - `membership_status` 会员详细状态筛选
 - ✅ 搜索功能（姓名、电话、科目等）
 
 ### 2. 现金交易 (`financial-transactions.spec.ts`)

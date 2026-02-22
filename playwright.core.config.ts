@@ -5,6 +5,9 @@ import { dirname, join } from 'path';
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const localWorkers = Number(process.env.PLAYWRIGHT_WORKERS ?? '1');
+const shouldReuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === 'true' && !process.env.CI;
+const e2eDatabaseUrl = process.env.E2E_DATABASE_URL || process.env.DATABASE_URL;
 
 /**
  * Playwright E2E 测试配置 - 核心流程版本
@@ -19,7 +22,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : (Number.isFinite(localWorkers) && localWorkers > 0 ? localWorkers : 1),
   
   // 报告配置
   reporter: [
@@ -52,13 +55,22 @@ export default defineConfig({
       command: 'npm run backend',
       port: 3001,
       timeout: 120 * 1000, // 2分钟启动超时
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: shouldReuseExistingServer,
+      env: {
+        NODE_ENV: 'test',
+        ...(e2eDatabaseUrl ? { DATABASE_URL: e2eDatabaseUrl } : {}),
+        TEST_DATA_CLEANUP: 'true',
+      },
     },
     {
       command: 'npm run dev',
       port: 1420,
       timeout: 60 * 1000, // 1分钟启动超时
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: shouldReuseExistingServer,
+      env: {
+        NODE_ENV: 'test',
+        VITE_API_BASE_URL: 'http://localhost:3001/api/v1',
+      },
     }
   ],
   

@@ -7,11 +7,18 @@ import { type Page, expect } from '@playwright/test';
 export class StudentManagementPage {
   constructor(public readonly page: Page) {}
 
-  private async dismissErrorModalIfPresent(): Promise<void> {
+  private isRateLimitMessage(message?: string | null): boolean {
+    if (!message) return false;
+    return /429|too many requests|请求过于频繁/i.test(message);
+  }
+
+  private async dismissErrorModalIfPresent(): Promise<string | null> {
     const overlay = this.page.locator('.error-modal-overlay');
     if (!(await overlay.isVisible().catch(() => false))) {
-      return;
+      return null;
     }
+
+    const message = await overlay.textContent().catch(() => null);
 
     const closeButton = this.page
       .locator('.error-modal-overlay button:has-text("确定"), .error-modal-overlay button:has-text("关闭")')
@@ -22,6 +29,21 @@ export class StudentManagementPage {
     }
     await this.page.keyboard.press('Escape').catch(() => {});
     await overlay.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    return message;
+  }
+
+  private async runWithRateLimitRetry(action: () => Promise<void>): Promise<void> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await this.dismissErrorModalIfPresent();
+      await action();
+      await this.page.waitForTimeout(800);
+      const modalMessage = await this.dismissErrorModalIfPresent();
+      if (!this.isRateLimitMessage(modalMessage)) {
+        return;
+      }
+
+      await this.page.waitForTimeout(1200 * attempt);
+    }
   }
 
   /**
@@ -35,50 +57,61 @@ export class StudentManagementPage {
    * 搜索学员
    */
   async searchStudent(searchTerm: string): Promise<void> {
-    await this.dismissErrorModalIfPresent();
-    await this.page.locator('[data-testid="student-search-input"]').fill(searchTerm);
-    const searchButton = this.page.locator('[data-testid="student-search-button"]');
-    if (await searchButton.isVisible().catch(() => false)) {
-      await searchButton.click().catch(async () => {
-        await this.dismissErrorModalIfPresent();
+    await this.runWithRateLimitRetry(async () => {
+      await this.page.locator('[data-testid="student-search-input"]').fill(searchTerm);
+      const searchButton = this.page.locator('[data-testid="student-search-button"]');
+      if (await searchButton.isVisible().catch(() => false)) {
+        await searchButton.click().catch(async () => {
+          await this.page.locator('[data-testid="student-search-input"]').press('Enter');
+        });
+      } else {
         await this.page.locator('[data-testid="student-search-input"]').press('Enter');
-      });
-    } else {
-      await this.page.locator('[data-testid="student-search-input"]').press('Enter');
-    }
-    await this.page.waitForTimeout(1000); // 等待搜索结果
+      }
+    });
   }
 
   /**
    * 按科目筛选
    */
   async filterBySubject(subject: string): Promise<void> {
-    await this.page.locator('[data-testid="filter-subject"]').selectOption(subject);
-    await this.page.waitForTimeout(1000);
+    await this.runWithRateLimitRetry(async () => {
+      await this.page.locator('[data-testid="filter-subject"]').selectOption(subject);
+    });
   }
 
   /**
    * 按课程类型筛选
    */
   async filterByClassType(classType: string): Promise<void> {
-    await this.page.locator('[data-testid="filter-class-type"]').selectOption(classType);
-    await this.page.waitForTimeout(1000);
+    await this.runWithRateLimitRetry(async () => {
+      await this.page.locator('[data-testid="filter-class-type"]').selectOption(classType);
+    });
   }
 
   /**
    * 按会员状态筛选
    */
   async filterByMembership(hasMembership: string): Promise<void> {
-    await this.page.locator('[data-testid="filter-has-membership"]').selectOption(hasMembership);
-    await this.page.waitForTimeout(1000);
+    await this.runWithRateLimitRetry(async () => {
+      await this.page.locator('[data-testid="filter-has-membership"]').selectOption(hasMembership);
+    });
   }
 
   /**
    * 按会员状态详细筛选
    */
   async filterByMembershipStatus(status: string): Promise<void> {
-    await this.page.locator('[data-testid="filter-membership-status"]').selectOption(status);
-    await this.page.waitForTimeout(1000);
+    const detailedFilter = this.page.locator('[data-testid="filter-membership-status"]');
+    if (await detailedFilter.count()) {
+      await this.runWithRateLimitRetry(async () => {
+        await detailedFilter.selectOption(status);
+      });
+      return;
+    }
+
+    // 当前页面仅提供 has_membership 筛选，兼容旧测试入口。
+    const normalized = status === '' ? '' : status === 'Active' ? 'true' : 'false';
+    await this.filterByMembership(normalized);
   }
 
   /**
@@ -218,6 +251,18 @@ export class StudentManagementPage {
    * 等待学员列表加载
    */
   async waitForStudentList(): Promise<void> {
-    await this.page.locator('[data-testid="student-list"]').waitFor({ state: 'visible' });
+    const list = this.page.locator('[data-testid="student-list"]');
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const visible = await list.isVisible().catch(() => false);
+      if (visible) return;
+
+      await list.waitFor({ state: 'visible', timeout: 4000 }).catch(async () => {
+        const message = await this.dismissErrorModalIfPresent();
+        if (this.isRateLimitMessage(message)) {
+          await this.page.waitForTimeout(1200 * attempt);
+        }
+      });
+    }
+    await list.waitFor({ state: 'visible', timeout: 6000 });
   }
 }

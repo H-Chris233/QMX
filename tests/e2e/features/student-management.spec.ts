@@ -37,7 +37,6 @@ test.describe('学生管理功能测试（重构版）', () => {
     expect(await studentPage.page.locator('[data-testid="filter-subject"]').isVisible()).toBeTruthy();
     expect(await studentPage.page.locator('[data-testid="filter-class-type"]').isVisible()).toBeTruthy();
     expect(await studentPage.page.locator('[data-testid="filter-has-membership"]').isVisible()).toBeTruthy();
-    expect(await studentPage.page.locator('[data-testid="filter-membership-status"]').isVisible()).toBeTruthy();
     
     console.log('学生管理页面可访问性验证通过');
   });

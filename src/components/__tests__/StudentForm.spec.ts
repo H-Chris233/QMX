@@ -38,6 +38,11 @@ const createMockStudent = (overrides: Partial<Student> = {}): Student => ({
 describe('StudentForm', () => {
   let wrapper: ReturnType<typeof mountWithPinia>;
 
+  const switchToMembershipClass = async (classType: 'Month' | 'Year' = 'Month') => {
+    await wrapper.find('#class').setValue(classType);
+    await wrapper.vm.$nextTick();
+  };
+
   beforeEach(() => {
     wrapper = mountWithPinia(StudentForm);
   });
@@ -70,8 +75,8 @@ describe('StudentForm', () => {
       expect(wrapper.find('#note').exists()).toBe(true);
       
       // 检查会员信息字段
-      expect(wrapper.find('#membership_start_date').exists()).toBe(true);
-      expect(wrapper.find('#membership_end_date').exists()).toBe(true);
+      expect(wrapper.find('#membership_start_date').exists()).toBe(false);
+      expect(wrapper.find('#membership_end_date').exists()).toBe(false);
       
       // 检查操作按钮
       expect(wrapper.find('.btn-cancel').exists()).toBe(true);
@@ -87,8 +92,8 @@ describe('StudentForm', () => {
       expect(wrapper.find('#subject').element.value).toBe('Shooting');
       expect(wrapper.find('#note').element.value).toBe('');
       expect(wrapper.find('#lesson_left').element.value).toBe('');
-      expect(wrapper.find('#membership_start_date').element.value).toBe('');
-      expect(wrapper.find('#membership_end_date').element.value).toBe('');
+      expect(wrapper.find('#membership_start_date').exists()).toBe(false);
+      expect(wrapper.find('#membership_end_date').exists()).toBe(false);
     });
 
     it('应该在编辑模式下正确填充学生数据', async () => {
@@ -104,7 +109,7 @@ describe('StudentForm', () => {
       expect(wrapper.find('#class').element.value).toBe(mockStudent.class);
       expect(wrapper.find('#subject').element.value).toBe(mockStudent.subject);
       expect(wrapper.find('#note').element.value).toBe(mockStudent.note ?? '');
-      expect(wrapper.find('#lesson_left').element.value).toBe(mockStudent.lesson_left?.toString() ?? '');
+      expect(wrapper.find('#lesson_left').exists()).toBe(false); // 月卡不显示课时输入
       
       // 检查日期格式转换（ISO date -> YYYY-MM-DD）
       expect(wrapper.find('#membership_start_date').element.value).toBe('2024-01-01');
@@ -129,9 +134,12 @@ describe('StudentForm', () => {
       expect(wrapper.find('#class').element.value).toBe(emptyStudent.class);
       expect(wrapper.find('#subject').element.value).toBe(emptyStudent.subject);
       expect(wrapper.find('#note').element.value).toBe(''); // null转为空字符串
-      expect(wrapper.find('#lesson_left').element.value).toBe(''); // null转为空字符串
-      expect(wrapper.find('#membership_start_date').element.value).toBe(''); // null转为空字符串
-      expect(wrapper.find('#membership_end_date').element.value).toBe(''); // null转为空字符串
+      expect(wrapper.find('#lesson_left').exists()).toBe(false); // 月卡不显示课时输入
+      const startDate = wrapper.find('#membership_start_date').element.value;
+      const endDate = wrapper.find('#membership_end_date').element.value;
+      expect(startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(new Date(endDate).getTime()).toBeGreaterThanOrEqual(new Date(startDate).getTime());
     });
   });
 
@@ -208,7 +216,6 @@ describe('StudentForm', () => {
       await wrapper.find('#phone').setValue('13900139000');
       await wrapper.find('#subject').setValue('Archery');
       await wrapper.find('#class').setValue('Year');
-      await wrapper.find('#lesson_left').setValue(20);
       await wrapper.find('#note').setValue('测试学员备注');
       await wrapper.find('#membership_start_date').setValue('2024-02-01');
       await wrapper.find('#membership_end_date').setValue('2025-01-31');
@@ -230,7 +237,7 @@ describe('StudentForm', () => {
       expect(payload.class).toBe('Year'); // 直接使用class字段
       expect(payload.subject).toBe('Archery');
       expect(payload.note).toBe('测试学员备注');
-      expect(payload.lesson_left).toBe(20);
+      expect(payload.lesson_left).toBeNull(); // 年卡不持久化课时
       expect(payload.membership_start_date).toBe('2024-02-01');
       expect(payload.membership_end_date).toBe('2025-01-31');
     });
@@ -248,10 +255,10 @@ describe('StudentForm', () => {
       // 验证可选字段的undefined转换
       expect(payload.age).toBeNull();
       expect(payload.phone).toBe('');
-      expect(payload.note).toBeUndefined();
-      expect(payload.lesson_left).toBeUndefined();
-      expect(payload.membership_start_date).toBeUndefined();
-      expect(payload.membership_end_date).toBeUndefined();
+      expect(payload.note).toBe('');
+      expect(payload.lesson_left).toBeNull();
+      expect(payload.membership_start_date).toBeNull();
+      expect(payload.membership_end_date).toBeNull();
     });
 
     it('应该正确处理空白字符串的trim和undefined转换', async () => {
@@ -265,7 +272,7 @@ describe('StudentForm', () => {
       const payload = saveEvent![0][0] as CurrentStudentInput;
       
       expect(payload.phone).toBe(''); // 空白字符被trim
-      expect(payload.note).toBeUndefined(); // 空白字符被trim后转为undefined
+      expect(payload.note).toBe(''); // 空白字符被trim后为空字符串
     });
 
     it('应该正确处理null值的转换', async () => {
@@ -274,18 +281,16 @@ describe('StudentForm', () => {
       // 通过设置空值来模拟null转换
       await wrapper.find('#age').setValue(''); // v-model.number会将空字符串转为null
       await wrapper.find('#lesson_left').setValue(''); // v-model.number会将空字符串转为null
-      await wrapper.find('#membership_start_date').setValue('');
-      await wrapper.find('#membership_end_date').setValue('');
       
       await wrapper.find('form').trigger('submit');
       
       const saveEvent = wrapper.emitted('save');
       const payload = saveEvent![0][0] as CurrentStudentInput;
       
-      expect(payload.age).toBe(''); // 空字符串通过v-model.number保持为空字符串
-      expect(payload.lesson_left).toBe(''); // 空字符串通过v-model.number保持为空字符串
-      expect(payload.membership_start_date).toBe(''); // 空字符串保持为空字符串
-      expect(payload.membership_end_date).toBe(''); // 空字符串保持为空字符串
+      expect(payload.age).toBe('');
+      expect(payload.lesson_left).toBeNull();
+      expect(payload.membership_start_date).toBeNull();
+      expect(payload.membership_end_date).toBeNull();
     });
   });
 
@@ -326,11 +331,9 @@ describe('StudentForm', () => {
       await wrapper.find('#age').setValue(25);
       await wrapper.find('#phone').setValue('13800138000');
       await wrapper.find('#subject').setValue('Shooting');
-      await wrapper.find('#class').setValue('Month');
+      await wrapper.find('#class').setValue('Others');
       await wrapper.find('#lesson_left').setValue(10);
       await wrapper.find('#note').setValue('类型测试备注');
-      await wrapper.find('#membership_start_date').setValue('2024-01-01');
-      await wrapper.find('#membership_end_date').setValue('2024-12-31');
       
       await wrapper.find('form').trigger('submit');
       
@@ -343,21 +346,23 @@ describe('StudentForm', () => {
       expect(typeof payload.phone).toBe('string');
       expect(typeof payload.class).toBe('string');
       expect(typeof payload.subject).toBe('string');
-      expect(payload.note === undefined || typeof payload.note === 'string').toBe(true);
-      expect(payload.lesson_left === undefined || typeof payload.lesson_left === 'number').toBe(true);
-      expect(payload.membership_start_date === undefined || typeof payload.membership_start_date === 'string').toBe(true);
-      expect(payload.membership_end_date === undefined || typeof payload.membership_end_date === 'string').toBe(true);
+      expect(typeof payload.note).toBe('string');
+      expect(payload.lesson_left === null || typeof payload.lesson_left === 'number').toBe(true);
+      expect(payload.membership_start_date === null || typeof payload.membership_start_date === 'string').toBe(true);
+      expect(payload.membership_end_date === null || typeof payload.membership_end_date === 'string').toBe(true);
       
       // 确保没有null值（除了age可以为null）
       expect(payload.note).not.toBeNull();
-      expect(payload.lesson_left).not.toBeNull();
-      expect(payload.membership_start_date).not.toBeNull();
-      expect(payload.membership_end_date).not.toBeNull();
+      expect(payload.lesson_left).not.toBeUndefined();
+      expect(payload.membership_start_date).toBeNull();
+      expect(payload.membership_end_date).toBeNull();
     });
   });
 
   describe('5. 交互测试', () => {
-    it('应该正确处理会员日期的清空', async () => {
+    it('应该在切换为非会员课程时清空会员日期', async () => {
+      await switchToMembershipClass('Month');
+
       // 设置初始日期
       await wrapper.find('#membership_start_date').setValue('2024-01-01');
       await wrapper.find('#membership_end_date').setValue('2024-12-31');
@@ -371,16 +376,19 @@ describe('StudentForm', () => {
       
       expect(wrapper.find('#membership_start_date').element.value).toBe('');
       expect(wrapper.find('#membership_end_date').element.value).toBe('');
+
+      // 切到非会员课程后，日期字段应从提交数据中清空
+      await wrapper.find('#class').setValue('Others');
+      await wrapper.vm.$nextTick();
       
-      // 提交后应该保持为空字符串（只有null或undefined才转为undefined）
       await wrapper.find('#name').setValue('测试清空');
       await wrapper.find('form').trigger('submit');
       
       const saveEvent = wrapper.emitted('save');
       const payload = saveEvent![0][0] as CurrentStudentInput;
       
-      expect(payload.membership_start_date).toBe(''); // 空字符串保持为空字符串
-      expect(payload.membership_end_date).toBe(''); // 空字符串保持为空字符串
+      expect(payload.membership_start_date).toBeNull();
+      expect(payload.membership_end_date).toBeNull();
     });
 
     it('应该正确处理大数字输入', async () => {
@@ -481,6 +489,7 @@ describe('StudentForm', () => {
 
     it('应该正确处理undefined的可选字段', async () => {
       const studentWithUndefined = createMockStudent({
+        class: 'Others',
         note: undefined,
         lesson_left: undefined,
         membership_start_date: undefined,
@@ -493,8 +502,8 @@ describe('StudentForm', () => {
       expect(wrapper.find('#name').element.value).toBe(studentWithUndefined.name);
       expect(wrapper.find('#note').element.value).toBe(''); // undefined转为空字符串
       expect(wrapper.find('#lesson_left').element.value).toBe(''); // undefined转为空字符串
-      expect(wrapper.find('#membership_start_date').element.value).toBe(''); // undefined转为空字符串
-      expect(wrapper.find('#membership_end_date').element.value).toBe(''); // undefined转为空字符串
+      expect(wrapper.find('#membership_start_date').exists()).toBe(false);
+      expect(wrapper.find('#membership_end_date').exists()).toBe(false);
     });
 
     it('应该正确处理空字符串和null的混合情况', async () => {
@@ -503,8 +512,6 @@ describe('StudentForm', () => {
       await wrapper.find('#note').setValue('非空备注');
       await wrapper.find('#age').setValue(''); // 空字符串会转为null
       await wrapper.find('#lesson_left').setValue('0'); // 设置为0
-      await wrapper.find('#membership_start_date').setValue(''); // 空字符串
-      await wrapper.find('#membership_end_date').setValue(''); // 空字符串
       
       await wrapper.find('form').trigger('submit');
       
@@ -513,10 +520,10 @@ describe('StudentForm', () => {
       
       expect(payload.phone).toBe(''); // 空字符串保持
       expect(payload.note).toBe('非空备注'); // 非空字符串保持
-      expect(payload.age).toBe(''); // 空字符串通过v-model.number保持为空字符串
+      expect(payload.age).toBe('');
       expect(payload.lesson_left).toBe(0); // 0保持
-      expect(payload.membership_start_date).toBe(''); // 空字符串保持为空字符串
-      expect(payload.membership_end_date).toBe(''); // 空字符串保持为空字符串
+      expect(payload.membership_start_date).toBeNull();
+      expect(payload.membership_end_date).toBeNull();
     });
   });
 });
