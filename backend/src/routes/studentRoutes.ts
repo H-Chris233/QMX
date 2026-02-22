@@ -15,6 +15,7 @@ const scoreDetailSchema = Joi.object({
   score: commonValidations.score,
   subject: Joi.string().valid(...Object.values(SubjectType)).required(),
   recorded_at: Joi.date().iso().required(),
+  note: commonValidations.text.allow(null).optional(),
 });
 
 // 验证规则

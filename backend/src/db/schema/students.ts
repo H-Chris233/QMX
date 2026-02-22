@@ -23,6 +23,7 @@ export interface ScoreDetail {
   score: number;
   subject: Subject;
   recorded_at: string;
+  note?: string | null;
 }
 
 // 学员表

@@ -23,9 +23,18 @@ const toFiniteScore = (value: unknown): number | null => {
   return score;
 };
 
+const toOptionalNote = (value: unknown): string | null | undefined => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  return normalized.length > 1000 ? normalized.slice(0, 1000) : normalized;
+};
+
 interface NormalizeOptions {
   fallbackSubject?: SubjectType;
   fallbackRecordedAt?: string;
+  note?: unknown;
 }
 
 export const createScoreDetail = (
@@ -34,12 +43,19 @@ export const createScoreDetail = (
 ): ScoreDetail => {
   const fallbackSubject = options.fallbackSubject ?? SubjectType.SHOOTING;
   const fallbackRecordedAt = options.fallbackRecordedAt ?? new Date().toISOString();
+  const fallbackNote = toOptionalNote(options.note);
 
-  return {
+  const detail: ScoreDetail = {
     score,
     subject: fallbackSubject,
     recorded_at: fallbackRecordedAt,
   };
+
+  if (fallbackNote !== undefined) {
+    detail.note = fallbackNote;
+  }
+
+  return detail;
 };
 
 export const normalizeScoreDetails = (
@@ -56,11 +72,16 @@ export const normalizeScoreDetails = (
   for (const item of input) {
     if (typeof item === 'number') {
       if (Number.isFinite(item)) {
-        normalized.push({
+        const detail: ScoreDetail = {
           score: item,
           subject: fallbackSubject,
           recorded_at: fallbackRecordedAt,
-        });
+        };
+        const fallbackNote = toOptionalNote(options.note);
+        if (fallbackNote !== undefined) {
+          detail.note = fallbackNote;
+        }
+        normalized.push(detail);
       }
       continue;
     }
@@ -71,11 +92,18 @@ export const normalizeScoreDetails = (
     const score = toFiniteScore(raw.score);
     if (score === null) continue;
 
-    normalized.push({
+    const detail: ScoreDetail = {
       score,
       subject: toSubjectType(raw.subject, fallbackSubject),
       recorded_at: toIsoDateTime(raw.recorded_at ?? raw.recordedAt, fallbackRecordedAt),
-    });
+    };
+
+    const note = toOptionalNote(raw.note ?? raw.notes ?? options.note);
+    if (note !== undefined) {
+      detail.note = note;
+    }
+
+    normalized.push(detail);
   }
 
   return normalized;

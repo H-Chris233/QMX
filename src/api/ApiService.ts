@@ -178,7 +178,7 @@ export class ApiService {
    */
   static async addScore(
     uid: number,
-    payload: { score: number; subject?: string; recorded_at?: string },
+    payload: { score: number; subject?: string; recorded_at?: string; note?: string | null },
   ): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
       () => StudentApiService.addScore(uid, payload),
@@ -204,7 +204,7 @@ export class ApiService {
   static async updateStudentScore(
     uid: number,
     scoreIndex: number,
-    payload: { newScore: number; subject?: string; recorded_at?: string },
+    payload: { newScore: number; subject?: string; recorded_at?: string; note?: string | null },
   ): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
       () => StudentApiService.updateScore(uid, scoreIndex, payload),
@@ -218,7 +218,7 @@ export class ApiService {
    */
   static async updateScoresBatch(
     uid: number,
-    scoreDetails: Array<{ score: number; subject?: string; recorded_at?: string }>,
+    scoreDetails: Array<{ score: number; subject?: string; recorded_at?: string; note?: string | null }>,
   ): Promise<StudentScoreDetail[]> {
     return handleApiOperation(
       () => StudentApiService.updateScoresBatch(uid, scoreDetails),

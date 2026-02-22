@@ -210,7 +210,7 @@ export class StudentApiService {
    */
   static async addScore(
     uid: number,
-    payload: { score: number; subject?: string; recorded_at?: string },
+    payload: { score: number; subject?: string; recorded_at?: string; note?: string | null },
   ): Promise<StudentScoreDetail[]> {
     const response = await apiCall<StudentScoresResponse>(
       baseClient.post(`/students/${uid}/scores`, payload)
@@ -241,7 +241,7 @@ export class StudentApiService {
   static async updateScore(
     uid: number,
     scoreIndex: number,
-    payload: { newScore: number; subject?: string; recorded_at?: string },
+    payload: { newScore: number; subject?: string; recorded_at?: string; note?: string | null },
   ): Promise<StudentScoreDetail[]> {
     const response = await apiCall<StudentScoresResponse>(
       baseClient.put(`/students/${uid}/scores/${scoreIndex}`, payload)
@@ -254,7 +254,7 @@ export class StudentApiService {
    */
   static async updateScoresBatch(
     uid: number,
-    scoreDetails: Array<{ score: number; subject?: string; recorded_at?: string }>,
+    scoreDetails: Array<{ score: number; subject?: string; recorded_at?: string; note?: string | null }>,
   ): Promise<StudentScoreDetail[]> {
     const response = await apiCall<StudentScoresResponse>(
       baseClient.post(`/students/${uid}/scores/batch`, { score_details: scoreDetails })

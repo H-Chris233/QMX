@@ -22,6 +22,7 @@
     "db:push": "sh ./scripts/db-push.sh",
     "db:studio": "NODE_OPTIONS=--dns-result-order=ipv4first drizzle-kit studio",
     "db:drop": "NODE_OPTIONS=--dns-result-order=ipv4first drizzle-kit drop",
+    "verify:persistence": "NODE_ENV=test TEST_DATA_CLEANUP=true ts-node -r tsconfig-paths/register src/scripts/verifyPersistence.ts",
     "docs:serve": "echo 'API 文档可在 http://localhost:3001/api-docs 访问（运行 pnpm dev 后）'"
   },
   "keywords": [

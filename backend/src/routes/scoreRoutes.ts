@@ -16,12 +16,14 @@ const addScoreSchema = Joi.object({
   score: commonValidations.score,
   subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
   recorded_at: Joi.date().iso().optional(),
+  note: commonValidations.text.allow(null).optional(),
 });
 
 const updateScoreSchema = Joi.object({
   newScore: commonValidations.score,
   subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
   recorded_at: Joi.date().iso().optional(),
+  note: commonValidations.text.allow(null).optional(),
 });
 
 const batchAddScoresSchema = Joi.object({
@@ -30,6 +32,7 @@ const batchAddScoresSchema = Joi.object({
       score: commonValidations.score,
       subject: Joi.string().valid(...Object.values(SubjectType)).optional(),
       recorded_at: Joi.date().iso().optional(),
+      note: commonValidations.text.allow(null).optional(),
     }))
     .min(1)
     .max(50) // 限制最多添加50个成绩

@@ -343,7 +343,7 @@ const handleSubmit = () => {
   const normalizedLessonLeft = normalizeLessonLeft(formData.value.lesson_left);
   const shouldPersistLessonLeft = formData.value.class !== 'Month' && formData.value.class !== 'Year';
   const lessonLeftValue = !shouldPersistLessonLeft
-    ? undefined
+    ? null
     : formData.value.class === 'TenTry'
       ? (normalizedLessonLeft ?? 10)
       : normalizedLessonLeft;
@@ -364,10 +364,10 @@ const handleSubmit = () => {
     phone: formData.value.phone.trim(),
     class: formData.value.class,
     subject: formData.value.subject,
-    note: trimmedNote || undefined,
-    lesson_left: lessonLeftValue === null ? undefined : lessonLeftValue,
-    membership_start_date: membershipStart ?? undefined,
-    membership_end_date: membershipEnd ?? undefined,
+    note: trimmedNote,
+    lesson_left: lessonLeftValue,
+    membership_start_date: membershipStart,
+    membership_end_date: membershipEnd,
   };
   emit('save', apiData);
 };

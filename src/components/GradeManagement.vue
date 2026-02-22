@@ -439,6 +439,7 @@ interface DetailedRecordItem {
   subject: DisplayCourse;
   subjectType: NormalizedSubjectType;
   recordedAt: string;
+  notes?: string;
 }
 
 interface ScoreRangeItem {
@@ -810,7 +811,7 @@ const buildRecentGradesFromStudents = (items: Student[]): Grade[] => {
         score: Number(detail.score),
         date: recordedAt ? recordedAt.split('T')[0] : '',
         recordedAt,
-        notes: student.note || '',
+        notes: detail.note || '',
       });
     }
   }
@@ -832,6 +833,7 @@ const detailedRecords = computed<DetailedRecordItem[]>(() => {
     subject: getRecentCourseBySubject(detail.subject),
     subjectType: normalizeSubjectType(detail.subject),
     recordedAt: formatDateTime(detail.recorded_at),
+    notes: detail.note || '',
   }));
 });
 
@@ -1191,12 +1193,14 @@ const saveGrade = async () => {
 
     const subjectValue = getSubjectValueByCourse(course);
     const recordedAt = toIsoByDateInput(currentGrade.value.date);
+    const note = currentGrade.value.notes.trim();
 
     if (showAddGrade.value) {
       await ApiService.addScore(studentId, {
         score,
         subject: subjectValue,
         recorded_at: recordedAt,
+        note: note || undefined,
       });
     } else if (showEditGrade.value && currentGrade.value.id !== null) {
       if (currentGrade.value.scoreIndex === null || currentGrade.value.scoreIndex === undefined) {
@@ -1207,6 +1211,7 @@ const saveGrade = async () => {
         newScore: score,
         subject: subjectValue,
         recorded_at: recordedAt,
+        note: note || undefined,
       });
     }
 

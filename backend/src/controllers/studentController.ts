@@ -36,16 +36,17 @@ const parseBoolean = (value: unknown): boolean | null => {
 const buildMembershipPayload = (
   start?: any,
   end?: any,
-): { start?: string | null; end?: string | null } | null | undefined => {
+): { start: string | null; end: string | null } | undefined => {
   if (start === undefined && end === undefined) {
     return undefined;
   }
-  if (start === null && end === null) {
-    return null;
-  }
+  const normalizeDate = (value: any): string | null => {
+    if (!value) return null;
+    return typeof value === 'string' ? value : value.toISOString().split('T')[0];
+  };
   return {
-    start: start ? (typeof start === 'string' ? start : start.toISOString().split('T')[0]) ?? null : null,
-    end: end ? (typeof end === 'string' ? end : end.toISOString().split('T')[0]) ?? null : null,
+    start: normalizeDate(start),
+    end: normalizeDate(end),
   };
 };
 
@@ -71,7 +72,18 @@ const applyUpdaterFromPayload = async (
     updateData.subject = payload.subject?.toUpperCase() as SubjectType;
   }
   if (payload.lesson_left !== undefined || payload.lessonLeft !== undefined) {
-    updateData.lessonLeft = payload.lesson_left ?? payload.lessonLeft === null ? null : Number(payload.lessonLeft);
+    const lessonLeftRaw = payload.lesson_left !== undefined
+      ? payload.lesson_left
+      : payload.lessonLeft;
+
+    if (lessonLeftRaw === null || lessonLeftRaw === undefined || lessonLeftRaw === '') {
+      updateData.lessonLeft = null;
+    } else {
+      const parsedLessonLeft = Number(lessonLeftRaw);
+      updateData.lessonLeft = Number.isFinite(parsedLessonLeft)
+        ? parsedLessonLeft
+        : null;
+    }
   }
   if (payload.note !== undefined) {
     updateData.note = payload.note;
@@ -100,9 +112,16 @@ const applyUpdaterFromPayload = async (
     payload.membershipStartDate !== undefined ||
     payload.membershipEndDate !== undefined
   ) {
+    const membershipStartRaw = payload.membership_start_date !== undefined
+      ? payload.membership_start_date
+      : payload.membershipStartDate;
+    const membershipEndRaw = payload.membership_end_date !== undefined
+      ? payload.membership_end_date
+      : payload.membershipEndDate;
+
     const membershipPayload = buildMembershipPayload(
-      payload.membership_start_date ?? payload.membershipStartDate,
-      payload.membership_end_date ?? payload.membershipEndDate,
+      membershipStartRaw,
+      membershipEndRaw,
     );
 
     if (membershipPayload !== undefined) {

@@ -147,6 +147,8 @@ export interface StudentScoreDetail {
   subject: SubjectType | string;
   /** 录入时间（ISO 字符串） */
   recorded_at: string;
+  /** 备注 */
+  note?: string | null;
 }
 
 /**

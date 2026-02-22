@@ -54,7 +54,7 @@ const getStudentScoreDetails = (student: {
 export class ScoreController {
   public addScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    const { score, subject, recorded_at } = req.body;
+    const { score, subject, recorded_at, note } = req.body;
 
     const student = await StudentRepository.findByUid(Number(id));
     if (!student) throw AppError.notFound('学员不存在');
@@ -75,6 +75,7 @@ export class ScoreController {
       fallbackRecordedAt: parsedRecordedAt && !Number.isNaN(parsedRecordedAt.getTime())
         ? parsedRecordedAt.toISOString()
         : new Date().toISOString(),
+      note,
     });
 
     const nextDetails = [...current, newDetail];
@@ -132,7 +133,7 @@ export class ScoreController {
 
   public updateStudentScore = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { id, scoreIndex } = req.params;
-    const { newScore, subject, recorded_at } = req.body;
+    const { newScore, subject, recorded_at, note } = req.body;
 
     const student = await StudentRepository.findByUid(Number(id));
     if (!student) throw AppError.notFound('学员不存在');
@@ -164,6 +165,7 @@ export class ScoreController {
             ? parsedRecordedAt.toISOString()
             : previous.recorded_at)
         : previous.recorded_at,
+      note: note === undefined ? previous.note : note,
     };
 
     const updatedStudent = await StudentRepository.updateByUid(Number(id), {
