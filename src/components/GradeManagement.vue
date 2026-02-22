@@ -246,43 +246,72 @@
 
       <!-- C. 最近更新的成绩 -->
       <div class="global-list-section">
-        <div class="section-title">
-          <Clock :size="18" />
-          <span>最近更新的成绩</span>
+        <div class="section-header">
+          <div class="section-title">
+            <div class="title-icon">
+              <Clock :size="18" />
+            </div>
+            <div class="title-text">
+              <span class="main-title">最近更新的成绩</span>
+              <span class="sub-title">共 {{ filteredGrades.length }} 条记录</span>
+            </div>
+          </div>
+          <button class="view-all-btn" v-if="filteredGrades.length > 10">
+            查看全部 <ChevronRight :size="14" />
+          </button>
         </div>
-        <div class="table-container">
-          <table class="modern-table">
-            <thead>
-              <tr>
-                <th>学员</th>
-                <th>课程</th>
-                <th>分数</th>
-                <th>等级</th>
-                <th>录入时间</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="grade in filteredGrades.slice(0, 10)" :key="grade.id">
-                <td class="font-medium">{{ getDisplayStudentName(grade) }}</td>
-                <td>{{ getDisplayCourseName(grade) }}</td>
-                <td>
-                  <span class="score-tag" :class="getScoreClass(grade.score)">{{ grade.score }}</span>
-                </td>
-                <td>{{ getGradeLevel(grade.score) }}</td>
-                <td class="text-muted">{{ getGradeDateText(grade) }}</td>
-                <td>
-                  <div class="row-actions">
-                    <button @click="editGrade(grade)" class="action-btn"><Edit2 :size="14" /></button>
-                    <button @click="deleteGrade(grade)" class="action-btn danger"><Trash2 :size="14" /></button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredGrades.length === 0">
-                <td colspan="6" class="text-muted">暂无最近更新的成绩</td>
-              </tr>
-            </tbody>
-          </table>
+        
+        <div class="grades-list-container">
+          <div v-if="filteredGrades.length === 0" class="grades-empty">
+            <Target :size="40" />
+            <span>暂无最近更新的成绩</span>
+          </div>
+          
+          <div v-else class="grade-cards">
+            <div
+              v-for="(grade, index) in filteredGrades.slice(0, 10)"
+              :key="grade.id"
+              class="grade-card"
+              :style="{ animationDelay: `${index * 40}ms` }"
+            >
+              <!-- 左侧：学员头像 -->
+              <div class="grade-student-avatar" :class="getScoreClass(grade.score)">
+                {{ getDisplayStudentName(grade).charAt(0).toUpperCase() }}
+              </div>
+              
+              <!-- 中间：信息 -->
+              <div class="grade-info">
+                <div class="grade-header">
+                  <span class="student-name">{{ getDisplayStudentName(grade) }}</span>
+                  <span class="course-badge">{{ getDisplayCourseName(grade) }}</span>
+                </div>
+                <div class="grade-meta">
+                  <span class="grade-time">
+                    <Clock :size="10" />
+                    {{ getGradeDateText(grade) }}
+                  </span>
+                  <span class="grade-level" :class="getScoreClass(grade.score)">
+                    等级 {{ getGradeLevel(grade.score) }}
+                  </span>
+                </div>
+              </div>
+              
+              <!-- 右侧：分数与操作 -->
+              <div class="grade-right">
+                <div class="score-circle" :class="getScoreClass(grade.score)">
+                  <span class="score-value">{{ grade.score }}</span>
+                </div>
+                <div class="grade-actions">
+                  <button @click="editGrade(grade)" class="grade-action-btn edit" title="编辑">
+                    <Edit2 :size="13" />
+                  </button>
+                  <button @click="deleteGrade(grade)" class="grade-action-btn delete" title="删除">
+                    <Trash2 :size="13" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -395,7 +424,8 @@ import { useAppStore } from '../stores/app';
 // 引入图标
 import { 
   User, 
-  ChevronDown, 
+  ChevronDown,
+  ChevronRight,
   Target, 
   Plus, 
   RefreshCw, 
@@ -1696,22 +1726,348 @@ onUnmounted(() => abortController.value?.abort());
 }
 .empty-content h3 { color: var(--text-primary); margin-bottom: 0.5rem; }
 
-/* Global List (Fallback) */
+/* Global List - Grade Cards */
 .global-list-section {
-  background-color: var(--bg-surface);
-  border-radius: 12px;
+  background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(25, 30, 40, 0.6) 100%);
+  border-radius: 16px;
   border: 1px solid var(--border-subtle);
   overflow: hidden;
   flex-shrink: 0;
+  position: relative;
 }
-.table-container { overflow-x: auto; overflow-y: auto; max-height: 420px; }
-.section-title { padding: 1rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.5rem; font-weight: 600; }
-.modern-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.modern-table th { text-align: left; padding: 0.75rem 1rem; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); font-weight: 500; }
-.modern-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); }
-.modern-table tr:last-child td { border-bottom: none; }
-.score-tag { padding: 0.1rem 0.5rem; border-radius: 4px; font-weight: 600; font-size: 0.85rem; }
-.score-tag.excellent { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+.global-list-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.15), transparent);
+}
+
+.section-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.05));
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #818cf8;
+}
+
+.title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.title-text .main-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.title-text .sub-title {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.view-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.2);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-all-btn:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: var(--primary-color);
+}
+
+.grades-list-container {
+  padding: 0.75rem;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.grades-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  gap: 0.75rem;
+}
+
+.grades-empty svg {
+  opacity: 0.3;
+}
+
+.grade-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.grade-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideIn 0.4s ease backwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.grade-card:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+  transform: translateX(4px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+/* Student Avatar */
+.grade-student-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.grade-student-avatar.excellent {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(16, 185, 129, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.grade-student-avatar.good {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #a78bfa;
+}
+
+.grade-student-avatar.pass {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.grade-student-avatar.fail {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.08));
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+/* Grade Info */
+.grade-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grade-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.student-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.course-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.grade-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.grade-time {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.grade-level {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.grade-level.excellent {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.grade-level.good {
+  background: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+}
+
+.grade-level.pass {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.grade-level.fail {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+/* Grade Right */
+.grade-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.score-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.score-circle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  padding: 2px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.score-circle.excellent::before {
+  background: conic-gradient(#10b981 var(--score-percent, 90%), transparent 0);
+}
+
+.score-circle.good::before {
+  background: conic-gradient(#8b5cf6 var(--score-percent, 80%), transparent 0);
+}
+
+.score-circle.pass::before {
+  background: conic-gradient(#f59e0b var(--score-percent, 60%), transparent 0);
+}
+
+.score-circle.fail::before {
+  background: conic-gradient(#ef4444 var(--score-percent, 50%), transparent 0);
+}
+
+.score-value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  z-index: 1;
+}
+
+.grade-actions {
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.grade-card:hover .grade-actions {
+  opacity: 1;
+}
+
+.grade-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.grade-action-btn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.grade-action-btn.edit { color: #60a5fa; }
+.grade-action-btn.edit:hover {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.grade-action-btn.delete { color: #f87171; }
+.grade-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
 
 /* Modals */
 .modal-overlay {
@@ -1769,5 +2125,56 @@ onUnmounted(() => abortController.value?.abort());
   .bar-left, .bar-right { justify-content: space-between; }
   .quick-add-group { display: none; } /* Hide quick add on mobile to save space */
   .stats-row { grid-template-columns: 1fr; }
+  
+  .grade-card {
+    padding: 0.75rem;
+    gap: 0.625rem;
+  }
+  
+  .grade-student-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 0.875rem;
+  }
+  
+  .score-circle {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .score-value {
+    font-size: 0.8rem;
+  }
+  
+  .grade-actions {
+    opacity: 1;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .grade-card {
+    position: relative;
+    padding-bottom: 2.25rem;
+  }
+  
+  .grade-actions {
+    position: absolute;
+    bottom: 0.4rem;
+    right: 0.75rem;
+  }
+  
+  .grade-meta {
+    gap: 0.4rem;
+  }
+  
+  .student-name {
+    font-size: 0.875rem;
+  }
 }
 </style>
