@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || '1234';
 
 /**
  * 全局测试设置
@@ -183,7 +184,7 @@ async function setupTestAuth() {
       const setupRes = await fetch('http://127.0.0.1:3001/api/v1/auth/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: 'test1234' }),
+        body: JSON.stringify({ password: TEST_PASSWORD }),
         signal: AbortSignal.timeout(10000),
       });
 

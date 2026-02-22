@@ -1,7 +1,7 @@
 import { type Page, expect } from '@playwright/test';
 
 /** E2E 测试使用的固定密码（与 global-setup 中设置的一致） */
-const TEST_PASSWORD = 'test1234';
+const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || '1234';
 
 /**
  * 主应用页面对象模型

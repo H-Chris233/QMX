@@ -110,15 +110,29 @@
     <div class="installment-panel" data-testid="pending-installments-panel">
       <div class="installment-panel-header">
         <div class="installment-panel-title">
-          <CalendarClock :size="18" />
-          <span>分期付款管理</span>
+          <div class="panel-icon">
+            <CalendarClock :size="20" />
+          </div>
+          <div class="panel-title-text">
+            <span class="main-title">分期付款管理</span>
+            <span class="sub-title">{{ filteredInstallmentPlans.length }} 个计划</span>
+          </div>
         </div>
         <div class="installment-panel-summary">
-          <span>待处理 {{ pendingInstallmentTermCount }}</span>
-          <span class="dot">•</span>
-          <span>逾期 {{ overdueInstallmentTermCount }}</span>
-          <span class="dot">•</span>
-          <span>总期数 {{ installmentTermCount }}</span>
+          <div class="summary-pill pending">
+            <span class="pill-dot"></span>
+            <span class="pill-count">{{ pendingInstallmentTermCount }}</span>
+            <span class="pill-label">待处理</span>
+          </div>
+          <div class="summary-pill overdue" v-if="overdueInstallmentTermCount > 0">
+            <span class="pill-dot"></span>
+            <span class="pill-count">{{ overdueInstallmentTermCount }}</span>
+            <span class="pill-label">逾期</span>
+          </div>
+          <div class="summary-pill total">
+            <span class="pill-count">{{ installmentTermCount }}</span>
+            <span class="pill-label">总期数</span>
+          </div>
         </div>
       </div>
 
@@ -134,57 +148,76 @@
         </button>
       </div>
 
-      <div class="installment-table-container">
-        <table class="installment-table">
-          <thead>
-            <tr>
-              <th>学员</th>
-              <th>计划概览</th>
-              <th>总金额</th>
-              <th>下次到期</th>
-              <th>合并状态</th>
-              <th class="text-right">管理</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="installmentLoading">
-              <td colspan="6" class="installment-empty">分期数据加载中...</td>
-            </tr>
-            <tr v-else-if="filteredInstallmentPlans.length === 0">
-              <td colspan="6" class="installment-empty">暂无分期记录</td>
-            </tr>
-            <tr v-for="plan in filteredInstallmentPlans" :key="plan.uid">
-              <td>
-                <div class="installment-student">{{ plan.studentName }}</div>
-                <div class="installment-student-id">UID: {{ plan.studentId ?? '未关联' }}</div>
-              </td>
-              <td>
-                <div>{{ plan.paidCount }} / {{ plan.totalInstallments }} 已支付</div>
-                <div class="installment-student-id">
-                  待处理 {{ plan.pendingCount }} · 逾期 {{ plan.overdueCount }}
+      <div class="installment-list-container">
+        <div v-if="installmentLoading" class="installment-loading">
+          <div class="loading-spinner"></div>
+          <span>分期数据加载中...</span>
+        </div>
+        <div v-else-if="filteredInstallmentPlans.length === 0" class="installment-empty">
+          <CalendarClock :size="32" />
+          <span>暂无分期记录</span>
+        </div>
+        <div v-else class="installment-cards">
+          <div
+            v-for="(plan, index) in filteredInstallmentPlans"
+            :key="plan.uid"
+            class="installment-card"
+            :style="{ animationDelay: `${index * 60}ms` }"
+          >
+            <!-- 左侧：学员信息 -->
+            <div class="installment-card-left">
+              <div class="student-avatar" :class="getPlanStatusColor(plan)">
+                {{ plan.studentName.charAt(0).toUpperCase() }}
+              </div>
+              <div class="student-info">
+                <div class="student-name">{{ plan.studentName }}</div>
+                <div class="student-meta">
+                  <span class="meta-id">UID: {{ plan.studentId ?? '未关联' }}</span>
                 </div>
-              </td>
-              <td class="amount-text text-income">{{ formatCurrency(plan.totalAmount) }}</td>
-              <td>{{ plan.nextDueDate ? formatDate(plan.nextDueDate) : '无' }}</td>
-              <td>
-                <span :class="['status-text', getMergedStatusClass(plan.mergedStatus)]">
-                  {{ getMergedStatusText(plan.mergedStatus) }}
-                </span>
-              </td>
-              <td class="text-right">
-                <div class="installment-manage">
-                  <button
-                    class="btn btn-secondary compact-btn"
-                    :disabled="loading || installmentLoading"
-                    @click="openInstallmentPlanModal(plan)"
-                  >
-                    管理分期
-                  </button>
+              </div>
+            </div>
+
+            <!-- 中间：进度与金额 -->
+            <div class="installment-card-middle">
+              <div class="progress-section">
+                <div class="progress-header">
+                  <span class="progress-text">{{ plan.paidCount }} / {{ plan.totalInstallments }} 已支付</span>
+                  <span class="progress-percent">{{ Math.round((plan.paidCount / plan.totalInstallments) * 100) }}%</span>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${(plan.paidCount / plan.totalInstallments) * 100}%` }"></div>
+                </div>
+                <div class="progress-meta">
+                  <span v-if="plan.pendingCount > 0" class="meta-tag pending">待处理 {{ plan.pendingCount }}</span>
+                  <span v-if="plan.overdueCount > 0" class="meta-tag overdue">逾期 {{ plan.overdueCount }}</span>
+                  <span v-if="plan.cancelledCount > 0" class="meta-tag cancelled">已取消 {{ plan.cancelledCount }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右侧：金额、状态、操作 -->
+            <div class="installment-card-right">
+              <div class="amount-section">
+                <div class="amount-value">{{ formatCurrency(plan.totalAmount) }}</div>
+                <div class="due-date" v-if="plan.nextDueDate">
+                  下次到期: {{ formatDate(plan.nextDueDate) }}
+                </div>
+                <div class="due-date empty" v-else>暂无待付</div>
+              </div>
+              <div class="status-badge" :class="getMergedStatusClass(plan.mergedStatus)">
+                {{ getMergedStatusText(plan.mergedStatus) }}
+              </div>
+              <button
+                class="manage-btn"
+                :disabled="loading || installmentLoading"
+                @click="openInstallmentPlanModal(plan)"
+              >
+                <span>管理</span>
+                <ChevronRight :size="14" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -222,85 +255,93 @@
         </div>
       </div>
 
-      <!-- 数据表格 -->
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th class="col-date">日期</th>
-              <th class="col-info">交易信息</th>
-              <th class="col-amount text-right">金额</th>
-              <th class="col-actions text-right">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="displayedTransactions.length === 0">
-              <td colspan="4">
-                <div class="empty-state">
-                  <Inbox :size="48" class="empty-icon" />
-                  <p>{{ loading ? '数据加载中...' : '暂无交易记录' }}</p>
-                </div>
-              </td>
-            </tr>
-            <tr
-              v-for="transaction in displayedTransactions"
-              :key="transaction.uid"
-              class="table-row"
-            >
-              <td class="col-date">
-                <div class="date-wrapper">
-                  <span class="date-day">{{ formatDate(transaction.created_at).split('-')[2] }}</span>
-                  <span class="date-month">{{ formatDate(transaction.created_at).substring(5, 7) }}月</span>
-                </div>
-              </td>
-              <td class="col-info">
-                <div class="info-wrapper">
-                  <div class="info-top">
-                    <span v-if="transaction.student_id" class="student-badge">
-                      <User :size="10" /> {{ transaction.student_id }}
-                    </span>
-                    <span :class="['type-badge', getTransactionTypeClass(transaction)]">
-                      {{ getTransactionTypeText(transaction) }}
-                    </span>
-                    <!-- 分期状态 -->
-                     <span v-if="isInstallmentTransaction(transaction) && transaction.installment" 
-                           :class="['status-text', getStatusClass(transaction.installment.status)]">
-                      {{ getStatusText(transaction.installment.status) }}
-                    </span>
-                  </div>
-                  <div class="info-note" v-if="transaction.note">
-                    {{ transaction.note }}
-                  </div>
-                </div>
-              </td>
-              <td class="col-amount text-right">
-                 <span :class="getAmountClass(transaction)" class="amount-text">
-                  {{ formatTransactionAmount(transaction) }}
-                </span>
-                <div v-if="isInstallmentTransaction(transaction) && getInstallmentProgressText(transaction)" class="installment-progress">
-                   {{ getInstallmentProgressText(transaction) }}
-                </div>
-              </td>
-              <td class="col-actions text-right">
-                <div class="action-group">
-                  <button
-                    v-if="!isInstallmentTransaction(transaction)"
-                    class="icon-btn edit"
-                    @click="openEditTransactionModal(transaction)"
-                  >
-                    <Edit2 :size="16" />
-                  </button>
-                  <button
-                    class="icon-btn delete"
-                    @click="deleteTransaction(transaction)"
-                  >
-                    <Trash2 :size="16" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- 数据卡片列表 -->
+      <div class="transaction-list">
+        <div v-if="displayedTransactions.length === 0" class="empty-state">
+          <Inbox :size="48" class="empty-icon" />
+          <p>{{ loading ? '数据加载中...' : '暂无交易记录' }}</p>
+        </div>
+        
+        <div
+          v-for="(transaction, index) in displayedTransactions"
+          :key="transaction.uid"
+          class="transaction-card"
+          :style="{ animationDelay: `${index * 50}ms` }"
+        >
+          <!-- 左侧日期 -->
+          <div class="transaction-date" :class="getDateThemeClass(transaction)">
+            <span class="date-num">{{ formatDate(transaction.created_at).split('-')[2] }}</span>
+            <span class="date-month">{{ formatDate(transaction.created_at).substring(5, 7) }}月</span>
+          </div>
+          
+          <!-- 中间内容 -->
+          <div class="transaction-body">
+            <div class="transaction-header">
+              <!-- 类型标签 -->
+              <span :class="['type-tag', getTransactionTypeClass(transaction)]">
+                <component
+                  :is="getTransactionIcon(transaction)"
+                  :size="12"
+                  class="tag-icon"
+                />
+                {{ getTransactionTypeText(transaction) }}
+              </span>
+              
+              <!-- 学员信息 -->
+              <span v-if="transaction.student_id" class="student-chip">
+                <User :size="10" />
+                学员 {{ transaction.student_id }}
+              </span>
+              
+              <!-- 分期状态 -->
+              <span v-if="isInstallmentTransaction(transaction) && transaction.installment"
+                    :class="['status-dot', getStatusClass(transaction.installment.status)]">
+                {{ getStatusText(transaction.installment.status) }}
+              </span>
+            </div>
+            
+            <!-- 备注 -->
+            <div class="transaction-note" v-if="transaction.note">
+              {{ transaction.note }}
+            </div>
+            <div class="transaction-note empty" v-else>
+              没有填写备注
+            </div>
+            
+            <!-- 分期进度 -->
+            <div v-if="isInstallmentTransaction(transaction) && getInstallmentProgressText(transaction)"
+                 class="installment-mini">
+              <div class="mini-progress">
+                <div class="mini-bar" :style="{ width: getInstallmentProgressPercent(transaction) }"></div>
+              </div>
+              <span class="mini-text">{{ getInstallmentProgressText(transaction) }}</span>
+            </div>
+          </div>
+          
+          <!-- 右侧金额与操作 -->
+          <div class="transaction-right">
+            <span :class="['transaction-amount', getAmountClass(transaction)]">
+              {{ formatTransactionAmount(transaction) }}
+            </span>
+            <div class="transaction-actions">
+              <button
+                v-if="!isInstallmentTransaction(transaction)"
+                class="action-btn edit"
+                @click="openEditTransactionModal(transaction)"
+                title="编辑"
+              >
+                <Edit2 :size="14" />
+              </button>
+              <button
+                class="action-btn delete"
+                @click="deleteTransaction(transaction)"
+                title="删除"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 分页页脚 -->
@@ -1059,6 +1100,22 @@ const getTransactionTypeClass = (transaction: Transaction) => {
   return isExpenseTransaction(transaction) ? 'badge-expense' : 'badge-income';
 };
 
+const getTransactionIcon = (transaction: Transaction) => {
+  if (isInstallmentTransaction(transaction)) return CalendarClock;
+  return isExpenseTransaction(transaction) ? TrendingDown : TrendingUp;
+};
+
+const getDateThemeClass = (transaction: Transaction) => {
+  if (isInstallmentTransaction(transaction)) return 'theme-installment';
+  return isExpenseTransaction(transaction) ? 'theme-expense' : 'theme-income';
+};
+
+const getInstallmentProgressPercent = (transaction: Transaction): string => {
+  const progress = getInstallmentProgress(transaction);
+  if (!progress) return '0%';
+  return `${(progress.installmentNumber / progress.totalInstallments) * 100}%`;
+};
+
 const getStatusClass = (status: string | null | undefined) => STATUS_CLASS_MAP[normalizeInstallmentStatus(status)] ?? '';
 const getStatusText = (status: string | null | undefined) => STATUS_TEXT_MAP[normalizeInstallmentStatus(status)] ?? '未知';
 const getMergedStatusText = (status: InstallmentMergedStatus): string => {
@@ -1077,6 +1134,13 @@ const getPlanStatusText = (status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED'): string
   if (status === 'ACTIVE') return '进行中';
   if (status === 'COMPLETED') return '已完成';
   return '已取消';
+};
+
+const getPlanStatusColor = (plan: InstallmentPlanView): string => {
+  if (plan.overdueCount > 0) return 'status-overdue';
+  if (plan.pendingCount > 0) return 'status-pending';
+  if (plan.paidCount > 0) return 'status-paid';
+  return 'status-default';
 };
 
 const handleTransactionUpdate = (value: TransactionFormModel) => {
@@ -1659,44 +1723,113 @@ onMounted(async () => {
 }
 
 .installment-panel {
-  background-color: var(--bg-surface);
+  background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(25, 25, 35, 0.6) 100%);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 16px;
   margin-bottom: 1.5rem;
   overflow: hidden;
+  position: relative;
+}
+
+.installment-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.2), transparent);
 }
 
 .installment-panel-header {
-  padding: 0.9rem 1rem;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .installment-panel-title {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.75rem;
+}
+
+.panel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+}
+
+.panel-title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.panel-title-text .main-title {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.panel-title-text .sub-title {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
 }
 
 .installment-panel-summary {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
+  gap: 0.6rem;
 }
 
-.dot {
-  opacity: 0.65;
+.summary-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.summary-pill .pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.summary-pill.pending .pill-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24;
+}
+
+.summary-pill.overdue .pill-dot {
+  background: #f87171;
+  box-shadow: 0 0 6px #f87171;
+}
+
+.summary-pill .pill-count {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.summary-pill .pill-label {
+  color: var(--text-secondary);
 }
 
 .installment-filter-row {
-  padding: 0.65rem 1rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   gap: 0.5rem;
@@ -1705,59 +1838,308 @@ onMounted(async () => {
 
 .installment-filter-btn {
   border: 1px solid var(--border-subtle);
-  background: var(--bg-app);
+  background: rgba(0,0,0,0.2);
   color: var(--text-secondary);
   border-radius: 8px;
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.75rem;
   font-size: 0.8rem;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.installment-filter-btn:hover:not(:disabled) {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: var(--primary-color);
 }
 
 .installment-filter-btn.active {
-  border-color: rgba(99, 102, 241, 0.45);
+  border-color: rgba(99, 102, 241, 0.5);
   color: var(--primary-color);
-  background: rgba(99, 102, 241, 0.08);
-}
-
-.installment-table-container {
-  overflow-x: auto;
-}
-
-.installment-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 720px;
-}
-
-.installment-table th,
-.installment-table td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 0.85rem;
-}
-
-.installment-table th {
-  color: var(--text-secondary);
+  background: rgba(99, 102, 241, 0.1);
   font-weight: 500;
 }
 
-.installment-student {
+.installment-list-container {
+  padding: 0.75rem;
+  min-height: 120px;
+}
+
+.installment-loading,
+.installment-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  color: var(--text-secondary);
+  gap: 0.75rem;
+}
+
+.installment-empty svg {
+  opacity: 0.3;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.installment-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.installment-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 14px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideIn 0.4s ease backwards;
+}
+
+.installment-card:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+  transform: translateX(4px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+/* Left: Student Info */
+.installment-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.student-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+}
+
+.student-avatar.status-pending {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.1));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.student-avatar.status-overdue {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.1));
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.student-avatar.status-paid {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.1));
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.student-avatar.status-default {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #818cf8;
+}
+
+.student-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.student-name {
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
-.installment-student-id {
+.student-meta {
+  font-size: 0.7rem;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+}
+
+.meta-id {
+  font-family: 'SF Mono', monospace;
+}
+
+/* Middle: Progress */
+.installment-card-middle {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.5rem;
+}
+
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.progress-text {
+  color: var(--text-secondary);
+}
+
+.progress-percent {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.progress-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.progress-meta {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.meta-tag {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.meta-tag.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+
+.meta-tag.overdue {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+.meta-tag.cancelled {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+}
+
+/* Right: Amount, Status, Action */
+.installment-card-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.amount-section {
+  text-align: right;
+}
+
+.amount-value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #34d399;
+}
+
+.due-date {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
   margin-top: 0.15rem;
 }
 
-.installment-empty {
-  text-align: center;
-  color: var(--text-secondary);
+.due-date.empty {
+  opacity: 0.5;
 }
 
-.installment-manage {
-  display: inline-flex;
+.status-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-badge.status-pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.status-badge.status-paid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.status-badge.status-overdue {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.status-badge.status-cancelled {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.manage-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.2);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.manage-btn:hover:not(:disabled) {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.manage-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .compact-btn {
@@ -1887,161 +2269,399 @@ onMounted(async () => {
 
 /* === Transactions Panel === */
 .transactions-panel {
-  background-color: var(--bg-surface);
+  background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(30, 30, 40, 0.5) 100%);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
+  position: relative;
+}
+
+.transactions-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
 }
 
 .panel-toolbar {
-  padding: 1rem;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .toolbar-left {
   display: flex;
   gap: 0.75rem;
+  flex: 1;
+}
+
+.toolbar-right {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 .search-box {
   position: relative;
   flex: 1;
+  max-width: 280px;
 }
 .search-icon {
   position: absolute;
-  left: 0.8rem;
+  left: 0.9rem;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-secondary);
 }
 .search-input {
   width: 100%;
-  padding: 0.5rem 0.5rem 0.5rem 2.2rem;
-  border-radius: 8px;
+  padding: 0.6rem 0.8rem 0.6rem 2.4rem;
+  border-radius: 10px;
   border: 1px solid var(--border-subtle);
-  background-color: var(--bg-app);
+  background-color: rgba(0,0,0,0.2);
   color: var(--text-primary);
   font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  background-color: rgba(0,0,0,0.3);
 }
 
 .filter-select {
-  padding: 0.5rem;
-  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
   border: 1px solid var(--border-subtle);
-  background-color: var(--bg-app);
+  background-color: rgba(0,0,0,0.2);
   color: var(--text-primary);
   font-size: 0.85rem;
-  max-width: 100px;
+  cursor: pointer;
 }
 
-/* === Data Table (Mobile Optimized) === */
-.table-container {
-  overflow-x: auto;
+/* === Transaction Card List === */
+.transaction-list {
+  padding: 0.75rem;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 500px; /* 保证表格不被过度压缩 */
+.transaction-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.03);
+  border-radius: 14px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideIn 0.4s ease backwards;
 }
 
-.data-table th {
-  text-align: left;
-  padding: 0.8rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.text-right { text-align: right !important; }
-
-.data-table td {
-  padding: 0.8rem;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* Date Column */
-.date-wrapper {
+.transaction-card:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+  transform: translateX(4px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+/* Date Styling */
+.transaction-date {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background-color: var(--bg-app);
-  padding: 0.3rem 0.5rem;
-  border-radius: 6px;
-  min-width: 40px;
+  justify-content: center;
+  min-width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
 }
-.date-day { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); line-height: 1; }
-.date-month { font-size: 0.7rem; color: var(--text-secondary); }
 
-/* Info Column */
-.info-top {
+.transaction-date::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+}
+
+.transaction-date.theme-income {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.transaction-date.theme-income::before {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+.transaction-date.theme-expense {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.transaction-date.theme-expense::before {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+.transaction-date.theme-installment {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+.transaction-date.theme-installment::before {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.transaction-date .date-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  z-index: 1;
+}
+.transaction-date .date-month {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+  z-index: 1;
+}
+
+/* Body Styling */
+.transaction-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.transaction-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.2rem;
   flex-wrap: wrap;
+  margin-bottom: 0.35rem;
 }
-.info-note {
-  font-size: 0.85rem;
+
+.type-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.type-tag .tag-icon {
+  margin-top: 0.5px;
+}
+.badge-income {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.badge-expense {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.badge-installment {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.student-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
   color: var(--text-secondary);
+  background: rgba(255,255,255,0.04);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+
+.status-dot {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+.status-dot.status-pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+.status-dot.status-paid {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+}
+.status-dot.status-overdue {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+.status-dot.status-cancelled {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+}
+
+.transaction-note {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
 }
-
-.student-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 0.7rem;
-  background-color: var(--bg-hover);
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
+.transaction-note.empty {
   color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.6;
 }
 
-.type-badge {
-  font-size: 0.7rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-}
-.badge-income { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.badge-expense { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-.badge-installment { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-
-.status-text { font-size: 0.7rem; font-weight: 500; }
-.status-pending { color: #f59e0b; }
-.status-paid { color: #10b981; }
-.status-overdue { color: #ef4444; }
-.status-cancelled { color: #94a3b8; }
-
-.amount-text {
-  font-weight: 600;
-  font-size: 0.95rem;
-  font-family: monospace;
-}
-.text-income { color: #10b981; }
-.text-expense { color: #ef4444; }
-.text-muted { color: var(--text-secondary); }
-.installment-progress { font-size: 0.7rem; color: var(--text-secondary); }
-
-.action-group {
+/* Mini Installment Progress */
+.installment-mini {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.mini-progress {
+  width: 60px;
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mini-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.mini-text {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Right Side Styling */
+.transaction-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 0.5rem;
 }
 
-.icon-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  padding: 0.3rem;
-  cursor: pointer;
+.transaction-amount {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
-.icon-btn.edit { color: #60a5fa; }
-.icon-btn.delete { color: #ef4444; }
+.text-income { color: #34d399; }
+.text-expense { color: #f87171; }
+.text-muted { color: var(--text-secondary); }
+
+.transaction-actions {
+  display: flex;
+  gap: 0.35rem;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+.transaction-card:hover .transaction-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.action-btn:hover {
+  background: rgba(255,255,255,0.06);
+}
+.action-btn.edit { color: #60a5fa; }
+.action-btn.edit:hover {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+.action-btn.delete { color: #f87171; }
+.action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary);
+}
+.empty-icon {
+  opacity: 0.3;
+  margin-bottom: 1rem;
+}
+
+/* Pagination */
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pagination-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.pagination-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 60px;
+  text-align: center;
+}
 
 /* === Modals (Fixed) === */
 .modal-overlay {
@@ -2213,7 +2833,128 @@ onMounted(async () => {
     align-items: flex-start;
   }
   
+  .transaction-card {
+    padding: 0.875rem;
+    gap: 0.75rem;
+  }
+  
+  .transaction-date {
+    min-width: 48px;
+    height: 48px;
+    border-radius: 10px;
+  }
+  .transaction-date .date-num {
+    font-size: 1.1rem;
+  }
+  
+  .transaction-right {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .transaction-amount {
+    font-size: 1rem;
+  }
+  
+  .transaction-actions {
+    opacity: 1;
+  }
+  
+  .panel-toolbar {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  
+  .toolbar-left {
+    width: 100%;
+  }
+  
+  .search-box {
+    max-width: none;
+  }
+  
+  .toolbar-right {
+    text-align: center;
+  }
+  
   /* 强制按钮样式 */
   .btn-text { display: block; }
+}
+
+@media (max-width: 480px) {
+  .transaction-card {
+    position: relative;
+    padding-bottom: 2.5rem;
+  }
+  
+  .transaction-actions {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.875rem;
+  }
+  
+  .transaction-note {
+    max-width: calc(100vw - 180px);
+  }
+}
+
+/* Installment Card Mobile Responsive */
+@media (max-width: 900px) {
+  .installment-card {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .installment-card-left {
+    width: 100%;
+    min-width: unset;
+  }
+  
+  .installment-card-middle {
+    width: 100%;
+    padding: 0;
+    order: 3;
+  }
+  
+  .installment-card-right {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  
+  .amount-section {
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .installment-panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .installment-panel-summary {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .installment-card {
+    padding: 0.875rem;
+  }
+  
+  .student-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+  
+  .installment-card-right {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 </style>
