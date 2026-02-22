@@ -7,6 +7,7 @@ CREATE TABLE "students" (
 	"subject" varchar(20) DEFAULT 'SHOOTING' NOT NULL,
 	"lesson_left" integer DEFAULT 0,
 	"rings" real[] DEFAULT '{}',
+	"score_details" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"note" text,
 	"membership_start_date" date,
 	"membership_end_date" date,

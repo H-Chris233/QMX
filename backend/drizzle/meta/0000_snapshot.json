@@ -1,5 +1,5 @@
 {
-  "id": "9e67ca50-fd2d-4c62-9a0e-e6c3233918f3",
+  "id": "2441bbb1-fdc6-4444-aaeb-c66f9833875f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -59,6 +59,13 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'{}'"
+        },
+        "score_details": {
+          "name": "score_details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "note": {
           "name": "note",

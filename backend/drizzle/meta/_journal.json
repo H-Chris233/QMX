@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1771426739775,
-      "tag": "0000_dry_wrecking_crew",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1771427457000,
-      "tag": "0002_subject_constraint_shooting_archery",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1771497600000,
-      "tag": "0003_score_details_breaking_change",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1771688171623,
-      "tag": "0003_supreme_sir_ram",
+      "when": 1771724276334,
+      "tag": "0000_baseline_current_schema",
       "breakpoints": true
     }
   ]
