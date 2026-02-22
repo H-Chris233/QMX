@@ -29,8 +29,9 @@ test.describe('统计仪表盘核心流程', () => {
     
     // 验证各个统计卡片存在
     expect(await dashboardPage.page.locator('[data-testid="revenue-card"]').isVisible()).toBeTruthy();
+    expect(await dashboardPage.page.locator('[data-testid="monthly-expense-card"]').isVisible()).toBeTruthy();
+    expect(await dashboardPage.page.locator('[data-testid="monthly-net-income-card"]').isVisible()).toBeTruthy();
     expect(await dashboardPage.page.locator('[data-testid="students-card"]').isVisible()).toBeTruthy();
-    expect(await dashboardPage.page.locator('[data-testid="grades-card"]').isVisible()).toBeTruthy();
     expect(await dashboardPage.page.locator('[data-testid="membership-card"]').isVisible()).toBeTruthy();
     
     // 验证刷新按钮
@@ -48,21 +49,21 @@ test.describe('统计仪表盘核心流程', () => {
     
     // 获取各项统计数据
     const totalRevenue = await dashboardPage.getTotalRevenue();
+    const monthlyExpense = await dashboardPage.getMonthlyExpense();
     const activeStudents = await dashboardPage.getActiveStudents();
-    const averageGrade = await dashboardPage.getAverageGrade();
     const expiringCount = await dashboardPage.getExpiringCount();
     
     console.log('仪表盘统计数据:', {
       totalRevenue,
+      monthlyExpense,
       activeStudents,
-      averageGrade,
       expiringCount
     });
     
     // 验证数据格式
     expect(await dashboardPage.verifyCurrencyFormat(totalRevenue)).toBeTruthy();
+    expect(await dashboardPage.verifyCurrencyFormat(monthlyExpense)).toBeTruthy();
     expect(await dashboardPage.verifyNumberFormat(activeStudents)).toBeTruthy();
-    expect(await dashboardPage.verifyGradeFormat(averageGrade)).toBeTruthy();
     expect(expiringCount).toMatch(/^\d+$/);
   });
 
@@ -154,35 +155,35 @@ test.describe('统计仪表盘核心流程', () => {
     
     // 获取刷新前的数据
     const initialRevenue = await dashboardPage.getTotalRevenue();
+    const initialExpense = await dashboardPage.getMonthlyExpense();
     const initialStudents = await dashboardPage.getActiveStudents();
-    const initialGrade = await dashboardPage.getAverageGrade();
     
     // 点击刷新按钮
     await dashboardPage.clickRefresh();
     
     // 获取刷新后的数据
     const refreshedRevenue = await dashboardPage.getTotalRevenue();
+    const refreshedExpense = await dashboardPage.getMonthlyExpense();
     const refreshedStudents = await dashboardPage.getActiveStudents();
-    const refreshedGrade = await dashboardPage.getAverageGrade();
     
     // 验证数据格式保持一致
     expect(await dashboardPage.verifyCurrencyFormat(refreshedRevenue)).toBeTruthy();
+    expect(await dashboardPage.verifyCurrencyFormat(refreshedExpense)).toBeTruthy();
     expect(await dashboardPage.verifyNumberFormat(refreshedStudents)).toBeTruthy();
-    expect(await dashboardPage.verifyGradeFormat(refreshedGrade)).toBeTruthy();
     
     // 验证刷新后数据仍然有效
     const revenueCents = await dashboardPage.parseCurrencyToCents(refreshedRevenue);
+    const expenseCents = await dashboardPage.parseCurrencyToCents(refreshedExpense);
     const studentsCount = dashboardPage.parseStringToNumber(refreshedStudents);
-    const gradeValue = parseFloat(refreshedGrade);
     
     expect(revenueCents).toBeGreaterThanOrEqual(0);
+    expect(expenseCents).toBeGreaterThanOrEqual(0);
     expect(studentsCount).toBeGreaterThanOrEqual(0);
-    expect(gradeValue).toBeGreaterThanOrEqual(0);
     
     console.log('刷新前后数据对比:', {
       revenue: { before: initialRevenue, after: refreshedRevenue },
+      expense: { before: initialExpense, after: refreshedExpense },
       students: { before: initialStudents, after: refreshedStudents },
-      grade: { before: initialGrade, after: refreshedGrade }
     });
   });
 
@@ -208,21 +209,18 @@ test.describe('统计仪表盘核心流程', () => {
     
     // 获取各项数据
     const revenue = await dashboardPage.getTotalRevenue();
-    const grade = await dashboardPage.getAverageGrade();
+    const expense = await dashboardPage.getMonthlyExpense();
     
     // 验证金额格式（¥符号，千分位分隔符，可选两位小数）
-    expect(revenue).toMatch(/^¥[\d,]+(\.\d{2})?$/);
-    
-    // 验证成绩格式（1-2位小数）
-    expect(grade).toMatch(/^\d+\.\d{1,2}$/);
+    expect(await dashboardPage.verifyCurrencyFormat(revenue)).toBeTruthy();
+    expect(await dashboardPage.verifyCurrencyFormat(expense)).toBeTruthy();
     
     // 验证数值范围合理性
     const revenueCents = await dashboardPage.parseCurrencyToCents(revenue);
-    const gradeValue = parseFloat(grade);
+    const expenseCents = await dashboardPage.parseCurrencyToCents(expense);
     
     expect(revenueCents).toBeGreaterThanOrEqual(0);
-    expect(gradeValue).toBeGreaterThanOrEqual(0);
-    expect(gradeValue).toBeLessThanOrEqual(100); // 成绩通常不超过100分
+    expect(expenseCents).toBeGreaterThanOrEqual(0);
   });
 
   test('响应式布局验证', async ({ page }) => {
@@ -286,8 +284,8 @@ test.describe('统计仪表盘核心流程', () => {
     // 获取初始数据
     const initialData = {
       revenue: await dashboardPage.getTotalRevenue(),
+      expense: await dashboardPage.getMonthlyExpense(),
       students: await dashboardPage.getActiveStudents(),
-      grade: await dashboardPage.getAverageGrade(),
       timestamp: Date.now()
     };
     
@@ -298,22 +296,22 @@ test.describe('统计仪表盘核心流程', () => {
     // 获取更新后数据
     const updatedData = {
       revenue: await dashboardPage.getTotalRevenue(),
+      expense: await dashboardPage.getMonthlyExpense(),
       students: await dashboardPage.getActiveStudents(),
-      grade: await dashboardPage.getAverageGrade(),
       timestamp: Date.now()
     };
     
     console.log('数据更新对比:', {
       timeDiff: updatedData.timestamp - initialData.timestamp,
       revenueChanged: initialData.revenue !== updatedData.revenue,
+      expenseChanged: initialData.expense !== updatedData.expense,
       studentsChanged: initialData.students !== updatedData.students,
-      gradeChanged: initialData.grade !== updatedData.grade
     });
     
     // 验证数据格式保持正确
     expect(await dashboardPage.verifyCurrencyFormat(updatedData.revenue)).toBeTruthy();
+    expect(await dashboardPage.verifyCurrencyFormat(updatedData.expense)).toBeTruthy();
     expect(await dashboardPage.verifyNumberFormat(updatedData.students)).toBeTruthy();
-    expect(await dashboardPage.verifyGradeFormat(updatedData.grade)).toBeTruthy();
     
     // 验证时间戳更新
     expect(updatedData.timestamp).toBeGreaterThan(initialData.timestamp);

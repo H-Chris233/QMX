@@ -26,7 +26,8 @@ test.describe('冒烟测试', () => {
   test('前端服务健康检查', async ({ page }) => {
     // 检查前端是否正常响应
     const response = await page.goto('/');
-    expect(response?.status()).toBe(200);
+    // Firefox/Chromium 在启用缓存时可能返回 304（Not Modified）
+    expect([200, 304]).toContain(response?.status());
     
     // 检查页面内容是否加载
     const bodyContent = await page.textContent('body');

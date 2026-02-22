@@ -23,7 +23,7 @@ test.describe('现金交易核心流程', () => {
 
   test('财务统计页面加载验证', async ({ page }) => {
     // 验证页面标题和主要元素
-    expect(await page.locator('h2:has-text("收支统计")').isVisible()).toBeTruthy();
+    expect(await page.locator('[data-testid="financial-statistics"]').isVisible()).toBeTruthy();
     
     // 验证统计卡片存在
     expect(await financePage.page.locator('[data-testid="overview-cards"]').isVisible()).toBeTruthy();

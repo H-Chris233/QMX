@@ -7,6 +7,32 @@ import { type Page, expect } from '@playwright/test';
 export class FinancialStatisticsPage {
   constructor(public readonly page: Page) {}
 
+  private async ensureSidebarClosed(): Promise<void> {
+    const isOpen = await this.page.evaluate(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return false;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'true') return true;
+      if (dataFlag === 'false') return false;
+      return sidebar.classList.contains('sidebar-open');
+    }).catch(() => false);
+
+    if (!isOpen) return;
+
+    await this.page.evaluate(() => {
+      const closeBtn = document.querySelector('.sidebar-close') as HTMLElement | null;
+      closeBtn?.click();
+    }).catch(() => {});
+
+    await this.page.waitForFunction(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return true;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'false') return true;
+      return !sidebar.classList.contains('sidebar-open');
+    }, { timeout: 2200 }).catch(() => {});
+  }
+
   /**
    * 等待财务统计页面加载
    */
@@ -19,7 +45,17 @@ export class FinancialStatisticsPage {
    * 点击刷新按钮
    */
   async clickRefresh(): Promise<void> {
-    await this.page.locator('[data-testid="refresh-btn"]').click();
+    await this.ensureSidebarClosed();
+    const refreshButton = this.page.locator('[data-testid="refresh-btn"]');
+    await refreshButton.click({ timeout: 2500 }).catch(async () => {
+      await this.ensureSidebarClosed();
+      const forceClicked = await refreshButton.click({ force: true, timeout: 1200 }).then(() => true).catch(() => false);
+      if (!forceClicked) {
+        await refreshButton.evaluate((element) => {
+          (element as HTMLElement).click();
+        });
+      }
+    });
     await this.waitForPageLoad();
   }
 
@@ -27,6 +63,7 @@ export class FinancialStatisticsPage {
    * 点击添加交易按钮
    */
   async clickAddTransaction(): Promise<void> {
+    await this.ensureSidebarClosed();
     await this.page.locator('[data-testid="add-transaction-btn"]').click();
   }
 

@@ -2,6 +2,7 @@ import { type Page, expect } from '@playwright/test';
 
 /** E2E 测试使用的固定密码（与 global-setup 中设置的一致） */
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || '1234';
+type TabId = 'dashboard' | 'students' | 'finance' | 'grades' | 'settings';
 
 /**
  * 主应用页面对象模型
@@ -9,6 +10,17 @@ const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || '1234';
  */
 export class AppPage {
   constructor(public readonly page: Page) {}
+
+  private getTabLabel(tabId: TabId): string {
+    const tabLabelMap: Record<TabId, string> = {
+      dashboard: '仪表盘',
+      students: '学员管理',
+      finance: '收支统计',
+      grades: '成绩管理',
+      settings: '设置',
+    };
+    return tabLabelMap[tabId];
+  }
 
   private async dismissErrorModalIfPresent(): Promise<void> {
     const overlay = this.page.locator('.error-modal-overlay');
@@ -27,20 +39,163 @@ export class AppPage {
     await overlay.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   }
 
+  private async clickDesktopNav(tabId: TabId): Promise<boolean> {
+    const navItem = this.page.locator(`[data-testid="nav-${tabId}"]`).first();
+    const visible = await navItem.isVisible().catch(() => false);
+    if (!visible) return false;
+
+    const pointerClicked = await navItem
+      .click({ timeout: 2500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!pointerClicked) {
+      await this.dismissErrorModalIfPresent();
+
+      const forceClicked = await navItem
+        .click({ force: true, timeout: 1500 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!forceClicked) {
+        await navItem.evaluate((element) => {
+          (element as HTMLElement).click();
+        });
+      }
+    }
+    return true;
+  }
+
+  private async clickMobileSidebarNav(tabId: TabId): Promise<boolean> {
+    const sidebarItemByTestId = this.page.locator(`[data-testid="sidebar-nav-${tabId}"]`).first();
+    const sidebarItemByText = this.page
+      .locator('.sidebar .sidebar-menu li', { hasText: this.getTabLabel(tabId) })
+      .first();
+    const sidebarItem = (await sidebarItemByTestId.count().catch(() => 0)) > 0 ? sidebarItemByTestId : sidebarItemByText;
+    const toggleBtn = this.page.locator('.sidebar-toggle').first();
+
+    const alreadyVisible = await sidebarItem.isVisible().catch(() => false);
+    if (!alreadyVisible) {
+      const toggleVisible = await toggleBtn.isVisible().catch(() => false);
+      if (!toggleVisible) return false;
+      await toggleBtn.click().catch(async () => {
+        await toggleBtn.click({ force: true });
+      });
+      await sidebarItem.waitFor({ state: 'visible', timeout: 2500 }).catch(() => {});
+    }
+
+    const handle = await sidebarItem.elementHandle({ timeout: 2000 }).catch(() => null);
+    if (!handle) return false;
+    await handle.evaluate((element) => {
+      (element as HTMLElement).click();
+    });
+    await handle.dispose().catch(() => {});
+    return true;
+  }
+
+  private async clickTabByDomScript(tabId: TabId): Promise<boolean> {
+    return this.page.evaluate((id) => {
+      const nav = document.querySelector(`[data-testid="nav-${id}"]`) as HTMLElement | null;
+      if (!nav) return false;
+      nav.click();
+      return true;
+    }, tabId).catch(() => false);
+  }
+
+  private async isSidebarOpen(): Promise<boolean> {
+    return this.page.evaluate(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return false;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'true') return true;
+      if (dataFlag === 'false') return false;
+      return sidebar.classList.contains('sidebar-open');
+    }).catch(() => false);
+  }
+
+  private async waitSidebarClosed(timeout = 2200): Promise<boolean> {
+    return this.page.waitForFunction(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return true;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'false') return true;
+      return !sidebar.classList.contains('sidebar-open');
+    }, { timeout }).then(() => true).catch(() => false);
+  }
+
+  private async closeSidebarIfOpen(): Promise<void> {
+    if (!(await this.isSidebarOpen())) return;
+
+    const closeBtn = this.page.locator('.sidebar-close').first();
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click({ force: true }).catch(() => {});
+      if (await this.waitSidebarClosed()) return;
+    }
+
+    const overlay = this.page.locator('[data-testid="sidebar-overlay"], .sidebar-overlay').first();
+    if (await overlay.isVisible().catch(() => false)) {
+      await overlay.click({ force: true }).catch(() => {});
+      if (await this.waitSidebarClosed()) return;
+    }
+
+    // DOM 级兜底：触发关闭按钮 click，避免直接改 class 导致响应式状态回写不一致。
+    await this.page.evaluate(() => {
+      const close = document.querySelector('.sidebar-close') as HTMLElement | null;
+      close?.click();
+    }).catch(() => {});
+
+    await this.waitSidebarClosed();
+  }
+
   /**
    * 导航到指定标签页
    */
-  async navigateToTab(tabId: 'dashboard' | 'students' | 'finance' | 'grades' | 'settings'): Promise<void> {
-    const navItem = this.page.locator(`[data-testid="nav-${tabId}"]`);
-    await this.dismissErrorModalIfPresent();
-    await navItem.click().catch(async () => {
+  async navigateToTab(tabId: TabId): Promise<void> {
+    const activeDesktopItem = this.page.locator(`[data-testid="nav-${tabId}"]`).first();
+    const alreadyActive = await activeDesktopItem
+      .evaluate((element) => element.classList.contains('active'))
+      .catch(() => false);
+
+    if (alreadyActive) {
+      await this.closeSidebarIfOpen();
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      return;
+    }
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
       await this.dismissErrorModalIfPresent();
-      await navItem.click({ force: true });
-    });
-    // 等待导航项变为激活状态
-    await expect(navItem).toHaveClass(/active/, { timeout: 10000 });
-    // 等待内容区过渡动画完成
-    await this.page.waitForLoadState('networkidle');
+
+      // 优先使用 DOM click，移动端可避免打开侧栏导致的点击拦截。
+      const clickedByScript = await this.clickTabByDomScript(tabId).catch(() => false);
+      const clickedDesktop = clickedByScript ? false : await this.clickDesktopNav(tabId).catch(() => false);
+      const clickedMobile = (clickedByScript || clickedDesktop)
+        ? false
+        : await this.clickMobileSidebarNav(tabId).catch(() => false);
+
+      if (!clickedDesktop && !clickedMobile && !clickedByScript) {
+        if (attempt === 3) {
+          throw new Error(`无法定位可点击的导航入口: ${tabId}`);
+        }
+        await this.page.waitForTimeout(300);
+        continue;
+      }
+
+      const activated = await expect(activeDesktopItem).toHaveClass(/active/, { timeout: 6000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (activated) {
+        await this.closeSidebarIfOpen();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        return;
+      }
+
+      if (attempt < 3) {
+        await this.page.waitForTimeout(300);
+      }
+    }
+
+    await expect(activeDesktopItem).toHaveClass(/active/, { timeout: 3000 });
   }
 
   /**

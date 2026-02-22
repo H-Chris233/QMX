@@ -87,7 +87,7 @@ tests/e2e/
 <!-- 仪表盘 -->
 <div data-testid="total-revenue">总收入</div>
 <div data-testid="active-students">活跃学员</div>
-<div data-testid="average-grade">平均成绩</div>
+<div data-testid="monthly-expense">月总支出</div>
 ```
 
 ## 🚀 快速开始

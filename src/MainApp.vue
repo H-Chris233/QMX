@@ -47,13 +47,19 @@
       </div>
 
       <!-- 移动端：侧边栏（抽屉式） -->
-      <aside ref="sidebarRef" class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
+      <aside
+        ref="sidebarRef"
+        class="sidebar"
+        :class="{ 'sidebar-open': isSidebarOpen }"
+        :data-sidebar-open="isSidebarOpen ? 'true' : 'false'"
+        data-testid="mobile-sidebar"
+      >
         <div class="sidebar-header">
           <div class="brand-logo">
             <component :is="Sparkles" class="brand-icon" />
             <h2>启明星</h2>
           </div>
-          <button class="icon-btn sidebar-close" type="button" aria-label="关闭侧边栏" @click="toggleSidebar">
+          <button class="icon-btn sidebar-close" type="button" aria-label="关闭侧边栏" @click="closeSidebar">
             <X :size="24" />
           </button>
         </div>
@@ -64,6 +70,7 @@
               v-for="item in menuItems"
               :key="item.id"
               :class="{ active: activeTab === item.id }"
+              :data-testid="`sidebar-nav-${item.id}`"
               @click="handleSidebarItemClick(item.id)"
             >
               <component :is="item.icon" class="sidebar-icon" :size="20" />
@@ -81,7 +88,9 @@
       <div
         class="sidebar-overlay"
         :class="{ 'sidebar-overlay-show': isSidebarOpen }"
-        @click="toggleSidebar"
+        :data-sidebar-open="isSidebarOpen ? 'true' : 'false'"
+        data-testid="sidebar-overlay"
+        @click="closeSidebar"
       ></div>
     </nav>
 
@@ -241,30 +250,36 @@ function handleComponentError(error: Error, info: string): void {
   });
 }
 
-// 侧边栏逻辑
-const toggleSidebar = (): void => {
-  const newState = !isSidebarOpen.value;
-  isSidebarOpen.value = newState;
-  
+// 侧边栏逻辑：拆分为幂等开/关，避免高频点击时反复 toggle 造成状态抖动
+const applySidebarState = (open: boolean): void => {
+  if (isSidebarOpen.value === open) return;
+  isSidebarOpen.value = open;
+
   // 核心交互优化：滚动锁定
-  if (newState) {
-    document.body.style.overflow = 'hidden';
-  } else {
-    document.body.style.overflow = '';
-  }
+  document.body.style.overflow = open ? 'hidden' : '';
 
   // A11y
   const sidebar = sidebarRef.value;
   if (sidebar) {
-    newState 
-      ? sidebar.setAttribute('aria-modal', 'true') 
-      : sidebar.removeAttribute('aria-modal');
+    if (open) {
+      sidebar.setAttribute('aria-modal', 'true');
+    } else {
+      sidebar.removeAttribute('aria-modal');
+    }
   }
+};
+
+const closeSidebar = (): void => {
+  applySidebarState(false);
+};
+
+const toggleSidebar = (): void => {
+  applySidebarState(!isSidebarOpen.value);
 };
 
 const handleSidebarItemClick = (id: string): void => {
   activeTab.value = id;
-  toggleSidebar();
+  closeSidebar();
 };
 
 // 响应式与事件清理
@@ -283,7 +298,7 @@ onMounted(async () => {
       const target = e.target as Node;
       if (sidebarRef.value && !sidebarRef.value.contains(target) && 
           toggleButtonRef.value && !toggleButtonRef.value.contains(target)) {
-        toggleSidebar();
+        closeSidebar();
       }
     }
   };
@@ -297,8 +312,7 @@ onMounted(async () => {
     resizeTimer = requestAnimationFrame(() => {
       if (window.innerWidth > 768 && isSidebarOpen.value) {
         // 大屏自动关闭侧边栏时，记得释放滚动锁定
-        isSidebarOpen.value = false;
-        document.body.style.overflow = '';
+        closeSidebar();
       }
     });
   };

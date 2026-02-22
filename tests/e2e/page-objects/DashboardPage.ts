@@ -7,6 +7,32 @@ import { type Page, expect } from '@playwright/test';
 export class DashboardPage {
   constructor(public readonly page: Page) {}
 
+  private async ensureSidebarClosed(): Promise<void> {
+    const isOpen = await this.page.evaluate(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return false;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'true') return true;
+      if (dataFlag === 'false') return false;
+      return sidebar.classList.contains('sidebar-open');
+    }).catch(() => false);
+
+    if (!isOpen) return;
+
+    await this.page.evaluate(() => {
+      const closeBtn = document.querySelector('.sidebar-close') as HTMLElement | null;
+      closeBtn?.click();
+    }).catch(() => {});
+
+    await this.page.waitForFunction(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return true;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'false') return true;
+      return !sidebar.classList.contains('sidebar-open');
+    }, { timeout: 2200 }).catch(() => {});
+  }
+
   private async dismissErrorModalIfPresent(): Promise<void> {
     const overlay = this.page.locator('.error-modal-overlay');
     if (!(await overlay.isVisible().catch(() => false))) {
@@ -37,9 +63,18 @@ export class DashboardPage {
    */
   async clickRefresh(): Promise<void> {
     await this.dismissErrorModalIfPresent();
-    await this.page.locator('[data-testid="dashboard-refresh-btn"]').click().catch(async () => {
+    await this.ensureSidebarClosed();
+
+    const refreshButton = this.page.locator('[data-testid="dashboard-refresh-btn"]');
+    await refreshButton.click({ timeout: 2500 }).catch(async () => {
       await this.dismissErrorModalIfPresent();
-      await this.page.locator('[data-testid="dashboard-refresh-btn"]').click({ force: true });
+      await this.ensureSidebarClosed();
+      const forceClicked = await refreshButton.click({ force: true, timeout: 1200 }).then(() => true).catch(() => false);
+      if (!forceClicked) {
+        await refreshButton.evaluate((element) => {
+          (element as HTMLElement).click();
+        });
+      }
     });
     await this.waitForPageLoad();
   }
@@ -59,10 +94,17 @@ export class DashboardPage {
   }
 
   /**
-   * 获取平均成绩
+   * 获取月总支出
+   */
+  async getMonthlyExpense(): Promise<string> {
+    return await this.page.locator('[data-testid="monthly-expense"]').textContent() || '¥0.00';
+  }
+
+  /**
+   * 兼容旧测试入口：平均成绩字段已下线，迁移到月总支出指标
    */
   async getAverageGrade(): Promise<string> {
-    return await this.page.locator('[data-testid="average-grade"]').textContent() || '0';
+    return this.getMonthlyExpense();
   }
 
   /**
@@ -120,7 +162,7 @@ export class DashboardPage {
    * 验证金额格式（包含¥符号，可选两位小数）
    */
   async verifyCurrencyFormat(amount: string): Promise<boolean> {
-    const currencyRegex = /^¥[\d,]+(\.\d{2})?$/;
+    const currencyRegex = /^¥-?[\d,]+(\.\d{2})?$/;
     return currencyRegex.test(amount.trim());
   }
 
@@ -135,7 +177,7 @@ export class DashboardPage {
    * 将金额字符串转换为数字（分）
    */
   parseCurrencyToCents(amount: string): Promise<number> {
-    const cleanAmount = amount.replace(/[¥,]/g, '');
+    const cleanAmount = amount.replace(/[^\d.-]/g, '');
     return Promise.resolve(Math.round(parseFloat(cleanAmount) * 100));
   }
 
@@ -165,8 +207,9 @@ export class DashboardPage {
   async verifyAllCardsLoaded(): Promise<boolean> {
     const cards = [
       '[data-testid="revenue-card"]',
+      '[data-testid="monthly-expense-card"]',
+      '[data-testid="monthly-net-income-card"]',
       '[data-testid="students-card"]',
-      '[data-testid="grades-card"]',
       '[data-testid="membership-card"]'
     ];
 

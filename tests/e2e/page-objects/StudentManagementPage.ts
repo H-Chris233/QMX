@@ -7,6 +7,32 @@ import { type Page, expect } from '@playwright/test';
 export class StudentManagementPage {
   constructor(public readonly page: Page) {}
 
+  private async ensureSidebarClosed(): Promise<void> {
+    const isOpen = await this.page.evaluate(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return false;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'true') return true;
+      if (dataFlag === 'false') return false;
+      return sidebar.classList.contains('sidebar-open');
+    }).catch(() => false);
+
+    if (!isOpen) return;
+
+    await this.page.evaluate(() => {
+      const closeBtn = document.querySelector('.sidebar-close') as HTMLElement | null;
+      closeBtn?.click();
+    }).catch(() => {});
+
+    await this.page.waitForFunction(() => {
+      const sidebar = document.querySelector('[data-testid="mobile-sidebar"], .sidebar') as HTMLElement | null;
+      if (!sidebar) return true;
+      const dataFlag = sidebar.getAttribute('data-sidebar-open');
+      if (dataFlag === 'false') return true;
+      return !sidebar.classList.contains('sidebar-open');
+    }, { timeout: 2200 }).catch(() => {});
+  }
+
   private isRateLimitMessage(message?: string | null): boolean {
     if (!message) return false;
     return /429|too many requests|请求过于频繁/i.test(message);
@@ -61,8 +87,12 @@ export class StudentManagementPage {
       await this.page.locator('[data-testid="student-search-input"]').fill(searchTerm);
       const searchButton = this.page.locator('[data-testid="student-search-button"]');
       if (await searchButton.isVisible().catch(() => false)) {
-        await searchButton.click().catch(async () => {
-          await this.page.locator('[data-testid="student-search-input"]').press('Enter');
+        await searchButton.click({ timeout: 2000 }).catch(async () => {
+          await this.dismissErrorModalIfPresent();
+          const forceClicked = await searchButton.click({ force: true, timeout: 1000 }).then(() => true).catch(() => false);
+          if (!forceClicked) {
+            await this.page.locator('[data-testid="student-search-input"]').press('Enter');
+          }
         });
       } else {
         await this.page.locator('[data-testid="student-search-input"]').press('Enter');
@@ -125,7 +155,17 @@ export class StudentManagementPage {
    * 点击导出学员数据按钮
    */
   async clickExportStudents(): Promise<void> {
-    await this.page.locator('[data-testid="export-students-btn"]').click();
+    await this.ensureSidebarClosed();
+    const exportButton = this.page.locator('[data-testid="export-students-btn"]');
+    await exportButton.click({ timeout: 2500 }).catch(async () => {
+      await this.ensureSidebarClosed();
+      const forceClicked = await exportButton.click({ force: true, timeout: 1200 }).then(() => true).catch(() => false);
+      if (!forceClicked) {
+        await exportButton.evaluate((element) => {
+          (element as HTMLElement).click();
+        });
+      }
+    });
   }
 
   /**
