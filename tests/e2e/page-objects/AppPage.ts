@@ -202,11 +202,20 @@ export class AppPage {
    * 获取当前激活的标签页
    */
   async getActiveTab(): Promise<string | null> {
-    const activeTab = this.page.locator('.nav-item.active').first();
-    if (await activeTab.isVisible()) {
-      return await activeTab.getAttribute('data-testid');
-    }
-    return null;
+    return this.page.evaluate(() => {
+      const desktopActive = document.querySelector('.nav-item.active') as HTMLElement | null;
+      const desktopTestId = desktopActive?.getAttribute('data-testid');
+      if (desktopTestId) return desktopTestId;
+
+      const sidebarActive = document.querySelector('.sidebar-menu li.active') as HTMLElement | null;
+      const sidebarTestId = sidebarActive?.getAttribute('data-testid');
+      if (!sidebarTestId) return null;
+
+      if (sidebarTestId.startsWith('sidebar-nav-')) {
+        return `nav-${sidebarTestId.replace('sidebar-nav-', '')}`;
+      }
+      return sidebarTestId;
+    }).catch(() => null);
   }
 
   /**
